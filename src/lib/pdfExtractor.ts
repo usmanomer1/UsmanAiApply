@@ -1,8 +1,9 @@
 import * as pdfjsLib from 'pdfjs-dist';
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
 
-// Configure PDF.js worker
+// Configure PDF.js worker using Vite's asset handling
 if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 }
 
 export const extractTextFromPDF = async (file: File): Promise<string> => {
@@ -41,4 +42,4 @@ export const extractTextFromPDF = async (file: File): Promise<string> => {
     console.error('Error extracting text from PDF:', error);
     throw new Error('Failed to extract text from PDF. Please copy and paste your resume text manually.');
   }
-}; 
+};
