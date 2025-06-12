@@ -631,7 +631,7 @@ export const DashboardHome: React.FC = () => {
               placeholder="Search applications..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="premium-input pl-12 w-64"
+              className="premium-input pl-14 w-64"
             />
           </div>
           
