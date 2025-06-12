@@ -111,13 +111,10 @@ const LinkedInAutomationBot: React.FC = () => {
         // Track usage in database for real analytics
         try {
           await supabase.from('usage_logs').insert({
-            user_id: user.id,
-            task_id: taskId,
+            subscription_id: userSubscription?.subscription_id || null,
+            campaign_id: null, // Will be set when we have campaign context
             browser_use_steps: steps,
-            job_tokens: jobTokens,
-            cost_usd: jobTokens * 0.01, // $0.01 per token
-            recorded_at: new Date().toISOString(),
-            activity_type: 'linkedin_automation'
+            cost_usd: jobTokens * 0.01 // $0.01 per token
           });
           
           addLog(`📊 Usage tracked: ${steps} steps, ${jobTokens} tokens`);
@@ -211,15 +208,16 @@ const LinkedInAutomationBot: React.FC = () => {
 
       setUserSubscription(subscription);
 
-      // Fetch current month usage
+      // Fetch current month usage - only query existing columns
       const currentMonth = new Date().toISOString().slice(0, 7);
       const { data: usageData } = await supabase
         .from('usage_logs')
-        .select('browser_use_steps, job_tokens')
+        .select('browser_use_steps')
         .gte('recorded_at', `${currentMonth}-01`)
         .lt('recorded_at', `${currentMonth}-32`);
 
-      const totalTokens = usageData?.reduce((sum, log) => sum + (log.job_tokens || 0), 0) || 0;
+      // Calculate job tokens from browser_use_steps (10 steps = 1 token)
+      const totalTokens = usageData?.reduce((sum, log) => sum + Math.ceil((log.browser_use_steps || 0) / 10), 0) || 0;
       setMonthlyUsage(prev => ({ ...prev, tokens_used: totalTokens }));
     } catch (error) {
       console.error('Error fetching subscription:', error);
@@ -1209,4 +1207,4 @@ CRITICAL: Always scroll down in forms to find submit buttons. Don't give up if y
   );
 };
 
-export default LinkedInAutomationBot; 
+export default LinkedInAutomationBot;
