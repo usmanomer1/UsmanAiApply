@@ -151,7 +151,9 @@ export const BillingPage: React.FC = () => {
       setSubscription(subData);
 
       // Fetch usage stats for current month
-      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+      const now = new Date();
+      const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
       
       if (subData) {
         const { data: usageData, error: usageError } = await supabase
@@ -166,8 +168,8 @@ export const BillingPage: React.FC = () => {
             )
           `)
           .eq('job_campaigns.profiles.user_id', user.id)
-          .gte('recorded_at', `${currentMonth}-01`)
-          .lt('recorded_at', `${currentMonth}-32`);
+          .gte('recorded_at', currentMonthStart.toISOString())
+          .lt('recorded_at', nextMonthStart.toISOString());
 
         if (usageError) {
           console.error('Error fetching usage:', usageError);
@@ -181,8 +183,8 @@ export const BillingPage: React.FC = () => {
           const { count: applicationsCount } = await supabase
             .from('applications')
             .select('*', { count: 'exact', head: true })
-            .gte('created_at', `${currentMonth}-01`)
-            .lt('created_at', `${currentMonth}-32`);
+            .gte('created_at', currentMonthStart.toISOString())
+            .lt('created_at', nextMonthStart.toISOString());
 
           // Simulate AI requests count (in real app, this would come from a separate table)
           const aiRequestsCount = Math.floor(totalSteps / 50); // Rough estimate
