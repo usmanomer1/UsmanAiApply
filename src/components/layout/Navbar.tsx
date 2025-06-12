@@ -36,6 +36,7 @@ export const Navbar: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
   const [notifications, setNotifications] = useState(3);
   const [userPlan, setUserPlan] = useState<string>('Free');
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
@@ -52,11 +53,13 @@ export const Navbar: React.FC = () => {
   ];
 
   const quickActions = [
-    { name: 'Start Auto Apply', href: '/auto-apply', icon: Zap },
-    { name: 'Generate CV', href: '/cv-generator', icon: Bot },
-    { name: 'Generate Cover Letter', href: '/cover-letter', icon: PenTool },
-    { name: 'Analyze Resume', href: '/resume', icon: FileText },
-    { name: 'View Analytics', href: '/dashboard', icon: BarChart3 },
+    { name: 'Start Auto Apply', href: '/auto-apply', icon: Zap, description: 'Begin automated job applications' },
+    { name: 'Generate CV', href: '/cv-generator', icon: Bot, description: 'Create AI-powered CV' },
+    { name: 'Generate Cover Letter', href: '/cover-letter', icon: PenTool, description: 'Write personalized cover letters' },
+    { name: 'Analyze Resume', href: '/resume', icon: FileText, description: 'Get AI resume feedback' },
+    { name: 'View Analytics', href: '/dashboard', icon: BarChart3, description: 'Check your job search progress' },
+    { name: 'Manage Profile', href: '/profile', icon: User, description: 'Update personal information' },
+    { name: 'Subscription Settings', href: '/billing', icon: CreditCard, description: 'Manage billing and plans' },
   ];
 
   useEffect(() => {
@@ -71,6 +74,8 @@ export const Navbar: React.FC = () => {
         setIsSearchOpen(false);
         setIsProfileOpen(false);
         setIsMobileMenuOpen(false);
+        setSearchQuery('');
+        setSearchResults([]);
       }
     };
 
@@ -82,6 +87,76 @@ export const Navbar: React.FC = () => {
     fetchUserSubscription();
     checkSupabaseConnection();
   }, [user]);
+
+  // Search functionality
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setSearchResults([]);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase();
+    const results = [];
+
+    // Search through navigation items
+    navigation.forEach(item => {
+      if (
+        item.name.toLowerCase().includes(query) ||
+        item.description.toLowerCase().includes(query)
+      ) {
+        results.push({
+          type: 'navigation',
+          ...item
+        });
+      }
+    });
+
+    // Search through quick actions
+    quickActions.forEach(action => {
+      if (
+        action.name.toLowerCase().includes(query) ||
+        action.description.toLowerCase().includes(query)
+      ) {
+        results.push({
+          type: 'action',
+          ...action
+        });
+      }
+    });
+
+    // Add some contextual search suggestions
+    if (query.includes('job') || query.includes('apply')) {
+      results.unshift({
+        type: 'suggestion',
+        name: 'Start Job Applications',
+        href: '/auto-apply',
+        icon: Zap,
+        description: 'Begin automated job applications with AI'
+      });
+    }
+
+    if (query.includes('resume') || query.includes('cv')) {
+      results.unshift({
+        type: 'suggestion',
+        name: 'Resume Tools',
+        href: '/resume',
+        icon: FileText,
+        description: 'Analyze and improve your resume'
+      });
+    }
+
+    if (query.includes('cover') || query.includes('letter')) {
+      results.unshift({
+        type: 'suggestion',
+        name: 'Cover Letter Generator',
+        href: '/cover-letter',
+        icon: PenTool,
+        description: 'Create personalized cover letters'
+      });
+    }
+
+    setSearchResults(results.slice(0, 8)); // Limit to 8 results
+  }, [searchQuery]);
 
   const isSupabaseConfigured = () => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -158,9 +233,18 @@ export const Navbar: React.FC = () => {
     }
   };
 
-  const handleSearch = (query: string) => {
-    // Implement search functionality
-    console.log('Searching for:', query);
+  const handleSearchSelect = (result: any) => {
+    navigate(result.href);
+    setIsSearchOpen(false);
+    setSearchQuery('');
+    setSearchResults([]);
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchResults.length > 0) {
+      handleSearchSelect(searchResults[0]);
+    }
   };
 
   return (
@@ -455,7 +539,7 @@ export const Navbar: React.FC = () => {
         </div>
       </nav>
 
-      {/* Search Modal */}
+      {/* Enhanced Search Modal */}
       <AnimatePresence>
         {isSearchOpen && (
           <motion.div
@@ -463,7 +547,11 @@ export const Navbar: React.FC = () => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-start justify-center pt-20"
-            onClick={() => setIsSearchOpen(false)}
+            onClick={() => {
+              setIsSearchOpen(false);
+              setSearchQuery('');
+              setSearchResults([]);
+            }}
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: -20 }}
@@ -474,7 +562,7 @@ export const Navbar: React.FC = () => {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="p-6">
-                <div className="flex items-center space-x-3 mb-6">
+                <form onSubmit={handleSearchSubmit} className="flex items-center space-x-3 mb-6">
                   <Search className="w-5 h-5 text-gray-400" />
                   <input
                     type="text"
@@ -487,27 +575,77 @@ export const Navbar: React.FC = () => {
                   <div className="flex items-center space-x-1 text-xs text-gray-400">
                     <span>ESC</span>
                   </div>
-                </div>
+                </form>
 
-                {searchQuery === '' && (
+                {searchQuery === '' ? (
                   <div>
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Quick Actions</h3>
                     <div className="space-y-2">
-                      {quickActions.map((action) => {
+                      {quickActions.slice(0, 5).map((action) => {
                         const Icon = action.icon;
                         return (
-                          <Link
+                          <button
                             key={action.name}
-                            to={action.href}
-                            onClick={() => setIsSearchOpen(false)}
-                            className="flex items-center space-x-3 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                            onClick={() => handleSearchSelect(action)}
+                            className="w-full flex items-center space-x-3 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
                           >
                             <Icon className="w-5 h-5 text-gray-400" />
-                            <span className="text-gray-900 dark:text-white">{action.name}</span>
-                          </Link>
+                            <div>
+                              <div className="text-gray-900 dark:text-white font-medium">{action.name}</div>
+                              <div className="text-sm text-gray-500 dark:text-gray-400">{action.description}</div>
+                            </div>
+                          </button>
                         );
                       })}
                     </div>
+                  </div>
+                ) : (
+                  <div>
+                    {searchResults.length > 0 ? (
+                      <>
+                        <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                          Search Results ({searchResults.length})
+                        </h3>
+                        <div className="space-y-2">
+                          {searchResults.map((result, index) => {
+                            const Icon = result.icon;
+                            return (
+                              <button
+                                key={`${result.type}-${result.name}-${index}`}
+                                onClick={() => handleSearchSelect(result)}
+                                className="w-full flex items-center space-x-3 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
+                              >
+                                <Icon className="w-5 h-5 text-gray-400" />
+                                <div className="flex-1">
+                                  <div className="text-gray-900 dark:text-white font-medium">{result.name}</div>
+                                  <div className="text-sm text-gray-500 dark:text-gray-400">{result.description}</div>
+                                </div>
+                                {result.type === 'suggestion' && (
+                                  <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded-full">
+                                    Suggested
+                                  </span>
+                                )}
+                                {result.badge && (
+                                  <span className="px-2 py-1 bg-gradient-to-r from-emerald-400 to-emerald-500 text-white text-xs font-bold rounded-full">
+                                    {result.badge}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-center py-8">
+                        <Search className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                          No results found
+                        </h3>
+                        <p className="text-gray-500 dark:text-gray-400">
+                          Try searching for "resume", "jobs", "cover letter", or "billing"
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
