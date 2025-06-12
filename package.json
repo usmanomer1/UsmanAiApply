@@ -13,7 +13,7 @@
     "@supabase/supabase-js": "^2.39.0",
     "framer-motion": "^10.16.16",
     "lucide-react": "^0.344.0",
-    "pdfjs-dist": "^5.3.31",
+    "pdfjs-dist": "^4.0.379",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hot-toast": "^2.4.1",
