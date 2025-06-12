@@ -12,7 +12,7 @@ const OPERATION_TOKEN_LIMITS = {
   company_research: 3000,
 } as const;
 
-// Monthly token limit for all users
+// Monthly token limit for all subscription tiers
 const MONTHLY_TOKEN_LIMIT = 150000; // 150k tokens
 
 export type OperationType = keyof typeof OPERATION_TOKEN_LIMITS;
@@ -84,7 +84,6 @@ class OpenAIServiceWithTokenTracking {
       throw new Error('Authentication required');
     }
     
-    // Explicit check for user.id to prevent null UUID errors
     if (!user.id) {
       throw new Error('User ID is missing from authentication data');
     }
@@ -93,8 +92,6 @@ class OpenAIServiceWithTokenTracking {
   }
 
   private async getUserSubscriptionStatus(): Promise<{ hasActiveSubscription: boolean; status?: string }> {
-    const user = await this.getCurrentUser();
-    
     try {
       const { data, error } = await supabase
         .from('stripe_user_subscriptions')
@@ -110,6 +107,7 @@ class OpenAIServiceWithTokenTracking {
         status: data.subscription_status
       };
     } catch (error) {
+      console.error('Error checking subscription status:', error);
       return { hasActiveSubscription: false };
     }
   }
@@ -117,26 +115,31 @@ class OpenAIServiceWithTokenTracking {
   private async checkTokenLimit(operationType: OperationType): Promise<void> {
     const user = await this.getCurrentUser();
     
-    // Check if user can make this request
-    const { data: canMakeRequest, error } = await supabase.rpc('can_user_make_ai_request', {
-      user_uuid: user.id,
-      estimated_tokens: OPERATION_TOKEN_LIMITS[operationType]
-    });
-    
-    if (error) {
-      console.error('Error checking token limit:', error);
-      throw new Error('Unable to verify token usage limits');
-    }
-    
-    if (!canMakeRequest) {
-      // Get more details about why the request was denied
-      const subscriptionInfo = await this.getUserSubscriptionStatus();
+    try {
+      const { data: canMakeRequest, error } = await supabase.rpc('can_user_make_ai_request', {
+        user_uuid: user.id,
+        estimated_tokens: OPERATION_TOKEN_LIMITS[operationType]
+      });
       
-      if (!subscriptionInfo.hasActiveSubscription) {
-        throw new Error(`Active subscription required. Subscribe to a plan to access AI-powered resume and cover letter features.`);
-      } else {
-        throw new Error(`Monthly token limit of ${MONTHLY_TOKEN_LIMIT.toLocaleString()} tokens exceeded. Usage resets monthly on your billing cycle.`);
+      if (error) {
+        console.error('Error checking token limit:', error);
+        throw new Error('Unable to verify token usage limits');
       }
+      
+      if (!canMakeRequest) {
+        const subscriptionInfo = await this.getUserSubscriptionStatus();
+        
+        if (!subscriptionInfo.hasActiveSubscription) {
+          throw new Error('Active subscription required. Subscribe to Pro, Pro Plus, or Extreme plan to access AI-powered features.');
+        } else {
+          throw new Error(`Monthly token limit of ${MONTHLY_TOKEN_LIMIT.toLocaleString()} tokens exceeded. Usage resets monthly on your billing cycle.`);
+        }
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Failed to check token limits');
     }
   }
 
@@ -154,7 +157,7 @@ class OpenAIServiceWithTokenTracking {
     const cost = (usage.total_tokens / 1000) * costPer1KTokens;
     
     try {
-      await supabase.from('ai_token_usage').insert({
+      const { error } = await supabase.from('ai_token_usage').insert({
         user_id: user.id,
         operation_type: operationType,
         prompt_tokens: usage.prompt_tokens,
@@ -166,6 +169,10 @@ class OpenAIServiceWithTokenTracking {
         response_data: responseData,
         cost_usd: cost
       });
+      
+      if (error) {
+        console.error('Error tracking token usage:', error);
+      }
     } catch (error) {
       console.error('Error tracking token usage:', error);
       // Don't throw here - we don't want to fail the request just because tracking failed
@@ -183,10 +190,6 @@ class OpenAIServiceWithTokenTracking {
 
     // Validate API key
     if (!OPENAI_API_KEY) {
-      console.error('Environment variables check:', {
-        VITE_OPENAI_API_KEY: import.meta.env.VITE_OPENAI_API_KEY ? 'Present' : 'Missing',
-        allEnvKeys: Object.keys(import.meta.env).filter(key => key.includes('OPENAI'))
-      });
       throw new Error('OpenAI API key not found in environment variables! Make sure VITE_OPENAI_API_KEY is set in your .env file.');
     }
 
@@ -238,22 +241,32 @@ class OpenAIServiceWithTokenTracking {
       const user = await this.getCurrentUser();
       
       const { data, error } = await supabase.rpc('get_user_monthly_ai_tokens', {
-        user_uuid: user.id
+        user_uuid: user.id,
+        target_date: new Date().toISOString().split('T')[0]
       });
       
       if (error) {
         console.error('Supabase RPC error:', error);
-        throw new Error(`Failed to fetch token usage stats: ${error.message}`);
+        // Return default stats instead of throwing
+        return {
+          totalTokens: 0,
+          operationCounts: {},
+          monthlyLimit: MONTHLY_TOKEN_LIMIT,
+          remainingTokens: MONTHLY_TOKEN_LIMIT,
+          usagePercentage: 0
+        };
       }
       
-      const result = data?.[0] || { total_tokens: 0, operation_counts: {} };
-      const totalTokens = Number(result.total_tokens) || 0;
+      // Handle the case where data is an array or single object
+      const result = Array.isArray(data) ? data[0] : data;
+      const totalTokens = Number(result?.total_tokens) || 0;
+      const operationCounts = result?.operation_counts || {};
       const remainingTokens = Math.max(0, MONTHLY_TOKEN_LIMIT - totalTokens);
-      const usagePercentage = (totalTokens / MONTHLY_TOKEN_LIMIT) * 100;
+      const usagePercentage = Math.min(100, (totalTokens / MONTHLY_TOKEN_LIMIT) * 100);
       
       return {
         totalTokens,
-        operationCounts: result.operation_counts || {},
+        operationCounts,
         monthlyLimit: MONTHLY_TOKEN_LIMIT,
         remainingTokens,
         usagePercentage
