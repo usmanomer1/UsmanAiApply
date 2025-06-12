@@ -15,7 +15,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
-  EyeOff
+  EyeOff,
+  Info
 } from 'lucide-react';
 import { browserUseAPI, BrowserUseTask } from '../../lib/browserUseAPI';
 
@@ -50,6 +51,7 @@ export const LiveBrowserPreview: React.FC<LiveBrowserPreviewProps> = ({
   const [showControls, setShowControls] = useState(true);
   const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>([]);
   const [retryCount, setRetryCount] = useState(0);
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
   // Refs for cleanup and control
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -61,6 +63,14 @@ export const LiveBrowserPreview: React.FC<LiveBrowserPreviewProps> = ({
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 5000; // 5 seconds
 
+  // Demo screenshots for when API is not available
+  const DEMO_SCREENSHOTS = [
+    'https://images.unsplash.com/photo-1611224923853-80b023f02d71?w=800&h=600&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=800&h=600&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1586717791821-3f44a563fa4c?w=800&h=600&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1573164713714-d95e436ab8d6?w=800&h=600&fit=crop&q=80'
+  ];
+
   /**
    * Fetch latest screenshots from Browser Use API
    */
@@ -70,7 +80,9 @@ export const LiveBrowserPreview: React.FC<LiveBrowserPreviewProps> = ({
       return screenshots || [];
     } catch (error) {
       console.error('Error fetching screenshots:', error);
-      throw error;
+      // Return demo screenshots as fallback
+      setIsDemoMode(true);
+      return DEMO_SCREENSHOTS;
     }
   }, []);
 
@@ -84,7 +96,7 @@ export const LiveBrowserPreview: React.FC<LiveBrowserPreviewProps> = ({
     } catch (error) {
       // GIF might not be available yet, don't throw error
       console.warn('GIF not available yet:', error);
-      return null;
+      return DEMO_SCREENSHOTS[0]; // Use first demo screenshot as GIF fallback
     }
   }, []);
 
@@ -106,35 +118,33 @@ export const LiveBrowserPreview: React.FC<LiveBrowserPreviewProps> = ({
 
       if (!mountedRef.current) return;
 
-      // Update screenshots if new ones are available
-      if (newScreenshots.length > screenshots.length) {
-        setScreenshots(newScreenshots);
-        
-        // Create media assets array
-        const assets: MediaAsset[] = newScreenshots.map((url, index) => ({
-          type: 'screenshot',
-          url,
+      // Always update with new data (including demo data)
+      setScreenshots(newScreenshots);
+      
+      // Create media assets array
+      const assets: MediaAsset[] = newScreenshots.map((url, index) => ({
+        type: 'screenshot',
+        url,
+        timestamp: new Date().toISOString(),
+        index
+      }));
+
+      // Add GIF if available
+      if (newGifUrl && newGifUrl !== gifUrl) {
+        setGifUrl(newGifUrl);
+        assets.push({
+          type: 'gif',
+          url: newGifUrl,
           timestamp: new Date().toISOString(),
-          index
-        }));
+          index: assets.length
+        });
+      }
 
-        // Add GIF if available
-        if (newGifUrl && newGifUrl !== gifUrl) {
-          setGifUrl(newGifUrl);
-          assets.push({
-            type: 'gif',
-            url: newGifUrl,
-            timestamp: new Date().toISOString(),
-            index: assets.length
-          });
-        }
-
-        setMediaAssets(assets);
-        
-        // Auto-advance to latest media if we were at the end
-        if (currentMediaIndex >= mediaAssets.length - 1) {
-          setCurrentMediaIndex(Math.max(0, assets.length - 1));
-        }
+      setMediaAssets(assets);
+      
+      // Auto-advance to latest media if we were at the end
+      if (currentMediaIndex >= mediaAssets.length - 1) {
+        setCurrentMediaIndex(Math.max(0, assets.length - 1));
       }
 
       setLastUpdate(new Date());
@@ -209,6 +219,7 @@ export const LiveBrowserPreview: React.FC<LiveBrowserPreviewProps> = ({
       setCurrentMediaIndex(0);
       setError(null);
       setRetryCount(0);
+      setIsDemoMode(false);
       lastTaskIdRef.current = taskId;
     }
 
@@ -362,6 +373,15 @@ export const LiveBrowserPreview: React.FC<LiveBrowserPreviewProps> = ({
 
     return (
       <div className="relative w-full h-full">
+        {/* Demo Mode Indicator */}
+        {isDemoMode && (
+          <div className="absolute top-3 right-3 z-20">
+            <div className="bg-amber-500 text-white px-3 py-1 rounded-full text-xs font-medium">
+              Demo Mode
+            </div>
+          </div>
+        )}
+
         {/* Media Display */}
         <div className="w-full h-full flex items-center justify-center bg-gray-900">
           {currentAsset.type === 'gif' ? (
@@ -451,6 +471,7 @@ export const LiveBrowserPreview: React.FC<LiveBrowserPreviewProps> = ({
                       )}
                       <span>
                         {currentAsset.type === 'gif' ? 'Live Animation' : `Screenshot ${currentAsset.index + 1}`}
+                        {isDemoMode && ' (Demo)'}
                       </span>
                     </div>
                     
@@ -506,7 +527,7 @@ export const LiveBrowserPreview: React.FC<LiveBrowserPreviewProps> = ({
           <span className="text-white text-xs font-medium">
             {loading ? 'Updating...' : 
              error ? 'Error' :
-             isActive && taskId ? 'Live' : 'Inactive'}
+             isActive && taskId ? (isDemoMode ? 'Demo' : 'Live') : 'Inactive'}
           </span>
         </div>
       </div>
@@ -545,7 +566,7 @@ export const LiveBrowserPreview: React.FC<LiveBrowserPreviewProps> = ({
                 <button
                   key={`${asset.type}-${index}`}
                   onClick={() => setCurrentMediaIndex(index)}
-                  className={`flex-shrink-0 w-12 h-8 rounded border-2 transition-all ${
+                  className={`flex-shrink-0 w-12 h-8 rounded border-2 transition-all relative ${
                     index === currentMediaIndex 
                       ? 'border-blue-400' 
                       : 'border-transparent hover:border-gray-400'
@@ -564,6 +585,16 @@ export const LiveBrowserPreview: React.FC<LiveBrowserPreviewProps> = ({
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Demo Mode Info */}
+      {isDemoMode && !isFullscreen && (
+        <div className="absolute bottom-3 right-3">
+          <div className="bg-amber-500/90 text-white px-2 py-1 rounded text-xs">
+            <Info className="w-3 h-3 inline mr-1" />
+            Demo Preview
           </div>
         </div>
       )}
