@@ -25,8 +25,7 @@ import {
   BarChart3,
   MessageSquare,
   RefreshCw,
-  Loader2,
-  Settings
+  Loader2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { openAIService, ResumeAnalysisRequest, ResumeScore, ResumeCritique, ResumeRewrite, TokenUsageStats } from '../lib/openaiWithTokenTracking';
@@ -62,7 +61,6 @@ export const ResumeTools: React.FC = () => {
     rewrite?: ResumeRewrite;
   }>({});
   const [tokenUsageStats, setTokenUsageStats] = useState<TokenUsageStats | null>(null);
-  const [isTestingConnection, setIsTestingConnection] = useState(false);
 
   useEffect(() => {
     fetchTokenUsageStats();
@@ -74,25 +72,6 @@ export const ResumeTools: React.FC = () => {
       setTokenUsageStats(stats);
     } catch (error) {
       console.error('Error fetching token usage stats:', error);
-    }
-  };
-
-  const testOpenAIConnection = async () => {
-    setIsTestingConnection(true);
-    try {
-      const result = await openAIService.testConnection();
-      if (result.success) {
-        toast.success(result.message);
-        console.log('OpenAI Test Success:', result.details);
-      } else {
-        toast.error(result.message);
-        console.error('OpenAI Test Failed:', result.details);
-      }
-    } catch (error) {
-      console.error('Test connection error:', error);
-      toast.error('Connection test failed');
-    } finally {
-      setIsTestingConnection(false);
     }
   };
 
@@ -185,7 +164,6 @@ export const ResumeTools: React.FC = () => {
     if (!validateForm()) return;
 
     setIsProcessing(true);
-    console.log('Starting resume processing with tool:', activeTool);
     
     try {
       const request: ResumeAnalysisRequest = {
@@ -197,27 +175,16 @@ export const ResumeTools: React.FC = () => {
         location: formData.location
       };
 
-      console.log('Request data:', { 
-        ...request, 
-        resumeText: `${request.resumeText.substring(0, 100)}...` 
-      });
-
       if (activeTool === 'score') {
-        console.log('Calling scoreResume...');
         const score = await openAIService.scoreResume(request);
-        console.log('Score result:', score);
         setResults(prev => ({ ...prev, score }));
         toast.success('Resume analysis complete!');
       } else if (activeTool === 'judge') {
-        console.log('Calling critiqueResume...');
         const critique = await openAIService.critiqueResume(request);
-        console.log('Critique result:', critique);
         setResults(prev => ({ ...prev, critique }));
         toast.success('Resume critique complete!');
       } else if (activeTool === 'rewrite') {
-        console.log('Calling rewriteResume...');
         const rewrite = await openAIService.rewriteResume(request);
-        console.log('Rewrite result:', rewrite);
         setResults(prev => ({ ...prev, rewrite }));
         toast.success('Resume rewrite complete!');
       }
@@ -307,27 +274,6 @@ export const ResumeTools: React.FC = () => {
             Leverage cutting-edge AI to score, critique, and rewrite your resume for maximum impact. 
             Get insights from industry experts and optimize for ATS systems.
           </p>
-
-          {/* Debug: Test OpenAI Connection */}
-          <div className="mt-6">
-            <button
-              onClick={testOpenAIConnection}
-              disabled={isTestingConnection}
-              className="inline-flex items-center px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-sm text-gray-600 dark:text-gray-300 transition-colors disabled:opacity-50"
-            >
-              {isTestingConnection ? (
-                <>
-                  <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2"></div>
-                  Testing...
-                </>
-              ) : (
-                <>
-                  <Settings className="w-4 h-4 mr-2" />
-                  Test OpenAI Connection
-                </>
-              )}
-            </button>
-          </div>
         </motion.div>
 
         {/* Token Usage Display */}
@@ -625,33 +571,6 @@ export const ResumeTools: React.FC = () => {
                     <ArrowRight className="w-5 h-5 ml-3" />
                   </div>
                 )}
-              </motion.button>
-
-              {/* Debug Test Button - Remove in production */}
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={async () => {
-                  try {
-                    console.log('Testing API connection...');
-                    console.log('API Key present:', !!import.meta.env.VITE_OPENAI_API_KEY);
-                    
-                    if (!import.meta.env.VITE_OPENAI_API_KEY) {
-                      toast.error('OpenAI API key not found in environment variables!');
-                      return;
-                    }
-                    
-                    const stats = await openAIService.getTokenUsageStats();
-                    console.log('Token stats:', stats);
-                    toast.success('API connection working!');
-                  } catch (error: any) {
-                    console.error('API test failed:', error);
-                    toast.error(`API Test Failed: ${error.message}`);
-                  }
-                }}
-                className="w-full mt-4 px-6 py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm"
-              >
-                🔧 Test API Connection
               </motion.button>
             </div>
           </motion.div>

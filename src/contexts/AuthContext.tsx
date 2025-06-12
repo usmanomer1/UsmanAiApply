@@ -80,14 +80,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         if (!isSupabaseConfigured()) {
-          console.log('Supabase not configured, using demo mode');
           if (mounted) {
             setLoading(false);
           }
           return;
         }
-
-        console.log('Initializing Supabase auth...');
 
         // Get initial session
         const { data: { session }, error } = await supabase.auth.getSession();
@@ -99,8 +96,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           return;
         }
-
-        console.log('Initial session:', session?.user?.email || 'No session');
         
         if (mounted) {
           setSession(session);
@@ -112,8 +107,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const {
           data: { subscription },
         } = supabase.auth.onAuthStateChange(async (event, session) => {
-          console.log('Auth state change:', event, session?.user?.email || 'No user');
-          
           if (mounted) {
             setSession(session);
             setUser(session?.user ?? null);
