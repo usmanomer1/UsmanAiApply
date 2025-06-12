@@ -179,6 +179,25 @@ class OpenAIServiceWithTokenTracking {
     }
   }
 
+  private cleanJsonResponse(content: string): string {
+    // Remove markdown code block delimiters
+    let cleaned = content.trim();
+    
+    // Remove ```json at the beginning
+    if (cleaned.startsWith('```json')) {
+      cleaned = cleaned.substring(7);
+    } else if (cleaned.startsWith('```')) {
+      cleaned = cleaned.substring(3);
+    }
+    
+    // Remove ``` at the end
+    if (cleaned.endsWith('```')) {
+      cleaned = cleaned.substring(0, cleaned.length - 3);
+    }
+    
+    return cleaned.trim();
+  }
+
   private async makeRequest(
     messages: any[], 
     maxTokens: number,
@@ -214,8 +233,11 @@ class OpenAIServiceWithTokenTracking {
       }
 
       const data = await response.json();
-      const content = data.choices[0].message.content;
+      const rawContent = data.choices[0].message.content;
       const usage = data.usage;
+
+      // Clean the content to remove markdown code blocks
+      const cleanedContent = this.cleanJsonResponse(rawContent);
 
       // Track token usage
       await this.trackTokenUsage(
@@ -223,11 +245,11 @@ class OpenAIServiceWithTokenTracking {
         usage,
         maxTokens,
         requestMetadata,
-        { content_length: content.length }
+        { content_length: cleanedContent.length }
       );
 
       return {
-        content,
+        content: cleanedContent,
         usage
       };
     } catch (error) {
