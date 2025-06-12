@@ -84,6 +84,11 @@ class OpenAIServiceWithTokenTracking {
       throw new Error('Authentication required');
     }
     
+    // Explicit check for user.id to prevent null UUID errors
+    if (!user.id) {
+      throw new Error('User ID is missing from authentication data');
+    }
+    
     return user;
   }
 
@@ -229,14 +234,17 @@ class OpenAIServiceWithTokenTracking {
   }
 
   async getTokenUsageStats(): Promise<TokenUsageStats> {
-    const user = await this.getCurrentUser();
-    
     try {
+      const user = await this.getCurrentUser();
+      
       const { data, error } = await supabase.rpc('get_user_monthly_ai_tokens', {
         user_uuid: user.id
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase RPC error:', error);
+        throw new Error(`Failed to fetch token usage stats: ${error.message}`);
+      }
       
       const result = data?.[0] || { total_tokens: 0, operation_counts: {} };
       const totalTokens = Number(result.total_tokens) || 0;
@@ -252,6 +260,8 @@ class OpenAIServiceWithTokenTracking {
       };
     } catch (error) {
       console.error('Error fetching token usage stats:', error);
+      
+      // Return default stats if there's an error
       return {
         totalTokens: 0,
         operationCounts: {},
@@ -525,4 +535,4 @@ Return only the cover letter text, properly formatted.`
   }
 }
 
-export const openAIService = new OpenAIServiceWithTokenTracking(); 
+export const openAIService = new OpenAIServiceWithTokenTracking();
