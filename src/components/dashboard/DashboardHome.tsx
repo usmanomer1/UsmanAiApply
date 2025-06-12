@@ -625,13 +625,13 @@ export const DashboardHome: React.FC = () => {
           className="flex flex-wrap items-center gap-3"
         >
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               type="text"
               placeholder="Search applications..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="premium-input pl-10 w-64"
+              className="premium-input pl-12 w-64"
             />
           </div>
           
