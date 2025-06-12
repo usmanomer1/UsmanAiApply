@@ -3,14 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-// Enhanced Supabase configuration detection for Bolt.new integration
+// Enhanced Supabase configuration detection for production
 const isSupabaseConfigured = () => {
-  // Debug logging to see what we're getting
-  console.log('Supabase URL:', supabaseUrl);
-  console.log('Supabase Key length:', supabaseAnonKey.length);
-  console.log('URL starts with https:', supabaseUrl.startsWith('https://'));
-  console.log('URL includes supabase.co:', supabaseUrl.includes('.supabase.co'));
-  
   return !!(
     supabaseUrl && 
     supabaseAnonKey && 
@@ -22,10 +16,7 @@ const isSupabaseConfigured = () => {
   );
 };
 
-// Log configuration status
-console.log('Supabase configured:', isSupabaseConfigured());
-
-// Create Supabase client - it should work with Bolt's connection
+// Create Supabase client
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export type Database = {
@@ -187,7 +178,6 @@ export type Database = {
 export const uploadResume = async (file: File, userId: string): Promise<string | null> => {
   try {
     if (!isSupabaseConfigured()) {
-      console.log('Demo mode: Resume upload simulated');
       return 'demo-resume.pdf';
     }
 
