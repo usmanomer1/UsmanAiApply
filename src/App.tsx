@@ -10,8 +10,9 @@ import { DashboardHome } from './components/dashboard/DashboardHome';
 import { BillingPage } from './components/billing/BillingPage';
 import { ProfilePage } from './components/ProfilePage';
 import { ResumeTools } from './components/ResumeTools';
+import { CVGeneration } from './components/CVGeneration';
 import { CoverLetterTool } from './components/CoverLetterTool';
-import { AutoApply } from './components/AutoApply';
+import LinkedInAutomationBot from './components/LinkedInAutomationBot';
 import { SuccessPage } from './components/SuccessPage';
 
 function App() {
@@ -31,10 +32,11 @@ function App() {
                     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                       <Routes>
                         <Route path="/dashboard" element={<DashboardHome />} />
-                        <Route path="/auto-apply" element={<AutoApply />} />
+                        <Route path="/auto-apply" element={<LinkedInAutomationBot />} />
                         <Route path="/billing" element={<BillingPage />} />
                         <Route path="/profile" element={<ProfilePage />} />
                         <Route path="/resume" element={<ResumeTools />} />
+                        <Route path="/cv-generator" element={<CVGeneration />} />
                         <Route path="/cover-letter" element={<CoverLetterTool />} />
                         <Route path="/" element={<Navigate to="/dashboard" replace />} />
                       </Routes>

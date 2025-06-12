@@ -46,12 +46,14 @@ export const Navbar: React.FC = () => {
     { name: 'Auto Apply', href: '/auto-apply', icon: Zap, description: 'AI Job Applications', badge: 'New' },
     { name: 'Cover Letters', href: '/cover-letter', icon: PenTool, description: 'AI-Generated Letters' },
     { name: 'Resume Tools', href: '/resume', icon: FileText, description: 'Resume Optimization' },
+    { name: 'CV Generator', href: '/cv-generator', icon: Bot, description: 'AI CV Generation', badge: 'AI' },
     { name: 'Profile', href: '/profile', icon: User, description: 'Personal Information' },
     { name: 'Billing', href: '/billing', icon: CreditCard, description: 'Plans & Usage' },
   ];
 
   const quickActions = [
     { name: 'Start Auto Apply', href: '/auto-apply', icon: Zap },
+    { name: 'Generate CV', href: '/cv-generator', icon: Bot },
     { name: 'Generate Cover Letter', href: '/cover-letter', icon: PenTool },
     { name: 'Analyze Resume', href: '/resume', icon: FileText },
     { name: 'View Analytics', href: '/dashboard', icon: BarChart3 },

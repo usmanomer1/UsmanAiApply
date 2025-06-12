@@ -331,12 +331,12 @@ export const BillingPage: React.FC = () => {
             <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-xl">
               <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-3 flex items-center">
                 <Bot className="w-5 h-5 mr-2" />
-                Job Applications Usage
+                Job Tokens Usage
               </h3>
               <div className="space-y-3 text-blue-800 dark:text-blue-200">
                 <p><strong>How it works:</strong> Our AI agent performs automated browser actions to apply to jobs on your behalf.</p>
-                <p><strong>What counts:</strong> Each completed job application counts as 1 usage, regardless of how many browser steps were needed.</p>
-                <p><strong>Billing:</strong> Included applications are free. Additional applications are billed at $0.75-$0.80 each depending on your plan.</p>
+                <p><strong>What counts:</strong> Every 10 automation steps (clicking, typing, navigating) equals exactly 1 job token.</p>
+                <p><strong>Plan limits:</strong> Pro (50 tokens), Pro Plus (75 tokens), Extreme (150 tokens). Usage is strictly capped to prevent overuse.</p>
                 <p><strong>Tracking:</strong> Usage resets monthly on your billing cycle date.</p>
               </div>
             </div>
@@ -344,13 +344,13 @@ export const BillingPage: React.FC = () => {
             <div className="bg-purple-50 dark:bg-purple-900/20 p-6 rounded-xl">
               <h3 className="text-lg font-semibold text-purple-900 dark:text-purple-100 mb-3 flex items-center">
                 <Brain className="w-5 h-5 mr-2" />
-                Resume & Cover Letter Usage
+                AI Resume & Cover Letter Usage
               </h3>
               <div className="space-y-3 text-purple-800 dark:text-purple-200">
                 <p><strong>How it works:</strong> AI generates personalized resumes and cover letters using advanced language models.</p>
-                <p><strong>What counts:</strong> Each AI generation request (resume optimization, cover letter creation, or content analysis) counts as 1 usage.</p>
-                <p><strong>Billing:</strong> 50 AI requests included monthly. Additional requests are billed at $0.18 each.</p>
-                <p><strong>Quality:</strong> Each request uses premium AI models to ensure high-quality, personalized content.</p>
+                <p><strong>What counts:</strong> Each AI operation (resume scoring, rewriting, cover letter generation) uses tokens from your 150k monthly allocation.</p>
+                <p><strong>Subscription required:</strong> Active subscription required to access AI features. All plans include 150,000 tokens monthly.</p>
+                <p><strong>Quality:</strong> Uses premium OpenAI models (GPT-4o-mini) for high-quality, personalized content.</p>
               </div>
             </div>
 
@@ -373,7 +373,7 @@ export const BillingPage: React.FC = () => {
                 Tips to Optimize Usage
               </h3>
               <div className="space-y-3 text-amber-800 dark:text-amber-200">
-                <p><strong>Job applications:</strong> Use specific filters to target the most relevant positions and maximize success rates.</p>
+                <p><strong>Job tokens:</strong> Each token represents exactly 10 automation steps. Use smart filtering to maximize efficiency and target the most relevant positions.</p>
                 <p><strong>AI requests:</strong> Batch similar requests together and reuse generated content when appropriate.</p>
                 <p><strong>Plan selection:</strong> Choose a plan that matches your job search intensity to get the best value.</p>
                 <p><strong>Monitor usage:</strong> Check your usage regularly to stay within limits and plan accordingly.</p>
@@ -517,7 +517,7 @@ export const BillingPage: React.FC = () => {
                 <Gift className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No Active Subscription</h3>
                 <p className="text-gray-600 dark:text-gray-300 mb-6">
-                  Subscribe to a plan to start using AI-powered job applications.
+                  Subscribe to a plan to start using AI-powered job automation tokens.
                 </p>
                 <button
                   onClick={() => handleUpgrade(STRIPE_PRODUCTS[0].priceId)}
@@ -563,8 +563,8 @@ export const BillingPage: React.FC = () => {
                   <Bot className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Job Applications</h3>
-                  <UsageTooltip content="Automated browser actions that complete job applications on your behalf. Each successful application counts as 1 usage.">
+                                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Job Tokens</h3>
+                <UsageTooltip content="Automation tokens used for job application processes. Each token represents exactly 10 automation steps (form filling, clicking, navigation).">
                     <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center cursor-help">
                       AI-powered automated applications
                       <HelpCircle className="w-3 h-3 ml-1" />
