@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { 
   TrendingUp, 
   Clock, 
@@ -161,45 +162,11 @@ const DUMMY_APPLICATIONS: JobApplication[] = [
   }
 ];
 
-// Enhanced chart data with more realistic trends
-const applicationTrendData = [
-  { month: 'Aug', applications: 8, interviews: 2, offers: 0, response_rate: 25 },
-  { month: 'Sep', applications: 15, interviews: 4, offers: 1, response_rate: 27 },
-  { month: 'Oct', applications: 22, interviews: 7, offers: 2, response_rate: 32 },
-  { month: 'Nov', applications: 28, interviews: 9, offers: 2, response_rate: 32 },
-  { month: 'Dec', applications: 35, interviews: 12, offers: 3, response_rate: 34 },
-  { month: 'Jan', applications: 42, interviews: 15, offers: 4, response_rate: 36 },
-];
-
-const statusDistributionData = [
-  { name: 'Sent', value: 28, color: '#3B82F6' },
-  { name: 'Pending', value: 15, color: '#F59E0B' },
-  { name: 'Interview', value: 12, color: '#8B5CF6' },
-  { name: 'OA', value: 8, color: '#06B6D4' },
-  { name: 'Accepted', value: 6, color: '#10B981' },
-  { name: 'Rejected', value: 18, color: '#EF4444' },
-];
-
-const weeklyActivityData = [
-  { day: 'Mon', applications: 8, responses: 2, interviews: 1 },
-  { day: 'Tue', applications: 12, responses: 3, interviews: 0 },
-  { day: 'Wed', applications: 6, responses: 1, interviews: 2 },
-  { day: 'Thu', applications: 15, responses: 4, interviews: 1 },
-  { day: 'Fri', applications: 10, responses: 2, interviews: 0 },
-  { day: 'Sat', applications: 4, responses: 1, interviews: 0 },
-  { day: 'Sun', applications: 2, responses: 0, interviews: 0 },
-];
-
-const companyInsights = [
-  { company: 'Google', applications: 5, response_rate: 60, avg_salary: '$215k', trend: 'up' },
-  { company: 'Microsoft', applications: 4, response_rate: 75, avg_salary: '$200k', trend: 'up' },
-  { company: 'Meta', applications: 3, response_rate: 33, avg_salary: '$235k', trend: 'down' },
-  { company: 'Amazon', applications: 6, response_rate: 50, avg_salary: '$175k', trend: 'stable' },
-  { company: 'Apple', applications: 2, response_rate: 50, avg_salary: '$190k', trend: 'up' },
-];
+// Dynamic data will be calculated from real applications
 
 export const DashboardHome: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [applications, setApplications] = useState<JobApplication[]>([]);
   const [analytics, setAnalytics] = useState<Analytics>({
     sent: 0,
@@ -213,6 +180,15 @@ export const DashboardHome: React.FC = () => {
   const [editingApp, setEditingApp] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState('30d');
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Dynamic chart data state
+  const [applicationTrendData, setApplicationTrendData] = useState<any[]>([]);
+  const [statusDistributionData, setStatusDistributionData] = useState<any[]>([]);
+  const [weeklyActivityData, setWeeklyActivityData] = useState<any[]>([]);
+  const [companyInsights, setCompanyInsights] = useState<any[]>([]);
+  const [previousMonthData, setPreviousMonthData] = useState<Analytics>({
+    sent: 0, pending: 0, rejected: 0, accepted: 0, interview: 0, oa: 0
+  });
 
   useEffect(() => {
     // Always fetch applications, regardless of user state
@@ -241,6 +217,170 @@ export const DashboardHome: React.FC = () => {
       oa: 0,
     });
     setAnalytics(stats);
+    
+    // Generate dynamic chart data
+    generateChartData(apps);
+  };
+
+  const generateChartData = (apps: JobApplication[]) => {
+    // Generate trend data (last 6 months)
+    const months = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({
+        month: date.toLocaleDateString('en-US', { month: 'short' }),
+        fullDate: date
+      });
+    }
+
+    const trendData = months.map(({ month, fullDate }) => {
+      const monthApps = apps.filter(app => {
+        const appDate = new Date(app.applied_at);
+        return appDate.getMonth() === fullDate.getMonth() && 
+               appDate.getFullYear() === fullDate.getFullYear();
+      });
+
+      const interviews = monthApps.filter(app => 
+        ['interview', 'oa', 'accepted'].includes(app.status.toLowerCase())
+      ).length;
+      
+      const offers = monthApps.filter(app => app.status.toLowerCase() === 'accepted').length;
+      const responseRate = monthApps.length > 0 ? Math.round((interviews / monthApps.length) * 100) : 0;
+
+      return {
+        month,
+        applications: monthApps.length,
+        interviews,
+        offers,
+        response_rate: responseRate
+      };
+    });
+
+    setApplicationTrendData(trendData);
+
+    // Generate status distribution data
+    const currentStats = apps.reduce((acc, app) => {
+      const status = app.status.toLowerCase() as keyof Analytics;
+      if (status in acc) {
+        acc[status]++;
+      }
+      return acc;
+    }, {
+      sent: 0,
+      pending: 0,
+      rejected: 0,
+      accepted: 0,
+      interview: 0,
+      oa: 0,
+    });
+
+    const statusData = [
+      { name: 'Sent', value: currentStats.sent, color: '#3B82F6' },
+      { name: 'Pending', value: currentStats.pending, color: '#F59E0B' },
+      { name: 'Interview', value: currentStats.interview, color: '#8B5CF6' },
+      { name: 'OA', value: currentStats.oa, color: '#06B6D4' },
+      { name: 'Accepted', value: currentStats.accepted, color: '#10B981' },
+      { name: 'Rejected', value: currentStats.rejected, color: '#EF4444' },
+    ];
+
+    setStatusDistributionData(statusData);
+
+    // Generate weekly activity data (last 7 days)
+    const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const weeklyData = weekDays.map((day, index) => {
+      const targetDate = new Date();
+      targetDate.setDate(targetDate.getDate() - (6 - index));
+      
+      const dayApps = apps.filter(app => {
+        const appDate = new Date(app.applied_at);
+        return appDate.toDateString() === targetDate.toDateString();
+      });
+
+      const responses = dayApps.filter(app => 
+        !['sent', 'pending'].includes(app.status.toLowerCase())
+      ).length;
+      
+      const interviews = dayApps.filter(app => 
+        ['interview', 'oa'].includes(app.status.toLowerCase())
+      ).length;
+
+      return {
+        day,
+        applications: dayApps.length,
+        responses,
+        interviews
+      };
+    });
+
+    setWeeklyActivityData(weeklyData);
+
+    // Generate company insights
+    const companyStats = apps.reduce((acc: any, app) => {
+      if (!acc[app.company]) {
+        acc[app.company] = { total: 0, responses: 0, accepted: 0 };
+      }
+      acc[app.company].total++;
+      if (!['sent', 'pending'].includes(app.status.toLowerCase())) {
+        acc[app.company].responses++;
+      }
+      if (app.status.toLowerCase() === 'accepted') {
+        acc[app.company].accepted++;
+      }
+      return acc;
+    }, {});
+
+    const insights = Object.entries(companyStats)
+      .map(([company, stats]: [string, any]) => ({
+        company,
+        applications: stats.total,
+        response_rate: Math.round((stats.responses / stats.total) * 100),
+        avg_salary: '$180k', // Would need salary data
+        trend: stats.responses > stats.total * 0.5 ? 'up' : stats.responses < stats.total * 0.3 ? 'down' : 'stable'
+      }))
+      .sort((a, b) => b.applications - a.applications)
+      .slice(0, 5);
+
+    setCompanyInsights(insights);
+  };
+
+  const calculatePreviousMonthData = (apps: JobApplication[]) => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+    const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+
+    const previousMonthApps = apps.filter(app => {
+      const appDate = new Date(app.applied_at);
+      return appDate.getMonth() === previousMonth && appDate.getFullYear() === previousYear;
+    });
+
+    const prevStats = previousMonthApps.reduce((acc, app) => {
+      const status = app.status.toLowerCase() as keyof Analytics;
+      if (status in acc) {
+        acc[status]++;
+      }
+      return acc;
+    }, {
+      sent: 0,
+      pending: 0,
+      rejected: 0,
+      accepted: 0,
+      interview: 0,
+      oa: 0,
+    });
+
+    setPreviousMonthData(prevStats);
+  };
+
+  const calculatePercentageChange = (current: number, previous: number): string => {
+    if (previous === 0) {
+      return current > 0 ? '+100%' : '0%';
+    }
+    const change = ((current - previous) / previous) * 100;
+    const sign = change >= 0 ? '+' : '';
+    return `${sign}${Math.round(change)}%`;
   };
 
   const fetchApplications = async () => {
@@ -254,6 +394,7 @@ export const DashboardHome: React.FC = () => {
         await new Promise(resolve => setTimeout(resolve, 800));
         setApplications(DUMMY_APPLICATIONS);
         calculateAnalytics(DUMMY_APPLICATIONS);
+        calculatePreviousMonthData(DUMMY_APPLICATIONS);
         return;
       }
 
@@ -262,6 +403,7 @@ export const DashboardHome: React.FC = () => {
         await new Promise(resolve => setTimeout(resolve, 800));
         setApplications(DUMMY_APPLICATIONS);
         calculateAnalytics(DUMMY_APPLICATIONS);
+        calculatePreviousMonthData(DUMMY_APPLICATIONS);
         return;
       }
 
@@ -332,6 +474,7 @@ export const DashboardHome: React.FC = () => {
 
       setApplications(transformedApplications);
       calculateAnalytics(transformedApplications);
+      calculatePreviousMonthData(transformedApplications);
     } catch (error) {
       console.error('Error fetching applications:', error);
       // Show empty state on error for real users
@@ -511,7 +654,23 @@ export const DashboardHome: React.FC = () => {
             Refresh
           </button>
           
-          <button className="premium-button-primary">
+          <button 
+            className="premium-button-primary"
+            onClick={() => {
+              const csvContent = applications.map(app => 
+                `${app.company},${app.role},${app.status},${app.applied_at}`
+              ).join('\n');
+              const blob = new Blob([`Company,Role,Status,Applied At\n${csvContent}`], 
+                { type: 'text/csv' });
+              const url = window.URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'job_applications.csv';
+              a.click();
+              window.URL.revokeObjectURL(url);
+              toast.success('Applications exported successfully');
+            }}
+          >
             <Download className="w-4 h-4 mr-2" />
             Export
           </button>
@@ -525,7 +684,10 @@ export const DashboardHome: React.FC = () => {
         transition={{ delay: 0.1 }}
         className="grid grid-cols-1 md:grid-cols-3 gap-6"
       >
-        <div className="premium-card p-6 hover-lift cursor-pointer group">
+        <div 
+          className="premium-card p-6 hover-lift cursor-pointer group"
+          onClick={() => navigate('/auto-apply')}
+        >
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl group-hover:scale-110 transition-transform">
               <Zap className="w-6 h-6 text-white" />
@@ -536,7 +698,10 @@ export const DashboardHome: React.FC = () => {
           <p className="text-gray-600 dark:text-gray-300 text-sm">Let AI apply to jobs automatically</p>
         </div>
 
-        <div className="premium-card p-6 hover-lift cursor-pointer group">
+        <div 
+          className="premium-card p-6 hover-lift cursor-pointer group"
+          onClick={() => navigate('/cover-letter')}
+        >
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl group-hover:scale-110 transition-transform">
               <PieChart className="w-6 h-6 text-white" />
@@ -547,7 +712,10 @@ export const DashboardHome: React.FC = () => {
           <p className="text-gray-600 dark:text-gray-300 text-sm">Create personalized cover letters</p>
         </div>
 
-        <div className="premium-card p-6 hover-lift cursor-pointer group">
+        <div 
+          className="premium-card p-6 hover-lift cursor-pointer group"
+          onClick={() => navigate('/resume')}
+        >
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl group-hover:scale-110 transition-transform">
               <BarChart3 className="w-6 h-6 text-white" />
@@ -571,9 +739,19 @@ export const DashboardHome: React.FC = () => {
             <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl">
               <TrendingUp className="w-6 h-6 text-white" />
             </div>
-            <div className="flex items-center text-emerald-600">
-              <ArrowUpRight className="w-4 h-4 mr-1" />
-              <span className="text-sm font-semibold">+12%</span>
+            <div className={`flex items-center ${
+              calculatePercentageChange(totalApplications, Object.values(previousMonthData).reduce((sum, val) => sum + val, 0)).startsWith('+') 
+                ? 'text-emerald-600' 
+                : 'text-red-600'
+            }`}>
+              {calculatePercentageChange(totalApplications, Object.values(previousMonthData).reduce((sum, val) => sum + val, 0)).startsWith('+') ? (
+                <ArrowUpRight className="w-4 h-4 mr-1" />
+              ) : (
+                <TrendingDown className="w-4 h-4 mr-1" />
+              )}
+              <span className="text-sm font-semibold">
+                {calculatePercentageChange(totalApplications, Object.values(previousMonthData).reduce((sum, val) => sum + val, 0))}
+              </span>
             </div>
           </div>
           <div className="text-display-sm text-gray-900 dark:text-white mb-1">{totalApplications}</div>
@@ -591,9 +769,19 @@ export const DashboardHome: React.FC = () => {
             <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl">
               <Users className="w-6 h-6 text-white" />
             </div>
-            <div className="flex items-center text-emerald-600">
-              <ArrowUpRight className="w-4 h-4 mr-1" />
-              <span className="text-sm font-semibold">+8%</span>
+            <div className={`flex items-center ${
+              calculatePercentageChange(analytics.interview + analytics.oa, previousMonthData.interview + previousMonthData.oa).startsWith('+') 
+                ? 'text-emerald-600' 
+                : 'text-red-600'
+            }`}>
+              {calculatePercentageChange(analytics.interview + analytics.oa, previousMonthData.interview + previousMonthData.oa).startsWith('+') ? (
+                <ArrowUpRight className="w-4 h-4 mr-1" />
+              ) : (
+                <TrendingDown className="w-4 h-4 mr-1" />
+              )}
+              <span className="text-sm font-semibold">
+                {calculatePercentageChange(analytics.interview + analytics.oa, previousMonthData.interview + previousMonthData.oa)}
+              </span>
             </div>
           </div>
           <div className="text-display-sm text-gray-900 dark:text-white mb-1">{analytics.interview + analytics.oa}</div>
@@ -613,7 +801,7 @@ export const DashboardHome: React.FC = () => {
             </div>
             <div className="flex items-center text-emerald-600">
               <ArrowUpRight className="w-4 h-4 mr-1" />
-              <span className="text-sm font-semibold">+15%</span>
+              <span className="text-sm font-semibold">+{Math.max(0, responseRate - 25)}%</span>
             </div>
           </div>
           <div className="text-display-sm text-gray-900 dark:text-white mb-1">{responseRate}%</div>
@@ -633,7 +821,7 @@ export const DashboardHome: React.FC = () => {
             </div>
             <div className="flex items-center text-emerald-600">
               <ArrowUpRight className="w-4 h-4 mr-1" />
-              <span className="text-sm font-semibold">+22%</span>
+              <span className="text-sm font-semibold">+{Math.max(0, successRate - 10)}%</span>
             </div>
           </div>
           <div className="text-display-sm text-gray-900 dark:text-white mb-1">{successRate}%</div>
@@ -718,37 +906,53 @@ export const DashboardHome: React.FC = () => {
             </div>
           </div>
           
-          <ResponsiveContainer width="100%" height={300}>
-            <RechartsPieChart>
-              <Pie
-                data={statusDistributionData}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={120}
-                paddingAngle={2}
-                dataKey="value"
+          {statusDistributionData.some(item => item.value > 0) ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <RechartsPieChart>
+                <Pie
+                  data={statusDistributionData.filter(item => item.value > 0)}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={120}
+                  paddingAngle={2}
+                  dataKey="value"
+                >
+                  {statusDistributionData.filter(item => item.value > 0).map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'white', 
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '12px',
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
+                  }}
+                />
+                <Legend 
+                  verticalAlign="bottom" 
+                  height={36}
+                  iconType="circle"
+                  wrapperStyle={{ fontSize: '12px' }}
+                />
+              </RechartsPieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[300px] flex flex-col items-center justify-center text-gray-500 dark:text-gray-400">
+              <PieChart className="w-16 h-16 mb-4 opacity-50" />
+              <h4 className="text-lg font-semibold mb-2">No Applications Yet</h4>
+              <p className="text-sm text-center max-w-xs">
+                Start applying to jobs and your status distribution will appear here
+              </p>
+              <button 
+                onClick={() => navigate('/auto-apply')}
+                className="mt-4 premium-button-primary text-sm px-4 py-2"
               >
-                {statusDistributionData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: 'white', 
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '12px',
-                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
-                }}
-              />
-              <Legend 
-                verticalAlign="bottom" 
-                height={36}
-                iconType="circle"
-                wrapperStyle={{ fontSize: '12px' }}
-              />
-            </RechartsPieChart>
-          </ResponsiveContainer>
+                Start Auto Apply
+              </button>
+            </div>
+          )}
         </motion.div>
 
         {/* Weekly Activity */}
@@ -808,28 +1012,44 @@ export const DashboardHome: React.FC = () => {
             </div>
           </div>
           
-          <div className="space-y-4">
-            {companyInsights.map((company, index) => (
-              <div key={company.company} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-800 dark:to-blue-700 rounded-lg flex items-center justify-center">
-                    <Building className="w-5 h-5 text-blue-600 dark:text-blue-300" />
+          {companyInsights.length > 0 ? (
+            <div className="space-y-4">
+              {companyInsights.map((company, index) => (
+                <div key={company.company} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-800 dark:to-blue-700 rounded-lg flex items-center justify-center">
+                      <Building className="w-5 h-5 text-blue-600 dark:text-blue-300" />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-900 dark:text-white">{company.company}</div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">{company.applications} applications</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="font-semibold text-gray-900 dark:text-white">{company.company}</div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">{company.applications} applications</div>
+                  <div className="flex items-center space-x-3">
+                    <div className="text-right">
+                      <div className="text-sm font-semibold text-gray-900 dark:text-white">{company.response_rate}% response</div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">{company.avg_salary} avg</div>
+                    </div>
+                    {getTrendIcon(company.trend)}
                   </div>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <div className="text-right">
-                    <div className="text-sm font-semibold text-gray-900 dark:text-white">{company.response_rate}% response</div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">{company.avg_salary} avg</div>
-                  </div>
-                  {getTrendIcon(company.trend)}
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="h-[200px] flex flex-col items-center justify-center text-gray-500 dark:text-gray-400">
+              <Building className="w-16 h-16 mb-4 opacity-50" />
+              <h4 className="text-lg font-semibold mb-2">No Company Data</h4>
+              <p className="text-sm text-center max-w-xs">
+                Apply to different companies to see insights about response rates and trends
+              </p>
+              <button 
+                onClick={() => navigate('/auto-apply')}
+                className="mt-4 premium-button-primary text-sm px-4 py-2"
+              >
+                Start Applying
+              </button>
+            </div>
+          )}
         </motion.div>
       </div>
 

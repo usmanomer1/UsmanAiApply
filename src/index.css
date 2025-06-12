@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -70,7 +72,6 @@
 }
 
 /* Typography System */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 * {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -365,19 +366,29 @@
 
 /* Dark Mode Enhancements */
 .dark .premium-card {
-  @apply bg-gray-800 border-gray-700;
+  @apply bg-gray-800 border-gray-700 shadow-2xl;
 }
 
 .dark .premium-input {
   @apply bg-gray-800 border-gray-600 text-white placeholder-gray-400 focus:bg-gray-700;
 }
 
+.dark .premium-select {
+  @apply bg-gray-800 border-gray-600 text-white;
+}
+
 .dark .premium-button-secondary {
-  @apply bg-gray-800 border-gray-600 text-gray-200 hover:bg-gray-700;
+  @apply bg-gray-800 border-gray-600 text-gray-200 hover:bg-gray-700 hover:border-gray-500;
 }
 
 .dark .premium-button-ghost {
   @apply text-gray-300 hover:bg-gray-800 hover:text-white;
+}
+
+.dark .glass {
+  background: rgba(31, 41, 55, 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(107, 114, 128, 0.2);
 }
 
 /* Accessibility */
