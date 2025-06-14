@@ -413,11 +413,11 @@ const LinkedInAutomationBot: React.FC = () => {
             </div>
           </CardContent>
         </Card>
-      </motion.div>
+      </div>
 
       {/* Main Control Panel */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-        {/* Mission Control */}
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
+        {/* Mission Control - Now smaller (2/5 width) */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -528,11 +528,12 @@ const LinkedInAutomationBot: React.FC = () => {
           </Card>
         </motion.div>
 
-        {/* Activity Monitor */}
+        {/* Activity Monitor - Now larger (3/5 width) */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
+          className="xl:col-span-3"
         >
           <Card className="premium-card hover-lift h-full">
             <CardHeader className="pb-6">
@@ -568,13 +569,13 @@ const LinkedInAutomationBot: React.FC = () => {
                   </div>
                   
                   <div className="space-y-3">
-                    <div className="flex items-center justify-center py-8">
+                    <div className="flex items-center justify-center py-12">
                       <div className="text-center">
-                        <div className="w-16 h-16 bg-gray-800 rounded-xl flex items-center justify-center mb-4 mx-auto">
-                          <Monitor className="w-8 h-8 text-gray-400" />
+                        <div className="w-20 h-20 bg-gray-800 rounded-xl flex items-center justify-center mb-6 mx-auto">
+                          <Monitor className="w-10 h-10 text-gray-400" />
                         </div>
-                        <h3 className="text-lg font-semibold text-white mb-2">Monitoring Ready</h3>
-                        <p className="text-gray-400 text-sm max-w-xs">
+                        <h3 className="text-xl font-semibold text-white mb-3">Monitoring Ready</h3>
+                        <p className="text-gray-400 text-sm max-w-md mx-auto leading-relaxed">
                           Configure your automation settings and click <span className="text-blue-400 font-medium">"Start Auto Apply"</span> to begin real-time activity monitoring
                         </p>
                       </div>
