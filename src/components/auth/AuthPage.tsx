@@ -3,6 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Bot, Mail, Lock, User, Eye, EyeOff, Sparkles, Shield, Zap, CheckCircle, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 
 export const AuthPage: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -170,9 +173,9 @@ export const AuthPage: React.FC = () => {
           transition={{ duration: 0.6 }}
           className="w-full max-w-md"
         >
-          <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/50 p-8">
+          <Card className="bg-white/90 backdrop-blur-xl border-white/50 shadow-3xl">
             {/* Mobile Logo */}
-            <div className="lg:hidden text-center mb-8">
+            <div className="lg:hidden text-center mb-8 pt-8">
               <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl mb-4">
                 <Bot className="w-8 h-8 text-white" />
               </div>
@@ -180,18 +183,19 @@ export const AuthPage: React.FC = () => {
               <p className="text-gray-600 mt-1">Premium Job Search Platform</p>
             </div>
 
-            {/* Form Header */}
-            <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">
+            <CardHeader className="text-center pb-4">
+              <CardTitle className="text-3xl font-bold text-gray-900 mb-2">
                 {isLogin ? 'Welcome Back' : 'Get Started'}
-              </h2>
-              <p className="text-gray-600">
+              </CardTitle>
+              <CardDescription className="text-gray-600 text-base">
                 {isLogin 
                   ? 'Sign in to continue your job search journey' 
                   : 'Create your account and start applying with AI'
                 }
-              </p>
-            </div>
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent>
 
             {/* Demo Credentials - Only show if Supabase is not configured */}
             {!isSupabaseConfigured() && (
@@ -227,12 +231,12 @@ export const AuthPage: React.FC = () => {
                     </label>
                     <div className="relative">
                       <User className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
-                      <input
+                      <Input
                         type="text"
                         required
                         value={formData.fullName}
                         onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                        className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white placeholder-gray-400"
+                        className="pl-12"
                         placeholder="Enter your full name"
                       />
                     </div>
@@ -246,12 +250,12 @@ export const AuthPage: React.FC = () => {
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
-                  <input
+                  <Input
                     type="email"
                     required
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white placeholder-gray-400"
+                    className="pl-12"
                     placeholder="Enter your email"
                   />
                 </div>
@@ -263,12 +267,12 @@ export const AuthPage: React.FC = () => {
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
-                  <input
+                  <Input
                     type={showPassword ? 'text' : 'password'}
                     required
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white placeholder-gray-400"
+                    className="pl-12 pr-12"
                     placeholder="Enter your password"
                   />
                   <button
@@ -281,25 +285,29 @@ export const AuthPage: React.FC = () => {
                 </div>
               </div>
 
-              <motion.button
-                type="submit"
-                disabled={loading}
+              <motion.div
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className="premium-button-primary w-full py-4 text-lg font-bold shadow-xl"
               >
-                {loading ? (
-                  <div className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
-                    Processing...
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center">
-                    {isLogin ? 'Sign In' : 'Create Account'}
-                    <ArrowRight className="w-5 h-5 ml-2" />
-                  </div>
-                )}
-              </motion.button>
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  size="lg"
+                  className="w-full text-lg font-bold shadow-xl"
+                >
+                  {loading ? (
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+                      Processing...
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center">
+                      {isLogin ? 'Sign In' : 'Create Account'}
+                      <ArrowRight className="w-5 h-5 ml-2" />
+                    </div>
+                  )}
+                </Button>
+              </motion.div>
             </form>
 
             {/* Toggle */}
@@ -332,7 +340,8 @@ export const AuthPage: React.FC = () => {
                 </div>
               </div>
             </div>
-          </div>
+            </CardContent>
+          </Card>
         </motion.div>
       </div>
     </div>

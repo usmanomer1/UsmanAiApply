@@ -48,8 +48,10 @@ interface UserSubscription {
 interface UsageStats {
   total_steps: number;
   total_cost: number;
+  job_tokens: number;
   applications_count: number;
   ai_requests_count: number;
+  ai_tokens_used: number;
 }
 
 // Demo data for when Supabase is not configured
@@ -68,8 +70,10 @@ const DEMO_SUBSCRIPTION: UserSubscription = {
 const DEMO_USAGE: UsageStats = {
   total_steps: 1250,
   total_cost: 12.50,
+  job_tokens: 125, // 1250 steps / 10 = 125 tokens
   applications_count: 23,
-  ai_requests_count: 15
+  ai_requests_count: 15,
+  ai_tokens_used: 45000 // 15 requests * 3000 tokens = 45k tokens
 };
 
 // Tooltip component for usage explanations
@@ -144,7 +148,7 @@ export const BillingPage: React.FC = () => {
       if (subError) {
         console.error('Error fetching subscription:', subError);
         setSubscription(null);
-        setUsage({ total_steps: 0, total_cost: 0, applications_count: 0, ai_requests_count: 0 });
+        setUsage({ total_steps: 0, total_cost: 0, job_tokens: 0, applications_count: 0, ai_requests_count: 0, ai_tokens_used: 0 });
         return;
       }
 
@@ -157,27 +161,20 @@ export const BillingPage: React.FC = () => {
       
       if (subData) {
         const { data: usageData, error: usageError } = await supabase
-          .from('usage_logs')
-          .select(`
-            browser_use_steps,
-            cost_usd,
-            job_campaigns!inner(
-              profiles!inner(
-                user_id
-              )
-            )
-          `)
-          .eq('job_campaigns.profiles.user_id', user.id)
-          .gte('recorded_at', currentMonthStart.toISOString())
-          .lt('recorded_at', nextMonthStart.toISOString());
+          .from('browser_use_logs')
+          .select('step_count, cost_usd')
+          .eq('user_id', user.id)
+          .gte('created_at', currentMonthStart.toISOString())
+          .lt('created_at', nextMonthStart.toISOString());
 
         if (usageError) {
           console.error('Error fetching usage:', usageError);
-          setUsage({ total_steps: 0, total_cost: 0, applications_count: 0, ai_requests_count: 0 });
+          setUsage({ total_steps: 0, total_cost: 0, job_tokens: 0, applications_count: 0, ai_requests_count: 0, ai_tokens_used: 0 });
         } else {
           // Calculate totals
-          const totalSteps = usageData?.reduce((sum, log) => sum + log.browser_use_steps, 0) || 0;
+          const totalSteps = usageData?.reduce((sum, log) => sum + log.step_count, 0) || 0;
           const totalCost = usageData?.reduce((sum, log) => sum + parseFloat(log.cost_usd.toString()), 0) || 0;
+          const jobTokens = Math.ceil(totalSteps / 10); // 10 steps = 1 token
 
           // Get applications count for current month
           const { count: applicationsCount } = await supabase
@@ -186,23 +183,43 @@ export const BillingPage: React.FC = () => {
             .gte('created_at', currentMonthStart.toISOString())
             .lt('created_at', nextMonthStart.toISOString());
 
-          // Simulate AI requests count (in real app, this would come from a separate table)
-          const aiRequestsCount = Math.floor(totalSteps / 50); // Rough estimate
+          // Get AI token usage for current month
+          const { data: aiUsageData, error: aiUsageError } = await supabase
+            .from('ai_token_usage')
+            .select('max_tokens_requested, operation_type')
+            .eq('user_id', user.id)
+            .gte('created_at', currentMonthStart.toISOString())
+            .lt('created_at', nextMonthStart.toISOString());
+
+          // Calculate AI requests based on token usage
+          // Each request is counted as: 3000 tokens = 1 request, 6000 tokens = 2 requests
+          let aiRequestsCount = 0;
+          let aiTokensUsed = 0;
+          if (aiUsageData && !aiUsageError) {
+            aiTokensUsed = aiUsageData.reduce((sum, log) => sum + (log.max_tokens_requested || 0), 0);
+            aiRequestsCount = aiUsageData.reduce((sum, log) => {
+              const tokens = log.max_tokens_requested || 0;
+              // Convert tokens to request count (3000 tokens = 1 request)
+              return sum + Math.ceil(tokens / 3000);
+            }, 0);
+          }
 
           setUsage({
             total_steps: totalSteps,
             total_cost: totalCost,
+            job_tokens: jobTokens,
             applications_count: applicationsCount || 0,
-            ai_requests_count: aiRequestsCount
+            ai_requests_count: aiRequestsCount,
+            ai_tokens_used: aiTokensUsed
           });
         }
       } else {
-        setUsage({ total_steps: 0, total_cost: 0, applications_count: 0, ai_requests_count: 0 });
+        setUsage({ total_steps: 0, total_cost: 0, job_tokens: 0, applications_count: 0, ai_requests_count: 0, ai_tokens_used: 0 });
       }
-    } catch (error) {
+          } catch (error) {
       console.error('Error fetching billing data:', error);
       setSubscription(null);
-      setUsage({ total_steps: 0, total_cost: 0, applications_count: 0, ai_requests_count: 0 });
+      setUsage({ total_steps: 0, total_cost: 0, job_tokens: 0, applications_count: 0, ai_requests_count: 0, ai_tokens_used: 0 });
     } finally {
       setLoading(false);
     }
@@ -287,11 +304,13 @@ export const BillingPage: React.FC = () => {
   const getAIRequestsLimit = () => {
     const currentProduct = getCurrentProduct();
     if (!currentProduct) return 0;
-    return 50; // All plans include 50 AI requests
+    // 150k tokens / 3000 tokens per request = 50 requests
+    return 50; // All plans include 150k tokens = 50 AI requests (3000 tokens each)
   };
 
   const getJobApplicationsUsed = () => {
-    return usage?.applications_count || 0;
+    // Return pre-calculated job tokens from usage data
+    return usage?.job_tokens || 0;
   };
 
   const getAIRequestsUsed = () => {
@@ -350,8 +369,8 @@ export const BillingPage: React.FC = () => {
               </h3>
               <div className="space-y-3 text-purple-800 dark:text-purple-200">
                 <p><strong>How it works:</strong> AI generates personalized resumes and cover letters using advanced language models.</p>
-                <p><strong>What counts:</strong> Each AI operation (resume scoring, rewriting, cover letter generation) uses tokens from your 150k monthly allocation.</p>
-                <p><strong>Subscription required:</strong> Active subscription required to access AI features. All plans include 150,000 tokens monthly.</p>
+                <p><strong>What counts:</strong> Resume scoring/critique = 1 request (3000 tokens), Resume/CV rewriting = 2 requests (6000 tokens), Cover letters = 2 requests (6000 tokens).</p>
+                <p><strong>Monthly limit:</strong> All plans include 150,000 tokens monthly = 50 AI requests (calculated as 3000 tokens per request).</p>
                 <p><strong>Quality:</strong> Uses premium OpenAI models (GPT-4o-mini) for high-quality, personalized content.</p>
               </div>
             </div>
@@ -618,7 +637,7 @@ export const BillingPage: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Resume & Cover Letters</h3>
-                  <UsageTooltip content="AI-powered content generation for resumes, cover letters, and content analysis. Each generation request counts as 1 usage.">
+                  <UsageTooltip content={`AI-powered content generation. Current usage: ${usage?.ai_tokens_used || 0} tokens out of 150,000 monthly limit. Resume scoring = 1 request (3000 tokens), Resume/CV rewriting = 2 requests (6000 tokens), Cover letters = 2 requests (6000 tokens).`}>
                     <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center cursor-help">
                       AI content generation requests
                       <HelpCircle className="w-3 h-3 ml-1" />

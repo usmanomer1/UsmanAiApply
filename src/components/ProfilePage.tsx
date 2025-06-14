@@ -15,6 +15,10 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, uploadResume, getSignedResumeUrl } from '../lib/supabase';
 import toast from 'react-hot-toast';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Badge } from './ui/badge';
 
 interface Profile {
   id: string;

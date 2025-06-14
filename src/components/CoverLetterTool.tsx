@@ -237,7 +237,7 @@ ${formData.achievements.filter(ach => ach.trim()).map(ach => `• ${ach}`).join(
         </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* Input Form */}
+        {/* Input Form */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -283,33 +283,33 @@ ${formData.achievements.filter(ach => ach.trim()).map(ach => `• ${ach}`).join(
               <div className="flex items-center mb-6">
                 <Briefcase className="w-6 h-6 text-purple-600 mr-3" />
                 <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                  Job Details
-                </h3>
+            Job Details
+          </h3>
               </div>
-
+          
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
+            <div>
                     <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-                      Job Title *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.jobTitle}
+                Job Title *
+              </label>
+              <input
+                type="text"
+                value={formData.jobTitle}
                       onChange={(e) => setFormData(prev => ({ ...prev, jobTitle: e.target.value }))}
                       placeholder="Senior Software Engineer"
                       className="premium-input"
-                    />
-                  </div>
+              />
+            </div>
 
-                  <div>
+            <div>
                     <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-                      Company Name *
-                    </label>
+                Company Name *
+              </label>
                     <div className="flex space-x-2">
-                      <input
-                        type="text"
-                        value={formData.companyName}
+              <input
+                type="text"
+                value={formData.companyName}
                         onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
                         placeholder="TechCorp Inc."
                         className="premium-input flex-1"
@@ -327,15 +327,15 @@ ${formData.achievements.filter(ach => ach.trim()).map(ach => `• ${ach}`).join(
                       </button>
                     </div>
                   </div>
-                </div>
+            </div>
 
-                <div>
+            <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-                    Job Description URL (optional)
-                  </label>
-                  <input
-                    type="url"
-                    value={formData.jobDescriptionUrl}
+                Job Description URL (optional)
+              </label>
+              <input
+                type="url"
+                value={formData.jobDescriptionUrl}
                     onChange={(e) => setFormData(prev => ({ ...prev, jobDescriptionUrl: e.target.value }))}
                     placeholder="https://company.com/careers/job-123"
                     className="premium-input"
@@ -351,10 +351,10 @@ ${formData.achievements.filter(ach => ach.trim()).map(ach => `• ${ach}`).join(
                     onChange={(e) => setFormData(prev => ({ ...prev, jobDescription: e.target.value }))}
                     placeholder="Paste the job description here to get a more tailored cover letter..."
                     className="premium-input h-32 resize-none"
-                  />
-                </div>
+              />
+            </div>
 
-                <div>
+            <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                     Experience Level
                   </label>
@@ -373,15 +373,15 @@ ${formData.achievements.filter(ach => ach.trim()).map(ach => `• ${ach}`).join(
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                     Writing Tone
-                  </label>
+              </label>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {tones.map((tone) => (
+                {tones.map((tone) => (
                       <label key={tone.value} className="relative">
-                        <input
-                          type="radio"
-                          name="tone"
-                          value={tone.value}
-                          checked={formData.tone === tone.value}
+                    <input
+                      type="radio"
+                      name="tone"
+                      value={tone.value}
+                      checked={formData.tone === tone.value}
                           onChange={(e) => setFormData(prev => ({ ...prev, tone: e.target.value }))}
                           className="sr-only"
                         />
@@ -393,11 +393,11 @@ ${formData.achievements.filter(ach => ach.trim()).map(ach => `• ${ach}`).join(
                           <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${tone.color} mb-3 mx-auto`}></div>
                           <h4 className="font-semibold text-gray-900 dark:text-white text-center">{tone.label}</h4>
                           <p className="text-sm text-gray-600 dark:text-gray-300 text-center">{tone.desc}</p>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
@@ -457,14 +457,14 @@ ${formData.achievements.filter(ach => ach.trim()).map(ach => `• ${ach}`).join(
                       </button>
                     </div>
                   ))}
-                  <button
+            <button
                     onClick={addAchievement}
                     className="text-purple-600 hover:text-purple-700 text-sm flex items-center"
                   >
                     + Add Achievement
-                  </button>
-                </div>
-              </div>
+            </button>
+          </div>
+        </div>
 
               <motion.button
                 whileHover={{ scale: 1.02 }}
@@ -507,7 +507,7 @@ ${formData.achievements.filter(ach => ach.trim()).map(ach => `• ${ach}`).join(
                   exit={{ opacity: 0, y: -20 }}
                   className="space-y-6"
                 >
-                  {/* Cover Letter */}
+          {/* Cover Letter */}
                   <div className="premium-card p-8">
                     <div className="flex items-center justify-between mb-6">
                       <div className="flex items-center">
@@ -517,13 +517,13 @@ ${formData.achievements.filter(ach => ach.trim()).map(ach => `• ${ach}`).join(
                         </h2>
                       </div>
                       <div className="flex space-x-3">
-                        <button
+                <button
                           onClick={() => copyToClipboard(generatedLetter.coverLetter)}
                           className="premium-button-secondary flex items-center"
-                        >
+                >
                           <Copy className="w-4 h-4 mr-2" />
-                          Copy
-                        </button>
+                  Copy
+                </button>
                         <button
                           onClick={downloadLetter}
                           className="premium-button-secondary flex items-center"
@@ -539,8 +539,8 @@ ${formData.achievements.filter(ach => ach.trim()).map(ach => `• ${ach}`).join(
                         {generatedLetter.coverLetter}
                       </pre>
                     </div>
-                  </div>
-
+            </div>
+            
                   {/* Company Research */}
                   {generatedLetter.companyResearch && (
                     <div className="premium-card p-8">
@@ -553,7 +553,7 @@ ${formData.achievements.filter(ach => ach.trim()).map(ach => `• ${ach}`).join(
                       <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-6 border border-blue-200 dark:border-blue-800">
                         <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-sans">
                           {generatedLetter.companyResearch}
-                        </pre>
+                </pre>
                       </div>
                     </div>
                   )}
@@ -592,10 +592,10 @@ ${formData.achievements.filter(ach => ach.trim()).map(ach => `• ${ach}`).join(
                                 </li>
                               ))}
                             </ul>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                </div>
+              )}
+            </div>
+          </div>
                   )}
                 </motion.div>
               ) : (
