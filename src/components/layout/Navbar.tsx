@@ -26,6 +26,9 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { supabase } from '../../lib/supabase';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Badge } from '../ui/badge';
 
 export const Navbar: React.FC = () => {
   const location = useLocation();
@@ -274,9 +277,9 @@ export const Navbar: React.FC = () => {
         )}
       </AnimatePresence>
 
-      <nav className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-700/50 sticky top-0 z-50">
+      <nav className="glass backdrop-blur-xl border-b border-white/20 dark:border-gray-700/50 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
+          <div className="flex justify-between h-20">
             {/* Logo */}
             <div className="flex items-center">
               <Link to="/dashboard" className="flex items-center space-x-3 group">
@@ -285,7 +288,7 @@ export const Navbar: React.FC = () => {
                     <Bot className="w-6 h-6 text-white" />
                   </div>
                   {hasActiveSubscription && (
-                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full flex items-center justify-center">
+                    <div className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full flex items-center justify-center">
                       <Sparkles className="w-2.5 h-2.5 text-white" />
                     </div>
                   )}
@@ -320,7 +323,7 @@ export const Navbar: React.FC = () => {
                     <Icon className="w-4 h-4" />
                     <span>{item.name}</span>
                     {item.badge && (
-                      <span className="absolute -top-1 -right-1 px-1.5 py-0.5 bg-gradient-to-r from-emerald-400 to-emerald-500 text-white text-xs font-bold rounded-full">
+                      <span className="absolute -top-0.5 -right-0.5 px-1.5 py-0.5 bg-gradient-to-r from-emerald-400 to-emerald-500 text-white text-xs font-bold rounded-full">
                         {item.badge}
                       </span>
                     )}
@@ -363,7 +366,7 @@ export const Navbar: React.FC = () => {
               <button className="relative p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
                 <Bell className="w-5 h-5 text-gray-600 dark:text-gray-300" />
                 {notifications > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                  <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
                     {notifications}
                   </span>
                 )}
@@ -558,18 +561,18 @@ export const Navbar: React.FC = () => {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: -20 }}
               transition={{ duration: 0.2 }}
-              className="w-full max-w-2xl mx-4 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700"
+              className="w-full max-w-2xl mx-4 glass-card rounded-3xl shadow-3xl border border-white/20 dark:border-gray-700/30"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="p-6">
                 <form onSubmit={handleSearchSubmit} className="flex items-center space-x-3 mb-6">
                   <Search className="w-5 h-5 text-gray-400" />
-                  <input
+                  <Input
                     type="text"
                     placeholder="Search for features, pages, or actions..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="flex-1 text-lg bg-transparent border-none outline-none text-gray-900 dark:text-white placeholder-gray-400"
+                    className="flex-1 text-lg border-none shadow-none focus:ring-0 pl-0"
                     autoFocus
                   />
                   <div className="flex items-center space-x-1 text-xs text-gray-400">

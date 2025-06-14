@@ -429,7 +429,7 @@ export const ResumeTools: React.FC = () => {
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                   Upload & Configure
                 </h2>
-              </div>
+      </div>
 
               {/* File Upload */}
               <div className="mb-8">
@@ -437,11 +437,11 @@ export const ResumeTools: React.FC = () => {
                   Resume File
                 </label>
                 <div className="relative">
-                  <input
-                    type="file"
+                <input
+                  type="file"
                     accept=".pdf,.txt,.doc,.docx"
                     onChange={handleFileUpload}
-                    className="hidden"
+                  className="hidden"
                     id="resume-upload"
                   />
                   <label
@@ -523,7 +523,7 @@ export const ResumeTools: React.FC = () => {
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                     Desired Salary
-                  </label>
+              </label>
                   <input
                     type="text"
                     value={formData.desiredSalary}
@@ -532,7 +532,7 @@ export const ResumeTools: React.FC = () => {
                     className="premium-input"
                   />
                 </div>
-              </div>
+          </div>
 
               <div className="mt-6">
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
@@ -769,14 +769,14 @@ export const ResumeTools: React.FC = () => {
                     <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
                       {results.critique.industryAlignment}
                     </p>
-                  </div>
+        </div>
 
                   {/* Action Items */}
                   <div>
                     <h3 className="text-lg font-bold text-green-600 mb-3 flex items-center">
                       <Target className="w-5 h-5 mr-2" />
                       Priority Action Items
-                    </h3>
+            </h3>
                     <div className="space-y-3">
                       {results.critique.actionItems.map((item, index) => (
                         <div key={index} className="flex items-start p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
@@ -807,7 +807,7 @@ export const ResumeTools: React.FC = () => {
                         AI-Optimized Resume
                       </h2>
                     </div>
-                    <button
+              <button
                       onClick={() => {
                         navigator.clipboard.writeText(results.rewrite!.improvedResume);
                         toast.success('Resume copied to clipboard!');
@@ -815,8 +815,8 @@ export const ResumeTools: React.FC = () => {
                       className="premium-button-secondary flex items-center"
                     >
                       <Download className="w-4 h-4 mr-2" />
-                      Copy
-                    </button>
+                Copy
+              </button>
                   </div>
 
                   {/* Strategy */}
@@ -860,7 +860,7 @@ export const ResumeTools: React.FC = () => {
                         </li>
                       ))}
                     </ul>
-                  </div>
+          </div>
 
                   {/* Improved Resume */}
                   <div>
@@ -871,7 +871,7 @@ export const ResumeTools: React.FC = () => {
                     <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 max-h-96 overflow-y-auto">
                       <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 font-mono leading-relaxed">
                         {results.rewrite.improvedResume}
-                      </pre>
+              </pre>
                     </div>
                   </div>
                 </motion.div>
@@ -888,7 +888,7 @@ export const ResumeTools: React.FC = () => {
                 >
                   <div className={`w-24 h-24 rounded-3xl bg-gradient-to-br ${toolConfig[activeTool].color} p-6 mx-auto mb-6`}>
                     {React.createElement(toolConfig[activeTool].icon, { className: "w-12 h-12 text-white" })}
-                  </div>
+              </div>
                   <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
                     Ready to {activeTool === 'score' ? 'Analyze' : activeTool === 'judge' ? 'Critique' : 'Rewrite'} Your Resume
                   </h3>

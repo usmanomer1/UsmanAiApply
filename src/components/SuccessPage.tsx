@@ -2,6 +2,9 @@ import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle, ArrowRight, Sparkles, Crown } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Badge } from './ui/badge';
 
 export const SuccessPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -20,7 +23,7 @@ export const SuccessPage: React.FC = () => {
         transition={{ duration: 0.5 }}
         className="max-w-2xl w-full"
       >
-        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+        <Card className="glass-card overflow-hidden border-none shadow-3xl">
           {/* Success Header */}
           <div className="bg-gradient-to-r from-emerald-500 to-green-600 px-8 py-12 text-center">
             <motion.div
@@ -51,8 +54,7 @@ export const SuccessPage: React.FC = () => {
             </motion.p>
           </div>
 
-          {/* Content */}
-          <div className="p-8">
+          <CardContent className="p-8">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -107,20 +109,18 @@ export const SuccessPage: React.FC = () => {
               transition={{ delay: 0.7 }}
               className="flex flex-col sm:flex-row gap-4"
             >
-              <Link
-                to="/auto-apply"
-                className="flex-1 premium-button-primary text-center"
-              >
-                Start Auto Apply
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </Link>
+              <Button asChild size="lg" className="flex-1">
+                <Link to="/auto-apply">
+                  Start Auto Apply
+                  <ArrowRight className="w-5 h-5 ml-2" />
+                </Link>
+              </Button>
               
-              <Link
-                to="/billing"
-                className="flex-1 premium-button-secondary text-center"
-              >
-                View Billing
-              </Link>
+              <Button asChild variant="secondary" size="lg" className="flex-1">
+                <Link to="/billing">
+                  View Billing
+                </Link>
+              </Button>
             </motion.div>
 
             {/* Session Info */}
@@ -136,8 +136,8 @@ export const SuccessPage: React.FC = () => {
                 </p>
               </motion.div>
             )}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </motion.div>
     </div>
   );

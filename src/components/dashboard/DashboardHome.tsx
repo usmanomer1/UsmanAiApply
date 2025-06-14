@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
   TrendingUp, 
@@ -34,11 +34,17 @@ import {
   LineChart,
   Loader2,
   AlertTriangle,
-  Info
+  Info,
+  X
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Badge } from '../ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { 
   LineChart as RechartsLineChart, 
   Line, 
@@ -80,90 +86,6 @@ interface Analytics {
   oa: number;
 }
 
-// Dummy data for demo mode
-const DUMMY_APPLICATIONS: JobApplication[] = [
-  {
-    id: '1',
-    company: 'Google',
-    role: 'Senior Software Engineer',
-    status: 'INTERVIEW',
-    applied_at: '2024-01-15T10:00:00Z',
-    details: {},
-    created_at: '2024-01-15T10:00:00Z',
-    campaign: {
-      job_title: 'Senior Software Engineer',
-      location: 'Mountain View, CA'
-    }
-  },
-  {
-    id: '2',
-    company: 'Microsoft',
-    role: 'Principal Software Engineer',
-    status: 'PENDING',
-    applied_at: '2024-01-14T14:30:00Z',
-    details: {},
-    created_at: '2024-01-14T14:30:00Z',
-    campaign: {
-      job_title: 'Principal Software Engineer',
-      location: 'Seattle, WA'
-    }
-  },
-  {
-    id: '3',
-    company: 'Meta',
-    role: 'Staff Frontend Engineer',
-    status: 'SENT',
-    applied_at: '2024-01-13T09:15:00Z',
-    details: {},
-    created_at: '2024-01-13T09:15:00Z',
-    campaign: {
-      job_title: 'Staff Frontend Engineer',
-      location: 'Menlo Park, CA'
-    }
-  },
-  {
-    id: '4',
-    company: 'Apple',
-    role: 'Senior iOS Developer',
-    status: 'REJECTED',
-    applied_at: '2024-01-10T16:45:00Z',
-    details: {},
-    created_at: '2024-01-10T16:45:00Z',
-    campaign: {
-      job_title: 'Senior iOS Developer',
-      location: 'Cupertino, CA'
-    }
-  },
-  {
-    id: '5',
-    company: 'Amazon',
-    role: 'Software Development Engineer III',
-    status: 'OA',
-    applied_at: '2024-01-12T11:20:00Z',
-    details: {},
-    created_at: '2024-01-12T11:20:00Z',
-    campaign: {
-      job_title: 'Software Development Engineer III',
-      location: 'Seattle, WA'
-    }
-  },
-  {
-    id: '6',
-    company: 'Netflix',
-    role: 'Senior Backend Engineer',
-    status: 'ACCEPTED',
-    applied_at: '2024-01-08T13:00:00Z',
-    details: {},
-    created_at: '2024-01-08T13:00:00Z',
-    campaign: {
-      job_title: 'Senior Backend Engineer',
-      location: 'Los Gatos, CA'
-    }
-  }
-];
-
-// Dynamic data will be calculated from real applications
-
 export const DashboardHome: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -180,6 +102,15 @@ export const DashboardHome: React.FC = () => {
   const [editingApp, setEditingApp] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState('30d');
   const [searchTerm, setSearchTerm] = useState('');
+  const [showAddApplicationModal, setShowAddApplicationModal] = useState(false);
+  const [newApplication, setNewApplication] = useState({
+    company: '',
+    role: '',
+    status: 'SENT' as JobApplication['status'],
+    location: '',
+    job_title: '',
+    applied_at: new Date().toISOString().split('T')[0]
+  });
   
   // Dynamic chart data state
   const [applicationTrendData, setApplicationTrendData] = useState<any[]>([]);
@@ -386,57 +317,31 @@ export const DashboardHome: React.FC = () => {
   const fetchApplications = async () => {
     try {
       setLoading(true);
-      console.log('Fetching applications...');
-
+      
       if (!isSupabaseConfigured()) {
-        console.log('Supabase not configured, using demo data');
-        // Simulate loading delay for demo
-        await new Promise(resolve => setTimeout(resolve, 800));
-        setApplications(DUMMY_APPLICATIONS);
-        calculateAnalytics(DUMMY_APPLICATIONS);
-        calculatePreviousMonthData(DUMMY_APPLICATIONS);
+        console.log('Supabase not configured - showing empty state');
+        setApplications([]);
+        calculateAnalytics([]);
+        calculatePreviousMonthData([]);
         return;
       }
 
       if (!user) {
-        console.log('No user found, using demo data');
-        await new Promise(resolve => setTimeout(resolve, 800));
-        setApplications(DUMMY_APPLICATIONS);
-        calculateAnalytics(DUMMY_APPLICATIONS);
-        calculatePreviousMonthData(DUMMY_APPLICATIONS);
-        return;
-      }
-
-      console.log('Fetching real applications for user:', user.email);
-
-      // First, ensure user has a profile
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (profileError) {
-        console.error('Error fetching profile:', profileError);
-        // Show empty state instead of demo data for real users
+        console.log('No user found - showing empty state');
         setApplications([]);
         calculateAnalytics([]);
+        calculatePreviousMonthData([]);
         return;
       }
 
-      if (!profile) {
-        console.log('No profile found for user, showing empty state');
-        setApplications([]);
-        calculateAnalytics([]);
-        return;
-      }
+      console.log('Fetching applications for user:', user.email);
 
-      // Fetch applications with campaign details
+      // Fetch applications with campaign details using the correct table structure
       const { data, error } = await supabase
         .from('applications')
         .select(`
           *,
-          job_campaigns!inner(
+          job_campaigns!campaign_id(
             job_title,
             location,
             profiles!inner(
@@ -448,16 +353,16 @@ export const DashboardHome: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Supabase error:', error);
-        // Show empty state instead of demo data for real users
+        console.error('Database error fetching applications:', error);
         setApplications([]);
         calculateAnalytics([]);
+        calculatePreviousMonthData([]);
         return;
       }
 
       console.log('Fetched applications:', data?.length || 0);
 
-      // Transform data to match interface
+      // Transform data to match our interface
       const transformedApplications: JobApplication[] = (data || []).map(app => ({
         id: app.id,
         company: app.company || 'Unknown Company',
@@ -467,19 +372,19 @@ export const DashboardHome: React.FC = () => {
         details: app.details || {},
         created_at: app.created_at,
         campaign: {
-          job_title: app.job_campaigns.job_title,
-          location: app.job_campaigns.location || 'Remote'
+          job_title: app.job_campaigns?.job_title || app.role || 'Unknown Role',
+          location: app.job_campaigns?.location || 'Not specified'
         }
       }));
-
+      
       setApplications(transformedApplications);
       calculateAnalytics(transformedApplications);
       calculatePreviousMonthData(transformedApplications);
     } catch (error) {
-      console.error('Error fetching applications:', error);
-      // Show empty state on error for real users
+      console.error('Unexpected error fetching applications:', error);
       setApplications([]);
       calculateAnalytics([]);
+      calculatePreviousMonthData([]);
     } finally {
       setLoading(false);
     }
@@ -494,17 +399,20 @@ export const DashboardHome: React.FC = () => {
           .eq('id', id);
 
         if (error) {
-          throw error;
+          console.error('Database error updating status:', error);
+          toast.error(`Failed to update status: ${error.message}`);
+          return;
         }
       }
 
+      // Update local state
       setApplications(apps => 
         apps.map(app => 
           app.id === id ? { ...app, status } : app
         )
       );
 
-      // Recalculate analytics
+      // Recalculate analytics with updated data
       const updatedApps = applications.map(app => 
         app.id === id ? { ...app, status } : app
       );
@@ -513,8 +421,173 @@ export const DashboardHome: React.FC = () => {
       setEditingApp(null);
       toast.success('Application status updated successfully');
     } catch (error) {
-      console.error('Error updating status:', error);
-      toast.error('Failed to update status');
+      console.error('Unexpected error updating status:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      toast.error(`Failed to update status: ${errorMessage}`);
+    }
+  };
+
+  const addApplication = async () => {
+    // Validate required fields first
+    if (!newApplication.company.trim() || !newApplication.role.trim()) {
+      toast.error('Please fill in company and role fields');
+      return;
+    }
+
+    // Validate date format if provided
+    if (newApplication.applied_at && isNaN(Date.parse(newApplication.applied_at))) {
+      toast.error('Please enter a valid date');
+      return;
+    }
+
+    try {
+      const applicationData = {
+        id: Date.now().toString(),
+        company: newApplication.company.trim(),
+        role: newApplication.role.trim(),
+        status: newApplication.status,
+        applied_at: newApplication.applied_at ? `${newApplication.applied_at}T00:00:00Z` : new Date().toISOString(),
+        details: {},
+        created_at: new Date().toISOString(),
+        campaign: {
+          job_title: newApplication.job_title?.trim() || newApplication.role.trim(),
+          location: newApplication.location?.trim() || 'Not specified'
+        }
+      };
+
+      if (isSupabaseConfigured() && user) {
+        try {
+          // Always ensure we have a campaign_id since RLS policy requires it
+          let campaignId = null;
+          
+          // First, ensure user has a profile
+          let { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+          if (profileError) {
+            console.error('Error fetching profile:', profileError);
+            toast.error('Profile not found. Please contact support.');
+            return;
+          }
+
+          if (!profile) {
+            // Create profile if it doesn't exist
+            const { data: newProfile, error: createProfileError } = await supabase
+              .from('profiles')
+              .insert([{ user_id: user.id }])
+              .select('id')
+              .single();
+
+            if (createProfileError) {
+              console.error('Error creating profile:', createProfileError);
+              toast.error('Failed to create profile. Please contact support.');
+              return;
+            }
+            profile = newProfile;
+          }
+
+          // At this point, profile is guaranteed to exist
+          if (!profile) {
+            toast.error('Failed to get or create profile. Please try again.');
+            return;
+          }
+
+          // Look for existing "Manual Applications" campaign
+          const { data: existingCampaign, error: campaignFetchError } = await supabase
+            .from('job_campaigns')
+            .select('id')
+            .eq('profile_id', profile.id)
+            .eq('job_title', 'Manual Application')
+            .maybeSingle();
+
+          if (campaignFetchError) {
+            console.error('Error fetching campaign:', campaignFetchError);
+          }
+
+          if (existingCampaign) {
+            campaignId = existingCampaign.id;
+          } else {
+            // Create a "Manual Applications" campaign
+            const { data: newCampaign, error: campaignError } = await supabase
+              .from('job_campaigns')
+              .insert([{
+                profile_id: profile.id,
+                job_title: 'Manual Application',
+                location: 'Various'
+              }])
+              .select('id')
+              .single();
+
+            if (campaignError) {
+              console.error('Error creating campaign:', campaignError);
+              toast.error(`Failed to create campaign: ${campaignError.message}`);
+              return;
+            }
+            campaignId = newCampaign.id;
+          }
+
+          // Now insert the application with the required campaign_id
+          const { data, error } = await supabase
+            .from('applications')
+            .insert([{
+              campaign_id: campaignId,
+              company: applicationData.company,
+              role: applicationData.role,
+              status: applicationData.status,
+              applied_at: applicationData.applied_at,
+              details: applicationData.details
+            }])
+            .select()
+            .single();
+
+          if (error) {
+            console.error('Database error adding application:', error);
+            toast.error(`Failed to add application: ${error.message}`);
+            return;
+          }
+
+          // Use the data returned from database to ensure consistency
+          if (data) {
+            applicationData.id = data.id;
+            applicationData.created_at = data.created_at;
+          }
+
+        } catch (dbError) {
+          console.error('Database operation failed:', dbError);
+          toast.error('Failed to add application. Please try again.');
+          return;
+        }
+      }
+
+      // Update local state
+      setApplications(prev => {
+        const updatedApps = [applicationData, ...prev];
+        return updatedApps;
+      });
+      
+      // Reset form and close modal
+      setShowAddApplicationModal(false);
+      setNewApplication({
+        company: '',
+        role: '',
+        status: 'SENT',
+        location: '',
+        job_title: '',
+        applied_at: new Date().toISOString().split('T')[0]
+      });
+      
+      toast.success('Application added successfully');
+      
+      // Refresh applications to ensure consistency
+      await fetchApplications();
+      
+    } catch (error) {
+      console.error('Unexpected error adding application:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      toast.error(`Failed to add application: ${errorMessage}`);
     }
   };
 
@@ -554,11 +627,18 @@ export const DashboardHome: React.FC = () => {
   const responseRate = totalApplications > 0 ? Math.round(((analytics.interview + analytics.oa + analytics.accepted) / totalApplications) * 100) : 0;
   const successRate = totalApplications > 0 ? Math.round((analytics.accepted / totalApplications) * 100) : 0;
 
-  const filteredApplications = applications.filter(app =>
-    app.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    app.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    app.campaign.job_title.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredApplications = applications.filter(app => {
+    if (!searchTerm.trim()) return true;
+    
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      app.company.toLowerCase().includes(searchLower) ||
+      app.role.toLowerCase().includes(searchLower) ||
+      app.campaign.job_title.toLowerCase().includes(searchLower) ||
+      app.status.toLowerCase().includes(searchLower) ||
+      app.campaign.location.toLowerCase().includes(searchLower)
+    );
+  });
 
   if (loading) {
     return (
@@ -625,55 +705,67 @@ export const DashboardHome: React.FC = () => {
           className="flex flex-wrap items-center gap-3"
         >
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none z-10" />
+            <Input
               type="text"
               placeholder="Search applications..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="premium-input pl-14 w-64"
+              className={`w-64 pl-12 pr-10 ${searchTerm ? 'ring-2 ring-blue-500 dark:ring-blue-400' : ''}`}
             />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 z-10"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
           
-          <select 
+          <Select 
             value={timeRange}
-            onChange={(e) => setTimeRange(e.target.value)}
-            className="premium-select w-40"
+            onValueChange={setTimeRange}
           >
-            <option value="7d">Last 7 days</option>
-            <option value="30d">Last 30 days</option>
-            <option value="90d">Last 90 days</option>
-            <option value="1y">Last year</option>
-          </select>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7d">Last 7 days</SelectItem>
+              <SelectItem value="30d">Last 30 days</SelectItem>
+              <SelectItem value="90d">Last 90 days</SelectItem>
+              <SelectItem value="1y">Last year</SelectItem>
+            </SelectContent>
+          </Select>
           
-          <button 
+          <Button 
             onClick={fetchApplications}
-            className="premium-button-secondary"
+            variant="secondary"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
-          </button>
+          </Button>
           
-          <button 
-            className="premium-button-primary"
+          <Button 
             onClick={() => {
-              const csvContent = applications.map(app => 
-                `${app.company},${app.role},${app.status},${app.applied_at}`
+              const dataToExport = searchTerm ? filteredApplications : applications;
+              const csvContent = dataToExport.map(app => 
+                `${app.company},${app.role},${app.status},${app.applied_at},${app.campaign.location}`
               ).join('\n');
-              const blob = new Blob([`Company,Role,Status,Applied At\n${csvContent}`], 
+              const blob = new Blob([`Company,Role,Status,Applied At,Location\n${csvContent}`], 
                 { type: 'text/csv' });
               const url = window.URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = url;
-              a.download = 'job_applications.csv';
+              a.download = searchTerm ? 'filtered_job_applications.csv' : 'job_applications.csv';
               a.click();
               window.URL.revokeObjectURL(url);
-              toast.success('Applications exported successfully');
+              toast.success(`${dataToExport.length} applications exported successfully`);
             }}
           >
             <Download className="w-4 h-4 mr-2" />
             Export
-          </button>
+          </Button>
         </motion.div>
       </div>
 
@@ -684,47 +776,53 @@ export const DashboardHome: React.FC = () => {
         transition={{ delay: 0.1 }}
         className="grid grid-cols-1 md:grid-cols-3 gap-6"
       >
-        <div 
-          className="premium-card p-6 hover-lift cursor-pointer group"
+        <Card 
+          className="glass-card hover-lift cursor-pointer group transition-all duration-300"
           onClick={() => navigate('/auto-apply')}
         >
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl group-hover:scale-110 transition-transform">
-              <Zap className="w-6 h-6 text-white" />
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl group-hover:scale-110 transition-transform">
+                <Zap className="w-6 h-6 text-white" />
+              </div>
+              <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
             </div>
-            <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
-          </div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Start Auto Apply</h3>
-          <p className="text-gray-600 dark:text-gray-300 text-sm">Let AI apply to jobs automatically</p>
-        </div>
+            <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Start Auto Apply</CardTitle>
+            <CardDescription className="text-gray-600 dark:text-gray-300 text-sm">Let AI apply to jobs automatically</CardDescription>
+          </CardContent>
+        </Card>
 
-        <div 
-          className="premium-card p-6 hover-lift cursor-pointer group"
+        <Card 
+          className="glass-card hover-lift cursor-pointer group transition-all duration-300"
           onClick={() => navigate('/cover-letter')}
         >
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl group-hover:scale-110 transition-transform">
-              <PieChart className="w-6 h-6 text-white" />
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl group-hover:scale-110 transition-transform">
+                <PieChart className="w-6 h-6 text-white" />
+              </div>
+              <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-purple-600 transition-colors" />
             </div>
-            <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-purple-600 transition-colors" />
-          </div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Generate Cover Letter</h3>
-          <p className="text-gray-600 dark:text-gray-300 text-sm">Create personalized cover letters</p>
-        </div>
+            <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Generate Cover Letter</CardTitle>
+            <CardDescription className="text-gray-600 dark:text-gray-300 text-sm">Create personalized cover letters</CardDescription>
+          </CardContent>
+        </Card>
 
-        <div 
-          className="premium-card p-6 hover-lift cursor-pointer group"
+        <Card 
+          className="glass-card hover-lift cursor-pointer group transition-all duration-300"
           onClick={() => navigate('/resume')}
         >
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl group-hover:scale-110 transition-transform">
-              <BarChart3 className="w-6 h-6 text-white" />
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl group-hover:scale-110 transition-transform">
+                <BarChart3 className="w-6 h-6 text-white" />
+              </div>
+              <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-emerald-600 transition-colors" />
             </div>
-            <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-emerald-600 transition-colors" />
-          </div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Analyze Resume</h3>
-          <p className="text-gray-600 dark:text-gray-300 text-sm">Optimize your resume with AI</p>
-        </div>
+            <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Analyze Resume</CardTitle>
+            <CardDescription className="text-gray-600 dark:text-gray-300 text-sm">Optimize your resume with AI</CardDescription>
+          </CardContent>
+        </Card>
       </motion.div>
 
       {/* Enhanced Key Metrics */}
@@ -733,100 +831,112 @@ export const DashboardHome: React.FC = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="premium-card p-6 hover-lift"
         >
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl">
-              <TrendingUp className="w-6 h-6 text-white" />
-            </div>
-            <div className={`flex items-center ${
-              calculatePercentageChange(totalApplications, Object.values(previousMonthData).reduce((sum, val) => sum + val, 0)).startsWith('+') 
-                ? 'text-emerald-600' 
-                : 'text-red-600'
-            }`}>
-              {calculatePercentageChange(totalApplications, Object.values(previousMonthData).reduce((sum, val) => sum + val, 0)).startsWith('+') ? (
-                <ArrowUpRight className="w-4 h-4 mr-1" />
-              ) : (
-                <TrendingDown className="w-4 h-4 mr-1" />
-              )}
-              <span className="text-sm font-semibold">
-                {calculatePercentageChange(totalApplications, Object.values(previousMonthData).reduce((sum, val) => sum + val, 0))}
-              </span>
-            </div>
-          </div>
-          <div className="text-display-sm text-gray-900 dark:text-white mb-1">{totalApplications}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">Total Applications</div>
-          <div className="text-xs text-blue-600 dark:text-blue-400">vs last month</div>
+          <Card className="glass-card hover-lift">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl">
+                  <TrendingUp className="w-6 h-6 text-white" />
+                </div>
+                <div className={`flex items-center ${
+                  calculatePercentageChange(totalApplications, Object.values(previousMonthData).reduce((sum, val) => sum + val, 0)).startsWith('+') 
+                    ? 'text-emerald-600' 
+                    : 'text-red-600'
+                }`}>
+                  {calculatePercentageChange(totalApplications, Object.values(previousMonthData).reduce((sum, val) => sum + val, 0)).startsWith('+') ? (
+                    <ArrowUpRight className="w-4 h-4 mr-1" />
+                  ) : (
+                    <TrendingDown className="w-4 h-4 mr-1" />
+                  )}
+                  <span className="text-sm font-semibold">
+                    {calculatePercentageChange(totalApplications, Object.values(previousMonthData).reduce((sum, val) => sum + val, 0))}
+                  </span>
+                </div>
+              </div>
+              <div className="text-display-sm text-gray-900 dark:text-white mb-1">{totalApplications}</div>
+              <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">Total Applications</div>
+              <div className="text-xs text-blue-600 dark:text-blue-400">vs last month</div>
+            </CardContent>
+          </Card>
         </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="premium-card p-6 hover-lift"
         >
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl">
-              <Users className="w-6 h-6 text-white" />
-            </div>
-            <div className={`flex items-center ${
-              calculatePercentageChange(analytics.interview + analytics.oa, previousMonthData.interview + previousMonthData.oa).startsWith('+') 
-                ? 'text-emerald-600' 
-                : 'text-red-600'
-            }`}>
-              {calculatePercentageChange(analytics.interview + analytics.oa, previousMonthData.interview + previousMonthData.oa).startsWith('+') ? (
-                <ArrowUpRight className="w-4 h-4 mr-1" />
-              ) : (
-                <TrendingDown className="w-4 h-4 mr-1" />
-              )}
-              <span className="text-sm font-semibold">
-                {calculatePercentageChange(analytics.interview + analytics.oa, previousMonthData.interview + previousMonthData.oa)}
-              </span>
-            </div>
-          </div>
-          <div className="text-display-sm text-gray-900 dark:text-white mb-1">{analytics.interview + analytics.oa}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">Active Processes</div>
-          <div className="text-xs text-purple-600 dark:text-purple-400">interviews & assessments</div>
+          <Card className="hover-lift">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl">
+                  <Users className="w-6 h-6 text-white" />
+                </div>
+                <div className={`flex items-center ${
+                  calculatePercentageChange(analytics.interview + analytics.oa, previousMonthData.interview + previousMonthData.oa).startsWith('+') 
+                    ? 'text-emerald-600' 
+                    : 'text-red-600'
+                }`}>
+                  {calculatePercentageChange(analytics.interview + analytics.oa, previousMonthData.interview + previousMonthData.oa).startsWith('+') ? (
+                    <ArrowUpRight className="w-4 h-4 mr-1" />
+                  ) : (
+                    <TrendingDown className="w-4 h-4 mr-1" />
+                  )}
+                  <span className="text-sm font-semibold">
+                    {calculatePercentageChange(analytics.interview + analytics.oa, previousMonthData.interview + previousMonthData.oa)}
+                  </span>
+                </div>
+              </div>
+              <div className="text-display-sm text-gray-900 dark:text-white mb-1">{analytics.interview + analytics.oa}</div>
+              <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">Active Processes</div>
+              <div className="text-xs text-purple-600 dark:text-purple-400">interviews & assessments</div>
+            </CardContent>
+          </Card>
         </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="premium-card p-6 hover-lift"
         >
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl">
-              <Target className="w-6 h-6 text-white" />
-            </div>
-            <div className="flex items-center text-emerald-600">
-              <ArrowUpRight className="w-4 h-4 mr-1" />
-              <span className="text-sm font-semibold">+{Math.max(0, responseRate - 25)}%</span>
-            </div>
-          </div>
-          <div className="text-display-sm text-gray-900 dark:text-white mb-1">{responseRate}%</div>
-          <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">Response Rate</div>
-          <div className="text-xs text-emerald-600 dark:text-emerald-400">above industry avg</div>
+          <Card className="hover-lift">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl">
+                  <Target className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex items-center text-emerald-600">
+                  <ArrowUpRight className="w-4 h-4 mr-1" />
+                  <span className="text-sm font-semibold">+{Math.max(0, responseRate - 25)}%</span>
+                </div>
+              </div>
+              <div className="text-display-sm text-gray-900 dark:text-white mb-1">{responseRate}%</div>
+              <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">Response Rate</div>
+              <div className="text-xs text-emerald-600 dark:text-emerald-400">above industry avg</div>
+            </CardContent>
+          </Card>
         </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
-          className="premium-card p-6 hover-lift"
         >
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl">
-              <Award className="w-6 h-6 text-white" />
-            </div>
-            <div className="flex items-center text-emerald-600">
-              <ArrowUpRight className="w-4 h-4 mr-1" />
-              <span className="text-sm font-semibold">+{Math.max(0, successRate - 10)}%</span>
-            </div>
-          </div>
-          <div className="text-display-sm text-gray-900 dark:text-white mb-1">{successRate}%</div>
-          <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">Success Rate</div>
-          <div className="text-xs text-amber-600 dark:text-amber-400">offers received</div>
+          <Card className="hover-lift">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl">
+                  <Award className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex items-center text-emerald-600">
+                  <ArrowUpRight className="w-4 h-4 mr-1" />
+                  <span className="text-sm font-semibold">+{Math.max(0, successRate - 10)}%</span>
+                </div>
+              </div>
+              <div className="text-display-sm text-gray-900 dark:text-white mb-1">{successRate}%</div>
+              <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">Success Rate</div>
+              <div className="text-xs text-amber-600 dark:text-amber-400">offers received</div>
+            </CardContent>
+          </Card>
         </motion.div>
       </div>
 
@@ -837,17 +947,18 @@ export const DashboardHome: React.FC = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6 }}
-          className="premium-card p-6 hover-lift"
         >
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Application Trends</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Monthly application and response patterns</p>
-            </div>
-            <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
-              <RefreshCw className="w-4 h-4 text-gray-500" />
-            </button>
-          </div>
+          <Card className="hover-lift">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
+              <div>
+                <CardTitle className="text-xl font-semibold">Application Trends</CardTitle>
+                <CardDescription className="mt-1">Monthly application and response patterns</CardDescription>
+              </div>
+              <Button variant="ghost" size="icon">
+                <RefreshCw className="w-4 h-4" />
+              </Button>
+            </CardHeader>
+            <CardContent>
           
           <ResponsiveContainer width="100%" height={300}>
             <AreaChart data={applicationTrendData}>
@@ -890,6 +1001,8 @@ export const DashboardHome: React.FC = () => {
               />
             </AreaChart>
           </ResponsiveContainer>
+            </CardContent>
+          </Card>
         </motion.div>
 
         {/* Status Distribution */}
@@ -1067,14 +1180,21 @@ export const DashboardHome: React.FC = () => {
               <p className="text-gray-600 dark:text-gray-300 mt-1">Track and manage your job applications with detailed insights</p>
             </div>
             <div className="flex items-center space-x-3">
-              <button className="premium-button-secondary">
+              <Button 
+                onClick={() => setShowAddApplicationModal(true)}
+                variant="secondary"
+                size="sm"
+              >
                 <Plus className="w-4 h-4 mr-2" />
                 Add Application
-              </button>
-              <button className="premium-button-primary">
+              </Button>
+              <Button 
+                onClick={() => navigate('/applications')}
+                size="sm"
+              >
                 <ExternalLink className="w-4 h-4 mr-2" />
                 View All
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -1094,10 +1214,18 @@ export const DashboardHome: React.FC = () => {
                     : 'Your job applications will appear here once you start using the auto-apply feature.'
                 }
               </p>
-              <button className="premium-button-primary">
+              <Button 
+                onClick={() => {
+                  if (isSupabaseConfigured() && user) {
+                    navigate('/auto-apply');
+                  } else {
+                    setShowAddApplicationModal(true);
+                  }
+                }}
+              >
                 <Plus className="w-4 h-4 mr-2" />
                 {isSupabaseConfigured() && user ? 'Start Auto Apply' : 'Add Your First Application'}
-              </button>
+              </Button>
             </div>
           ) : (
             <>
@@ -1188,13 +1316,128 @@ export const DashboardHome: React.FC = () => {
 
         {filteredApplications.length > 8 && (
           <div className="p-6 border-t border-gray-100 dark:border-gray-700 text-center">
-            <button className="premium-button-secondary">
+            <Button 
+              onClick={() => navigate('/applications')}
+              variant="secondary"
+            >
               View {filteredApplications.length - 8} more applications
               <ChevronRight className="w-4 h-4 ml-2" />
-            </button>
+            </Button>
           </div>
         )}
       </motion.div>
-    </div>
-  );
+
+      {/* Add Application Modal */}
+      <AnimatePresence>
+        {showAddApplicationModal && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-md w-full p-6"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Add Application</h3>
+              <button
+                onClick={() => setShowAddApplicationModal(false)}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Company *
+                </label>
+                <input
+                  type="text"
+                  value={newApplication.company}
+                  onChange={(e) => setNewApplication(prev => ({ ...prev, company: e.target.value }))}
+                  className="w-full h-10 px-4 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="e.g. Google, Microsoft, etc."
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Role *
+                </label>
+                <input
+                  type="text"
+                  value={newApplication.role}
+                  onChange={(e) => setNewApplication(prev => ({ ...prev, role: e.target.value }))}
+                  className="w-full h-10 px-4 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="e.g. Software Engineer, Product Manager"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Status
+                </label>
+                <select
+                  value={newApplication.status}
+                  onChange={(e) => setNewApplication(prev => ({ ...prev, status: e.target.value as JobApplication['status'] }))}
+                  className="w-full h-10 px-4 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="SENT">Sent</option>
+                  <option value="PENDING">Pending</option>
+                  <option value="INTERVIEW">Interview</option>
+                  <option value="OA">Online Assessment</option>
+                  <option value="ACCEPTED">Accepted</option>
+                  <option value="REJECTED">Rejected</option>
+                </select>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Location
+                  </label>
+                  <input
+                    type="text"
+                    value={newApplication.location}
+                    onChange={(e) => setNewApplication(prev => ({ ...prev, location: e.target.value }))}
+                    className="w-full h-10 px-4 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Remote, NYC, etc."
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Applied Date
+                  </label>
+                  <input
+                    type="date"
+                    value={newApplication.applied_at}
+                    onChange={(e) => setNewApplication(prev => ({ ...prev, applied_at: e.target.value }))}
+                    className="w-full h-10 px-4 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-end space-x-3 mt-6">
+              <button
+                onClick={() => setShowAddApplicationModal(false)}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={addApplication}
+                className="premium-button-primary"
+              >
+                Add Application
+              </button>
+            </div>
+                     </motion.div>
+         </div>
+       )}
+     </AnimatePresence>
+   </div>
+ );
 };

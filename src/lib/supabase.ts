@@ -144,30 +144,80 @@ export type Database = {
           created_at?: string;
         };
       };
-      usage_logs: {
+      browser_use_logs: {
         Row: {
           id: string;
-          subscription_id: string;
-          campaign_id: string;
-          browser_use_steps: number;
+          user_id: string;
+          task_id: string;
+          step_count: number;
           cost_usd: number;
-          recorded_at: string;
+          task_type: string;
+          campaign_id: string | null;
+          created_at: string;
         };
         Insert: {
           id?: string;
-          subscription_id: string;
-          campaign_id: string;
-          browser_use_steps: number;
+          user_id: string;
+          task_id: string;
+          step_count: number;
           cost_usd: number;
-          recorded_at?: string;
+          task_type: string;
+          campaign_id?: string | null;
+          created_at?: string;
         };
         Update: {
           id?: string;
-          subscription_id?: string;
-          campaign_id?: string;
-          browser_use_steps?: number;
+          user_id?: string;
+          task_id?: string;
+          step_count?: number;
           cost_usd?: number;
-          recorded_at?: string;
+          task_type?: string;
+          campaign_id?: string | null;
+          created_at?: string;
+        };
+      };
+      ai_token_usage: {
+        Row: {
+          id: string;
+          user_id: string;
+          operation_type: string;
+          prompt_tokens: number;
+          completion_tokens: number;
+          total_tokens: number;
+          max_tokens_requested: number;
+          model_used: string;
+          request_data: any;
+          response_data: any;
+          cost_usd: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          operation_type: string;
+          prompt_tokens?: number;
+          completion_tokens?: number;
+          total_tokens?: number;
+          max_tokens_requested?: number;
+          model_used?: string;
+          request_data?: any;
+          response_data?: any;
+          cost_usd?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          operation_type?: string;
+          prompt_tokens?: number;
+          completion_tokens?: number;
+          total_tokens?: number;
+          max_tokens_requested?: number;
+          model_used?: string;
+          request_data?: any;
+          response_data?: any;
+          cost_usd?: number;
+          created_at?: string;
         };
       };
     };
