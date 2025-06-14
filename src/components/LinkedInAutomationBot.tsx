@@ -413,7 +413,7 @@ const LinkedInAutomationBot: React.FC = () => {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </motion.div>
 
       {/* Main Control Panel */}
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
