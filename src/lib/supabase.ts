@@ -79,7 +79,7 @@ export type Database = {
           job_type?: string | null;
           work_type?: string | null;
           experience_level?: string | null;
-          target_count?: number | null;
+          target_count?: string | null;
           created_at?: string;
         };
       };
@@ -218,6 +218,29 @@ export type Database = {
           response_data?: any;
           cost_usd?: number;
           created_at?: string;
+        };
+      };
+      automation_configs: {
+        Row: {
+          id: string;
+          user_id: string;
+          config: any;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          config?: any;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          config?: any;
+          created_at?: string;
+          updated_at?: string;
         };
       };
     };
