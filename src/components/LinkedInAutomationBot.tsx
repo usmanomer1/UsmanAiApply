@@ -107,8 +107,8 @@ const EXPERIENCE_LEVEL_MAP = {
 const LinkedInAutomationBot: React.FC = () => {
   const { user } = useAuth();
   
-  // Get API key from environment variable
-  const apiKey = import.meta.env.VITE_BROWSER_USE_API_KEY || import.meta.env.VITE_BROWSERUSE_API_KEY;
+  // Get API key from environment variable with proper fallback
+  const apiKey = import.meta.env.VITE_BROWSER_USE_API_KEY || import.meta.env.VITE_BROWSERUSE_API_KEY || '';
   
   const [config, setConfig] = useState<BrowserUseConfig>({
     apiKey: apiKey,
@@ -503,72 +503,102 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
       max_steps: parseInt(config.targetCount || '10') * 5
     };
 
+    // Validate API key before making request
+    if (!apiKey || apiKey.trim() === '') {
+      throw new Error('Browser Use API key is not configured. Please check your environment variables.');
+    }
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    const response = await fetch(`${BROWSER_USE_API_BASE}/tasks`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify(taskData),
-      signal: controller.signal,
-    });
+    try {
+      const response = await fetch(`${BROWSER_USE_API_BASE}/tasks`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey.trim()}`
+        },
+        body: JSON.stringify(taskData),
+        signal: controller.signal,
+      });
 
-    clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      throw new Error(`Failed to create task: ${response.statusText}`);
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        throw new Error(`API request failed (${response.status}): ${errorText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      clearTimeout(timeoutId);
+      
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          throw new Error('Request timed out. Please check your internet connection and try again.');
+        } else if (error.message.includes('Failed to fetch')) {
+          throw new Error(`Unable to connect to Browser Use API at ${BROWSER_USE_API_BASE}. Please check:\n• Internet connection\n• API key configuration\n• Firewall/network settings`);
+        }
+      }
+      
+      throw error;
     }
-
-    return await response.json();
   };
 
   const getTaskStatus = async (taskId: string): Promise<TaskStatus> => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-    const response = await fetch(`${BROWSER_USE_API_BASE}/task/${taskId}`, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      signal: controller.signal,
-    });
+    try {
+      const response = await fetch(`${BROWSER_USE_API_BASE}/task/${taskId}`, {
+        headers: {
+          'Authorization': `Bearer ${apiKey.trim()}`,
+        },
+        signal: controller.signal,
+      });
 
-    clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
 
-    if (response.ok) {
-      const data = await response.json();
-      return {
-        id: taskId,
-        status: data.status,
-        live_url: data.live_url,
-        steps: data.steps,
-        output: data.output,
-        error: data.error
-      };
+      if (response.ok) {
+        const data = await response.json();
+        return {
+          id: taskId,
+          status: data.status,
+          live_url: data.live_url,
+          steps: data.steps,
+          output: data.output,
+          error: data.error
+        };
+      }
+      
+      throw new Error(`Failed to get task status: ${response.statusText}`);
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
     }
-    
-    throw new Error(`Failed to get task status: ${response.statusText}`);
   };
 
   const stopTask = async (taskId: string): Promise<void> => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-    const response = await fetch(`${BROWSER_USE_API_BASE}/stop-task?task_id=${taskId}`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      signal: controller.signal,
-    });
+    try {
+      const response = await fetch(`${BROWSER_USE_API_BASE}/stop-task?task_id=${taskId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${apiKey.trim()}`,
+        },
+        signal: controller.signal,
+      });
 
-    clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      throw new Error(`Failed to stop task: ${response.statusText}`);
+      if (!response.ok) {
+        throw new Error(`Failed to stop task: ${response.statusText}`);
+      }
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
     }
   };
 
@@ -588,6 +618,12 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
       return;
     }
 
+    if (!apiKey || apiKey.trim() === '') {
+      toast.error('Browser Use API key is not configured. Please check your environment variables.');
+      addLog('❌ API key missing: VITE_BROWSER_USE_API_KEY not found in environment variables', 'error');
+      return;
+    }
+
     if (!canStartAutomation()) {
       const limit = getTokenLimit();
       toast.error(`Usage limit reached! You have used ${monthlyUsage.tokens_used}/${limit} job tokens this month.`);
@@ -604,6 +640,8 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
 
     try {
       addLog('🚀 Starting LinkedIn job application automation...');
+      addLog(`🔗 API Endpoint: ${BROWSER_USE_API_BASE}`);
+      addLog(`🔑 API Key configured: ${apiKey.substring(0, 10)}...`);
       
       const task = await createLinkedInTask();
       setCurrentTask(task);
@@ -704,14 +742,10 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
       setIsRunning(false);
       
       if (error instanceof Error) {
-        if (error.name === 'AbortError') {
-          toast.error('Request timed out. Please check your internet connection and try again.');
-        } else if (error.message.includes('Failed to fetch')) {
-          toast.error(`Unable to connect to Browser Use API. Please check:\n• Internet connection\n• API URL: ${BROWSER_USE_API_BASE}\n• Firewall/network settings`);
-        } else {
-          toast.error(`Error starting automation: ${error.message}`);
-        }
+        addLog(`❌ Error: ${error.message}`, 'error');
+        toast.error(error.message);
       } else {
+        addLog('❌ Unknown error occurred while starting automation', 'error');
         toast.error('Unknown error occurred while starting automation');
       }
     }
@@ -728,7 +762,7 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
+          'Authorization': `Bearer ${apiKey.trim()}`,
         },
         body: JSON.stringify({ task_id: currentTask.id }),
         signal: controller.signal,
@@ -763,7 +797,7 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
+          'Authorization': `Bearer ${apiKey.trim()}`,
         },
         body: JSON.stringify({ task_id: currentTask.id }),
         signal: controller.signal,
