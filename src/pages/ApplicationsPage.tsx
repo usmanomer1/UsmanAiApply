@@ -19,7 +19,8 @@ import {
   X,
   Trash2,
   ExternalLink,
-  MoreHorizontal
+  MoreHorizontal,
+  Loader2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
