@@ -71,7 +71,7 @@ interface BrowserUseConfig {
   targetCount: string;
 }
 
-const BROWSER_USE_API_BASE = 'https://api.browser-use.com/api/v1';
+const BROWSER_USE_API_BASE = import.meta.env.VITE_BROWSER_USE_API_URL || 'https://api.browseruse.cloud/v1';
 
 // LinkedIn location ID mapping
 const LINKEDIN_LOCATIONS = {
@@ -506,7 +506,7 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    const response = await fetch('https://api.browseruse.com/v1/tasks', {
+    const response = await fetch(`${BROWSER_USE_API_BASE}/tasks`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
