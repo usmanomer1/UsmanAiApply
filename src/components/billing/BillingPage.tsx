@@ -22,7 +22,8 @@ import {
   TrendingUp,
   Activity,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Settings
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -302,7 +303,37 @@ export const BillingPage: React.FC = () => {
       }
     } catch (error) {
       console.error('Error opening billing portal:', error);
-      toast.error(error instanceof Error ? error.message : 'Unable to open billing portal');
+      
+      // Check if this is the specific Stripe configuration error
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      if (errorMessage.includes('No configuration provided') && errorMessage.includes('customer portal settings')) {
+        // Show specific guidance for Stripe configuration issue
+        toast.error(
+          'Stripe Customer Portal not configured. Please set up your customer portal settings in the Stripe dashboard.',
+          { 
+            duration: 8000,
+            style: {
+              maxWidth: '500px',
+            }
+          }
+        );
+        
+        // Show additional help in console for developers
+        console.warn(`
+🔧 Stripe Configuration Required:
+
+To fix this error, you need to configure your Stripe Customer Portal:
+
+1. Go to: https://dashboard.stripe.com/test/settings/billing/portal
+2. Configure your customer portal settings
+3. Save the configuration
+
+This will create the default configuration needed for the billing portal to work.
+        `);
+      } else {
+        toast.error(errorMessage || 'Unable to open billing portal');
+      }
     }
   };
 
