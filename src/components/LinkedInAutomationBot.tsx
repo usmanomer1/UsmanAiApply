@@ -141,6 +141,12 @@ export const LinkedInAutomationBot: React.FC = () => {
     return !!(supabaseUrl && supabaseKey && supabaseUrl !== 'your_supabase_url_here' && supabaseKey !== 'your_supabase_anon_key_here');
   };
 
+  const isBrowserUseApiConfigured = () => {
+    return !!(BROWSER_USE_API_KEY && 
+             BROWSER_USE_API_KEY !== 'your_browser_use_api_key_here' && 
+             BROWSER_USE_API_KEY.trim() !== '');
+  };
+
   const loadConfiguration = async () => {
     if (!isSupabaseConfigured() || !user) {
       console.log('Supabase not configured or no user, using demo mode');
@@ -286,8 +292,9 @@ export const LinkedInAutomationBot: React.FC = () => {
   };
 
   const startAutomation = async () => {
-    if (!BROWSER_USE_API_KEY) {
-      toast.error('Browser Use API key not configured');
+    // Enhanced API key validation
+    if (!isBrowserUseApiConfigured()) {
+      toast.error('Browser Use API key is not configured. Please set VITE_BROWSER_USE_API_KEY in your .env file.');
       return;
     }
 
@@ -338,7 +345,23 @@ Important: Only apply to jobs that have the "Easy Apply" button. Skip jobs that 
       });
 
       if (!response.ok) {
-        throw new Error(`API request failed: ${response.statusText}`);
+        const errorText = await response.text();
+        let errorMessage = `API request failed: ${response.status} ${response.statusText}`;
+        
+        // Try to parse error response for more details
+        try {
+          const errorData = JSON.parse(errorText);
+          if (errorData.error || errorData.message) {
+            errorMessage = errorData.error || errorData.message;
+          }
+        } catch {
+          // If parsing fails, use the raw error text if it's meaningful
+          if (errorText && errorText.length < 200) {
+            errorMessage = errorText;
+          }
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
@@ -363,14 +386,31 @@ Important: Only apply to jobs that have the "Easy Apply" button. Skip jobs that 
       toast.success('Automation started successfully!');
     } catch (error) {
       console.error('Error starting automation:', error);
-      toast.error('Failed to start automation');
+      
+      // Provide more specific error messages
+      let errorMessage = 'Failed to start automation';
+      if (error instanceof Error) {
+        if (error.message.includes('Failed to fetch')) {
+          errorMessage = 'Network error: Unable to connect to Browser Use API. Please check your internet connection and API configuration.';
+        } else if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+          errorMessage = 'Invalid API key: Please check your VITE_BROWSER_USE_API_KEY in the .env file.';
+        } else if (error.message.includes('403') || error.message.includes('Forbidden')) {
+          errorMessage = 'Access denied: Your API key may not have the required permissions.';
+        } else if (error.message.includes('429') || error.message.includes('Too Many Requests')) {
+          errorMessage = 'Rate limit exceeded: Please wait before trying again.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
   const monitorTask = async (taskId: string) => {
-    if (!BROWSER_USE_API_KEY) return;
+    if (!isBrowserUseApiConfigured()) return;
 
     const pollInterval = setInterval(async () => {
       try {
@@ -413,7 +453,7 @@ Important: Only apply to jobs that have the "Easy Apply" button. Skip jobs that 
   };
 
   const pauseTask = async () => {
-    if (!currentTask || !BROWSER_USE_API_KEY) return;
+    if (!currentTask || !isBrowserUseApiConfigured()) return;
 
     try {
       await fetch(`${BROWSER_USE_API_URL}/pause-task/${currentTask.id}`, {
@@ -432,7 +472,7 @@ Important: Only apply to jobs that have the "Easy Apply" button. Skip jobs that 
   };
 
   const resumeTask = async () => {
-    if (!currentTask || !BROWSER_USE_API_KEY) return;
+    if (!currentTask || !isBrowserUseApiConfigured()) return;
 
     try {
       await fetch(`${BROWSER_USE_API_URL}/resume-task/${currentTask.id}`, {
@@ -451,7 +491,7 @@ Important: Only apply to jobs that have the "Easy Apply" button. Skip jobs that 
   };
 
   const stopTask = async () => {
-    if (!currentTask || !BROWSER_USE_API_KEY) return;
+    if (!currentTask || !isBrowserUseApiConfigured()) return;
 
     try {
       await fetch(`${BROWSER_USE_API_URL}/stop-task/${currentTask.id}`, {
@@ -508,6 +548,41 @@ Important: Only apply to jobs that have the "Easy Apply" button. Skip jobs that 
         </p>
       </motion.div>
 
+      {/* API Configuration Warning */}
+      {!isBrowserUseApiConfigured() && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <Card className="glass-card hover-lift border-amber-200 dark:border-amber-800">
+            <CardContent className="p-6">
+              <div className="flex items-start space-x-4">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg">
+                  <AlertCircle className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-amber-800 dark:text-amber-200 mb-2">
+                    API Configuration Required
+                  </h3>
+                  <p className="text-amber-700 dark:text-amber-300 mb-4">
+                    To use LinkedIn automation, you need to configure your Browser Use API key. Please add <code className="bg-amber-100 dark:bg-amber-900/30 px-2 py-1 rounded text-sm">VITE_BROWSER_USE_API_KEY</code> to your .env file.
+                  </p>
+                  <div className="text-sm text-amber-600 dark:text-amber-400">
+                    <strong>Steps:</strong>
+                    <ol className="list-decimal list-inside mt-2 space-y-1">
+                      <li>Get your API key from Browser Use</li>
+                      <li>Add it to your .env file: <code>VITE_BROWSER_USE_API_KEY=your_actual_api_key</code></li>
+                      <li>Restart the development server</li>
+                    </ol>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
       {/* Configuration Status */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -547,6 +622,7 @@ Important: Only apply to jobs that have the "Easy Apply" button. Skip jobs that 
                 variant={isConfigured ? "outline" : "default"}
                 size="lg"
                 className="shadow-lg"
+                disabled={!isBrowserUseApiConfigured()}
               >
                 <Settings className="w-5 h-5 mr-2" />
                 {isConfigured ? 'Reconfigure' : 'Configure'}
@@ -705,7 +781,7 @@ Important: Only apply to jobs that have the "Easy Apply" button. Skip jobs that 
       )}
 
       {/* Start Automation */}
-      {!currentTask && isConfigured && (
+      {!currentTask && isConfigured && isBrowserUseApiConfigured() && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
