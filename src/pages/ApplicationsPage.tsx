@@ -16,7 +16,10 @@ import {
   XCircle,
   CheckCircle,
   Users,
-  X
+  X,
+  Trash2,
+  ExternalLink,
+  MoreHorizontal
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -28,6 +31,7 @@ import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 
 interface JobApplication {
   id: string;
@@ -51,6 +55,11 @@ export const ApplicationsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [error, setError] = useState<string | null>(null);
+  const [selectedApplication, setSelectedApplication] = useState<JobApplication | null>(null);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const isSupabaseConfigured = () => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -133,6 +142,79 @@ export const ApplicationsPage: React.FC = () => {
   useEffect(() => {
     fetchApplications();
   }, [user]);
+
+  const handleViewApplication = (application: JobApplication) => {
+    setSelectedApplication(application);
+    setIsViewDialogOpen(true);
+  };
+
+  const handleEditApplication = (application: JobApplication) => {
+    setSelectedApplication(application);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleDeleteApplication = async (application: JobApplication) => {
+    if (!isSupabaseConfigured() || !user) {
+      toast.error('Database not configured');
+      return;
+    }
+
+    setDeletingId(application.id);
+    
+    try {
+      const { error } = await supabase
+        .from('applications')
+        .delete()
+        .eq('id', application.id);
+
+      if (error) {
+        throw error;
+      }
+
+      // Remove from local state
+      setApplications(prev => prev.filter(app => app.id !== application.id));
+      toast.success('Application deleted successfully');
+      setIsDeleteDialogOpen(false);
+      setSelectedApplication(null);
+    } catch (error) {
+      console.error('Error deleting application:', error);
+      toast.error('Failed to delete application');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const updateApplicationStatus = async (applicationId: string, newStatus: JobApplication['status']) => {
+    if (!isSupabaseConfigured() || !user) {
+      toast.error('Database not configured');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('applications')
+        .update({ status: newStatus })
+        .eq('id', applicationId);
+
+      if (error) {
+        throw error;
+      }
+
+      // Update local state
+      setApplications(prev => 
+        prev.map(app => 
+          app.id === applicationId ? { ...app, status: newStatus } : app
+        )
+      );
+      
+      toast.success('Application status updated');
+      setIsEditDialogOpen(false);
+      setSelectedApplication(null);
+    } catch (error) {
+      console.error('Error updating application:', error);
+      toast.error('Failed to update application');
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -325,11 +407,32 @@ export const ApplicationsPage: React.FC = () => {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end space-x-2">
-                        <Button variant="ghost" size="icon">
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => handleViewApplication(app)}
+                          className="hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                        >
                           <Eye className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="icon">
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => handleEditApplication(app)}
+                          className="hover:bg-green-50 dark:hover:bg-green-900/20"
+                        >
                           <Edit3 className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => {
+                            setSelectedApplication(app);
+                            setIsDeleteDialogOpen(true);
+                          }}
+                          className="hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
                     </TableCell>
@@ -341,6 +444,167 @@ export const ApplicationsPage: React.FC = () => {
         )}
         </Card>
       </motion.div>
+
+      {/* View Application Dialog */}
+      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Building className="w-5 h-5" />
+              <span>Application Details</span>
+            </DialogTitle>
+            <DialogDescription>
+              View detailed information about this job application
+            </DialogDescription>
+          </DialogHeader>
+          {selectedApplication && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Company</label>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-white">{selectedApplication.company}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Role</label>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-white">{selectedApplication.role}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
+                  <Badge className={getStatusColor(selectedApplication.status)}>
+                    {getStatusIcon(selectedApplication.status)}
+                    <span className="ml-2">{selectedApplication.status}</span>
+                  </Badge>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Applied Date</label>
+                  <p className="text-gray-900 dark:text-white">
+                    {new Date(selectedApplication.applied_at).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Location</label>
+                  <p className="text-gray-900 dark:text-white">{selectedApplication.campaign.location}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Job Title</label>
+                  <p className="text-gray-900 dark:text-white">{selectedApplication.campaign.job_title}</p>
+                </div>
+              </div>
+              
+              {selectedApplication.details && Object.keys(selectedApplication.details).length > 0 && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">Additional Details</label>
+                  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                    <pre className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                      {JSON.stringify(selectedApplication.details, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Application Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Edit3 className="w-5 h-5" />
+              <span>Edit Application</span>
+            </DialogTitle>
+            <DialogDescription>
+              Update the status of this job application
+            </DialogDescription>
+          </DialogHeader>
+          {selectedApplication && (
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                  {selectedApplication.company} - {selectedApplication.role}
+                </p>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+                  Application Status
+                </label>
+                <Select 
+                  value={selectedApplication.status} 
+                  onValueChange={(value) => updateApplicationStatus(selectedApplication.id, value as JobApplication['status'])}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SENT">Sent</SelectItem>
+                    <SelectItem value="PENDING">Pending</SelectItem>
+                    <SelectItem value="INTERVIEW">Interview</SelectItem>
+                    <SelectItem value="OA">Online Assessment</SelectItem>
+                    <SelectItem value="ACCEPTED">Accepted</SelectItem>
+                    <SelectItem value="REJECTED">Rejected</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2 text-red-600">
+              <Trash2 className="w-5 h-5" />
+              <span>Delete Application</span>
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this application? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedApplication && (
+            <div className="space-y-4">
+              <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                <p className="text-sm text-red-800 dark:text-red-200">
+                  <strong>{selectedApplication.company}</strong> - {selectedApplication.role}
+                </p>
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                  Applied on {new Date(selectedApplication.applied_at).toLocaleDateString()}
+                </p>
+              </div>
+              <div className="flex justify-end space-x-3">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsDeleteDialogOpen(false)}
+                  disabled={deletingId === selectedApplication.id}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  variant="destructive"
+                  onClick={() => handleDeleteApplication(selectedApplication)}
+                  disabled={deletingId === selectedApplication.id}
+                >
+                  {deletingId === selectedApplication.id ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete Application
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
-}; 
+};
