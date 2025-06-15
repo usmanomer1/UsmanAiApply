@@ -37,10 +37,10 @@ export const STRIPE_PRODUCTS: StripeProduct[] = [
     ]
   },
   {
-    id: 'prod_STtWcPBpRuamgq',
-    priceId: 'price_1RaM40QGabzJD80BYU2QsQwn',
+    id: 'prod_ALT_PRO_PLUS',
+    priceId: 'price_1RYvjSQGabzJD80BbbXxTq2S',
     name: 'AIApply Pro Plus',
-    description: 'Boost your career with 77 automated job applications monthly, powered by our AI-driven job application platform. Get 30,000 AI tokens for advanced resume and cover letter creation—complex tasks count as double tokens. Additional job applications are $0.80 each; extra AI tokens cost $0.10 per 1,000 tokens. Designed for mid-tier users seeking efficiency and control.',
+    description: 'Legacy price id for Pro Plus – same limits as standard Pro Plus plan.',
     mode: 'subscription',
     price: 50.00,
     currency: 'usd',
