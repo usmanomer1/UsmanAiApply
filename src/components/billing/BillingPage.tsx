@@ -74,10 +74,10 @@ const DEMO_SUBSCRIPTION: UserSubscription = {
 const DEMO_USAGE: UsageStats = {
   total_steps: 1250,
   total_cost: 12.50,
-  job_tokens: 125,
-  applications_count: 23,
-  ai_requests_count: 15,
-  ai_tokens_used: 15000
+  job_tokens: 15, // 15 job applications used
+  applications_count: 15,
+  ai_requests_count: 20,
+  ai_tokens_used: 6000 // 6000 AI tokens used out of 30000
 };
 
 export const BillingPage: React.FC = () => {
@@ -135,6 +135,38 @@ export const BillingPage: React.FC = () => {
       const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
       
       if (subData) {
+        // Get job applications count for current month (this is the actual applications, not tokens)
+        const { data: applicationsData, error: applicationsError } = await supabase
+          .from('applications')
+          .select(`
+            id,
+            job_campaigns!campaign_id(
+              profiles!inner(user_id)
+            )
+          `)
+          .eq('job_campaigns.profiles.user_id', user.id)
+          .gte('created_at', currentMonthStart.toISOString())
+          .lt('created_at', nextMonthStart.toISOString());
+
+        const applicationsCount = applicationsData?.length || 0;
+
+        // Get AI token usage for current month - use max_tokens_requested field
+        const { data: aiUsageData, error: aiUsageError } = await supabase
+          .from('ai_token_usage')
+          .select('max_tokens_requested, operation_type')
+          .eq('user_id', user.id)
+          .gte('created_at', currentMonthStart.toISOString())
+          .lt('created_at', nextMonthStart.toISOString());
+
+        // Calculate AI token usage from max_tokens_requested
+        let aiRequestsCount = 0;
+        let aiTokensUsed = 0;
+        if (aiUsageData && !aiUsageError) {
+          aiTokensUsed = aiUsageData.reduce((sum, log) => sum + (log.max_tokens_requested || 0), 0);
+          aiRequestsCount = aiUsageData.length;
+        }
+
+        // Get browser use logs for step count (for reference)
         const { data: usageData, error: usageError } = await supabase
           .from('browser_use_logs')
           .select('step_count, cost_usd')
@@ -142,47 +174,18 @@ export const BillingPage: React.FC = () => {
           .gte('created_at', currentMonthStart.toISOString())
           .lt('created_at', nextMonthStart.toISOString());
 
-        if (usageError) {
-          console.error('Error fetching usage:', usageError);
-          setUsage({ total_steps: 0, total_cost: 0, job_tokens: 0, applications_count: 0, ai_requests_count: 0, ai_tokens_used: 0 });
-        } else {
-          // Calculate totals
-          const totalSteps = usageData?.reduce((sum, log) => sum + log.step_count, 0) || 0;
-          const totalCost = usageData?.reduce((sum, log) => sum + parseFloat(log.cost_usd.toString()), 0) || 0;
-          const jobTokens = Math.ceil(totalSteps / 10);
+        const totalSteps = usageData?.reduce((sum, log) => sum + log.step_count, 0) || 0;
+        const totalCost = usageData?.reduce((sum, log) => sum + parseFloat(log.cost_usd.toString()), 0) || 0;
+        const jobTokens = Math.ceil(totalSteps / 10); // This is for reference, but we use applicationsCount for the actual metric
 
-          // Get applications count for current month
-          const { count: applicationsCount } = await supabase
-            .from('applications')
-            .select('*', { count: 'exact', head: true })
-            .gte('created_at', currentMonthStart.toISOString())
-            .lt('created_at', nextMonthStart.toISOString());
-
-          // Get AI token usage for current month
-          const { data: aiUsageData, error: aiUsageError } = await supabase
-            .from('ai_token_usage')
-            .select('total_tokens, operation_type')
-            .eq('user_id', user.id)
-            .gte('created_at', currentMonthStart.toISOString())
-            .lt('created_at', nextMonthStart.toISOString());
-
-          // Calculate AI token usage
-          let aiRequestsCount = 0;
-          let aiTokensUsed = 0;
-          if (aiUsageData && !aiUsageError) {
-            aiTokensUsed = aiUsageData.reduce((sum, log) => sum + (log.total_tokens || 0), 0);
-            aiRequestsCount = aiUsageData.length;
-          }
-
-          setUsage({
-            total_steps: totalSteps,
-            total_cost: totalCost,
-            job_tokens: jobTokens,
-            applications_count: applicationsCount || 0,
-            ai_requests_count: aiRequestsCount,
-            ai_tokens_used: aiTokensUsed
-          });
-        }
+        setUsage({
+          total_steps: totalSteps,
+          total_cost: totalCost,
+          job_tokens: applicationsCount, // Use actual applications count, not calculated tokens
+          applications_count: applicationsCount,
+          ai_requests_count: aiRequestsCount,
+          ai_tokens_used: aiTokensUsed // This now uses max_tokens_requested
+        });
       } else {
         setUsage({ total_steps: 0, total_cost: 0, job_tokens: 0, applications_count: 0, ai_requests_count: 0, ai_tokens_used: 0 });
       }
@@ -395,14 +398,16 @@ export const BillingPage: React.FC = () => {
                     </span>
                   </div>
                   
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${applicationProgress}%` }}
-                      transition={{ duration: 1, delay: 0.5 }}
-                      className={`h-3 rounded-full bg-gradient-to-r ${getProgressBarColor(applicationProgress)}`}
-                    />
-                  </div>
+                  {limits.applications > 0 && (
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${applicationProgress}%` }}
+                        transition={{ duration: 1, delay: 0.5 }}
+                        className={`h-3 rounded-full bg-gradient-to-r ${getProgressBarColor(applicationProgress)}`}
+                      />
+                    </div>
+                  )}
                   
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-500 dark:text-gray-400">
@@ -444,14 +449,16 @@ export const BillingPage: React.FC = () => {
                     </span>
                   </div>
                   
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${aiTokenProgress}%` }}
-                      transition={{ duration: 1, delay: 0.7 }}
-                      className={`h-3 rounded-full bg-gradient-to-r ${getProgressBarColor(aiTokenProgress)}`}
-                    />
-                  </div>
+                  {limits.aiTokens > 0 && (
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${aiTokenProgress}%` }}
+                        transition={{ duration: 1, delay: 0.7 }}
+                        className={`h-3 rounded-full bg-gradient-to-r ${getProgressBarColor(aiTokenProgress)}`}
+                      />
+                    </div>
+                  )}
                   
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-500 dark:text-gray-400">
