@@ -63,7 +63,7 @@ const DEMO_SUBSCRIPTION: UserSubscription = {
   customer_id: 'cus_demo123',
   subscription_id: 'sub_demo123',
   subscription_status: 'active',
-  price_id: 'price_1RaM5LQGabzJD80B3zGbTHcZ',
+  price_id: 'price_1RaM5LQGabzJD80B3zGbTHcZ', // Pro plan
   current_period_start: Math.floor(Date.now() / 1000),
   current_period_end: Math.floor((Date.now() + 30 * 24 * 60 * 60 * 1000) / 1000),
   cancel_at_period_end: false,
@@ -263,15 +263,14 @@ export const BillingPage: React.FC = () => {
     return getProductByPriceId(subscription.price_id);
   };
 
-  // Get plan limits based on current subscription
+  // Get plan limits based on current subscription using the helper function
   const getPlanUsageLimits = () => {
-    const currentProduct = getCurrentProduct();
-    if (!currentProduct) return { applications: 0, aiTokens: 0 };
+    if (!subscription?.price_id) {
+      return { applications: 0, aiTokens: 0, isSubscription: false };
+    }
     
-    return {
-      applications: currentProduct.applicationCount || 0,
-      aiTokens: currentProduct.aiTokenCount || 0
-    };
+    const limits = getPlanLimits(subscription.price_id);
+    return limits || { applications: 0, aiTokens: 0, isSubscription: false };
   };
 
   const getUsageProgress = (used: number, limit: number) => {
