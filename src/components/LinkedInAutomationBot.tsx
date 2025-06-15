@@ -2,38 +2,27 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Bot, 
+  Settings, 
   Play, 
   Pause, 
   Square, 
-  Settings, 
+  AlertCircle, 
   User, 
+  Globe, 
   Briefcase, 
   Search, 
-  TrendingUp, 
-  BarChart3, 
-  Shield, 
-  Zap, 
   Activity, 
+  Eye, 
+  ExternalLink, 
+  RefreshCw, 
+  Clock, 
+  TrendingUp, 
+  Zap, 
   Crown, 
-  Sparkles, 
-  ChevronRight, 
-  Globe,
-  ExternalLink,
-  Loader2,
-  AlertCircle,
-  CheckCircle,
-  Eye,
-  Lock,
-  Unlock,
-  Target,
-  Calendar,
-  MapPin,
-  Building,
-  DollarSign,
-  Clock,
-  ArrowRight,
-  Info,
-  RefreshCw
+  Building, 
+  Loader2, 
+  Sparkles,
+  Shield 
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
@@ -236,6 +225,7 @@ const LinkedInAutomationBot: React.FC = () => {
   const [userSubscription, setUserSubscription] = useState<any>(null);
   const [monthlyUsage, setMonthlyUsage] = useState({ tokens_used: 0, ai_requests_used: 0, cost_usd: 0 });
   const [loading, setLoading] = useState(true);
+  const [showConfigPanel, setShowConfigPanel] = useState(false);
 
   const isSupabaseConfigured = () => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -489,6 +479,32 @@ const LinkedInAutomationBot: React.FC = () => {
       if (experienceLevel) {
         params.append('f_E', experienceLevel);
       }
+    }
+    
+    // Job type (Full-time, Part-time, etc.)
+    if (config.jobType) {
+      const jobTypeMap: { [key: string]: string } = {
+        'Full-time': 'F',
+        'Part-time': 'P',
+        'Contract': 'C',
+        'Temporary': 'T',
+        'Volunteer': 'V',
+        'Internship': 'I'
+      };
+      const jobType = jobTypeMap[config.jobType];
+      if (jobType) {
+        params.append('f_JT', jobType);
+      }
+    }
+    
+    // Date posted
+    if (config.datePosted) {
+      params.append('f_TPR', config.datePosted);
+    }
+    
+    // Company size
+    if (config.companySize) {
+      params.append('f_C', config.companySize);
     }
     
     // Sort by most recent
@@ -1326,712 +1342,598 @@ This helps track which companies you applied to. Use the exact company names and
   }
 
   return (
-    <div className="space-y-8">
-      {/* Header Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-center"
-      >
+    <div className="max-w-4xl mx-auto space-y-8">
+      {/* Simple Header */}
+      <div className="text-center">
         <div className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full mb-6 shadow-lg">
           <Bot className="w-5 h-5 text-white mr-2" />
           <span className="text-white font-semibold">LinkedIn Auto Apply</span>
         </div>
         
-        <h1 className="text-display-lg text-gray-900 dark:text-white mb-6">
+        <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
           AI-Powered Job Applications
         </h1>
         
-        <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed">
-          Automate your LinkedIn job applications with AI. Set your preferences and let our bot apply to relevant positions using Easy Apply.
+        <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+          Automate your LinkedIn job applications with AI. Set your preferences and let our bot apply to relevant positions.
         </p>
-      </motion.div>
+      </div>
 
       {/* API Configuration Warning */}
       {!apiKey && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="premium-card p-6 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-amber-200 dark:border-amber-800"
-        >
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-6">
           <div className="flex items-start space-x-4">
             <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-xl">
               <AlertCircle className="w-6 h-6 text-amber-600 dark:text-amber-400" />
             </div>
             <div className="flex-1">
-              <h3 className="text-xl font-semibold text-amber-800 dark:text-amber-200 mb-3">
-                Browser Use API Not Configured
+              <h3 className="text-lg font-semibold text-amber-800 dark:text-amber-200 mb-2">
+                API Configuration Required
               </h3>
-              <p className="text-amber-700 dark:text-amber-300 mb-4 leading-relaxed">
-                To use the LinkedIn automation feature, you need to configure the Browser Use API key.
+              <p className="text-amber-700 dark:text-amber-300 mb-4">
+                Please configure your Browser Use API key to enable LinkedIn automation.
               </p>
-              <div className="bg-amber-100 dark:bg-amber-900/40 rounded-lg p-4">
-                <p className="text-sm text-amber-800 dark:text-amber-200 font-medium mb-2">
-                  Required Environment Variables:
-                </p>
-                <ul className="text-sm text-amber-700 dark:text-amber-300 space-y-1">
-                  <li>• <code>VITE_BROWSER_USE_API_KEY</code> - Your Browser Use API key</li>
-                </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Configuration Panel Toggle */}
+      <div className="flex justify-center mb-8">
+        <button
+          onClick={() => setShowConfigPanel(!showConfigPanel)}
+          className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+        >
+          <Settings className="w-5 h-5 mr-2" />
+          {showConfigPanel ? 'Hide Configuration' : 'Configure AI Agent'}
+          {showConfigPanel ? (
+            <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          )}
+        </button>
+      </div>
+
+      {/* Configuration Panel */}
+      {showConfigPanel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/60 backdrop-blur-xl animate-fade-in" 
+            onClick={() => setShowConfigPanel(false)} 
+          />
+          
+          {/* Modal */}
+          <div className="relative bg-white/20 dark:bg-gray-900/20 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/30 dark:border-gray-700/30 p-8 w-full max-w-5xl max-h-[90vh] overflow-y-auto animate-modal-popup">
+            {/* Premium Header */}
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-xl">
+                  <Settings className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-3xl font-bold text-white dark:text-white">
+                    AI Agent Configuration
+                  </h2>
+                  <p className="text-white/80 dark:text-white/80 mt-1">
+                    Customize your intelligent LinkedIn automation assistant
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={saveConfiguration}
+                  className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+                >
+                  <Settings className="w-5 h-5 mr-2" />
+                  Save Configuration
+                </button>
+                <button
+                  onClick={() => setShowConfigPanel(false)}
+                  className="p-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* LinkedIn Credentials */}
+            <div className="space-y-6">
+              <div className="flex items-center space-x-3 pb-4 border-b border-white/20 dark:border-gray-700/20">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <User className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white dark:text-white">LinkedIn Account</h3>
+                  <p className="text-sm text-white/70 dark:text-white/70">Your LinkedIn login credentials</p>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-white/90 dark:text-white/90 mb-2">
+                  Email Address *
+                </label>
+                <input
+                  type="email"
+                  className="w-full px-4 py-3 border border-white/20 dark:border-gray-600/20 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-600 dark:placeholder-white/60 transition-all duration-200"
+                  placeholder="your.email@company.com"
+                  value={config.linkedinEmail}
+                  onChange={(e) => setConfig(prev => ({ ...prev, linkedinEmail: e.target.value }))}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-white/90 dark:text-white/90 mb-2">
+                  Password *
+                </label>
+                <input
+                  type="password"
+                  className="w-full px-4 py-3 border border-white/20 dark:border-gray-600/20 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-600 dark:placeholder-white/60 transition-all duration-200"
+                  placeholder="••••••••••••"
+                  value={config.linkedinPassword}
+                  onChange={(e) => setConfig(prev => ({ ...prev, linkedinPassword: e.target.value }))}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-white/90 dark:text-white/90 mb-2">
+                  Phone Number
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  <select
+                    className="col-span-1 px-3 py-3 border border-white/20 dark:border-gray-600/20 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm text-gray-900 dark:text-white transition-all duration-200"
+                    value={config.countryCode}
+                    onChange={(e) => setConfig(prev => ({ ...prev, countryCode: e.target.value }))}
+                  >
+                    <option value="+1">🇺🇸 +1</option>
+                    <option value="+1">🇨🇦 +1</option>
+                    <option value="+44">🇬🇧 +44</option>
+                    <option value="+33">🇫🇷 +33</option>
+                    <option value="+49">🇩🇪 +49</option>
+                    <option value="+39">🇮🇹 +39</option>
+                    <option value="+34">🇪🇸 +34</option>
+                    <option value="+31">🇳🇱 +31</option>
+                    <option value="+46">🇸🇪 +46</option>
+                    <option value="+47">🇳🇴 +47</option>
+                    <option value="+45">🇩🇰 +45</option>
+                    <option value="+358">🇫🇮 +358</option>
+                    <option value="+41">🇨🇭 +41</option>
+                    <option value="+43">🇦🇹 +43</option>
+                    <option value="+32">🇧🇪 +32</option>
+                    <option value="+351">🇵🇹 +351</option>
+                    <option value="+353">🇮🇪 +353</option>
+                    <option value="+91">🇮🇳 +91</option>
+                    <option value="+86">🇨🇳 +86</option>
+                    <option value="+81">🇯🇵 +81</option>
+                    <option value="+82">🇰🇷 +82</option>
+                    <option value="+65">🇸🇬 +65</option>
+                    <option value="+852">🇭🇰 +852</option>
+                    <option value="+61">🇦🇺 +61</option>
+                    <option value="+64">🇳🇿 +64</option>
+                    <option value="+55">🇧🇷 +55</option>
+                    <option value="+52">🇲🇽 +52</option>
+                    <option value="+54">🇦🇷 +54</option>
+                    <option value="+56">🇨🇱 +56</option>
+                    <option value="+57">🇨🇴 +57</option>
+                    <option value="+51">🇵🇪 +51</option>
+                    <option value="+27">🇿🇦 +27</option>
+                    <option value="+234">🇳🇬 +234</option>
+                    <option value="+20">🇪🇬 +20</option>
+                    <option value="+971">🇦🇪 +971</option>
+                    <option value="+966">🇸🇦 +966</option>
+                    <option value="+90">🇹🇷 +90</option>
+                    <option value="+7">🇷🇺 +7</option>
+                    <option value="+380">🇺🇦 +380</option>
+                    <option value="+48">🇵🇱 +48</option>
+                    <option value="+420">🇨🇿 +420</option>
+                    <option value="+36">🇭🇺 +36</option>
+                    <option value="+40">🇷🇴 +40</option>
+                  </select>
+                  <input
+                    type="tel"
+                    className="col-span-2 px-4 py-3 border border-white/20 dark:border-gray-600/20 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-600 dark:placeholder-white/60 transition-all duration-200"
+                    placeholder="Phone number"
+                    value={config.contactNumber}
+                    onChange={(e) => setConfig(prev => ({ ...prev, contactNumber: e.target.value }))}
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-white/90 dark:text-white/90 mb-2">
+                  Resume Name
+                </label>
+                <input
+                  type="text"
+                  className="w-full px-4 py-3 border border-white/20 dark:border-gray-600/20 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-600 dark:placeholder-white/60 transition-all duration-200"
+                  placeholder="e.g., 'Software Engineer Resume'"
+                  value={config.linkedinResume}
+                  onChange={(e) => setConfig(prev => ({ ...prev, linkedinResume: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            {/* Job Preferences */}
+            <div className="space-y-6">
+              <div className="flex items-center space-x-3 pb-4 border-b border-white/20 dark:border-gray-700/20">
+                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <Briefcase className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white dark:text-white">Job Preferences</h3>
+                  <p className="text-sm text-white/70 dark:text-white/70">Define your job search criteria</p>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-white/90 dark:text-white/90 mb-2">
+                  Job Title
+                </label>
+                <input
+                  type="text"
+                  className="w-full px-4 py-3 border border-white/20 dark:border-gray-600/20 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-600 dark:placeholder-white/60 transition-all duration-200"
+                  placeholder="Software Engineer, Data Scientist..."
+                  value={config.jobTitle}
+                  onChange={(e) => setConfig(prev => ({ ...prev, jobTitle: e.target.value }))}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-white/90 dark:text-white/90 mb-2">
+                  Location
+                </label>
+                <input
+                  type="text"
+                  className="w-full px-4 py-3 border border-white/20 dark:border-gray-600/20 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-600 dark:placeholder-white/60 transition-all duration-200"
+                  placeholder="San Francisco, Remote..."
+                  value={config.location}
+                  onChange={(e) => setConfig(prev => ({ ...prev, location: e.target.value }))}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-white/90 dark:text-white/90 mb-2">
+                  Target Applications
+                </label>
+                <input
+                  type="number"
+                  className="w-full px-4 py-3 border border-white/20 dark:border-gray-600/20 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-600 dark:placeholder-white/60 transition-all duration-200"
+                  placeholder="10"
+                  min="1"
+                  max="50"
+                  value={config.targetCount}
+                  onChange={(e) => setConfig(prev => ({ ...prev, targetCount: e.target.value }))}
+                />
+              </div>
+
+            </div>
+
+            {/* Optional Filters */}
+            <div className="space-y-6">
+              <div className="flex items-center space-x-3 pb-4 border-b border-white/20 dark:border-gray-700/20">
+                <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <Search className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white dark:text-white">Advanced Filters</h3>
+                  <p className="text-sm text-white/70 dark:text-white/70">Optional LinkedIn search filters</p>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-white/90 dark:text-white/90 mb-2">
+                  Work Type
+                </label>
+                <select
+                  className="w-full px-4 py-3 border border-white/20 dark:border-gray-600/20 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm text-gray-900 dark:text-white transition-all duration-200"
+                  value={config.workType || ''}
+                  onChange={(e) => setConfig(prev => ({ ...prev, workType: e.target.value || undefined }))}
+                >
+                  <option value="">Any work type</option>
+                  <option value="Remote">Remote</option>
+                  <option value="On-site">On-site</option>
+                  <option value="Hybrid">Hybrid</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-white/90 dark:text-white/90 mb-2">
+                  Experience Level
+                </label>
+                <select
+                  className="w-full px-4 py-3 border border-white/20 dark:border-gray-600/20 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm text-gray-900 dark:text-white transition-all duration-200"
+                  value={config.experienceLevel || ''}
+                  onChange={(e) => setConfig(prev => ({ ...prev, experienceLevel: e.target.value || undefined }))}
+                >
+                  <option value="">Any experience level</option>
+                  <option value="Internship">Internship</option>
+                  <option value="Entry level">Entry level</option>
+                  <option value="Associate">Associate</option>
+                  <option value="Mid-Senior level">Mid-Senior level</option>
+                  <option value="Director">Director</option>
+                  <option value="Executive">Executive</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-white/90 dark:text-white/90 mb-2">
+                  Job Type
+                </label>
+                <select
+                  className="w-full px-4 py-3 border border-white/20 dark:border-gray-600/20 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm text-gray-900 dark:text-white transition-all duration-200"
+                  value={config.jobType || ''}
+                  onChange={(e) => setConfig(prev => ({ ...prev, jobType: e.target.value || undefined }))}
+                >
+                  <option value="">Any job type</option>
+                  <option value="Full-time">Full-time</option>
+                  <option value="Part-time">Part-time</option>
+                  <option value="Contract">Contract</option>
+                  <option value="Temporary">Temporary</option>
+                  <option value="Volunteer">Volunteer</option>
+                  <option value="Internship">Internship</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-white/90 dark:text-white/90 mb-2">
+                  Date Posted
+                </label>
+                <select
+                  className="w-full px-4 py-3 border border-white/20 dark:border-gray-600/20 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm text-gray-900 dark:text-white transition-all duration-200"
+                  value={config.datePosted || ''}
+                  onChange={(e) => setConfig(prev => ({ ...prev, datePosted: e.target.value || undefined }))}
+                >
+                  <option value="">Any time</option>
+                  <option value="r86400">Past 24 hours</option>
+                  <option value="r604800">Past week</option>
+                  <option value="r2592000">Past month</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-white/90 dark:text-white/90 mb-2">
+                  Company Size
+                </label>
+                <select
+                  className="w-full px-4 py-3 border border-white/20 dark:border-gray-600/20 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm text-gray-900 dark:text-white transition-all duration-200"
+                  value={config.companySize || ''}
+                  onChange={(e) => setConfig(prev => ({ ...prev, companySize: e.target.value || undefined }))}
+                >
+                  <option value="">Any company size</option>
+                  <option value="A">Self-employed</option>
+                  <option value="B">1-10 employees</option>
+                  <option value="C">11-50 employees</option>
+                  <option value="D">51-200 employees</option>
+                  <option value="E">201-500 employees</option>
+                  <option value="F">501-1000 employees</option>
+                  <option value="G">1001-5000 employees</option>
+                  <option value="H">5001-10000 employees</option>
+                  <option value="I">10001+ employees</option>
+                </select>
               </div>
             </div>
           </div>
-        </motion.div>
+
+          {/* AI Instructions - Full Width */}
+          <div className="lg:col-span-3 mt-8 pt-8 border-t border-gray-200/50 dark:border-gray-700/50">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                <Sparkles className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white">AI Agent Instructions</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Prompt your AI agent with custom behavior instructions</p>
+              </div>
+            </div>
+            
+            <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+              <div className="flex items-start space-x-3">
+                <div className="p-2 bg-blue-100 dark:bg-blue-800 rounded-lg">
+                  <Sparkles className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-1">
+                    Prompt Your AI Agent
+                  </p>
+                  <p className="text-xs text-blue-600 dark:text-blue-300">
+                    Give your AI agent specific instructions beyond the standard filters. This is for behavioral guidance, preferences, and custom decision-making criteria.
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <textarea
+              className="w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 resize-none transition-all duration-200"
+              rows={4}
+              placeholder="e.g., 'Prioritize companies with good work-life balance', 'Avoid positions requiring extensive travel', 'Focus on mission-driven organizations'..."
+              value={config.customInstructions}
+              onChange={(e) => setConfig(prev => ({ ...prev, customInstructions: e.target.value }))}
+            />
+          </div>
+        </div>
+        </div>
       )}
 
-      {/* Main Dashboard Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-        {/* Left Column - Configuration & Controls */}
-        <div className="xl:col-span-1 space-y-6">
-          {/* LinkedIn Credentials Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <Card className="glass-card hover-lift">
-              <CardHeader className="pb-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                    <User className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg text-gray-900 dark:text-white">LinkedIn Account</CardTitle>
-                    <CardDescription className="text-gray-600 dark:text-gray-300">
-                      Your LinkedIn login credentials
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Input
-                  type="email"
-                  value={config.linkedinEmail}
-                  onChange={(e) => setConfig(prev => ({ ...prev, linkedinEmail: e.target.value }))}
-                  placeholder="LinkedIn Email"
-                  className="premium-input"
-                />
-                <Input
-                  type="password"
-                  value={config.linkedinPassword}
-                  onChange={(e) => setConfig(prev => ({ ...prev, linkedinPassword: e.target.value }))}
-                  placeholder="LinkedIn Password"
-                  className="premium-input"
-                />
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Contact & Resume Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25 }}
-          >
-            <Card className="glass-card hover-lift">
-              <CardHeader className="pb-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg">
-                    <Globe className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg text-gray-900 dark:text-white">Contact & Resume</CardTitle>
-                    <CardDescription className="text-gray-600 dark:text-gray-300">
-                      Contact information and resume selection
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Contact Number with Country Code */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Contact Number
-                  </label>
-                  <div className="grid grid-cols-4 gap-2">
-                    <Select value={config.countryCode} onValueChange={(value) => setConfig(prev => ({ ...prev, countryCode: value }))}>
-                      <SelectTrigger className="premium-select">
-                        <SelectValue placeholder="Code" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {COUNTRY_CODES.map((country) => (
-                          <SelectItem key={country.code} value={country.code}>
-                            <div className="flex items-center space-x-2">
-                              <span>{country.flag}</span>
-                              <span>{country.code}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      type="tel"
-                      value={config.contactNumber}
-                      onChange={(e) => setConfig(prev => ({ ...prev, contactNumber: e.target.value.replace(/[^0-9]/g, '') }))}
-                      placeholder="Phone number"
-                      className="premium-input col-span-3"
-                    />
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Select your country code and enter phone number without the country code
-                  </p>
-                </div>
-
-                {/* LinkedIn Resume */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    LinkedIn Resume Name
-                  </label>
-                  <Input
-                    type="text"
-                    value={config.linkedinResume}
-                    onChange={(e) => setConfig(prev => ({ ...prev, linkedinResume: e.target.value }))}
-                    placeholder="e.g., 'Software Engineer Resume', 'Updated Resume 2024'"
-                    className="premium-input"
-                  />
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Enter the exact name of your resume as saved on LinkedIn
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Job Search Preferences Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            <Card className="glass-card hover-lift">
-              <CardHeader className="pb-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
-                    <Briefcase className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg text-gray-900 dark:text-white">Job Preferences</CardTitle>
-                    <CardDescription className="text-gray-600 dark:text-gray-300">
-                      Define your job search criteria
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Job Title / Keywords
-                    </label>
-                    <Input
-                      type="text"
-                      value={config.jobTitle}
-                      onChange={(e) => setConfig(prev => ({ ...prev, jobTitle: e.target.value }))}
-                      placeholder="Software Engineer, Data Scientist, Product Manager..."
-                      className="premium-input"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Location
-                    </label>
-                    <Input
-                      type="text"
-                      value={config.location}
-                      onChange={(e) => setConfig(prev => ({ ...prev, location: e.target.value }))}
-                      placeholder="San Francisco, New York, Remote..."
-                      className="premium-input"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Target Applications
-                    </label>
-                    <Input
-                      type="number"
-                      value={config.targetCount}
-                      onChange={(e) => setConfig(prev => ({ ...prev, targetCount: e.target.value }))}
-                      placeholder="10"
-                      min="1"
-                      max="50"
-                      className="premium-input"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Advanced Filters Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35 }}
-          >
-            <Card className="glass-card hover-lift">
-              <CardHeader className="pb-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center shadow-lg">
-                    <Search className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg text-gray-900 dark:text-white">Advanced Filters</CardTitle>
-                    <CardDescription className="text-gray-600 dark:text-gray-300">
-                      Optional filters to refine your search
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Work Type
-                    </label>
-                    <Select value={config.workType} onValueChange={(value) => setConfig(prev => ({ ...prev, workType: value }))}>
-                      <SelectTrigger className="premium-select">
-                        <SelectValue placeholder="Any work type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="any">Any</SelectItem>
-                        <SelectItem value="Remote">Remote</SelectItem>
-                        <SelectItem value="On-site">On-site</SelectItem>
-                        <SelectItem value="Hybrid">Hybrid</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Experience Level
-                    </label>
-                    <Select value={config.experienceLevel} onValueChange={(value) => setConfig(prev => ({ ...prev, experienceLevel: value }))}>
-                      <SelectTrigger className="premium-select">
-                        <SelectValue placeholder="Any experience level" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="any">Any</SelectItem>
-                        <SelectItem value="Internship">Internship</SelectItem>
-                        <SelectItem value="Entry level">Entry level</SelectItem>
-                        <SelectItem value="Associate">Associate</SelectItem>
-                        <SelectItem value="Mid-Senior level">Mid-Senior level</SelectItem>
-                        <SelectItem value="Director">Director</SelectItem>
-                        <SelectItem value="Executive">Executive</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Date Posted
-                    </label>
-                    <Select value={config.datePosted} onValueChange={(value) => setConfig(prev => ({ ...prev, datePosted: value }))}>
-                      <SelectTrigger className="premium-select">
-                        <SelectValue placeholder="Any time" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="any">Any time</SelectItem>
-                        <SelectItem value="r86400">Past 24 hours</SelectItem>
-                        <SelectItem value="r604800">Past week</SelectItem>
-                        <SelectItem value="r2592000">Past month</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* AI Custom Instructions Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-          >
-            <Card className="glass-card hover-lift">
-              <CardHeader className="pb-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                    <Bot className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg text-gray-900 dark:text-white">AI Instructions</CardTitle>
-                    <CardDescription className="text-gray-600 dark:text-gray-300">
-                      Customize the AI agent behavior
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                  <div className="flex items-start space-x-2">
-                    <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                    <div className="text-sm text-blue-800 dark:text-blue-200">
-                      <p className="font-medium mb-1">Powered by GPT-4o</p>
-                      <p>Our autonomous browser agent understands natural language and can adapt to your specific requirements.</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Custom Instructions (Optional)
-                  </label>
-                  <textarea
-                    value={config.customInstructions}
-                    onChange={(e) => setConfig(prev => ({ ...prev, customInstructions: e.target.value }))}
-                    placeholder="e.g., 'Focus on remote positions only', 'Skip jobs requiring security clearance', 'Prioritize startups over large corporations', 'Apply only to companies with 100+ employees'"
-                    className="premium-input min-h-[100px] resize-none"
-                    rows={4}
-                  />
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Provide specific guidance to help the AI make better decisions during applications
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Save Configuration Button */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.45 }}
-          >
-            <Button
-              onClick={saveConfiguration}
-              variant="outline"
-              className="w-full h-12 text-base font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-200"
-            >
-              <Settings className="w-5 h-5 mr-2" />
-              Save Configuration
-            </Button>
-          </motion.div>
-
-          {/* Usage & Plan Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-          >
-            <Card className="glass-card hover-lift">
-              <CardHeader className="pb-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg">
-                    <Crown className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg text-gray-900 dark:text-white">Usage & Plan</CardTitle>
-                    <CardDescription className="text-gray-600 dark:text-gray-300">
-                      {getPlanName()}
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Job Tokens</span>
-                    <span className="text-sm text-gray-600 dark:text-gray-400 font-mono">
-                      {monthlyUsage.tokens_used}/{getTokenLimit()}
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                    <div
-                      className="bg-gradient-to-r from-amber-500 to-orange-600 h-2 rounded-full transition-all duration-300"
-                      style={{ 
-                        width: `${Math.min((monthlyUsage.tokens_used / getTokenLimit()) * 100, 100)}%` 
-                      }}
-                    />
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
-                    {getTokenLimit() - monthlyUsage.tokens_used} tokens remaining this month
-                  </div>
-                </div>
-
-                {!canStartAutomation() && (
-                  <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
-                    <div className="flex items-center space-x-2">
-                      <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                      <span className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                        Usage limit reached
-                      </span>
-                    </div>
-                    <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-                      Upgrade your plan to continue using automation features.
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
+      {/* Control Panel */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-8">
+        <div className="flex items-center space-x-4 mb-8">
+          <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg">
+            <Activity className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Automation Control</h3>
+            <p className="text-gray-600 dark:text-gray-300">Monitor and control your LinkedIn automation</p>
+          </div>
         </div>
 
-        {/* Right Column - Dashboard & Live Preview */}
-        <div className="xl:col-span-2 space-y-6">
-          {/* Control Panel */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-          >
-            <Card className="glass-card hover-lift">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg">
-                      <Activity className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-xl text-gray-900 dark:text-white">Automation Control</CardTitle>
-                      <CardDescription className="text-gray-600 dark:text-gray-300">
-                        Monitor and control your LinkedIn automation
-                      </CardDescription>
-                    </div>
-                  </div>
-                  {currentTask?.live_url && (
-                    <Button
-                      asChild
-                      variant="outline"
-                      size="sm"
-                    >
-                      <a href={currentTask.live_url} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="w-4 h-4 mr-2" />
-                        Live View
-                      </a>
-                    </Button>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Metrics Grid */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
-                    <div className="flex items-center justify-between mb-2">
-                      <Search className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-                    </div>
-                    <div className="text-2xl font-bold text-gray-900 dark:text-white">{stepCount}</div>
-                    <div className="text-sm text-blue-600 dark:text-blue-400">Steps</div>
-                  </div>
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
+            <div className="flex items-center justify-between mb-2">
+              <Search className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+            </div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">{stepCount}</div>
+            <div className="text-sm text-blue-600 dark:text-blue-400">Steps</div>
+          </div>
 
-                  <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-4 border border-purple-200 dark:border-purple-800">
-                    <div className="flex items-center justify-between mb-2">
-                      <Zap className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                      <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
-                    </div>
-                    <div className="text-2xl font-bold text-gray-900 dark:text-white">{Math.ceil(stepCount / 10)}</div>
-                    <div className="text-sm text-purple-600 dark:text-purple-400">Tokens</div>
-                  </div>
+          <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-4 border border-purple-200 dark:border-purple-800">
+            <div className="flex items-center justify-between mb-2">
+              <Zap className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
+            </div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">{Math.ceil(stepCount / 10)}</div>
+            <div className="text-sm text-purple-600 dark:text-purple-400">Tokens</div>
+          </div>
 
-                  <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-4 border border-emerald-200 dark:border-emerald-800">
-                    <div className="flex items-center justify-between mb-2">
-                      <Briefcase className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                      <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                    </div>
-                    <div className="text-2xl font-bold text-gray-900 dark:text-white">{appliedCount}</div>
-                    <div className="text-sm text-emerald-600 dark:text-emerald-400">Applied</div>
-                  </div>
+          <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-4 border border-emerald-200 dark:border-emerald-800">
+            <div className="flex items-center justify-between mb-2">
+              <Briefcase className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+            </div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">{appliedCount}</div>
+            <div className="text-sm text-emerald-600 dark:text-emerald-400">Applied</div>
+          </div>
 
-                  <div className="bg-orange-50 dark:bg-orange-900/20 rounded-xl p-4 border border-orange-200 dark:border-orange-800">
-                    <div className="flex items-center justify-between mb-2">
-                      <TrendingUp className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                      <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
-                    </div>
-                    <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {appliedCount > 0 ? Math.round((appliedCount / Math.max(stepCount, 1)) * 100) : 0}%
-                    </div>
-                    <div className="text-sm text-orange-600 dark:text-orange-400">Success</div>
-                  </div>
-                </div>
+          <div className="bg-orange-50 dark:bg-orange-900/20 rounded-xl p-4 border border-orange-200 dark:border-orange-800">
+            <div className="flex items-center justify-between mb-2">
+              <TrendingUp className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+              <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+            </div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">
+              {appliedCount > 0 ? Math.round((appliedCount / parseInt(config.targetCount)) * 100) : 0}%
+            </div>
+            <div className="text-sm text-orange-600 dark:text-orange-400">Progress</div>
+          </div>
+        </div>
 
-                {/* Control Buttons */}
-                <div className="flex flex-col sm:flex-row gap-4">
-                  {!isRunning ? (
-                    <Button
-                      onClick={startAutomation}
-                      disabled={!canStartAutomation() || !apiKey}
-                      className="flex-1 h-14 text-lg font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
-                    >
-                      <Play className="w-5 h-5 mr-2" />
-                      Start Auto Apply
-                    </Button>
-                  ) : (
-                    <>
-                      {!isPaused ? (
-                        <Button
-                          onClick={pauseAutomation}
-                          variant="outline"
-                          className="flex-1 h-14 text-lg font-bold"
-                        >
-                          <Pause className="w-5 h-5 mr-2" />
-                          Pause
-                        </Button>
-                      ) : (
-                        <Button
-                          onClick={resumeAutomation}
-                          className="flex-1 h-14 text-lg font-bold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
-                        >
-                          <Play className="w-5 h-5 mr-2" />
-                          Resume
-                        </Button>
-                      )}
-                      <Button
-                        onClick={stopAutomation}
-                        variant="destructive"
-                        className="flex-1 h-14 text-lg font-bold"
-                      >
-                        <Square className="w-5 h-5 mr-2" />
-                        Stop
-                      </Button>
-                    </>
-                  )}
-                </div>
-
-                {/* Status Display */}
-                {currentTask && (
-                  <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Status:</span>
-                      <Badge 
-                        variant={
-                          currentTask.status === 'running' ? 'default' : 
-                          currentTask.status === 'finished' ? 'success' : 
-                          currentTask.status === 'failed' ? 'destructive' : 'outline'
-                        }
-                        className="capitalize"
-                      >
-                        {isRunning && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
-                        {currentTask.status}
-                      </Badge>
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">
-                      Task ID: {currentTask.id}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Browser Preview Card */}
-          {currentTask?.live_url && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
+        {/* Control Buttons */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          {!isRunning ? (
+            <button
+              onClick={startAutomation}
+              disabled={!canStartAutomation() || !apiKey}
+              className="flex-1 inline-flex items-center justify-center px-6 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
-              <Card className="glass-card hover-lift">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
-                        <Eye className="w-6 h-6 text-white" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-xl text-gray-900 dark:text-white">Live Browser Preview</CardTitle>
-                        <CardDescription className="text-gray-600 dark:text-gray-300">
-                          Watch your automation in real-time
-                        </CardDescription>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        asChild
-                        variant="outline"
-                        size="sm"
-                      >
-                        <a href={currentTask.live_url} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink className="w-4 h-4 mr-2" />
-                          Full Screen
-                        </a>
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          const iframe = document.getElementById('browser-preview-iframe') as HTMLIFrameElement;
-                          if (iframe) {
-                            iframe.src = iframe.src; // Refresh iframe
-                          }
-                        }}
-                        variant="outline"
-                        size="sm"
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-2">
-                  <div className="relative w-full bg-gray-100 dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-                      <div className="flex items-center space-x-2">
-                        <div className="flex items-center space-x-2">
-                          <div className="flex space-x-1">
-                            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                            <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                          </div>
-                          <div className="flex items-center space-x-2 ml-4">
-                            <Globe className="w-4 h-4 text-gray-500" />
-                            <span className="text-sm text-gray-600 dark:text-gray-400 font-mono truncate max-w-96">
-                              {currentTask.live_url}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                        <span className="text-xs text-green-600 dark:text-green-400 font-medium">LIVE</span>
-                      </div>
-                    </div>
-                    <div className="relative" style={{ paddingBottom: '56.25%', height: 0 }}>
-                      <iframe
-                        id="browser-preview-iframe"
-                        src={currentTask.live_url}
-                        className="absolute top-0 left-0 w-full h-full"
-                        style={{ border: 'none' }}
-                        allow="camera; microphone; display-capture"
-                        sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-downloads"
-                        loading="lazy"
-                      />
-                    </div>
-                    <div className="px-4 py-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center space-x-4">
-                          <div className="flex items-center space-x-2">
-                            <Activity className="w-4 h-4 text-blue-500" />
-                            <span className="text-gray-600 dark:text-gray-400">
-                              Status: <span className="font-medium text-gray-900 dark:text-white capitalize">{currentTask.status}</span>
-                            </span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Clock className="w-4 h-4 text-purple-500" />
-                            <span className="text-gray-600 dark:text-gray-400">
-                              Steps: <span className="font-medium text-gray-900 dark:text-white">{stepCount}</span>
-                            </span>
-                          </div>
-                        </div>
-                        <Button
-                          asChild
-                          variant="ghost"
-                          size="sm"
-                          className="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
-                        >
-                          <a href={currentTask.live_url} target="_blank" rel="noopener noreferrer">
-                            <ExternalLink className="w-4 h-4 mr-1" />
-                            Open in new tab
-                          </a>
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
+              <Play className="w-5 h-5 mr-2" />
+              Start Auto Apply
+            </button>
+          ) : (
+            <>
+              {!isPaused ? (
+                <button
+                  onClick={pauseAutomation}
+                  disabled={!currentTask?.id}
+                  className="flex-1 inline-flex items-center justify-center px-6 py-4 bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Pause className="w-5 h-5 mr-2" />
+                  Pause
+                </button>
+              ) : (
+                <button
+                  onClick={resumeAutomation}
+                  className="flex-1 inline-flex items-center justify-center px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
+                >
+                  <Play className="w-5 h-5 mr-2" />
+                  Resume
+                </button>
+              )}
+              <button
+                onClick={stopAutomation}
+                disabled={!currentTask?.id}
+                className="flex-1 inline-flex items-center justify-center px-6 py-4 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Square className="w-5 h-5 mr-2" />
+                Stop
+              </button>
+            </>
           )}
         </div>
+
+        {/* Status Display */}
+        {currentTask && (
+          <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-xl">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Current Status</span>
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                currentTask.status === 'running' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' :
+                currentTask.status === 'paused' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400' :
+                currentTask.status === 'finished' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400' :
+                'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
+              }`}>
+                {currentTask.status}
+              </span>
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+              Task ID: {currentTask.id}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Browser Preview */}
+      {currentTask?.live_url && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                <Eye className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Live Browser Preview</h3>
+                <p className="text-gray-600 dark:text-gray-300">Watch your automation in real-time</p>
+              </div>
+            </div>
+            <a
+              href={currentTask.live_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Full Screen
+            </a>
+          </div>
+          
+          <div className="relative w-full bg-gray-100 dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center space-x-2">
+                <div className="flex space-x-1">
+                  <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                  <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                </div>
+                <Globe className="w-4 h-4 text-gray-500 ml-4" />
+                <span className="text-sm text-gray-600 dark:text-gray-400 font-mono">
+                  {currentTask.live_url}
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-xs text-green-600 dark:text-green-400 font-medium">LIVE</span>
+              </div>
+            </div>
+            <div className="relative" style={{ paddingBottom: '56.25%', height: 0 }}>
+              <iframe
+                id="browser-preview-iframe"
+                src={currentTask.live_url}
+                className="absolute top-0 left-0 w-full h-full"
+                style={{ border: 'none' }}
+                allow="camera; microphone; display-capture"
+                sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-downloads"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
