@@ -164,17 +164,38 @@ export const DashboardHome: React.FC = () => {
       const startDate = new Date();
       startDate.setDate(endDate.getDate() - 6); // Last 7 days including today
 
+      // First get user's profile to get campaigns
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profileError || !profileData) {
+        console.log('No profile found, using demo data');
+        setApplicationTrendData(generateDemoTrendData());
+        return;
+      }
+
+      // Get user's campaigns
+      const { data: campaignData, error: campaignError } = await supabase
+        .from('job_campaigns')
+        .select('id')
+        .eq('profile_id', profileData.id);
+
+      if (campaignError || !campaignData || campaignData.length === 0) {
+        console.log('No campaigns found, using demo data');
+        setApplicationTrendData(generateDemoTrendData());
+        return;
+      }
+
+      const campaignIds = campaignData.map(c => c.id);
+
+      // Get applications for the last 7 days
       const { data: applicationsData, error } = await supabase
         .from('applications')
-        .select(`
-          created_at,
-          job_campaigns!campaign_id(
-            profiles!inner(
-              user_id
-            )
-          )
-        `)
-        .eq('job_campaigns.profiles.user_id', user.id)
+        .select('created_at, applied_at')
+        .in('campaign_id', campaignIds)
         .gte('created_at', startDate.toISOString().split('T')[0])
         .lte('created_at', endDate.toISOString().split('T')[0]);
 
@@ -220,18 +241,38 @@ export const DashboardHome: React.FC = () => {
         return;
       }
 
+      // First get user's profile to get campaigns
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profileError || !profileData) {
+        console.log('No profile found for status distribution, using demo data');
+        setStatusDistributionData(generateDemoStatusData());
+        return;
+      }
+
+      // Get user's campaigns
+      const { data: campaignData, error: campaignError } = await supabase
+        .from('job_campaigns')
+        .select('id')
+        .eq('profile_id', profileData.id);
+
+      if (campaignError || !campaignData || campaignData.length === 0) {
+        console.log('No campaigns found for status distribution, using demo data');
+        setStatusDistributionData(generateDemoStatusData());
+        return;
+      }
+
+      const campaignIds = campaignData.map(c => c.id);
+
       // Get all applications for the user
       const { data: applicationsData, error } = await supabase
         .from('applications')
-        .select(`
-          status,
-          job_campaigns!campaign_id(
-            profiles!inner(
-              user_id
-            )
-          )
-        `)
-        .eq('job_campaigns.profiles.user_id', user.id);
+        .select('status')
+        .in('campaign_id', campaignIds);
 
       if (error) {
         console.error('Error fetching status distribution data:', error);
@@ -331,75 +372,91 @@ export const DashboardHome: React.FC = () => {
       const weekAgo = new Date(currentDate.getTime() - 7 * 24 * 60 * 60 * 1000);
       const monthAgo = new Date(currentDate.getTime() - 30 * 24 * 60 * 60 * 1000);
 
+      // First get user's profile
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profileError || !profileData) {
+        console.log('No profile found, using demo data');
+        // Use demo data if no profile
+        const totalApps = 0;
+        setStats({
+          totalApplications: totalApps,
+          thisWeekApplications: 0,
+          successRate: 0,
+          activeJobs: 0,
+          tokensUsed: 0,
+          tokensRemaining: 75
+        });
+        setRecentApplications([]);
+        await Promise.all([
+          fetchApplicationTrendData(),
+          fetchStatusDistributionData()
+        ]);
+        setLoading(false);
+        return;
+      }
+
+      // Get user's campaigns
+      const { data: campaignData, error: campaignError } = await supabase
+        .from('job_campaigns')
+        .select('id')
+        .eq('profile_id', profileData.id);
+
+      if (campaignError || !campaignData || campaignData.length === 0) {
+        console.log('No campaigns found, using demo data');
+        setStats({
+          totalApplications: 0,
+          thisWeekApplications: 0,
+          successRate: 0,
+          activeJobs: 0,
+          tokensUsed: 0,
+          tokensRemaining: 75
+        });
+        setRecentApplications([]);
+        await Promise.all([
+          fetchApplicationTrendData(),
+          fetchStatusDistributionData()
+        ]);
+        setLoading(false);
+        return;
+      }
+
+      const campaignIds = campaignData.map(c => c.id);
+
       // Get total applications for the user
       const { count: totalCount } = await supabase
         .from('applications')
         .select('*', { count: 'exact', head: true })
-        .in('campaign_id', 
-          await supabase
-            .from('job_campaigns')
-            .select('id')
-            .in('profile_id',
-              await supabase
-                .from('profiles')
-                .select('id')
-                .eq('user_id', user.id)
-                .then(({ data }) => data?.map(p => p.id) || [])
-            )
-            .then(({ data }) => data?.map(c => c.id) || [])
-        );
+        .in('campaign_id', campaignIds);
 
       // Get this week's applications
       const { count: weekCount } = await supabase
         .from('applications')
         .select('*', { count: 'exact', head: true })
-        .gte('created_at', weekAgo.toISOString())
-        .in('campaign_id', 
-          await supabase
-            .from('job_campaigns')
-            .select('id')
-            .in('profile_id',
-              await supabase
-                .from('profiles')
-                .select('id')
-                .eq('user_id', user.id)
-                .then(({ data }) => data?.map(p => p.id) || [])
-            )
-            .then(({ data }) => data?.map(c => c.id) || [])
-        );
+        .in('campaign_id', campaignIds)
+        .gte('created_at', weekAgo.toISOString());
 
       // Get accepted applications for success rate calculation
       const { count: acceptedCount } = await supabase
         .from('applications')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'ACCEPTED')
-        .in('campaign_id', 
-          await supabase
-            .from('job_campaigns')
-            .select('id')
-            .in('profile_id',
-              await supabase
-                .from('profiles')
-                .select('id')
-                .eq('user_id', user.id)
-                .then(({ data }) => data?.map(p => p.id) || [])
-            )
-            .then(({ data }) => data?.map(c => c.id) || [])
-        );
+        .in('campaign_id', campaignIds);
 
-      // Get recent applications
+      // Get recent applications with campaign details
       const { data: applicationsData } = await supabase
         .from('applications')
         .select(`
           *,
           job_campaigns!campaign_id(
-            location,
-            profiles!inner(
-              user_id
-            )
+            location
           )
         `)
-        .eq('job_campaigns.profiles.user_id', user.id)
+        .in('campaign_id', campaignIds)
         .order('created_at', { ascending: false })
         .limit(5);
 
@@ -450,6 +507,10 @@ export const DashboardHome: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    await fetchDashboardData();
   };
 
   const handleAddApplication = async () => {
@@ -583,27 +644,6 @@ export const DashboardHome: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
-  const exportData = () => {
-    const csvContent = [
-      ['Company', 'Role', 'Status', 'Applied Date', 'Location'],
-      ...recentApplications.map(app => [
-        app.company,
-        app.role,
-        app.status,
-        new Date(app.applied_at).toLocaleDateString(),
-        app.campaign.location
-      ])
-    ].map(row => row.join(',')).join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'applications.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
-  };
-
   if (loading) {
     return (
       <div className="space-y-8">
@@ -645,7 +685,7 @@ export const DashboardHome: React.FC = () => {
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
-          <Button onClick={exportData} variant="outline" size="sm">
+          <Button onClick={() => {}} variant="outline" size="sm">
             <Download className="w-4 h-4 mr-2" />
             Export
           </Button>
