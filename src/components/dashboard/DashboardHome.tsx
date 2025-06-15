@@ -54,23 +54,17 @@ interface RecentApplication {
   };
 }
 
-// Sample data for charts
-const applicationTrendData = [
-  { name: 'Mon', applications: 4 },
-  { name: 'Tue', applications: 3 },
-  { name: 'Wed', applications: 6 },
-  { name: 'Thu', applications: 8 },
-  { name: 'Fri', applications: 5 },
-  { name: 'Sat', applications: 2 },
-  { name: 'Sun', applications: 1 },
-];
+interface ApplicationTrendData {
+  name: string;
+  applications: number;
+  date: string;
+}
 
-const statusDistributionData = [
-  { name: 'Sent', value: 45, color: '#3B82F6' },
-  { name: 'Pending', value: 25, color: '#F59E0B' },
-  { name: 'Interview', value: 20, color: '#8B5CF6' },
-  { name: 'Rejected', value: 10, color: '#EF4444' },
-];
+interface StatusDistributionData {
+  name: string;
+  value: number;
+  color: string;
+}
 
 export const DashboardHome: React.FC = () => {
   const { user } = useAuth();
@@ -83,6 +77,8 @@ export const DashboardHome: React.FC = () => {
     tokensRemaining: 75
   });
   const [recentApplications, setRecentApplications] = useState<RecentApplication[]>([]);
+  const [applicationTrendData, setApplicationTrendData] = useState<ApplicationTrendData[]>([]);
+  const [statusDistributionData, setStatusDistributionData] = useState<StatusDistributionData[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -102,6 +98,156 @@ export const DashboardHome: React.FC = () => {
   useEffect(() => {
     fetchDashboardData();
   }, [user]);
+
+  const generateDemoTrendData = (): ApplicationTrendData[] => {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const today = new Date();
+    
+    return days.map((day, index) => {
+      const date = new Date(today);
+      date.setDate(today.getDate() - (6 - index)); // Last 7 days
+      
+      return {
+        name: day,
+        applications: Math.floor(Math.random() * 8) + 1, // Random 1-8 applications
+        date: date.toISOString().split('T')[0]
+      };
+    });
+  };
+
+  const generateDemoStatusData = (): StatusDistributionData[] => {
+    return [
+      { name: 'Sent', value: 45, color: '#3B82F6' },
+      { name: 'Pending', value: 25, color: '#F59E0B' },
+      { name: 'Interview', value: 20, color: '#8B5CF6' },
+      { name: 'Rejected', value: 10, color: '#EF4444' },
+    ];
+  };
+
+  const fetchApplicationTrendData = async () => {
+    try {
+      if (!isSupabaseConfigured() || !user) {
+        // Generate demo data
+        setApplicationTrendData(generateDemoTrendData());
+        return;
+      }
+
+      // Get applications from the last 7 days
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(endDate.getDate() - 6); // Last 7 days including today
+
+      const { data: applicationsData, error } = await supabase
+        .from('applications')
+        .select(`
+          created_at,
+          job_campaigns!campaign_id(
+            profiles!inner(
+              user_id
+            )
+          )
+        `)
+        .eq('job_campaigns.profiles.user_id', user.id)
+        .gte('created_at', startDate.toISOString().split('T')[0])
+        .lte('created_at', endDate.toISOString().split('T')[0]);
+
+      if (error) {
+        console.error('Error fetching trend data:', error);
+        setApplicationTrendData(generateDemoTrendData());
+        return;
+      }
+
+      // Group applications by day
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const trendData: ApplicationTrendData[] = [];
+
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0];
+        const dayName = dayNames[date.getDay()];
+
+        const applicationsOnDay = applicationsData?.filter(app => 
+          app.created_at.startsWith(dateStr)
+        ).length || 0;
+
+        trendData.push({
+          name: dayName,
+          applications: applicationsOnDay,
+          date: dateStr
+        });
+      }
+
+      setApplicationTrendData(trendData);
+    } catch (error) {
+      console.error('Error fetching application trend data:', error);
+      setApplicationTrendData(generateDemoTrendData());
+    }
+  };
+
+  const fetchStatusDistributionData = async () => {
+    try {
+      if (!isSupabaseConfigured() || !user) {
+        // Generate demo data
+        setStatusDistributionData(generateDemoStatusData());
+        return;
+      }
+
+      // Get all applications for the user
+      const { data: applicationsData, error } = await supabase
+        .from('applications')
+        .select(`
+          status,
+          job_campaigns!campaign_id(
+            profiles!inner(
+              user_id
+            )
+          )
+        `)
+        .eq('job_campaigns.profiles.user_id', user.id);
+
+      if (error) {
+        console.error('Error fetching status distribution data:', error);
+        setStatusDistributionData(generateDemoStatusData());
+        return;
+      }
+
+      // Count applications by status
+      const statusCounts: Record<string, number> = {};
+      const totalApplications = applicationsData?.length || 0;
+
+      if (totalApplications === 0) {
+        setStatusDistributionData([]);
+        return;
+      }
+
+      applicationsData?.forEach(app => {
+        const status = app.status || 'SENT';
+        statusCounts[status] = (statusCounts[status] || 0) + 1;
+      });
+
+      // Convert to percentage and create chart data
+      const statusColors: Record<string, string> = {
+        'SENT': '#3B82F6',
+        'PENDING': '#F59E0B',
+        'INTERVIEW': '#8B5CF6',
+        'OA': '#06B6D4',
+        'ACCEPTED': '#10B981',
+        'REJECTED': '#EF4444'
+      };
+
+      const distributionData: StatusDistributionData[] = Object.entries(statusCounts).map(([status, count]) => ({
+        name: status,
+        value: Math.round((count / totalApplications) * 100),
+        color: statusColors[status] || '#6B7280'
+      }));
+
+      setStatusDistributionData(distributionData);
+    } catch (error) {
+      console.error('Error fetching status distribution data:', error);
+      setStatusDistributionData(generateDemoStatusData());
+    }
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -143,6 +289,12 @@ export const DashboardHome: React.FC = () => {
             campaign: { location: 'New York, NY' }
           }
         ]);
+        
+        // Fetch chart data separately
+        await Promise.all([
+          fetchApplicationTrendData(),
+          fetchStatusDistributionData()
+        ]);
         setLoading(false);
         return;
       }
@@ -152,22 +304,61 @@ export const DashboardHome: React.FC = () => {
       const weekAgo = new Date(currentDate.getTime() - 7 * 24 * 60 * 60 * 1000);
       const monthAgo = new Date(currentDate.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-      // Get total applications
+      // Get total applications for the user
       const { count: totalCount } = await supabase
         .from('applications')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true })
+        .in('campaign_id', 
+          await supabase
+            .from('job_campaigns')
+            .select('id')
+            .in('profile_id',
+              await supabase
+                .from('profiles')
+                .select('id')
+                .eq('user_id', user.id)
+                .then(({ data }) => data?.map(p => p.id) || [])
+            )
+            .then(({ data }) => data?.map(c => c.id) || [])
+        );
 
       // Get this week's applications
       const { count: weekCount } = await supabase
         .from('applications')
         .select('*', { count: 'exact', head: true })
-        .gte('created_at', weekAgo.toISOString());
+        .gte('created_at', weekAgo.toISOString())
+        .in('campaign_id', 
+          await supabase
+            .from('job_campaigns')
+            .select('id')
+            .in('profile_id',
+              await supabase
+                .from('profiles')
+                .select('id')
+                .eq('user_id', user.id)
+                .then(({ data }) => data?.map(p => p.id) || [])
+            )
+            .then(({ data }) => data?.map(c => c.id) || [])
+        );
 
       // Get accepted applications for success rate calculation
       const { count: acceptedCount } = await supabase
         .from('applications')
         .select('*', { count: 'exact', head: true })
-        .eq('status', 'ACCEPTED');
+        .eq('status', 'ACCEPTED')
+        .in('campaign_id', 
+          await supabase
+            .from('job_campaigns')
+            .select('id')
+            .in('profile_id',
+              await supabase
+                .from('profiles')
+                .select('id')
+                .eq('user_id', user.id)
+                .then(({ data }) => data?.map(p => p.id) || [])
+            )
+            .then(({ data }) => data?.map(c => c.id) || [])
+        );
 
       // Get recent applications
       const { data: applicationsData } = await supabase
@@ -221,6 +412,12 @@ export const DashboardHome: React.FC = () => {
       }));
 
       setRecentApplications(transformedApplications);
+      
+      // Fetch chart data
+      await Promise.all([
+        fetchApplicationTrendData(),
+        fetchStatusDistributionData()
+      ]);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -472,46 +669,62 @@ export const DashboardHome: React.FC = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <RechartsPieChart>
-                  <Pie
-                    data={statusDistributionData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {statusDistributionData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: '#1F2937', 
-                      border: 'none', 
-                      borderRadius: '8px',
-                      color: '#F9FAFB'
-                    }} 
-                  />
-                </RechartsPieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex flex-wrap justify-center gap-4 mt-4">
-              {statusDistributionData.map((item, index) => (
-                <div key={index} className="flex items-center">
-                  <div 
-                    className="w-3 h-3 rounded-full mr-2" 
-                    style={{ backgroundColor: item.color }}
-                  ></div>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    {item.name} ({item.value}%)
-                  </span>
+            {statusDistributionData.length > 0 ? (
+              <>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RechartsPieChart>
+                      <Pie
+                        data={statusDistributionData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {statusDistributionData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: '#1F2937', 
+                          border: 'none', 
+                          borderRadius: '8px',
+                          color: '#F9FAFB'
+                        }} 
+                      />
+                    </RechartsPieChart>
+                  </ResponsiveContainer>
                 </div>
-              ))}
-            </div>
+                <div className="flex flex-wrap justify-center gap-4 mt-4">
+                  {statusDistributionData.map((item, index) => (
+                    <div key={index} className="flex items-center">
+                      <div 
+                        className="w-3 h-3 rounded-full mr-2" 
+                        style={{ backgroundColor: item.color }}
+                      ></div>
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        {item.name} ({item.value}%)
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="h-64 flex items-center justify-center">
+                <div className="text-center">
+                  <PieChart className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                    No Application Data
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-300 text-sm">
+                    Start applying to jobs to see status distribution
+                  </p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </motion.div>
