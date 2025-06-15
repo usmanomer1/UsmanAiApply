@@ -1,348 +1,150 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { 
+  BarChart3, 
   TrendingUp, 
+  Users, 
+  Target, 
+  Calendar, 
   Clock, 
-  XCircle, 
   CheckCircle, 
-  Calendar,
-  Users,
-  Building,
-  ExternalLink,
-  Edit3,
-  ArrowUpRight,
+  AlertCircle,
   ArrowRight,
-  Target,
-  Filter,
-  Download,
-  RefreshCw,
-  Award,
-  Briefcase,
+  Zap,
+  Bot,
+  FileText,
+  Building,
   MapPin,
-  ChevronRight,
+  Eye,
   Plus,
   Search,
-  Bell,
-  Settings,
-  Zap,
-  Star,
-  TrendingDown,
-  Activity,
-  BarChart3,
-  PieChart,
-  LineChart,
-  Loader2,
-  AlertTriangle,
-  Info,
-  X
+  Filter,
+  RefreshCw
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
-import toast from 'react-hot-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { 
-  LineChart as RechartsLineChart, 
-  Line, 
-  AreaChart, 
-  Area, 
-  BarChart, 
-  Bar, 
-  PieChart as RechartsPieChart, 
-  Pie, 
-  Cell, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  Legend
-} from 'recharts';
 
-interface JobApplication {
+interface DashboardStats {
+  totalApplications: number;
+  thisWeekApplications: number;
+  successRate: number;
+  activeJobs: number;
+  tokensUsed: number;
+  tokensRemaining: number;
+}
+
+interface RecentApplication {
   id: string;
   company: string;
   role: string;
-  status: 'SENT' | 'PENDING' | 'REJECTED' | 'ACCEPTED' | 'INTERVIEW' | 'OA';
+  status: string;
   applied_at: string;
-  details: any;
-  created_at: string;
   campaign: {
-    job_title: string;
     location: string;
   };
 }
 
-interface Analytics {
-  sent: number;
-  pending: number;
-  rejected: number;
-  accepted: number;
-  interview: number;
-  oa: number;
-}
-
 export const DashboardHome: React.FC = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
-  const [applications, setApplications] = useState<JobApplication[]>([]);
-  const [analytics, setAnalytics] = useState<Analytics>({
-    sent: 0,
-    pending: 0,
-    rejected: 0,
-    accepted: 0,
-    interview: 0,
-    oa: 0,
+  const [stats, setStats] = useState<DashboardStats>({
+    totalApplications: 0,
+    thisWeekApplications: 0,
+    successRate: 0,
+    activeJobs: 0,
+    tokensUsed: 0,
+    tokensRemaining: 75
   });
+  const [recentApplications, setRecentApplications] = useState<RecentApplication[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingApp, setEditingApp] = useState<string | null>(null);
-  const [timeRange, setTimeRange] = useState('30d');
   const [searchTerm, setSearchTerm] = useState('');
-  const [showAddApplicationModal, setShowAddApplicationModal] = useState(false);
-  const [newApplication, setNewApplication] = useState({
-    company: '',
-    role: '',
-    status: 'SENT' as JobApplication['status'],
-    location: '',
-    job_title: '',
-    applied_at: new Date().toISOString().split('T')[0]
-  });
-  
-  // Dynamic chart data state
-  const [applicationTrendData, setApplicationTrendData] = useState<any[]>([]);
-  const [statusDistributionData, setStatusDistributionData] = useState<any[]>([]);
-  const [weeklyActivityData, setWeeklyActivityData] = useState<any[]>([]);
-  const [companyInsights, setCompanyInsights] = useState<any[]>([]);
-  const [previousMonthData, setPreviousMonthData] = useState<Analytics>({
-    sent: 0, pending: 0, rejected: 0, accepted: 0, interview: 0, oa: 0
-  });
-
-  useEffect(() => {
-    // Always fetch applications, regardless of user state
-    fetchApplications();
-  }, [user]);
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
   const isSupabaseConfigured = () => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    return !!(supabaseUrl && supabaseKey && supabaseUrl !== 'your_supabase_url_here' && supabaseKey !== 'your_supabase_anon_key_here');
+    return !!(supabaseUrl && supabaseKey && 
+      supabaseUrl !== 'your_supabase_url_here' && 
+      supabaseKey !== 'your_supabase_anon_key_here' &&
+      supabaseUrl.startsWith('https://') &&
+      supabaseUrl.includes('.supabase.co') &&
+      supabaseKey.length > 50
+    );
   };
 
-  const calculateAnalytics = (apps: JobApplication[]) => {
-    const stats = apps.reduce((acc, app) => {
-      const status = app.status.toLowerCase() as keyof Analytics;
-      if (status in acc) {
-        acc[status]++;
-      }
-      return acc;
-    }, {
-      sent: 0,
-      pending: 0,
-      rejected: 0,
-      accepted: 0,
-      interview: 0,
-      oa: 0,
-    });
-    setAnalytics(stats);
-    
-    // Generate dynamic chart data
-    generateChartData(apps);
-  };
+  useEffect(() => {
+    fetchDashboardData();
+  }, [user]);
 
-  const generateChartData = (apps: JobApplication[]) => {
-    // Generate trend data (last 6 months)
-    const months = [];
-    const now = new Date();
-    for (let i = 5; i >= 0; i--) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      months.push({
-        month: date.toLocaleDateString('en-US', { month: 'short' }),
-        fullDate: date
-      });
-    }
-
-    const trendData = months.map(({ month, fullDate }) => {
-      const monthApps = apps.filter(app => {
-        const appDate = new Date(app.applied_at);
-        return appDate.getMonth() === fullDate.getMonth() && 
-               appDate.getFullYear() === fullDate.getFullYear();
-      });
-
-      const interviews = monthApps.filter(app => 
-        ['interview', 'oa', 'accepted'].includes(app.status.toLowerCase())
-      ).length;
-      
-      const offers = monthApps.filter(app => app.status.toLowerCase() === 'accepted').length;
-      const responseRate = monthApps.length > 0 ? Math.round((interviews / monthApps.length) * 100) : 0;
-
-      return {
-        month,
-        applications: monthApps.length,
-        interviews,
-        offers,
-        response_rate: responseRate
-      };
-    });
-
-    setApplicationTrendData(trendData);
-
-    // Generate status distribution data
-    const currentStats = apps.reduce((acc, app) => {
-      const status = app.status.toLowerCase() as keyof Analytics;
-      if (status in acc) {
-        acc[status]++;
-      }
-      return acc;
-    }, {
-      sent: 0,
-      pending: 0,
-      rejected: 0,
-      accepted: 0,
-      interview: 0,
-      oa: 0,
-    });
-
-    const statusData = [
-      { name: 'Sent', value: currentStats.sent, color: '#3B82F6' },
-      { name: 'Pending', value: currentStats.pending, color: '#F59E0B' },
-      { name: 'Interview', value: currentStats.interview, color: '#8B5CF6' },
-      { name: 'OA', value: currentStats.oa, color: '#06B6D4' },
-      { name: 'Accepted', value: currentStats.accepted, color: '#10B981' },
-      { name: 'Rejected', value: currentStats.rejected, color: '#EF4444' },
-    ];
-
-    setStatusDistributionData(statusData);
-
-    // Generate weekly activity data (last 7 days)
-    const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const weeklyData = weekDays.map((day, index) => {
-      const targetDate = new Date();
-      targetDate.setDate(targetDate.getDate() - (6 - index));
-      
-      const dayApps = apps.filter(app => {
-        const appDate = new Date(app.applied_at);
-        return appDate.toDateString() === targetDate.toDateString();
-      });
-
-      const responses = dayApps.filter(app => 
-        !['sent', 'pending'].includes(app.status.toLowerCase())
-      ).length;
-      
-      const interviews = dayApps.filter(app => 
-        ['interview', 'oa'].includes(app.status.toLowerCase())
-      ).length;
-
-      return {
-        day,
-        applications: dayApps.length,
-        responses,
-        interviews
-      };
-    });
-
-    setWeeklyActivityData(weeklyData);
-
-    // Generate company insights
-    const companyStats = apps.reduce((acc: any, app) => {
-      if (!acc[app.company]) {
-        acc[app.company] = { total: 0, responses: 0, accepted: 0 };
-      }
-      acc[app.company].total++;
-      if (!['sent', 'pending'].includes(app.status.toLowerCase())) {
-        acc[app.company].responses++;
-      }
-      if (app.status.toLowerCase() === 'accepted') {
-        acc[app.company].accepted++;
-      }
-      return acc;
-    }, {});
-
-    const insights = Object.entries(companyStats)
-      .map(([company, stats]: [string, any]) => ({
-        company,
-        applications: stats.total,
-        response_rate: Math.round((stats.responses / stats.total) * 100),
-        avg_salary: '$180k', // Would need salary data
-        trend: stats.responses > stats.total * 0.5 ? 'up' : stats.responses < stats.total * 0.3 ? 'down' : 'stable'
-      }))
-      .sort((a, b) => b.applications - a.applications)
-      .slice(0, 5);
-
-    setCompanyInsights(insights);
-  };
-
-  const calculatePreviousMonthData = (apps: JobApplication[]) => {
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-    const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-
-    const previousMonthApps = apps.filter(app => {
-      const appDate = new Date(app.applied_at);
-      return appDate.getMonth() === previousMonth && appDate.getFullYear() === previousYear;
-    });
-
-    const prevStats = previousMonthApps.reduce((acc, app) => {
-      const status = app.status.toLowerCase() as keyof Analytics;
-      if (status in acc) {
-        acc[status]++;
-      }
-      return acc;
-    }, {
-      sent: 0,
-      pending: 0,
-      rejected: 0,
-      accepted: 0,
-      interview: 0,
-      oa: 0,
-    });
-
-    setPreviousMonthData(prevStats);
-  };
-
-  const calculatePercentageChange = (current: number, previous: number): string => {
-    if (previous === 0) {
-      return current > 0 ? '+100%' : '0%';
-    }
-    const change = ((current - previous) / previous) * 100;
-    const sign = change >= 0 ? '+' : '';
-    return `${sign}${Math.round(change)}%`;
-  };
-
-  const fetchApplications = async () => {
+  const fetchDashboardData = async () => {
     try {
-      setLoading(true);
-      
-      if (!isSupabaseConfigured()) {
-        console.log('Supabase not configured - showing empty state');
-        setApplications([]);
-        calculateAnalytics([]);
-        calculatePreviousMonthData([]);
+      if (!isSupabaseConfigured() || !user) {
+        // Demo data
+        setStats({
+          totalApplications: 23,
+          thisWeekApplications: 8,
+          successRate: 12,
+          activeJobs: 5,
+          tokensUsed: 15,
+          tokensRemaining: 60
+        });
+        setRecentApplications([
+          {
+            id: '1',
+            company: 'TechCorp Inc.',
+            role: 'Senior Software Engineer',
+            status: 'SENT',
+            applied_at: new Date().toISOString(),
+            campaign: { location: 'San Francisco, CA' }
+          },
+          {
+            id: '2',
+            company: 'StartupXYZ',
+            role: 'Full Stack Developer',
+            status: 'INTERVIEW',
+            applied_at: new Date(Date.now() - 86400000).toISOString(),
+            campaign: { location: 'Remote' }
+          },
+          {
+            id: '3',
+            company: 'BigTech Solutions',
+            role: 'Frontend Engineer',
+            status: 'PENDING',
+            applied_at: new Date(Date.now() - 172800000).toISOString(),
+            campaign: { location: 'New York, NY' }
+          }
+        ]);
+        setLoading(false);
         return;
       }
 
-      if (!user) {
-        console.log('No user found - showing empty state');
-        setApplications([]);
-        calculateAnalytics([]);
-        calculatePreviousMonthData([]);
-        return;
-      }
+      // Fetch real data from Supabase
+      const currentDate = new Date();
+      const weekAgo = new Date(currentDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const monthAgo = new Date(currentDate.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-      console.log('Fetching applications for user:', user.email);
+      // Get total applications
+      const { count: totalCount } = await supabase
+        .from('applications')
+        .select('*', { count: 'exact', head: true });
 
-      // Fetch applications with campaign details using the correct table structure
-      const { data, error } = await supabase
+      // Get this week's applications
+      const { count: weekCount } = await supabase
+        .from('applications')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', weekAgo.toISOString());
+
+      // Get recent applications
+      const { data: applicationsData } = await supabase
         .from('applications')
         .select(`
           *,
           job_campaigns!campaign_id(
-            job_title,
             location,
             profiles!inner(
               user_id
@@ -350,329 +152,80 @@ export const DashboardHome: React.FC = () => {
           )
         `)
         .eq('job_campaigns.profiles.user_id', user.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(5);
 
-      if (error) {
-        console.error('Database error fetching applications:', error);
-        setApplications([]);
-        calculateAnalytics([]);
-        calculatePreviousMonthData([]);
-        return;
-      }
+      // Get browser use stats for tokens
+      const { data: usageData } = await supabase
+        .from('browser_use_logs')
+        .select('step_count')
+        .eq('user_id', user.id)
+        .gte('created_at', monthAgo.toISOString());
 
-      console.log('Fetched applications:', data?.length || 0);
+      const totalSteps = usageData?.reduce((sum, log) => sum + log.step_count, 0) || 0;
+      const tokensUsed = Math.ceil(totalSteps / 10);
 
-      // Transform data to match our interface
-      const transformedApplications: JobApplication[] = (data || []).map(app => ({
+      setStats({
+        totalApplications: totalCount || 0,
+        thisWeekApplications: weekCount || 0,
+        successRate: totalCount ? Math.round(((weekCount || 0) / totalCount) * 100) : 0,
+        activeJobs: applicationsData?.filter(app => ['SENT', 'PENDING', 'INTERVIEW'].includes(app.status)).length || 0,
+        tokensUsed,
+        tokensRemaining: Math.max(0, 75 - tokensUsed)
+      });
+
+      const transformedApplications: RecentApplication[] = (applicationsData || []).map(app => ({
         id: app.id,
         company: app.company || 'Unknown Company',
         role: app.role || 'Unknown Role',
-        status: (app.status || 'SENT') as JobApplication['status'],
+        status: app.status || 'SENT',
         applied_at: app.applied_at || app.created_at,
-        details: app.details || {},
-        created_at: app.created_at,
         campaign: {
-          job_title: app.job_campaigns?.job_title || app.role || 'Unknown Role',
           location: app.job_campaigns?.location || 'Not specified'
         }
       }));
-      
-      setApplications(transformedApplications);
-      calculateAnalytics(transformedApplications);
-      calculatePreviousMonthData(transformedApplications);
+
+      setRecentApplications(transformedApplications);
     } catch (error) {
-      console.error('Unexpected error fetching applications:', error);
-      setApplications([]);
-      calculateAnalytics([]);
-      calculatePreviousMonthData([]);
+      console.error('Error fetching dashboard data:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const updateApplicationStatus = async (id: string, status: JobApplication['status']) => {
-    try {
-      if (isSupabaseConfigured() && user) {
-        const { error } = await supabase
-          .from('applications')
-          .update({ status })
-          .eq('id', id);
-
-        if (error) {
-          console.error('Database error updating status:', error);
-          toast.error(`Failed to update status: ${error.message}`);
-          return;
-        }
-      }
-
-      // Update local state
-      setApplications(apps => 
-        apps.map(app => 
-          app.id === id ? { ...app, status } : app
-        )
-      );
-
-      // Recalculate analytics with updated data
-      const updatedApps = applications.map(app => 
-        app.id === id ? { ...app, status } : app
-      );
-      
-      calculateAnalytics(updatedApps);
-      setEditingApp(null);
-      toast.success('Application status updated successfully');
-    } catch (error) {
-      console.error('Unexpected error updating status:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      toast.error(`Failed to update status: ${errorMessage}`);
-    }
-  };
-
-  const addApplication = async () => {
-    // Validate required fields first
-    if (!newApplication.company.trim() || !newApplication.role.trim()) {
-      toast.error('Please fill in company and role fields');
-      return;
-    }
-
-    // Validate date format if provided
-    if (newApplication.applied_at && isNaN(Date.parse(newApplication.applied_at))) {
-      toast.error('Please enter a valid date');
-      return;
-    }
-
-    try {
-      const applicationData = {
-        id: Date.now().toString(),
-        company: newApplication.company.trim(),
-        role: newApplication.role.trim(),
-        status: newApplication.status,
-        applied_at: newApplication.applied_at ? `${newApplication.applied_at}T00:00:00Z` : new Date().toISOString(),
-        details: {},
-        created_at: new Date().toISOString(),
-        campaign: {
-          job_title: newApplication.job_title?.trim() || newApplication.role.trim(),
-          location: newApplication.location?.trim() || 'Not specified'
-        }
-      };
-
-      if (isSupabaseConfigured() && user) {
-        try {
-          // Always ensure we have a campaign_id since RLS policy requires it
-          let campaignId = null;
-          
-          // First, ensure user has a profile
-          let { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('user_id', user.id)
-            .maybeSingle();
-
-          if (profileError) {
-            console.error('Error fetching profile:', profileError);
-            toast.error('Profile not found. Please contact support.');
-            return;
-          }
-
-          if (!profile) {
-            // Create profile if it doesn't exist
-            const { data: newProfile, error: createProfileError } = await supabase
-              .from('profiles')
-              .insert([{ user_id: user.id }])
-              .select('id')
-              .single();
-
-            if (createProfileError) {
-              console.error('Error creating profile:', createProfileError);
-              toast.error('Failed to create profile. Please contact support.');
-              return;
-            }
-            profile = newProfile;
-          }
-
-          // At this point, profile is guaranteed to exist
-          if (!profile) {
-            toast.error('Failed to get or create profile. Please try again.');
-            return;
-          }
-
-          // Look for existing "Manual Applications" campaign
-          const { data: existingCampaign, error: campaignFetchError } = await supabase
-            .from('job_campaigns')
-            .select('id')
-            .eq('profile_id', profile.id)
-            .eq('job_title', 'Manual Application')
-            .maybeSingle();
-
-          if (campaignFetchError) {
-            console.error('Error fetching campaign:', campaignFetchError);
-          }
-
-          if (existingCampaign) {
-            campaignId = existingCampaign.id;
-          } else {
-            // Create a "Manual Applications" campaign
-            const { data: newCampaign, error: campaignError } = await supabase
-              .from('job_campaigns')
-              .insert([{
-                profile_id: profile.id,
-                job_title: 'Manual Application',
-                location: 'Various'
-              }])
-              .select('id')
-              .single();
-
-            if (campaignError) {
-              console.error('Error creating campaign:', campaignError);
-              toast.error(`Failed to create campaign: ${campaignError.message}`);
-              return;
-            }
-            campaignId = newCampaign.id;
-          }
-
-          // Now insert the application with the required campaign_id
-          const { data, error } = await supabase
-            .from('applications')
-            .insert([{
-              campaign_id: campaignId,
-              company: applicationData.company,
-              role: applicationData.role,
-              status: applicationData.status,
-              applied_at: applicationData.applied_at,
-              details: applicationData.details
-            }])
-            .select()
-            .single();
-
-          if (error) {
-            console.error('Database error adding application:', error);
-            toast.error(`Failed to add application: ${error.message}`);
-            return;
-          }
-
-          // Use the data returned from database to ensure consistency
-          if (data) {
-            applicationData.id = data.id;
-            applicationData.created_at = data.created_at;
-          }
-
-        } catch (dbError) {
-          console.error('Database operation failed:', dbError);
-          toast.error('Failed to add application. Please try again.');
-          return;
-        }
-      }
-
-      // Update local state
-      setApplications(prev => {
-        const updatedApps = [applicationData, ...prev];
-        return updatedApps;
-      });
-      
-      // Reset form and close modal
-      setShowAddApplicationModal(false);
-      setNewApplication({
-        company: '',
-        role: '',
-        status: 'SENT',
-        location: '',
-        job_title: '',
-        applied_at: new Date().toISOString().split('T')[0]
-      });
-      
-      toast.success('Application added successfully');
-      
-      // Refresh applications to ensure consistency
-      await fetchApplications();
-      
-    } catch (error) {
-      console.error('Unexpected error adding application:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      toast.error(`Failed to add application: ${errorMessage}`);
-    }
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'SENT': return 'premium-badge-blue';
-      case 'PENDING': return 'premium-badge-yellow';
-      case 'REJECTED': return 'premium-badge-red';
-      case 'ACCEPTED': return 'premium-badge-green';
-      case 'INTERVIEW': return 'premium-badge-purple';
-      case 'OA': return 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-800';
+      case 'SENT': return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800';
+      case 'PENDING': return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800';
+      case 'INTERVIEW': return 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800';
+      case 'ACCEPTED': return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800';
+      case 'REJECTED': return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800';
       default: return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600';
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'SENT': return <TrendingUp className="w-4 h-4" />;
-      case 'PENDING': return <Clock className="w-4 h-4" />;
-      case 'REJECTED': return <XCircle className="w-4 h-4" />;
-      case 'ACCEPTED': return <CheckCircle className="w-4 h-4" />;
-      case 'INTERVIEW': return <Users className="w-4 h-4" />;
-      case 'OA': return <Calendar className="w-4 h-4" />;
-      default: return <Clock className="w-4 h-4" />;
-    }
-  };
-
-  const getTrendIcon = (trend: string) => {
-    switch (trend) {
-      case 'up': return <TrendingUp className="w-4 h-4 text-green-500" />;
-      case 'down': return <TrendingDown className="w-4 h-4 text-red-500" />;
-      default: return <Activity className="w-4 h-4 text-gray-500" />;
-    }
-  };
-
-  const totalApplications = Object.values(analytics).reduce((sum, val) => sum + val, 0);
-  const responseRate = totalApplications > 0 ? Math.round(((analytics.interview + analytics.oa + analytics.accepted) / totalApplications) * 100) : 0;
-  const successRate = totalApplications > 0 ? Math.round((analytics.accepted / totalApplications) * 100) : 0;
-
-  const filteredApplications = applications.filter(app => {
-    if (!searchTerm.trim()) return true;
+  const filteredApplications = recentApplications.filter(app => {
+    const matchesSearch = !searchTerm.trim() || 
+      app.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      app.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      app.campaign.location.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      app.company.toLowerCase().includes(searchLower) ||
-      app.role.toLowerCase().includes(searchLower) ||
-      app.campaign.job_title.toLowerCase().includes(searchLower) ||
-      app.status.toLowerCase().includes(searchLower) ||
-      app.campaign.location.toLowerCase().includes(searchLower)
-    );
+    const matchesStatus = statusFilter === 'ALL' || app.status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
   });
 
   if (loading) {
     return (
       <div className="space-y-8">
-        {/* Enhanced Loading State */}
         <div className="animate-pulse">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded-lg w-80 mb-3"></div>
-              <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-96"></div>
-            </div>
-            <div className="flex space-x-3">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-10 bg-gray-200 dark:bg-gray-700 rounded-lg w-24"></div>
-              ))}
-            </div>
-          </div>
-          
-          {/* Metrics Skeleton */}
+          <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded-lg w-1/3 mb-4"></div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-36 bg-gray-200 dark:bg-gray-700 rounded-2xl shimmer"></div>
+              <div key={i} className="h-32 bg-gray-200 dark:bg-gray-700 rounded-2xl"></div>
             ))}
           </div>
-
-          {/* Charts Skeleton */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-96 bg-gray-200 dark:bg-gray-700 rounded-2xl shimmer"></div>
-            ))}
-          </div>
-
-          {/* Applications List Skeleton */}
-          <div className="h-[600px] bg-gray-200 dark:bg-gray-700 rounded-2xl shimmer"></div>
+          <div className="h-96 bg-gray-200 dark:bg-gray-700 rounded-2xl"></div>
         </div>
       </div>
     );
@@ -680,764 +233,302 @@ export const DashboardHome: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      {/* Enhanced Header with Quick Actions */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-6 lg:space-y-0">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <h1 className="text-display-lg text-gray-900 dark:text-white mb-3">
-            Welcome back, {user?.email?.split('@')[0] || 'User'}! 👋
-          </h1>
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-6 lg:space-y-0"
+      >
+        <div>
+          <h1 className="text-display-lg text-gray-900 dark:text-white mb-3">Dashboard</h1>
           <p className="text-xl text-gray-600 dark:text-gray-300">
-            Here's your job search performance and latest updates
+            Track your job search progress and automation performance
           </p>
           {!isSupabaseConfigured() && (
             <div className="mt-2 text-sm text-amber-600 dark:text-amber-400">
               Demo mode - Connect Supabase to see real data
             </div>
           )}
-        </motion.div>
+        </div>
         
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="flex flex-wrap items-center gap-3"
-        >
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none z-10" />
-            <Input
-              type="text"
-              placeholder="Search applications..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={`w-64 pl-12 pr-10 ${searchTerm ? 'ring-2 ring-blue-500 dark:ring-blue-400' : ''}`}
-            />
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 z-10"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-          
-          <Select 
-            value={timeRange}
-            onValueChange={setTimeRange}
-          >
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7d">Last 7 days</SelectItem>
-              <SelectItem value="30d">Last 30 days</SelectItem>
-              <SelectItem value="90d">Last 90 days</SelectItem>
-              <SelectItem value="1y">Last year</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          <Button 
-            onClick={fetchApplications}
-            variant="secondary"
-          >
+        <div className="flex flex-wrap items-center gap-3">
+          <Button onClick={fetchDashboardData} variant="outline" size="sm">
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
-          
-          <Button 
-            onClick={() => {
-              const dataToExport = searchTerm ? filteredApplications : applications;
-              const csvContent = dataToExport.map(app => 
-                `${app.company},${app.role},${app.status},${app.applied_at},${app.campaign.location}`
-              ).join('\n');
-              const blob = new Blob([`Company,Role,Status,Applied At,Location\n${csvContent}`], 
-                { type: 'text/csv' });
-              const url = window.URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = searchTerm ? 'filtered_job_applications.csv' : 'job_applications.csv';
-              a.click();
-              window.URL.revokeObjectURL(url);
-              toast.success(`${dataToExport.length} applications exported successfully`);
-            }}
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Export
-          </Button>
-        </motion.div>
-      </div>
+          <Link to="/auto-apply">
+            <Button size="sm" className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
+              <Zap className="w-4 h-4 mr-2" />
+              Start Auto Apply
+            </Button>
+          </Link>
+        </div>
+      </motion.div>
 
-      {/* Quick Action Cards */}
+      {/* Stats Grid */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="grid grid-cols-1 md:grid-cols-3 gap-6"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
       >
-        <Card 
-          className="glass-card hover-lift cursor-pointer group transition-all duration-300"
-          onClick={() => navigate('/auto-apply')}
-        >
+        <Card className="premium-card hover-lift">
           <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl group-hover:scale-110 transition-transform">
-                <Zap className="w-6 h-6 text-white" />
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Applications</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.totalApplications}</p>
               </div>
-              <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+                <Target className="w-6 h-6 text-white" />
+              </div>
             </div>
-            <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Start Auto Apply</CardTitle>
-            <CardDescription className="text-gray-600 dark:text-gray-300 text-sm">Let AI apply to jobs automatically</CardDescription>
+            <div className="mt-4 flex items-center">
+              <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
+              <span className="text-sm text-green-600 dark:text-green-400">+{stats.thisWeekApplications} this week</span>
+            </div>
           </CardContent>
         </Card>
 
-        <Card 
-          className="glass-card hover-lift cursor-pointer group transition-all duration-300"
-          onClick={() => navigate('/cover-letter')}
-        >
+        <Card className="premium-card hover-lift">
           <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl group-hover:scale-110 transition-transform">
-                <PieChart className="w-6 h-6 text-white" />
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Success Rate</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.successRate}%</p>
               </div>
-              <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-purple-600 transition-colors" />
-            </div>
-            <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Generate Cover Letter</CardTitle>
-            <CardDescription className="text-gray-600 dark:text-gray-300 text-sm">Create personalized cover letters</CardDescription>
-          </CardContent>
-        </Card>
-
-        <Card 
-          className="glass-card hover-lift cursor-pointer group transition-all duration-300"
-          onClick={() => navigate('/resume')}
-        >
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl group-hover:scale-110 transition-transform">
+              <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center">
                 <BarChart3 className="w-6 h-6 text-white" />
               </div>
-              <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-emerald-600 transition-colors" />
             </div>
-            <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Analyze Resume</CardTitle>
-            <CardDescription className="text-gray-600 dark:text-gray-300 text-sm">Optimize your resume with AI</CardDescription>
+            <div className="mt-4 flex items-center">
+              <CheckCircle className="w-4 h-4 text-emerald-500 mr-1" />
+              <span className="text-sm text-emerald-600 dark:text-emerald-400">Above average</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="premium-card hover-lift">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Jobs</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.activeJobs}</p>
+              </div>
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
+                <Users className="w-6 h-6 text-white" />
+              </div>
+            </div>
+            <div className="mt-4 flex items-center">
+              <Clock className="w-4 h-4 text-purple-500 mr-1" />
+              <span className="text-sm text-purple-600 dark:text-purple-400">In progress</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="premium-card hover-lift">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Tokens Remaining</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.tokensRemaining}</p>
+              </div>
+              <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center">
+                <Bot className="w-6 h-6 text-white" />
+              </div>
+            </div>
+            <div className="mt-4 flex items-center">
+              <Zap className="w-4 h-4 text-amber-500 mr-1" />
+              <span className="text-sm text-amber-600 dark:text-amber-400">{stats.tokensUsed} used</span>
+            </div>
           </CardContent>
         </Card>
       </motion.div>
 
-      {/* Enhanced Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <Card className="glass-card hover-lift">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl">
-                  <TrendingUp className="w-6 h-6 text-white" />
-                </div>
-                <div className={`flex items-center ${
-                  calculatePercentageChange(totalApplications, Object.values(previousMonthData).reduce((sum, val) => sum + val, 0)).startsWith('+') 
-                    ? 'text-emerald-600' 
-                    : 'text-red-600'
-                }`}>
-                  {calculatePercentageChange(totalApplications, Object.values(previousMonthData).reduce((sum, val) => sum + val, 0)).startsWith('+') ? (
-                    <ArrowUpRight className="w-4 h-4 mr-1" />
-                  ) : (
-                    <TrendingDown className="w-4 h-4 mr-1" />
-                  )}
-                  <span className="text-sm font-semibold">
-                    {calculatePercentageChange(totalApplications, Object.values(previousMonthData).reduce((sum, val) => sum + val, 0))}
-                  </span>
-                </div>
-              </div>
-              <div className="text-display-sm text-gray-900 dark:text-white mb-1">{totalApplications}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">Total Applications</div>
-              <div className="text-xs text-blue-600 dark:text-blue-400">vs last month</div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <Card className="hover-lift">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl">
-                  <Users className="w-6 h-6 text-white" />
-                </div>
-                <div className={`flex items-center ${
-                  calculatePercentageChange(analytics.interview + analytics.oa, previousMonthData.interview + previousMonthData.oa).startsWith('+') 
-                    ? 'text-emerald-600' 
-                    : 'text-red-600'
-                }`}>
-                  {calculatePercentageChange(analytics.interview + analytics.oa, previousMonthData.interview + previousMonthData.oa).startsWith('+') ? (
-                    <ArrowUpRight className="w-4 h-4 mr-1" />
-                  ) : (
-                    <TrendingDown className="w-4 h-4 mr-1" />
-                  )}
-                  <span className="text-sm font-semibold">
-                    {calculatePercentageChange(analytics.interview + analytics.oa, previousMonthData.interview + previousMonthData.oa)}
-                  </span>
-                </div>
-              </div>
-              <div className="text-display-sm text-gray-900 dark:text-white mb-1">{analytics.interview + analytics.oa}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">Active Processes</div>
-              <div className="text-xs text-purple-600 dark:text-purple-400">interviews & assessments</div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <Card className="hover-lift">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-3 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl">
-                  <Target className="w-6 h-6 text-white" />
-                </div>
-                <div className="flex items-center text-emerald-600">
-                  <ArrowUpRight className="w-4 h-4 mr-1" />
-                  <span className="text-sm font-semibold">+{Math.max(0, responseRate - 25)}%</span>
-                </div>
-              </div>
-              <div className="text-display-sm text-gray-900 dark:text-white mb-1">{responseRate}%</div>
-              <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">Response Rate</div>
-              <div className="text-xs text-emerald-600 dark:text-emerald-400">above industry avg</div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-        >
-          <Card className="hover-lift">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-3 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl">
-                  <Award className="w-6 h-6 text-white" />
-                </div>
-                <div className="flex items-center text-emerald-600">
-                  <ArrowUpRight className="w-4 h-4 mr-1" />
-                  <span className="text-sm font-semibold">+{Math.max(0, successRate - 10)}%</span>
-                </div>
-              </div>
-              <div className="text-display-sm text-gray-900 dark:text-white mb-1">{successRate}%</div>
-              <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">Success Rate</div>
-              <div className="text-xs text-amber-600 dark:text-amber-400">offers received</div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
-
-      {/* Enhanced Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Application Trends */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-        >
-          <Card className="hover-lift">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
-              <div>
-                <CardTitle className="text-xl font-semibold">Application Trends</CardTitle>
-                <CardDescription className="mt-1">Monthly application and response patterns</CardDescription>
-              </div>
-              <Button variant="ghost" size="icon">
-                <RefreshCw className="w-4 h-4" />
-              </Button>
-            </CardHeader>
-            <CardContent>
-          
-          <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={applicationTrendData}>
-              <defs>
-                <linearGradient id="colorApplications" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="colorInterviews" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="month" stroke="#6b7280" fontSize={12} />
-              <YAxis stroke="#6b7280" fontSize={12} />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: 'white', 
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '12px',
-                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
-                }}
-              />
-              <Area 
-                type="monotone" 
-                dataKey="applications" 
-                stroke="#3B82F6" 
-                fillOpacity={1} 
-                fill="url(#colorApplications)"
-                strokeWidth={3}
-              />
-              <Area 
-                type="monotone" 
-                dataKey="interviews" 
-                stroke="#8B5CF6" 
-                fillOpacity={1} 
-                fill="url(#colorInterviews)"
-                strokeWidth={3}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Status Distribution */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
-          className="premium-card p-6 hover-lift"
-        >
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Status Distribution</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Current application status breakdown</p>
-            </div>
-          </div>
-          
-          {statusDistributionData.some(item => item.value > 0) ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <RechartsPieChart>
-                <Pie
-                  data={statusDistributionData.filter(item => item.value > 0)}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={120}
-                  paddingAngle={2}
-                  dataKey="value"
-                >
-                  {statusDistributionData.filter(item => item.value > 0).map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'white', 
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '12px',
-                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
-                  }}
-                />
-                <Legend 
-                  verticalAlign="bottom" 
-                  height={36}
-                  iconType="circle"
-                  wrapperStyle={{ fontSize: '12px' }}
-                />
-              </RechartsPieChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-[300px] flex flex-col items-center justify-center text-gray-500 dark:text-gray-400">
-              <PieChart className="w-16 h-16 mb-4 opacity-50" />
-              <h4 className="text-lg font-semibold mb-2">No Applications Yet</h4>
-              <p className="text-sm text-center max-w-xs">
-                Start applying to jobs and your status distribution will appear here
-              </p>
-              <button 
-                onClick={() => navigate('/auto-apply')}
-                className="mt-4 premium-button-primary text-sm px-4 py-2"
-              >
-                Start Auto Apply
-              </button>
-            </div>
-          )}
-        </motion.div>
-
-        {/* Weekly Activity */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8 }}
-          className="premium-card p-6 hover-lift"
-        >
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Weekly Activity</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Daily application and response patterns</p>
-            </div>
-          </div>
-          
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={weeklyActivityData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="day" stroke="#6b7280" fontSize={12} />
-              <YAxis stroke="#6b7280" fontSize={12} />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: 'white', 
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '12px',
-                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
-                }}
-              />
-              <Bar 
-                dataKey="applications" 
-                fill="#3B82F6" 
-                radius={[4, 4, 0, 0]}
-                name="Applications"
-              />
-              <Bar 
-                dataKey="responses" 
-                fill="#10B981" 
-                radius={[4, 4, 0, 0]}
-                name="Responses"
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </motion.div>
-
-        {/* Company Insights */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.9 }}
-          className="premium-card p-6 hover-lift"
-        >
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Top Companies</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Performance by company</p>
-            </div>
-          </div>
-          
-          {companyInsights.length > 0 ? (
-            <div className="space-y-4">
-              {companyInsights.map((company, index) => (
-                <div key={company.company} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-800 dark:to-blue-700 rounded-lg flex items-center justify-center">
-                      <Building className="w-5 h-5 text-blue-600 dark:text-blue-300" />
-                    </div>
-                    <div>
-                      <div className="font-semibold text-gray-900 dark:text-white">{company.company}</div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">{company.applications} applications</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="text-right">
-                      <div className="text-sm font-semibold text-gray-900 dark:text-white">{company.response_rate}% response</div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">{company.avg_salary} avg</div>
-                    </div>
-                    {getTrendIcon(company.trend)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="h-[200px] flex flex-col items-center justify-center text-gray-500 dark:text-gray-400">
-              <Building className="w-16 h-16 mb-4 opacity-50" />
-              <h4 className="text-lg font-semibold mb-2">No Company Data</h4>
-              <p className="text-sm text-center max-w-xs">
-                Apply to different companies to see insights about response rates and trends
-              </p>
-              <button 
-                onClick={() => navigate('/auto-apply')}
-                className="mt-4 premium-button-primary text-sm px-4 py-2"
-              >
-                Start Applying
-              </button>
-            </div>
-          )}
-        </motion.div>
-      </div>
-
-      {/* Enhanced Recent Applications */}
+      {/* Quick Actions */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 1.0 }}
-        className="premium-card hover-lift"
+        transition={{ delay: 0.2 }}
+        className="grid grid-cols-1 md:grid-cols-3 gap-6"
       >
-        <div className="p-6 border-b border-gray-100 dark:border-gray-700">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
-            <div>
-              <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">Recent Applications</h2>
-              <p className="text-gray-600 dark:text-gray-300 mt-1">Track and manage your job applications with detailed insights</p>
-            </div>
-            <div className="flex items-center space-x-3">
-              <Button 
-                onClick={() => setShowAddApplicationModal(true)}
-                variant="secondary"
-                size="sm"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Application
-              </Button>
-              <Button 
-                onClick={() => navigate('/applications')}
-                size="sm"
-              >
-                <ExternalLink className="w-4 h-4 mr-2" />
-                View All
-              </Button>
-            </div>
-          </div>
-        </div>
+        <Link to="/auto-apply">
+          <Card className="premium-card hover-lift cursor-pointer group transition-all duration-300 hover:shadow-2xl hover:scale-105">
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Bot className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Start Auto Apply</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Begin automated job applications</p>
+                </div>
+                <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <div className="divide-y divide-gray-100 dark:divide-gray-700">
-          {filteredApplications.length === 0 ? (
-            <div className="p-12 text-center">
-              <Building className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                {isSupabaseConfigured() && user ? 'No applications found' : 'No applications yet'}
-              </h3>
-              <p className="text-gray-600 dark:text-gray-300 mb-6">
-                {searchTerm 
-                  ? 'Try adjusting your search terms.' 
-                  : isSupabaseConfigured() && user
-                    ? 'Start using the auto-apply feature to see your applications here.'
-                    : 'Your job applications will appear here once you start using the auto-apply feature.'
-                }
-              </p>
-              <Button 
-                onClick={() => {
-                  if (isSupabaseConfigured() && user) {
-                    navigate('/auto-apply');
-                  } else {
-                    setShowAddApplicationModal(true);
-                  }
-                }}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                {isSupabaseConfigured() && user ? 'Start Auto Apply' : 'Add Your First Application'}
-              </Button>
+        <Link to="/resume">
+          <Card className="premium-card hover-lift cursor-pointer group transition-all duration-300 hover:shadow-2xl hover:scale-105">
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-emerald-600 to-teal-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <FileText className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Optimize Resume</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">AI-powered resume analysis</p>
+                </div>
+                <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all" />
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link to="/cover-letter">
+          <Card className="premium-card hover-lift cursor-pointer group transition-all duration-300 hover:shadow-2xl hover:scale-105">
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <FileText className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Generate Cover Letter</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Create personalized letters</p>
+                </div>
+                <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-purple-600 group-hover:translate-x-1 transition-all" />
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+      </motion.div>
+
+      {/* Recent Applications */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        <Card className="premium-card hover-lift">
+          <CardHeader className="pb-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-2xl text-gray-900 dark:text-white">View Applications</CardTitle>
+                <CardDescription className="text-gray-600 dark:text-gray-300">
+                  Recent job applications and their status
+                </CardDescription>
+              </div>
+              <Link to="/applications">
+                <Button variant="outline" size="sm">
+                  <Eye className="w-4 h-4 mr-2" />
+                  View All
+                </Button>
+              </Link>
             </div>
-          ) : (
-            <>
-              {filteredApplications.slice(0, 8).map((app, index) => (
-                <motion.div
-                  key={app.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="p-6 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
-                >
-                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
-                    <div className="flex items-start space-x-4">
-                      <div className="w-14 h-14 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-800 dark:to-blue-700 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <Building className="w-7 h-7 text-blue-600 dark:text-blue-300" />
+            
+            {/* Search and Filter Controls */}
+            <div className="flex flex-col sm:flex-row gap-4 mt-6">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none z-10" />
+                <Input
+                  type="text"
+                  placeholder="Search applications..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm"
+                />
+              </div>
+              
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full sm:w-48 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Status</SelectItem>
+                  <SelectItem value="SENT">Sent</SelectItem>
+                  <SelectItem value="PENDING">Pending</SelectItem>
+                  <SelectItem value="INTERVIEW">Interview</SelectItem>
+                  <SelectItem value="ACCEPTED">Accepted</SelectItem>
+                  <SelectItem value="REJECTED">Rejected</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {filteredApplications.length === 0 ? (
+              <div className="text-center py-12">
+                <Building className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                  {recentApplications.length === 0 ? 'No Applications Yet' : 'No Matching Applications'}
+                </h3>
+                <p className="text-gray-600 dark:text-gray-300 mb-6">
+                  {recentApplications.length === 0 
+                    ? 'Start applying to jobs to see your applications here.' 
+                    : 'Try adjusting your search or filter criteria.'
+                  }
+                </p>
+                <Link to="/auto-apply">
+                  <Button>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Start Applying
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredApplications.map((application, index) => (
+                  <motion.div
+                    key={application.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className="flex items-center justify-between p-4 bg-white/50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-all duration-200 backdrop-blur-sm"
+                  >
+                    <div className="flex items-center space-x-4">
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-800 dark:to-blue-700 rounded-xl flex items-center justify-center">
+                        <Building className="w-6 h-6 text-blue-600 dark:text-blue-300" />
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-gray-900 dark:text-white text-lg mb-1">{app.role}</h3>
-                        <p className="text-gray-600 dark:text-gray-300 font-medium">{app.company}</p>
-                        <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-gray-500 dark:text-gray-400">
-                          <div className="flex items-center">
-                            <Calendar className="w-4 h-4 mr-1" />
-                            Applied {new Date(app.applied_at).toLocaleDateString()}
-                          </div>
-                          {app.campaign.location && (
-                            <div className="flex items-center">
-                              <MapPin className="w-4 h-4 mr-1" />
-                              {app.campaign.location}
-                            </div>
-                          )}
-                          <div className="flex items-center">
-                            <Briefcase className="w-4 h-4 mr-1" />
-                            {app.campaign.job_title}
-                          </div>
+                      <div>
+                        <h4 className="text-lg font-semibold text-gray-900 dark:text-white">{application.company}</h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{application.role}</p>
+                        <div className="flex items-center mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          <MapPin className="w-3 h-3 mr-1" />
+                          {application.campaign.location}
+                          <span className="mx-2">•</span>
+                          <Calendar className="w-3 h-3 mr-1" />
+                          {new Date(application.applied_at).toLocaleDateString()}
                         </div>
                       </div>
                     </div>
-
-                    <div className="flex items-center space-x-3 lg:flex-shrink-0">
-                      <div className="relative">
-                        {editingApp === app.id ? (
-                          <select
-                            value={app.status}
-                            onChange={(e) => updateApplicationStatus(app.id, e.target.value as JobApplication['status'])}
-                            className="premium-select text-sm min-w-32"
-                            onBlur={() => setEditingApp(null)}
-                            autoFocus
-                          >
-                            <option value="SENT">Sent</option>
-                            <option value="PENDING">Pending</option>
-                            <option value="INTERVIEW">Interview</option>
-                            <option value="OA">Online Assessment</option>
-                            <option value="ACCEPTED">Accepted</option>
-                            <option value="REJECTED">Rejected</option>
-                          </select>
-                        ) : (
-                          <button
-                            onClick={() => setEditingApp(app.id)}
-                            className={`inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium border-2 ${getStatusColor(app.status)} hover:shadow-lg transition-all group-hover:scale-105`}
-                          >
-                            {getStatusIcon(app.status)}
-                            <span className="ml-2">{app.status}</span>
-                            <Edit3 className="w-3 h-3 ml-2 opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </button>
-                        )}
-                      </div>
+                    <div className="flex items-center space-x-3">
+                      <Badge className={getStatusColor(application.status)}>
+                        {application.status}
+                      </Badge>
+                      <Link to="/applications">
+                        <Button variant="ghost" size="sm">
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </Link>
                     </div>
-                  </div>
-                </motion.div>
-              ))}
-
-              {/* Application Summary Disclaimer */}
-              <div className="p-6 bg-amber-50 dark:bg-amber-900/20 border-t border-amber-200 dark:border-amber-800">
-                <div className="flex items-start space-x-3">
-                  <Info className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-                  <div className="text-sm text-amber-800 dark:text-amber-200">
-                    <p className="font-medium mb-1">Application Review Reminder</p>
-                    <p>
-                      <strong>Note:</strong> Some form fields may have been auto-filled by AI with generic information. 
-                      Please verify your application details in your LinkedIn account to ensure accuracy.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        {filteredApplications.length > 8 && (
-          <div className="p-6 border-t border-gray-100 dark:border-gray-700 text-center">
-            <Button 
-              onClick={() => navigate('/applications')}
-              variant="secondary"
-            >
-              View {filteredApplications.length - 8} more applications
-              <ChevronRight className="w-4 h-4 ml-2" />
-            </Button>
-          </div>
-        )}
-      </motion.div>
-
-      {/* Add Application Modal */}
-      <AnimatePresence>
-        {showAddApplicationModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-md w-full p-6"
-          >
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Add Application</h3>
-              <button
-                onClick={() => setShowAddApplicationModal(false)}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Company *
-                </label>
-                <input
-                  type="text"
-                  value={newApplication.company}
-                  onChange={(e) => setNewApplication(prev => ({ ...prev, company: e.target.value }))}
-                  className="w-full h-10 px-4 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="e.g. Google, Microsoft, etc."
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Role *
-                </label>
-                <input
-                  type="text"
-                  value={newApplication.role}
-                  onChange={(e) => setNewApplication(prev => ({ ...prev, role: e.target.value }))}
-                  className="w-full h-10 px-4 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="e.g. Software Engineer, Product Manager"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Status
-                </label>
-                <select
-                  value={newApplication.status}
-                  onChange={(e) => setNewApplication(prev => ({ ...prev, status: e.target.value as JobApplication['status'] }))}
-                  className="w-full h-10 px-4 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="SENT">Sent</option>
-                  <option value="PENDING">Pending</option>
-                  <option value="INTERVIEW">Interview</option>
-                  <option value="OA">Online Assessment</option>
-                  <option value="ACCEPTED">Accepted</option>
-                  <option value="REJECTED">Rejected</option>
-                </select>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Location
-                  </label>
-                  <input
-                    type="text"
-                    value={newApplication.location}
-                    onChange={(e) => setNewApplication(prev => ({ ...prev, location: e.target.value }))}
-                    className="w-full h-10 px-4 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Remote, NYC, etc."
-                  />
-                </div>
+                  </motion.div>
+                ))}
                 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Applied Date
-                  </label>
-                  <input
-                    type="date"
-                    value={newApplication.applied_at}
-                    onChange={(e) => setNewApplication(prev => ({ ...prev, applied_at: e.target.value }))}
-                    className="w-full h-10 px-4 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
+                {filteredApplications.length > 0 && (
+                  <div className="text-center pt-4">
+                    <Link to="/applications">
+                      <Button variant="outline">
+                        View All Applications
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </Button>
+                    </Link>
+                  </div>
+                )}
               </div>
-            </div>
-            
-            <div className="flex items-center justify-end space-x-3 mt-6">
-              <button
-                onClick={() => setShowAddApplicationModal(false)}
-                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={addApplication}
-                className="premium-button-primary"
-              >
-                Add Application
-              </button>
-            </div>
-                     </motion.div>
-         </div>
-       )}
-     </AnimatePresence>
-   </div>
- );
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+    </div>
+  );
 };
