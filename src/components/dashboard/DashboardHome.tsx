@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { 
   BarChart3, 
   TrendingUp, 
@@ -23,12 +23,7 @@ import {
   Download,
   PieChart,
   Activity,
-  X,
-  Briefcase,
-  User,
-  Mail,
-  Phone,
-  Loader2
+  X
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -38,8 +33,9 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
+import toast from 'react-hot-toast';
 
 interface DashboardStats {
   totalApplications: number;
@@ -76,11 +72,9 @@ interface StatusDistributionData {
 interface NewApplicationData {
   company: string;
   role: string;
+  status: string;
   location: string;
-  status: 'SENT' | 'PENDING' | 'INTERVIEW' | 'ACCEPTED' | 'REJECTED';
-  appliedDate: string;
-  jobUrl?: string;
-  notes?: string;
+  notes: string;
 }
 
 export const DashboardHome: React.FC = () => {
@@ -101,13 +95,11 @@ export const DashboardHome: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [newApplicationData, setNewApplicationData] = useState<NewApplicationData>({
+  const [newApplication, setNewApplication] = useState<NewApplicationData>({
     company: '',
     role: '',
-    location: '',
     status: 'SENT',
-    appliedDate: new Date().toISOString().split('T')[0],
-    jobUrl: '',
+    location: '',
     notes: ''
   });
 
@@ -155,77 +147,52 @@ export const DashboardHome: React.FC = () => {
   const fetchApplicationTrendData = async () => {
     try {
       if (!isSupabaseConfigured() || !user) {
-        console.log('Using demo trend data - Supabase not configured or no user');
+        // Generate demo data
         setApplicationTrendData(generateDemoTrendData());
         return;
       }
 
-      console.log('Fetching application trend data for user:', user.id);
-
-      // Get applications from the last 7 days using the correct relationship chain
+      // Get applications from the last 7 days
       const endDate = new Date();
       const startDate = new Date();
       startDate.setDate(endDate.getDate() - 6); // Last 7 days including today
 
-      // First, get the user's profile
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (profileError || !profileData) {
-        console.log('No profile found for user, using demo data');
-        setApplicationTrendData(generateDemoTrendData());
-        return;
-      }
-
-      console.log('Found profile:', profileData.id);
-
-      // Get the user's campaigns
-      const { data: campaignData, error: campaignError } = await supabase
-        .from('job_campaigns')
-        .select('id')
-        .eq('profile_id', profileData.id);
-
-      if (campaignError || !campaignData || campaignData.length === 0) {
-        console.log('No campaigns found for profile, using demo data');
-        setApplicationTrendData(generateDemoTrendData());
-        return;
-      }
-
-      console.log('Found campaigns:', campaignData.map(c => c.id));
-
-      // Get applications for these campaigns in the last 7 days
-      const campaignIds = campaignData.map(c => c.id);
-      const { data: applicationsData, error: applicationsError } = await supabase
+      const { data: applicationsData, error } = await supabase
         .from('applications')
-        .select('created_at')
-        .in('campaign_id', campaignIds)
+        .select(`
+          created_at,
+          job_campaigns!campaign_id(
+            profiles!inner(
+              user_id
+            )
+          )
+        `)
+        .eq('job_campaigns.profiles.user_id', user.id)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString());
 
-      if (applicationsError) {
-        console.error('Error fetching applications:', applicationsError);
+      if (error) {
+        console.error('Error fetching trend data:', error);
         setApplicationTrendData(generateDemoTrendData());
         return;
       }
-
-      console.log('Found applications:', applicationsData?.length || 0);
 
       // Group applications by day
       const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const trendData: ApplicationTrendData[] = [];
 
+      // Create data for each of the last 7 days
       for (let i = 6; i >= 0; i--) {
         const date = new Date();
         date.setDate(date.getDate() - i);
         const dateStr = date.toISOString().split('T')[0];
         const dayName = dayNames[date.getDay()];
 
-        const applicationsOnDay = applicationsData?.filter(app => 
-          app.created_at.startsWith(dateStr)
-        ).length || 0;
+        // Count applications created on this specific date
+        const applicationsOnDay = applicationsData?.filter(app => {
+          const appDate = new Date(app.created_at).toISOString().split('T')[0];
+          return appDate === dateStr;
+        }).length || 0;
 
         trendData.push({
           name: dayName,
@@ -234,7 +201,6 @@ export const DashboardHome: React.FC = () => {
         });
       }
 
-      console.log('Generated trend data:', trendData);
       setApplicationTrendData(trendData);
     } catch (error) {
       console.error('Error fetching application trend data:', error);
@@ -245,61 +211,39 @@ export const DashboardHome: React.FC = () => {
   const fetchStatusDistributionData = async () => {
     try {
       if (!isSupabaseConfigured() || !user) {
-        console.log('Using demo status data - Supabase not configured or no user');
+        // Generate demo data
         setStatusDistributionData(generateDemoStatusData());
         return;
       }
 
-      console.log('Fetching status distribution data for user:', user.id);
-
-      // First, get the user's profile
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (profileError || !profileData) {
-        console.log('No profile found for user, using demo data');
-        setStatusDistributionData(generateDemoStatusData());
-        return;
-      }
-
-      // Get the user's campaigns
-      const { data: campaignData, error: campaignError } = await supabase
-        .from('job_campaigns')
-        .select('id')
-        .eq('profile_id', profileData.id);
-
-      if (campaignError || !campaignData || campaignData.length === 0) {
-        console.log('No campaigns found for profile, using demo data');
-        setStatusDistributionData(generateDemoStatusData());
-        return;
-      }
-
-      // Get all applications for these campaigns
-      const campaignIds = campaignData.map(c => c.id);
-      const { data: applicationsData, error: applicationsError } = await supabase
+      // Get all applications for the user
+      const { data: applicationsData, error } = await supabase
         .from('applications')
-        .select('status')
-        .in('campaign_id', campaignIds);
+        .select(`
+          status,
+          job_campaigns!campaign_id(
+            profiles!inner(
+              user_id
+            )
+          )
+        `)
+        .eq('job_campaigns.profiles.user_id', user.id);
 
-      if (applicationsError) {
-        console.error('Error fetching status distribution data:', applicationsError);
+      if (error) {
+        console.error('Error fetching status distribution data:', error);
         setStatusDistributionData(generateDemoStatusData());
-        return;
-      }
-
-      const totalApplications = applicationsData?.length || 0;
-
-      if (totalApplications === 0) {
-        console.log('No applications found, showing empty state');
-        setStatusDistributionData([]);
         return;
       }
 
       // Count applications by status
       const statusCounts: Record<string, number> = {};
+      const totalApplications = applicationsData?.length || 0;
+
+      if (totalApplications === 0) {
+        setStatusDistributionData([]);
+        return;
+      }
+
       applicationsData?.forEach(app => {
         const status = app.status || 'SENT';
         statusCounts[status] = (statusCounts[status] || 0) + 1;
@@ -321,7 +265,6 @@ export const DashboardHome: React.FC = () => {
         color: statusColors[status] || '#6B7280'
       }));
 
-      console.log('Generated status distribution data:', distributionData);
       setStatusDistributionData(distributionData);
     } catch (error) {
       console.error('Error fetching status distribution data:', error);
@@ -332,7 +275,6 @@ export const DashboardHome: React.FC = () => {
   const fetchDashboardData = async () => {
     try {
       if (!isSupabaseConfigured() || !user) {
-        console.log('Using demo data - Supabase not configured or no user');
         // Demo data with corrected success rate calculation
         const totalApps = 23;
         const acceptedApps = 3; // 3 accepted out of 23 applications
@@ -380,123 +322,84 @@ export const DashboardHome: React.FC = () => {
         return;
       }
 
-      console.log('Fetching real dashboard data for user:', user.id);
-
-      // First, get the user's profile
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (profileError || !profileData) {
-        console.log('No profile found, using demo data');
-        setStats({
-          totalApplications: 0,
-          thisWeekApplications: 0,
-          successRate: 0,
-          activeJobs: 0,
-          tokensUsed: 0,
-          tokensRemaining: 75
-        });
-        setRecentApplications([]);
-        await Promise.all([
-          fetchApplicationTrendData(),
-          fetchStatusDistributionData()
-        ]);
-        setLoading(false);
-        return;
-      }
-
-      // Get the user's campaigns
-      const { data: campaignData, error: campaignError } = await supabase
-        .from('job_campaigns')
-        .select('id, job_title, location')
-        .eq('profile_id', profileData.id);
-
-      if (campaignError || !campaignData || campaignData.length === 0) {
-        console.log('No campaigns found, using empty stats');
-        setStats({
-          totalApplications: 0,
-          thisWeekApplications: 0,
-          successRate: 0,
-          activeJobs: 0,
-          tokensUsed: 0,
-          tokensRemaining: 75
-        });
-        setRecentApplications([]);
-        await Promise.all([
-          fetchApplicationTrendData(),
-          fetchStatusDistributionData()
-        ]);
-        setLoading(false);
-        return;
-      }
-
-      const campaignIds = campaignData.map(c => c.id);
+      // Fetch real data from Supabase
       const currentDate = new Date();
       const weekAgo = new Date(currentDate.getTime() - 7 * 24 * 60 * 60 * 1000);
       const monthAgo = new Date(currentDate.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-      // Get all applications for these campaigns
-      const { data: allApplicationsData, error: allAppsError } = await supabase
+      // Get total applications for the user
+      const { count: totalCount } = await supabase
         .from('applications')
-        .select('*')
-        .in('campaign_id', campaignIds);
+        .select('*', { count: 'exact', head: true })
+        .in('campaign_id', 
+          await supabase
+            .from('job_campaigns')
+            .select('id')
+            .in('profile_id',
+              await supabase
+                .from('profiles')
+                .select('id')
+                .eq('user_id', user.id)
+                .then(({ data }) => data?.map(p => p.id) || [])
+            )
+            .then(({ data }) => data?.map(c => c.id) || [])
+        );
 
-      if (allAppsError) {
-        console.error('Error fetching applications:', allAppsError);
-        setStats({
-          totalApplications: 0,
-          thisWeekApplications: 0,
-          successRate: 0,
-          activeJobs: 0,
-          tokensUsed: 0,
-          tokensRemaining: 75
-        });
-        setRecentApplications([]);
-        await Promise.all([
-          fetchApplicationTrendData(),
-          fetchStatusDistributionData()
-        ]);
-        setLoading(false);
-        return;
-      }
+      // Get this week's applications
+      const { count: weekCount } = await supabase
+        .from('applications')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', weekAgo.toISOString())
+        .in('campaign_id', 
+          await supabase
+            .from('job_campaigns')
+            .select('id')
+            .in('profile_id',
+              await supabase
+                .from('profiles')
+                .select('id')
+                .eq('user_id', user.id)
+                .then(({ data }) => data?.map(p => p.id) || [])
+            )
+            .then(({ data }) => data?.map(c => c.id) || [])
+        );
 
-      const totalApplications = allApplicationsData?.length || 0;
-      const thisWeekApplications = allApplicationsData?.filter(app => 
-        new Date(app.created_at) >= weekAgo
-      ).length || 0;
-      const acceptedApplications = allApplicationsData?.filter(app => 
-        app.status === 'ACCEPTED'
-      ).length || 0;
-      const activeApplications = allApplicationsData?.filter(app => 
-        ['SENT', 'PENDING', 'INTERVIEW'].includes(app.status)
-      ).length || 0;
+      // Get accepted applications for success rate calculation
+      const { count: acceptedCount } = await supabase
+        .from('applications')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'ACCEPTED')
+        .in('campaign_id', 
+          await supabase
+            .from('job_campaigns')
+            .select('id')
+            .in('profile_id',
+              await supabase
+                .from('profiles')
+                .select('id')
+                .eq('user_id', user.id)
+                .then(({ data }) => data?.map(p => p.id) || [])
+            )
+            .then(({ data }) => data?.map(c => c.id) || [])
+        );
 
-      const successRate = totalApplications > 0 
-        ? Math.round((acceptedApplications / totalApplications) * 100)
-        : 0;
+      // Get recent applications
+      const { data: applicationsData } = await supabase
+        .from('applications')
+        .select(`
+          *,
+          job_campaigns!campaign_id(
+            location,
+            profiles!inner(
+              user_id
+            )
+          )
+        `)
+        .eq('job_campaigns.profiles.user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(5);
 
-      // Get recent applications with campaign info
-      const recentAppsData = allApplicationsData
-        ?.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-        .slice(0, 5)
-        .map(app => {
-          const campaign = campaignData.find(c => c.id === app.campaign_id);
-          return {
-            id: app.id,
-            company: app.company || 'Unknown Company',
-            role: app.role || 'Unknown Role',
-            status: app.status || 'SENT',
-            applied_at: app.applied_at || app.created_at,
-            campaign: {
-              location: campaign?.location || 'Not specified'
-            }
-          };
-        }) || [];
-
-      // Get browser use stats for tokens (if available)
+      // Get browser use stats for tokens
       const { data: usageData } = await supabase
         .from('browser_use_logs')
         .select('step_count')
@@ -506,16 +409,32 @@ export const DashboardHome: React.FC = () => {
       const totalSteps = usageData?.reduce((sum, log) => sum + log.step_count, 0) || 0;
       const tokensUsed = Math.ceil(totalSteps / 10);
 
+      // Calculate success rate as accepted/applied * 100
+      const successRate = totalCount && totalCount > 0 
+        ? Math.round(((acceptedCount || 0) / totalCount) * 100)
+        : 0;
+
       setStats({
-        totalApplications,
-        thisWeekApplications,
+        totalApplications: totalCount || 0,
+        thisWeekApplications: weekCount || 0,
         successRate,
-        activeJobs: activeApplications,
+        activeJobs: applicationsData?.filter(app => ['SENT', 'PENDING', 'INTERVIEW'].includes(app.status)).length || 0,
         tokensUsed,
         tokensRemaining: Math.max(0, 75 - tokensUsed)
       });
 
-      setRecentApplications(recentAppsData);
+      const transformedApplications: RecentApplication[] = (applicationsData || []).map(app => ({
+        id: app.id,
+        company: app.company || 'Unknown Company',
+        role: app.role || 'Unknown Role',
+        status: app.status || 'SENT',
+        applied_at: app.applied_at || app.created_at,
+        campaign: {
+          location: app.job_campaigns?.location || 'Not specified'
+        }
+      }));
+
+      setRecentApplications(transformedApplications);
       
       // Fetch chart data
       await Promise.all([
@@ -524,143 +443,109 @@ export const DashboardHome: React.FC = () => {
       ]);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-      // Use demo data as fallback
-      setStats({
-        totalApplications: 0,
-        thisWeekApplications: 0,
-        successRate: 0,
-        activeJobs: 0,
-        tokensUsed: 0,
-        tokensRemaining: 75
-      });
-      setRecentApplications([]);
-      await Promise.all([
-        fetchApplicationTrendData(),
-        fetchStatusDistributionData()
-      ]);
     } finally {
       setLoading(false);
     }
   };
 
   const handleAddApplication = async () => {
+    if (!newApplication.company.trim() || !newApplication.role.trim()) {
+      toast.error('Please fill in company and role fields');
+      return;
+    }
+
     if (!isSupabaseConfigured() || !user) {
-      // Demo mode - just add to local state
-      const newApp: RecentApplication = {
-        id: Date.now().toString(),
-        company: newApplicationData.company,
-        role: newApplicationData.role,
-        status: newApplicationData.status,
-        applied_at: newApplicationData.appliedDate,
-        campaign: {
-          location: newApplicationData.location
-        }
-      };
-      
-      setRecentApplications(prev => [newApp, ...prev.slice(0, 4)]);
-      setStats(prev => ({
-        ...prev,
-        totalApplications: prev.totalApplications + 1,
-        thisWeekApplications: prev.thisWeekApplications + 1
-      }));
-      
-      setIsAddModalOpen(false);
-      setNewApplicationData({
-        company: '',
-        role: '',
-        location: '',
-        status: 'SENT',
-        appliedDate: new Date().toISOString().split('T')[0],
-        jobUrl: '',
-        notes: ''
-      });
+      toast.error('Database not configured');
       return;
     }
 
     setIsSubmitting(true);
+
     try {
       // Get user's profile
-      const { data: profileData, error: profileError } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id')
         .eq('user_id', user.id)
         .single();
 
-      if (profileError || !profileData) {
+      if (profileError || !profile) {
         throw new Error('Profile not found');
       }
 
-      // Create or get a "Manual Applications" campaign - FIXED: Use .maybeSingle() instead of .single()
-      let { data: campaignData, error: campaignError } = await supabase
+      // Find or create "Manual Applications" campaign
+      let { data: campaign, error: campaignError } = await supabase
         .from('job_campaigns')
         .select('id')
-        .eq('profile_id', profileData.id)
+        .eq('profile_id', profile.id)
         .eq('job_title', 'Manual Applications')
         .maybeSingle();
 
       if (campaignError) {
-        throw new Error(`Failed to query campaigns: ${campaignError.message}`);
+        console.error('Error querying campaign:', campaignError);
+        throw new Error('Failed to query campaigns');
       }
 
-      if (!campaignData) {
-        // Create the manual campaign
+      if (!campaign) {
+        // Create "Manual Applications" campaign
         const { data: newCampaign, error: createError } = await supabase
           .from('job_campaigns')
           .insert({
-            profile_id: profileData.id,
+            profile_id: profile.id,
             job_title: 'Manual Applications',
             location: 'Various',
             job_type: 'Manual',
-            work_type: 'Various',
-            experience_level: 'Various',
+            work_type: 'Manual Entry',
+            experience_level: 'All Levels',
             target_count: null
           })
           .select('id')
           .single();
 
         if (createError || !newCampaign) {
-          throw new Error('Failed to create manual campaign');
+          throw new Error('Failed to create campaign');
         }
-        campaignData = newCampaign;
+
+        campaign = newCampaign;
       }
 
       // Add the application
-      const { error: appError } = await supabase
+      const { error: applicationError } = await supabase
         .from('applications')
         .insert({
-          campaign_id: campaignData.id,
-          company: newApplicationData.company,
-          role: newApplicationData.role,
-          status: newApplicationData.status,
-          applied_at: newApplicationData.appliedDate,
+          campaign_id: campaign.id,
+          company: newApplication.company.trim(),
+          role: newApplication.role.trim(),
+          status: newApplication.status,
+          applied_at: new Date().toISOString(),
           details: {
-            location: newApplicationData.location,
-            jobUrl: newApplicationData.jobUrl,
-            notes: newApplicationData.notes,
+            location: newApplication.location.trim() || null,
+            notes: newApplication.notes.trim() || null,
             source: 'manual'
           }
         });
 
-      if (appError) {
-        throw appError;
+      if (applicationError) {
+        throw applicationError;
       }
 
+      // Reset form and close modal
+      setNewApplication({
+        company: '',
+        role: '',
+        status: 'SENT',
+        location: '',
+        notes: ''
+      });
+      setIsAddModalOpen(false);
+      
       // Refresh dashboard data
       await fetchDashboardData();
       
-      setIsAddModalOpen(false);
-      setNewApplicationData({
-        company: '',
-        role: '',
-        location: '',
-        status: 'SENT',
-        appliedDate: new Date().toISOString().split('T')[0],
-        jobUrl: '',
-        notes: ''
-      });
+      toast.success('Application added successfully!');
     } catch (error) {
       console.error('Error adding application:', error);
-      alert('Failed to add application. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Failed to add application');
     } finally {
       setIsSubmitting(false);
     }
@@ -687,6 +572,27 @@ export const DashboardHome: React.FC = () => {
     
     return matchesSearch && matchesStatus;
   });
+
+  const exportData = () => {
+    const csvContent = [
+      ['Company', 'Role', 'Status', 'Applied Date', 'Location'],
+      ...recentApplications.map(app => [
+        app.company,
+        app.role,
+        app.status,
+        new Date(app.applied_at).toLocaleDateString(),
+        app.campaign.location
+      ])
+    ].map(row => row.join(',')).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'applications.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
 
   if (loading) {
     return (
@@ -729,26 +635,7 @@ export const DashboardHome: React.FC = () => {
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
-          <Button onClick={() => {
-            const csvContent = [
-              ['Company', 'Role', 'Status', 'Applied Date', 'Location'],
-              ...recentApplications.map(app => [
-                app.company,
-                app.role,
-                app.status,
-                new Date(app.applied_at).toLocaleDateString(),
-                app.campaign.location
-              ])
-            ].map(row => row.join(',')).join('\n');
-
-            const blob = new Blob([csvContent], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'applications.csv';
-            a.click();
-            window.URL.revokeObjectURL(url);
-          }} variant="outline" size="sm">
+          <Button onClick={exportData} variant="outline" size="sm">
             <Download className="w-4 h-4 mr-2" />
             Export
           </Button>
@@ -1043,10 +930,10 @@ export const DashboardHome: React.FC = () => {
                 </CardDescription>
               </div>
               <div className="flex items-center space-x-3">
-                <Button
+                <Button 
                   onClick={() => setIsAddModalOpen(true)}
-                  variant="outline"
                   size="sm"
+                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Add Application
@@ -1162,176 +1049,133 @@ export const DashboardHome: React.FC = () => {
       </motion.div>
 
       {/* Add Application Modal */}
-      <AnimatePresence>
-        {isAddModalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setIsAddModalOpen(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              transition={{ duration: 0.2 }}
-              className="w-full max-w-2xl glass-card rounded-3xl shadow-3xl border border-white/20 dark:border-gray-700/30 overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center">
-                      <Plus className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Add Application</h2>
-                      <p className="text-gray-600 dark:text-gray-300">Manually track a job application</p>
-                    </div>
-                  </div>
-                  <Button
-                    onClick={() => setIsAddModalOpen(false)}
-                    variant="ghost"
-                    size="icon"
-                    className="rounded-xl"
-                  >
-                    <X className="w-5 h-5" />
-                  </Button>
+      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+        <DialogContent className="sm:max-w-md glass-card border-0 shadow-2xl">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
+                  <Plus className="w-5 h-5 text-white" />
                 </div>
-
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        Company Name *
-                      </label>
-                      <Input
-                        type="text"
-                        value={newApplicationData.company}
-                        onChange={(e) => setNewApplicationData(prev => ({ ...prev, company: e.target.value }))}
-                        placeholder="e.g., Google"
-                        className="premium-input"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        Job Title *
-                      </label>
-                      <Input
-                        type="text"
-                        value={newApplicationData.role}
-                        onChange={(e) => setNewApplicationData(prev => ({ ...prev, role: e.target.value }))}
-                        placeholder="e.g., Software Engineer"
-                        className="premium-input"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        Location
-                      </label>
-                      <Input
-                        type="text"
-                        value={newApplicationData.location}
-                        onChange={(e) => setNewApplicationData(prev => ({ ...prev, location: e.target.value }))}
-                        placeholder="e.g., San Francisco, CA"
-                        className="premium-input"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        Status
-                      </label>
-                      <Select 
-                        value={newApplicationData.status} 
-                        onValueChange={(value) => setNewApplicationData(prev => ({ ...prev, status: value as any }))}
-                      >
-                        <SelectTrigger className="premium-select">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="SENT">Sent</SelectItem>
-                          <SelectItem value="PENDING">Pending</SelectItem>
-                          <SelectItem value="INTERVIEW">Interview</SelectItem>
-                          <SelectItem value="ACCEPTED">Accepted</SelectItem>
-                          <SelectItem value="REJECTED">Rejected</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        Applied Date
-                      </label>
-                      <Input
-                        type="date"
-                        value={newApplicationData.appliedDate}
-                        onChange={(e) => setNewApplicationData(prev => ({ ...prev, appliedDate: e.target.value }))}
-                        className="premium-input"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        Job URL (Optional)
-                      </label>
-                      <Input
-                        type="url"
-                        value={newApplicationData.jobUrl}
-                        onChange={(e) => setNewApplicationData(prev => ({ ...prev, jobUrl: e.target.value }))}
-                        placeholder="https://..."
-                        className="premium-input"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
-                      Notes (Optional)
-                    </label>
-                    <textarea
-                      value={newApplicationData.notes}
-                      onChange={(e) => setNewApplicationData(prev => ({ ...prev, notes: e.target.value }))}
-                      placeholder="Any additional notes about this application..."
-                      className="premium-input h-24 resize-none"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200 dark:border-gray-700">
-                    <Button
-                      onClick={() => setIsAddModalOpen(false)}
-                      variant="outline"
-                      disabled={isSubmitting}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={handleAddApplication}
-                      disabled={!newApplicationData.company || !newApplicationData.role || isSubmitting}
-                      className="premium-button-primary"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Adding...
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="w-4 h-4 mr-2" />
-                          Add Application
-                        </>
-                      )}
-                    </Button>
-                  </div>
+                <div>
+                  <DialogTitle className="text-xl text-gray-900 dark:text-white">Add Application</DialogTitle>
+                  <DialogDescription className="text-gray-600 dark:text-gray-300">
+                    Manually add a job application to track
+                  </DialogDescription>
                 </div>
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsAddModalOpen(false)}
+                className="hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </DialogHeader>
+          
+          <div className="space-y-4 mt-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Company *
+                </label>
+                <Input
+                  placeholder="Company name"
+                  value={newApplication.company}
+                  onChange={(e) => setNewApplication(prev => ({ ...prev, company: e.target.value }))}
+                  className="bg-white/60 dark:bg-gray-800/60"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Role *
+                </label>
+                <Input
+                  placeholder="Job title"
+                  value={newApplication.role}
+                  onChange={(e) => setNewApplication(prev => ({ ...prev, role: e.target.value }))}
+                  className="bg-white/60 dark:bg-gray-800/60"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Status
+                </label>
+                <Select 
+                  value={newApplication.status} 
+                  onValueChange={(value) => setNewApplication(prev => ({ ...prev, status: value }))}
+                >
+                  <SelectTrigger className="bg-white/60 dark:bg-gray-800/60">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SENT">Sent</SelectItem>
+                    <SelectItem value="PENDING">Pending</SelectItem>
+                    <SelectItem value="INTERVIEW">Interview</SelectItem>
+                    <SelectItem value="ACCEPTED">Accepted</SelectItem>
+                    <SelectItem value="REJECTED">Rejected</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Location
+                </label>
+                <Input
+                  placeholder="City, State"
+                  value={newApplication.location}
+                  onChange={(e) => setNewApplication(prev => ({ ...prev, location: e.target.value }))}
+                  className="bg-white/60 dark:bg-gray-800/60"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Notes
+              </label>
+              <textarea
+                placeholder="Additional notes about this application..."
+                value={newApplication.notes}
+                onChange={(e) => setNewApplication(prev => ({ ...prev, notes: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm resize-none h-20"
+              />
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => setIsAddModalOpen(false)}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAddApplication}
+                disabled={isSubmitting || !newApplication.company.trim() || !newApplication.role.trim()}
+                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Application
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
