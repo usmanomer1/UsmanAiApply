@@ -19,7 +19,10 @@ import {
   Plus,
   Search,
   Filter,
-  RefreshCw
+  RefreshCw,
+  Download,
+  PieChart,
+  Activity
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -29,6 +32,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RechartsPieChart, Cell } from 'recharts';
 
 interface DashboardStats {
   totalApplications: number;
@@ -49,6 +53,24 @@ interface RecentApplication {
     location: string;
   };
 }
+
+// Sample data for charts
+const applicationTrendData = [
+  { name: 'Mon', applications: 4 },
+  { name: 'Tue', applications: 3 },
+  { name: 'Wed', applications: 6 },
+  { name: 'Thu', applications: 8 },
+  { name: 'Fri', applications: 5 },
+  { name: 'Sat', applications: 2 },
+  { name: 'Sun', applications: 1 },
+];
+
+const statusDistributionData = [
+  { name: 'Sent', value: 45, color: '#3B82F6' },
+  { name: 'Pending', value: 25, color: '#F59E0B' },
+  { name: 'Interview', value: 20, color: '#8B5CF6' },
+  { name: 'Rejected', value: 10, color: '#EF4444' },
+];
 
 export const DashboardHome: React.FC = () => {
   const { user } = useAuth();
@@ -215,6 +237,27 @@ export const DashboardHome: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
+  const exportData = () => {
+    const csvContent = [
+      ['Company', 'Role', 'Status', 'Applied Date', 'Location'],
+      ...recentApplications.map(app => [
+        app.company,
+        app.role,
+        app.status,
+        new Date(app.applied_at).toLocaleDateString(),
+        app.campaign.location
+      ])
+    ].map(row => row.join(',')).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'applications.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
   if (loading) {
     return (
       <div className="space-y-8">
@@ -255,6 +298,10 @@ export const DashboardHome: React.FC = () => {
           <Button onClick={fetchDashboardData} variant="outline" size="sm">
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
+          </Button>
+          <Button onClick={exportData} variant="outline" size="sm">
+            <Download className="w-4 h-4 mr-2" />
+            Export
           </Button>
           <Link to="/auto-apply">
             <Button size="sm" className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
@@ -345,11 +392,122 @@ export const DashboardHome: React.FC = () => {
         </Card>
       </motion.div>
 
-      {/* Quick Actions */}
+      {/* Charts Section */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
+        className="grid grid-cols-1 lg:grid-cols-2 gap-8"
+      >
+        {/* Application Trend Chart */}
+        <Card className="premium-card hover-lift">
+          <CardHeader>
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                <Activity className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-xl text-gray-900 dark:text-white">Application Trend</CardTitle>
+                <CardDescription className="text-gray-600 dark:text-gray-300">
+                  Daily applications over the past week
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={applicationTrendData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
+                  <XAxis dataKey="name" stroke="#6B7280" />
+                  <YAxis stroke="#6B7280" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1F2937', 
+                      border: 'none', 
+                      borderRadius: '8px',
+                      color: '#F9FAFB'
+                    }} 
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="applications" 
+                    stroke="#3B82F6" 
+                    strokeWidth={3}
+                    dot={{ fill: '#3B82F6', strokeWidth: 2, r: 4 }}
+                    activeDot={{ r: 6, stroke: '#3B82F6', strokeWidth: 2 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Status Distribution Chart */}
+        <Card className="premium-card hover-lift">
+          <CardHeader>
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
+                <PieChart className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-xl text-gray-900 dark:text-white">Status Distribution</CardTitle>
+                <CardDescription className="text-gray-600 dark:text-gray-300">
+                  Breakdown of application statuses
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsPieChart>
+                  <Pie
+                    data={statusDistributionData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {statusDistributionData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1F2937', 
+                      border: 'none', 
+                      borderRadius: '8px',
+                      color: '#F9FAFB'
+                    }} 
+                  />
+                </RechartsPieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex flex-wrap justify-center gap-4 mt-4">
+              {statusDistributionData.map((item, index) => (
+                <div key={index} className="flex items-center">
+                  <div 
+                    className="w-3 h-3 rounded-full mr-2" 
+                    style={{ backgroundColor: item.color }}
+                  ></div>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    {item.name} ({item.value}%)
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Quick Actions */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
         className="grid grid-cols-1 md:grid-cols-3 gap-6"
       >
         <Link to="/auto-apply">
@@ -408,7 +566,7 @@ export const DashboardHome: React.FC = () => {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
+        transition={{ delay: 0.4 }}
       >
         <Card className="premium-card hover-lift">
           <CardHeader className="pb-6">
@@ -427,7 +585,7 @@ export const DashboardHome: React.FC = () => {
               </Link>
             </div>
             
-            {/* Search and Filter Controls */}
+            {/* Search and Filter Controls - Moved here */}
             <div className="flex flex-col sm:flex-row gap-4 mt-6">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none z-10" />
