@@ -590,15 +590,19 @@ export const DashboardHome: React.FC = () => {
         throw new Error('Profile not found');
       }
 
-      // Create or get a "Manual Applications" campaign
+      // Create or get a "Manual Applications" campaign - FIXED: Use .maybeSingle() instead of .single()
       let { data: campaignData, error: campaignError } = await supabase
         .from('job_campaigns')
         .select('id')
         .eq('profile_id', profileData.id)
         .eq('job_title', 'Manual Applications')
-        .single();
+        .maybeSingle();
 
-      if (campaignError || !campaignData) {
+      if (campaignError) {
+        throw new Error(`Failed to query campaigns: ${campaignError.message}`);
+      }
+
+      if (!campaignData) {
         // Create the manual campaign
         const { data: newCampaign, error: createError } = await supabase
           .from('job_campaigns')
