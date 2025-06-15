@@ -295,6 +295,9 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
         max_steps: parseInt(config.targetCount || '10') * 5 // 5 steps per application estimate
       };
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
       const response = await fetch(`${API_URL}/run-task`, {
         method: 'POST',
         headers: {
@@ -302,7 +305,10 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
           'Authorization': `Bearer ${API_KEY}`,
         },
         body: JSON.stringify(taskData),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -332,8 +338,19 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
       }
     } catch (error) {
       console.error('Error starting automation:', error);
-      toast.error(`Error starting automation: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setIsRunning(false);
+      
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          toast.error('Request timed out. Please check your internet connection and try again.');
+        } else if (error.message.includes('Failed to fetch')) {
+          toast.error(`Unable to connect to Browser Use API. Please check:\n• Internet connection\n• API URL: ${API_URL}\n• Firewall/network settings`);
+        } else {
+          toast.error(`Error starting automation: ${error.message}`);
+        }
+      } else {
+        toast.error('Unknown error occurred while starting automation');
+      }
     }
   };
 
@@ -341,6 +358,9 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
     if (!currentTaskId || !API_KEY) return;
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const response = await fetch(`${API_URL}/pause-task`, {
         method: 'PUT',
         headers: {
@@ -348,15 +368,24 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
           'Authorization': `Bearer ${API_KEY}`,
         },
         body: JSON.stringify({ task_id: currentTaskId }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         setIsPaused(true);
         toast.success('Automation paused');
+      } else {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
     } catch (error) {
       console.error('Error pausing automation:', error);
-      toast.error('Failed to pause automation');
+      if (error instanceof Error && error.name === 'AbortError') {
+        toast.error('Request timed out while pausing automation');
+      } else {
+        toast.error('Failed to pause automation');
+      }
     }
   };
 
@@ -364,6 +393,9 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
     if (!currentTaskId || !API_KEY) return;
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const response = await fetch(`${API_URL}/resume-task`, {
         method: 'PUT',
         headers: {
@@ -371,15 +403,24 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
           'Authorization': `Bearer ${API_KEY}`,
         },
         body: JSON.stringify({ task_id: currentTaskId }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         setIsPaused(false);
         toast.success('Automation resumed');
+      } else {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
     } catch (error) {
       console.error('Error resuming automation:', error);
-      toast.error('Failed to resume automation');
+      if (error instanceof Error && error.name === 'AbortError') {
+        toast.error('Request timed out while resuming automation');
+      } else {
+        toast.error('Failed to resume automation');
+      }
     }
   };
 
@@ -387,6 +428,9 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
     if (!currentTaskId || !API_KEY) return;
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const response = await fetch(`${API_URL}/stop-task`, {
         method: 'PUT',
         headers: {
@@ -394,7 +438,10 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
           'Authorization': `Bearer ${API_KEY}`,
         },
         body: JSON.stringify({ task_id: currentTaskId }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         setIsRunning(false);
@@ -403,10 +450,16 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
         setTaskStatus(null);
         setPreviewUrl(null);
         toast.success('Automation stopped');
+      } else {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
     } catch (error) {
       console.error('Error stopping automation:', error);
-      toast.error('Failed to stop automation');
+      if (error instanceof Error && error.name === 'AbortError') {
+        toast.error('Request timed out while stopping automation');
+      } else {
+        toast.error('Failed to stop automation');
+      }
     }
   };
 
@@ -414,11 +467,17 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
     if (!API_KEY) return;
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const response = await fetch(`${API_URL}/get-task-status?task_id=${taskId}`, {
         headers: {
           'Authorization': `Bearer ${API_KEY}`,
         },
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const status = await response.json();
@@ -436,7 +495,9 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
         }
       }
     } catch (error) {
-      console.error('Error checking task status:', error);
+      if (error instanceof Error && error.name !== 'AbortError') {
+        console.error('Error checking task status:', error);
+      }
     }
   };
 
