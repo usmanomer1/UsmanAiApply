@@ -189,37 +189,40 @@ const LinkedInAutomationBot: React.FC = () => {
         .from('automation_configs')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle(); // Use maybeSingle() instead of single() to handle no rows gracefully
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+      if (error) {
         console.error('Error loading configuration:', error);
         setLoading(false);
         return;
       }
 
-      if (configData) {
+      if (configData && configData.config) {
+        // Extract configuration from the JSONB config column
+        const savedConfig = configData.config;
+        
         setConfig({
           credentials: {
-            email: configData.linkedin_email || '',
+            email: savedConfig.credentials?.email || '',
             password: '', // Never load password from storage
-            twoFactorEnabled: configData.two_factor_enabled || false
+            twoFactorEnabled: savedConfig.credentials?.twoFactorEnabled || false
           },
           preferences: {
-            jobTitle: configData.job_title || '',
-            location: configData.location || '',
-            experienceLevel: configData.experience_level || '',
-            jobType: configData.job_type || '',
-            workType: configData.work_type || '',
-            salaryRange: configData.salary_range || '',
-            keywords: configData.keywords || [],
-            excludeKeywords: configData.exclude_keywords || [],
-            companySize: configData.company_size || '',
-            industries: configData.industries || [],
-            maxApplicationsPerDay: configData.max_applications_per_day || 10,
-            applyToEasyApplyOnly: configData.easy_apply_only || true,
-            skipAlreadyApplied: configData.skip_already_applied || true
+            jobTitle: savedConfig.preferences?.jobTitle || '',
+            location: savedConfig.preferences?.location || '',
+            experienceLevel: savedConfig.preferences?.experienceLevel || '',
+            jobType: savedConfig.preferences?.jobType || '',
+            workType: savedConfig.preferences?.workType || '',
+            salaryRange: savedConfig.preferences?.salaryRange || '',
+            keywords: savedConfig.preferences?.keywords || [],
+            excludeKeywords: savedConfig.preferences?.excludeKeywords || [],
+            companySize: savedConfig.preferences?.companySize || '',
+            industries: savedConfig.preferences?.industries || [],
+            maxApplicationsPerDay: savedConfig.preferences?.maxApplicationsPerDay || 10,
+            applyToEasyApplyOnly: savedConfig.preferences?.applyToEasyApplyOnly !== false,
+            skipAlreadyApplied: savedConfig.preferences?.skipAlreadyApplied !== false
           },
-          isConfigured: !!configData.linkedin_email && !!configData.job_title
+          isConfigured: !!(savedConfig.credentials?.email && savedConfig.preferences?.jobTitle)
         });
       }
     } catch (error) {
@@ -237,24 +240,30 @@ const LinkedInAutomationBot: React.FC = () => {
 
     setSaving(true);
     try {
+      // Store all configuration data in the JSONB config column
       const configData = {
         user_id: user.id,
-        linkedin_email: config.credentials.email,
-        two_factor_enabled: config.credentials.twoFactorEnabled,
-        job_title: config.preferences.jobTitle,
-        location: config.preferences.location,
-        experience_level: config.preferences.experienceLevel,
-        job_type: config.preferences.jobType,
-        work_type: config.preferences.workType,
-        salary_range: config.preferences.salaryRange,
-        keywords: config.preferences.keywords,
-        exclude_keywords: config.preferences.excludeKeywords,
-        company_size: config.preferences.companySize,
-        industries: config.preferences.industries,
-        max_applications_per_day: config.preferences.maxApplicationsPerDay,
-        easy_apply_only: config.preferences.applyToEasyApplyOnly,
-        skip_already_applied: config.preferences.skipAlreadyApplied,
-        updated_at: new Date().toISOString()
+        config: {
+          credentials: {
+            email: config.credentials.email,
+            twoFactorEnabled: config.credentials.twoFactorEnabled
+          },
+          preferences: {
+            jobTitle: config.preferences.jobTitle,
+            location: config.preferences.location,
+            experienceLevel: config.preferences.experienceLevel,
+            jobType: config.preferences.jobType,
+            workType: config.preferences.workType,
+            salaryRange: config.preferences.salaryRange,
+            keywords: config.preferences.keywords,
+            excludeKeywords: config.preferences.excludeKeywords,
+            companySize: config.preferences.companySize,
+            industries: config.preferences.industries,
+            maxApplicationsPerDay: config.preferences.maxApplicationsPerDay,
+            applyToEasyApplyOnly: config.preferences.applyToEasyApplyOnly,
+            skipAlreadyApplied: config.preferences.skipAlreadyApplied
+          }
+        }
       };
 
       const { error } = await supabase
@@ -1178,6 +1187,29 @@ const LinkedInAutomationBot: React.FC = () => {
                         className="premium-input"
                       />
                     </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Company Size
+                      </label>
+                      <Select 
+                        value={config.preferences.companySize} 
+                        onValueChange={(value) => setConfig(prev => ({
+                          ...prev,
+                          preferences: { ...prev.preferences, companySize: value }
+                        }))}
+                      >
+                        <SelectTrigger className="premium-select">
+                          <SelectValue placeholder="Select company size" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="startup">Startup (1-50)</SelectItem>
+                          <SelectItem value="small">Small (51-200)</SelectItem>
+                          <SelectItem value="medium">Medium (201-1000)</SelectItem>
+                          <SelectItem value="large">Large (1000+)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
                   {/* Keywords */}
@@ -1357,6 +1389,10 @@ const LinkedInAutomationBot: React.FC = () => {
                         <div>
                           <span className="text-gray-600 dark:text-gray-400">Experience: </span>
                           <span className="text-gray-900 dark:text-white">{config.preferences.experienceLevel || 'Any'}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600 dark:text-gray-400">Company Size: </span>
+                          <span className="text-gray-900 dark:text-white">{config.preferences.companySize || 'Any'}</span>
                         </div>
                         <div>
                           <span className="text-gray-600 dark:text-gray-400">Max Applications/Day: </span>
