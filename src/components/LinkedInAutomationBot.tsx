@@ -46,7 +46,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 
 interface TaskStatus {
   id: string;
-  status: 'pending' | 'running' | 'paused' | 'finished' | 'failed' | 'stopped';
+  status: 'created' | 'running' | 'paused' | 'finished' | 'failed' | 'stopped';
   live_url?: string;
   steps?: any[];
   output?: string;
@@ -57,6 +57,10 @@ interface BrowserUseConfig {
   apiKey: string;
   linkedinEmail: string;
   linkedinPassword: string;
+  contactNumber: string;
+  countryCode: string;
+  linkedinResume: string;
+  customInstructions: string;
   jobTitle: string;
   location: string;
   locationId: string;
@@ -71,7 +75,7 @@ interface BrowserUseConfig {
   targetCount: string;
 }
 
-const BROWSER_USE_API_BASE = import.meta.env.VITE_BROWSER_USE_API_URL || 'https://api.browseruse.cloud/v1';
+const BROWSER_USE_API_BASE = import.meta.env.VITE_BROWSER_USE_API_URL || 'https://api.browser-use.com/api/v1';
 
 // LinkedIn location ID mapping
 const LINKEDIN_LOCATIONS = {
@@ -86,6 +90,97 @@ const LINKEDIN_LOCATIONS = {
   'London, UK': '90000062',
   'Remote': 'remote'
 };
+
+// Country codes for phone numbers
+const COUNTRY_CODES = [
+  { code: '+1', country: 'United States/Canada', flag: '🇺🇸' },
+  { code: '+44', country: 'United Kingdom', flag: '🇬🇧' },
+  { code: '+91', country: 'India', flag: '🇮🇳' },
+  { code: '+49', country: 'Germany', flag: '🇩🇪' },
+  { code: '+33', country: 'France', flag: '🇫🇷' },
+  { code: '+81', country: 'Japan', flag: '🇯🇵' },
+  { code: '+86', country: 'China', flag: '🇨🇳' },
+  { code: '+61', country: 'Australia', flag: '🇦🇺' },
+  { code: '+55', country: 'Brazil', flag: '🇧🇷' },
+  { code: '+7', country: 'Russia', flag: '🇷🇺' },
+  { code: '+82', country: 'South Korea', flag: '🇰🇷' },
+  { code: '+34', country: 'Spain', flag: '🇪🇸' },
+  { code: '+39', country: 'Italy', flag: '🇮🇹' },
+  { code: '+31', country: 'Netherlands', flag: '🇳🇱' },
+  { code: '+46', country: 'Sweden', flag: '🇸🇪' },
+  { code: '+41', country: 'Switzerland', flag: '🇨🇭' },
+  { code: '+65', country: 'Singapore', flag: '🇸🇬' },
+  { code: '+852', country: 'Hong Kong', flag: '🇭🇰' },
+  { code: '+971', country: 'UAE', flag: '🇦🇪' },
+  { code: '+966', country: 'Saudi Arabia', flag: '🇸🇦' },
+  // Additional countries
+  { code: '+92', country: 'Pakistan', flag: '🇵🇰' },
+  { code: '+880', country: 'Bangladesh', flag: '🇧🇩' },
+  { code: '+62', country: 'Indonesia', flag: '🇮🇩' },
+  { code: '+60', country: 'Malaysia', flag: '🇲🇾' },
+  { code: '+66', country: 'Thailand', flag: '🇹🇭' },
+  { code: '+84', country: 'Vietnam', flag: '🇻🇳' },
+  { code: '+63', country: 'Philippines', flag: '🇵🇭' },
+  { code: '+90', country: 'Turkey', flag: '🇹🇷' },
+  { code: '+98', country: 'Iran', flag: '🇮🇷' },
+  { code: '+20', country: 'Egypt', flag: '🇪🇬' },
+  { code: '+27', country: 'South Africa', flag: '🇿🇦' },
+  { code: '+234', country: 'Nigeria', flag: '🇳🇬' },
+  { code: '+254', country: 'Kenya', flag: '🇰🇪' },
+  { code: '+52', country: 'Mexico', flag: '🇲🇽' },
+  { code: '+54', country: 'Argentina', flag: '🇦🇷' },
+  { code: '+56', country: 'Chile', flag: '🇨🇱' },
+  { code: '+57', country: 'Colombia', flag: '🇨🇴' },
+  { code: '+51', country: 'Peru', flag: '🇵🇪' },
+  { code: '+58', country: 'Venezuela', flag: '🇻🇪' },
+  { code: '+32', country: 'Belgium', flag: '🇧🇪' },
+  { code: '+43', country: 'Austria', flag: '🇦🇹' },
+  { code: '+45', country: 'Denmark', flag: '🇩🇰' },
+  { code: '+47', country: 'Norway', flag: '🇳🇴' },
+  { code: '+358', country: 'Finland', flag: '🇫🇮' },
+  { code: '+48', country: 'Poland', flag: '🇵🇱' },
+  { code: '+420', country: 'Czech Republic', flag: '🇨🇿' },
+  { code: '+36', country: 'Hungary', flag: '🇭🇺' },
+  { code: '+40', country: 'Romania', flag: '🇷🇴' },
+  { code: '+30', country: 'Greece', flag: '🇬🇷' },
+  { code: '+351', country: 'Portugal', flag: '🇵🇹' },
+  { code: '+353', country: 'Ireland', flag: '🇮🇪' },
+  { code: '+372', country: 'Estonia', flag: '🇪🇪' },
+  { code: '+371', country: 'Latvia', flag: '🇱🇻' },
+  { code: '+370', country: 'Lithuania', flag: '🇱🇹' },
+  { code: '+64', country: 'New Zealand', flag: '🇳🇿' },
+  { code: '+972', country: 'Israel', flag: '🇮🇱' },
+  { code: '+974', country: 'Qatar', flag: '🇶🇦' },
+  { code: '+965', country: 'Kuwait', flag: '🇰🇼' },
+  { code: '+973', country: 'Bahrain', flag: '🇧🇭' },
+  { code: '+968', country: 'Oman', flag: '🇴🇲' },
+  { code: '+961', country: 'Lebanon', flag: '🇱🇧' },
+  { code: '+962', country: 'Jordan', flag: '🇯🇴' },
+  { code: '+212', country: 'Morocco', flag: '🇲🇦' },
+  { code: '+213', country: 'Algeria', flag: '🇩🇿' },
+  { code: '+216', country: 'Tunisia', flag: '🇹🇳' },
+  { code: '+218', country: 'Libya', flag: '🇱🇾' },
+  { code: '+233', country: 'Ghana', flag: '🇬🇭' },
+  { code: '+256', country: 'Uganda', flag: '🇺🇬' },
+  { code: '+255', country: 'Tanzania', flag: '🇹🇿' },
+  { code: '+251', country: 'Ethiopia', flag: '🇪🇹' },
+  { code: '+593', country: 'Ecuador', flag: '🇪🇨' },
+  { code: '+595', country: 'Paraguay', flag: '🇵🇾' },
+  { code: '+598', country: 'Uruguay', flag: '🇺🇾' },
+  { code: '+591', country: 'Bolivia', flag: '🇧🇴' },
+  { code: '+507', country: 'Panama', flag: '🇵🇦' },
+  { code: '+506', country: 'Costa Rica', flag: '🇨🇷' },
+  { code: '+503', country: 'El Salvador', flag: '🇸🇻' },
+  { code: '+502', country: 'Guatemala', flag: '🇬🇹' },
+  { code: '+504', country: 'Honduras', flag: '🇭🇳' },
+  { code: '+505', country: 'Nicaragua', flag: '🇳🇮' },
+  { code: '+1876', country: 'Jamaica', flag: '🇯🇲' },
+  { code: '+1809', country: 'Dominican Republic', flag: '🇩🇴' },
+  { code: '+1787', country: 'Puerto Rico', flag: '🇵🇷' },
+  { code: '+1868', country: 'Trinidad & Tobago', flag: '🇹🇹' },
+  { code: '+1242', country: 'Bahamas', flag: '🇧🇸' },
+  { code: '+1246', country: 'Barbados', flag: '🇧🇧' }
+];
 
 // Work type mapping
 const WORK_TYPE_MAP = {
@@ -114,6 +209,10 @@ const LinkedInAutomationBot: React.FC = () => {
     apiKey: apiKey,
     linkedinEmail: '',
     linkedinPassword: '',
+    contactNumber: '',
+    countryCode: '+1',
+    linkedinResume: '',
+    customInstructions: '',
     jobTitle: 'Software Engineer',
     location: 'San Francisco Bay Area',
     locationId: '90000084',
@@ -134,9 +233,8 @@ const LinkedInAutomationBot: React.FC = () => {
   const [logs, setLogs] = useState<string[]>([]);
   const [stepCount, setStepCount] = useState(0);
   const [appliedCount, setAppliedCount] = useState(0);
-  const [jobTokensUsed, setJobTokensUsed] = useState(0);
   const [userSubscription, setUserSubscription] = useState<any>(null);
-  const [monthlyUsage, setMonthlyUsage] = useState({ tokens_used: 0, ai_requests_used: 0 });
+  const [monthlyUsage, setMonthlyUsage] = useState({ tokens_used: 0, ai_requests_used: 0, cost_usd: 0 });
   const [loading, setLoading] = useState(true);
 
   const isSupabaseConfigured = () => {
@@ -238,36 +336,68 @@ const LinkedInAutomationBot: React.FC = () => {
           subscription_status: 'active',
           price_id: 'price_1RYvf7QGabzJD80Bhd4V99CB' // Demo Pro plan
         });
-        setMonthlyUsage({ tokens_used: 15, ai_requests_used: 5 });
+        setMonthlyUsage({ tokens_used: 15, ai_requests_used: 5, cost_usd: 0.15 });
         return;
       }
 
+      // Fetch subscription using the same table as Navbar (stripe_user_subscriptions)
       const { data: subscription, error: subError } = await supabase
         .from('stripe_user_subscriptions')
         .select('*')
-        .single();
+        .maybeSingle();
 
-      setUserSubscription(subscription);
+      if (subError) {
+        console.error('Error fetching subscription:', subError);
+        setUserSubscription({ subscription_status: 'inactive', price_id: null });
+      } else if (subscription && subscription.subscription_status === 'active') {
+        setUserSubscription(subscription);
+      } else {
+        setUserSubscription({ subscription_status: 'inactive', price_id: null });
+      }
 
-      // Fetch current month usage
+      // Fetch current month usage with proper timezone handling
       const today = new Date();
       const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
 
-      const startDate = firstDayOfMonth.toISOString().split('T')[0];
-      const endDate = lastDayOfMonth.toISOString().split('T')[0];
+      const startDate = firstDayOfMonth.toISOString();
+      const endDate = nextMonth.toISOString();
+
+      console.log(`📊 Fetching usage from ${startDate} to ${endDate}`);
 
       const { data: usageData, error: usageError } = await supabase
         .from('browser_use_logs')
-        .select('step_count')
+        .select('step_count, cost_usd, created_at')
         .eq('user_id', user.id)
+        .eq('task_type', 'linkedin_auto_apply')
         .gte('created_at', startDate)
-        .lt('created_at', endDate);
+        .lt('created_at', endDate)
+        .order('created_at', { ascending: false });
 
-      const totalTokens = usageData?.reduce((sum, log) => sum + Math.ceil((log.step_count || 0) / 10), 0) || 0;
-      setMonthlyUsage(prev => ({ ...prev, tokens_used: totalTokens }));
+      if (usageError) {
+        console.error('Error fetching usage data:', usageError);
+        console.warn(`⚠️ Error fetching usage data: ${usageError.message}`);
+      }
+
+      const totalTokens = usageData?.reduce((sum, log) => {
+        return sum + (log.step_count || 0);
+      }, 0) || 0;
+      
+      const jobTokens = Math.ceil(totalTokens / 10);
+
+      const totalCost = usageData?.reduce((sum, log) => sum + (log.cost_usd || 0), 0) || 0;
+
+      console.log(`📈 Monthly usage: ${jobTokens} tokens (${totalTokens} steps), $${totalCost.toFixed(2)} cost`);
+      
+      setMonthlyUsage({ 
+        tokens_used: jobTokens, 
+        ai_requests_used: usageData?.length || 0,
+        cost_usd: totalCost
+      });
+
     } catch (error) {
       console.error('Error fetching subscription:', error);
+              console.error(`❌ Error fetching subscription data: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -276,7 +406,8 @@ const LinkedInAutomationBot: React.FC = () => {
       return 'Free Plan';
     }
     
-    const priceId = userSubscription.price_id || '';
+    // Use the price_id directly from the subscription
+    const priceId = userSubscription.price_id;
     
     if (priceId === 'price_1RYvocQGabzJD80BEVgRcdSa') {
       return 'Extreme Plan';
@@ -288,27 +419,30 @@ const LinkedInAutomationBot: React.FC = () => {
       return 'Pro Plan';
     }
     
-    return 'Free Plan';
+    // If subscription exists but price ID doesn't match, default to Pro
+    return userSubscription.subscription_status === 'active' ? 'Pro Plan' : 'Free Plan';
   };
 
   const getTokenLimit = () => {
     if (!userSubscription || userSubscription.subscription_status !== 'active') {
-      return 0;
+      return 0; // Free plan gets 0 tokens
     }
     
-    const priceId = userSubscription.price_id || '';
+    // Use the price_id directly from the subscription
+    const priceId = userSubscription.price_id;
     
     if (priceId === 'price_1RYvocQGabzJD80BEVgRcdSa') {
-      return 150;
+      return 150; // Extreme Plan
     }
     if (priceId === 'price_1RYvjSQGabzJD80BbbXxTq2S') {
-      return 75;
+      return 75; // Pro Plus Plan
     }
     if (priceId === 'price_1RYvf7QGabzJD80Bhd4V99CB') {
-      return 50;
+      return 50; // Pro Plan
     }
     
-    return 0;
+    // If subscription exists but price ID doesn't match, give basic tokens
+    return userSubscription.subscription_status === 'active' ? 50 : 0;
   };
 
   const canStartAutomation = () => {
@@ -317,8 +451,10 @@ const LinkedInAutomationBot: React.FC = () => {
       return false;
     }
     
-    const estimatedTokensNeeded = 5;
-    return monthlyUsage.tokens_used + estimatedTokensNeeded <= limit;
+    const estimatedTokensNeeded = 5; // Minimum tokens needed to start
+    const canStart = monthlyUsage.tokens_used + estimatedTokensNeeded <= limit;
+    
+    return canStart;
   };
 
   const buildLinkedInJobsURL = () => {
@@ -364,21 +500,52 @@ const LinkedInAutomationBot: React.FC = () => {
   const trackUsage = async (steps: number, taskId: string) => {
     try {
       const jobTokens = Math.ceil(steps / 10);
+      const costUsd = jobTokens * 0.01; // $0.01 per token
       
       if (isSupabaseConfigured() && user) {
-        addLog(`💰 Used ${jobTokens} job token${jobTokens > 1 ? 's' : ''} (${steps} steps)`);
+        addLog(`💰 Used ${jobTokens} job token${jobTokens > 1 ? 's' : ''} (${steps} steps, $${costUsd.toFixed(2)})`);
         
         try {
-          await supabase.from('browser_use_logs').insert({
+          // Log to browser_use_logs table
+          const { error: logError } = await supabase.from('browser_use_logs').insert({
             user_id: user.id,
             task_id: taskId,
             step_count: steps,
-            cost_usd: jobTokens * 0.01,
+            cost_usd: costUsd,
             task_type: 'linkedin_auto_apply',
             campaign_id: null
           });
-          
-          addLog(`📊 Usage tracked: ${steps} steps, ${jobTokens} tokens`);
+
+          if (logError) {
+            console.error('Error saving to browser_use_logs:', logError);
+            addLog(`⚠️ Browser use logging failed: ${logError.message}`, 'error');
+          }
+
+          // Also log to automation_tasks table for better tracking
+          const { error: taskError } = await supabase.from('automation_tasks').insert({
+            user_id: user.id,
+            task_id: taskId,
+            task_type: 'linkedin_auto_apply',
+            status: 'running',
+            step_count: steps,
+            cost_usd: costUsd,
+            started_at: new Date().toISOString()
+          });
+
+          if (taskError) {
+            console.error('Error saving to automation_tasks:', taskError);
+            // Don't log this error since it's not critical and might be a duplicate
+          } else {
+            addLog(`📊 Usage tracked: ${steps} steps, ${jobTokens} tokens, $${costUsd.toFixed(2)}`);
+          }
+
+          // Update the monthly usage immediately with the new tokens only
+          setMonthlyUsage(prev => ({
+            ...prev,
+            tokens_used: prev.tokens_used + jobTokens,
+            cost_usd: prev.cost_usd + costUsd
+          }));
+
         } catch (dbError) {
           console.error('Error saving usage to database:', dbError);
           addLog(`⚠️ Usage tracking failed - data not saved`, 'error');
@@ -386,22 +553,34 @@ const LinkedInAutomationBot: React.FC = () => {
       }
     } catch (error) {
       console.error('Error tracking usage:', error);
+      addLog(`❌ Error tracking usage: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
   };
 
   const saveJobApplication = async (company: string, role: string, taskId: string) => {
     try {
-      if (!isSupabaseConfigured() || !user) return;
+      if (!isSupabaseConfigured() || !user) {
+        addLog(`❌ Cannot save application: Database not configured or user not found`, 'error');
+        return false;
+      }
 
-      const { data: profile } = await supabase
+      addLog(`🔍 Attempting to save application: ${company} - ${role}`);
+
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id')
         .eq('user_id', user.id)
         .single();
 
-      if (!profile) return;
+      if (profileError || !profile) {
+        addLog(`❌ No profile found for user: ${profileError?.message || 'Profile not found'}`, 'error');
+        return false;
+      }
 
-      const { data: campaign } = await supabase
+      addLog(`✅ Profile found: ${profile.id}`);
+
+      // First, get or create a job campaign
+      const { data: campaign, error: campaignSelectError } = await supabase
         .from('job_campaigns')
         .select('id')
         .eq('profile_id', profile.id)
@@ -412,48 +591,103 @@ const LinkedInAutomationBot: React.FC = () => {
       let campaignId = campaign?.id;
 
       if (!campaignId) {
-        const { data: newCampaign } = await supabase
+        addLog(`📋 Creating new job campaign: ${config.jobTitle} in ${config.location}`);
+        
+        const { data: newCampaign, error: campaignError } = await supabase
           .from('job_campaigns')
           .insert({
             profile_id: profile.id,
             job_title: config.jobTitle || 'LinkedIn Auto Apply',
             location: config.location || 'Remote',
-            experience_level: config.experience || '',
-            work_type: config.remotePreference || ''
+            experience_level: config.experienceLevel || config.experience || '',
+            work_type: config.workType || config.remotePreference || '',
+            target_count: parseInt(config.targetCount) || 10
           })
           .select('id')
           .single();
 
-        campaignId = newCampaign?.id;
+        if (campaignError || !newCampaign) {
+          addLog(`❌ Failed to create job campaign: ${campaignError?.message || 'Unknown error'}`, 'error');
+          return false;
+        }
+
+        campaignId = newCampaign.id;
+        addLog(`✅ Created new job campaign with ID: ${campaignId}`);
+      } else {
+        addLog(`✅ Using existing campaign: ${campaignId}`);
       }
 
       if (campaignId) {
-        await supabase.from('applications').insert({
-          campaign_id: campaignId,
-          company: company,
-          role: role,
-          status: 'SENT',
-          applied_at: new Date().toISOString(),
-          details: {
-            automated: true,
-            job_title: config.jobTitle,
-            location: config.location
-          }
-        });
+        // Check if this application already exists to avoid duplicates
+        const { data: existingApp, error: existingError } = await supabase
+          .from('applications')
+          .select('id')
+          .eq('campaign_id', campaignId)
+          .eq('company', company)
+          .eq('role', role)
+          .maybeSingle();
 
-        addLog(`📝 Application saved: ${company} - ${role}`);
+        if (existingError) {
+          addLog(`⚠️ Error checking for existing application: ${existingError.message}`, 'error');
+        }
+
+        if (!existingApp) {
+          addLog(`💾 Inserting application: ${company} - ${role}`);
+          
+          const applicationData = {
+            campaign_id: campaignId,
+            company: company.trim(),
+            role: role.trim(),
+            status: 'SENT',
+            applied_at: new Date().toISOString(),
+            details: {
+              automated: true,
+              task_id: taskId,
+              job_title: config.jobTitle,
+              location: config.location,
+              contact_number: `${config.countryCode}${config.contactNumber}`,
+              resume_used: config.linkedinResume || 'Default',
+              custom_instructions: config.customInstructions || '',
+              extraction_method: 'browser_use_api',
+              timestamp: new Date().toISOString()
+            }
+          };
+
+          addLog(`📝 Application data: ${JSON.stringify(applicationData, null, 2)}`);
+
+          const { data: newApp, error: appError } = await supabase
+            .from('applications')
+            .insert(applicationData)
+            .select('id')
+            .single();
+
+          if (appError) {
+            addLog(`❌ Failed to save application: ${appError.message}`, 'error');
+            console.error('Full application error:', appError);
+            return false;
+          } else {
+            addLog(`✅ Application saved successfully: ${company} - ${role} (ID: ${newApp?.id})`, 'success');
+            return true;
+          }
+        } else {
+          addLog(`⚪ Duplicate application skipped: ${company} - ${role} (ID: ${existingApp.id})`);
+          return true;
+        }
       }
+      
+      return false;
     } catch (error) {
       console.error('Error saving job application:', error);
-      addLog(`⚠️ Failed to save application to database`, 'error');
+      addLog(`❌ Failed to save application to database: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      return false;
     }
   };
 
   const createLinkedInTask = async () => {
     const linkedinUrl = buildLinkedInJobsURL();
+    const fullContactNumber = `${config.countryCode}${config.contactNumber}`;
     
     const taskData = {
-      url: linkedinUrl,
       task: `You are an AI assistant helping with LinkedIn job applications. Your goal is to apply to jobs using LinkedIn's "Easy Apply" feature.
 
 CRITICAL SCROLLING INSTRUCTIONS:
@@ -464,26 +698,46 @@ CRITICAL SCROLLING INSTRUCTIONS:
 - Easy Apply modals often require scrolling to see the submit button
 
 STEP-BY-STEP PROCESS:
-1. First, log into LinkedIn using the provided credentials
+1. First, go to LinkedIn.com and log in using the provided credentials
 2. Navigate to the job search URL: ${linkedinUrl}
 3. Look for jobs with "Easy Apply" buttons
 4. For each job with Easy Apply:
-   a. Click the "Easy Apply" button
-   b. Fill out the application form (scroll down if you can't see all fields)
-   c. Answer any questions that appear (scroll to see all questions)
-   d. Upload resume if prompted (use existing resume if available)
-   e. SCROLL DOWN to find the "Submit" or "Submit application" button
-   f. Click submit to complete the application
-   g. Close the modal and move to the next job
+   a. BEFORE clicking Easy Apply, clearly state: "APPLYING TO: [EXACT COMPANY NAME] - [EXACT JOB TITLE]"
+   b. Extract the actual company name from the job posting (not generic terms)
+   c. Extract the exact job title from the posting
+   d. Click the "Easy Apply" button
+   e. Fill out the application form (scroll down if you can't see all fields)
+   f. Answer any questions that appear (scroll to see all questions)
+   g. Upload resume if prompted - use the specified LinkedIn resume: "${config.linkedinResume || 'Use the most recent resume available'}"
+   h. SCROLL DOWN to find the "Submit" or "Submit application" button
+   i. Before clicking submit, repeat: "SUBMITTING APPLICATION TO: [COMPANY NAME] - [JOB TITLE]"
+   j. Click submit to complete the application
+   k. Close the modal and move to the next job
+
+COMPANY NAME EXTRACTION REQUIREMENTS:
+- Extract the ACTUAL company name from the LinkedIn job posting
+- Look for the company name near the job title, usually displayed prominently
+- DO NOT use generic terms like "Company", "Employer", "Organization"
+- Examples of good company names: "Google", "Microsoft", "Acme Corp", "TechStart Inc"
+- Examples of bad company names: "Company", "Employer", "LinkedIn Company"
+
+JOB TITLE EXTRACTION REQUIREMENTS:
+- Extract the EXACT job title from the posting
+- Use the full title as displayed on LinkedIn
+- Examples: "Senior Software Engineer", "Product Manager", "Data Scientist"
 
 FORM HANDLING GUIDELINES:
 - Always scroll down in Easy Apply forms to ensure you see all content
 - If you can't find a "Submit" button, scroll down - it's usually below the visible area
 - For multi-step forms, look for "Next" or "Continue" buttons (may require scrolling)
 - If forms have multiple questions, scroll to see all questions before proceeding
-- Handle file uploads by using any existing resume/CV files
+- Handle file uploads by using any existing resume/CV files${config.linkedinResume ? ` - specifically look for: "${config.linkedinResume}"` : ''}
 - Skip optional fields if they're complex, but fill required fields
 - If a form seems stuck, try scrolling up and down to find missing elements
+- When filling contact information:
+  * If there's a country code dropdown, select: ${config.countryCode}
+  * For the phone number field, use ONLY the number WITHOUT country code: ${config.contactNumber}
+  * Do NOT add the country code to the phone number field if you already selected it in a dropdown
 
 IMPORTANT SCROLLING BEHAVIORS:
 - Scroll slowly and check for new elements after each scroll
@@ -495,12 +749,19 @@ IMPORTANT SCROLLING BEHAVIORS:
 CREDENTIALS:
 - Email: ${config.linkedinEmail}
 - Password: ${config.linkedinPassword}
+- Country Code: ${config.countryCode}
+- Phone Number (without country code): ${config.contactNumber}
+- Resume to Use: ${config.linkedinResume || 'Most recent available'}
 
-Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that match the search criteria and have the Easy Apply option available.`,
-      
-      session_id: null,
-      model: 'claude-3-5-sonnet-20241022',
-      max_steps: parseInt(config.targetCount || '10') * 5
+${config.customInstructions ? `
+CUSTOM INSTRUCTIONS:
+${config.customInstructions}
+` : ''}
+
+CRITICAL: For every application, you MUST clearly announce both BEFORE clicking Easy Apply and BEFORE submitting:
+"APPLYING TO: [EXACT COMPANY NAME] - [EXACT JOB TITLE]"
+
+This helps track which companies you applied to. Use the exact company names and job titles from the LinkedIn job postings.`
     };
 
     // Validate API key before making request
@@ -512,7 +773,7 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     try {
-      const response = await fetch(`${BROWSER_USE_API_BASE}/tasks`, {
+      const response = await fetch(`${BROWSER_USE_API_BASE}/run-task`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -529,7 +790,17 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
         throw new Error(`API request failed (${response.status}): ${errorText}`);
       }
 
-      return await response.json();
+      const result = await response.json();
+      
+      // Ensure we capture the live_url from the response
+      return {
+        id: result.id,
+        live_url: result.live_url,
+        status: result.status || 'created',
+        steps: result.steps || [],
+        output: result.output,
+        error: result.error
+      };
     } catch (error) {
       clearTimeout(timeoutId);
       
@@ -550,7 +821,7 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     try {
-      const response = await fetch(`${BROWSER_USE_API_BASE}/task/${taskId}`, {
+      const response = await fetch(`${BROWSER_USE_API_BASE}/task/${taskId}/status`, {
         headers: {
           'Authorization': `Bearer ${apiKey.trim()}`,
         },
@@ -560,14 +831,24 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
       clearTimeout(timeoutId);
 
       if (response.ok) {
-        const data = await response.json();
+        const status = await response.json();
+        
+        // Get full task details if needed
+        const taskResponse = await fetch(`${BROWSER_USE_API_BASE}/task/${taskId}`, {
+          headers: {
+            'Authorization': `Bearer ${apiKey.trim()}`,
+          },
+        });
+        
+        const data = taskResponse.ok ? await taskResponse.json() : {};
+        
         return {
           id: taskId,
-          status: data.status,
-          live_url: data.live_url,
-          steps: data.steps,
+          status: status,
+          steps: data.steps || [],
           output: data.output,
-          error: data.error
+          error: data.error,
+          live_url: data.live_url
         };
       }
       
@@ -583,6 +864,8 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     try {
+      addLog(`🛑 Stopping task: ${taskId}`);
+      
       const response = await fetch(`${BROWSER_USE_API_BASE}/stop-task?task_id=${taskId}`, {
         method: 'PUT',
         headers: {
@@ -593,11 +876,15 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
 
       clearTimeout(timeoutId);
 
-      if (!response.ok) {
-        throw new Error(`Failed to stop task: ${response.statusText}`);
+      if (response.ok) {
+        addLog(`✅ Task stopped successfully: ${taskId}`, 'success');
+      } else {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        throw new Error(`Failed to stop task (${response.status}): ${errorText}`);
       }
     } catch (error) {
       clearTimeout(timeoutId);
+      addLog(`❌ Error stopping task: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
       throw error;
     }
   };
@@ -618,6 +905,11 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
       return;
     }
 
+    if (!config.contactNumber.trim()) {
+      toast.error('Please enter your contact number for job applications');
+      return;
+    }
+
     if (!apiKey || apiKey.trim() === '') {
       toast.error('Browser Use API key is not configured. Please check your environment variables.');
       addLog('❌ API key missing: VITE_BROWSER_USE_API_KEY not found in environment variables', 'error');
@@ -626,8 +918,13 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
 
     if (!canStartAutomation()) {
       const limit = getTokenLimit();
-      toast.error(`Usage limit reached! You have used ${monthlyUsage.tokens_used}/${limit} job tokens this month.`);
-      addLog(`❌ Cannot start automation: Monthly limit of ${limit} job tokens reached (${monthlyUsage.tokens_used} used)`, 'error');
+      if (limit === 0) {
+        toast.error(`No tokens available. Current plan: ${getPlanName()}. Please upgrade your subscription.`);
+        addLog(`❌ No tokens available. Current plan: ${getPlanName()}`, 'error');
+      } else {
+        toast.error(`Usage limit reached! You have used ${monthlyUsage.tokens_used}/${limit} job tokens this month.`);
+        addLog(`❌ Cannot start automation: Monthly limit of ${limit} job tokens reached (${monthlyUsage.tokens_used} used)`, 'error');
+      }
       return;
     }
 
@@ -636,12 +933,18 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
     setLogs([]);
     setStepCount(0);
     setAppliedCount(0);
-    setJobTokensUsed(0);
 
     try {
       addLog('🚀 Starting LinkedIn job application automation...');
       addLog(`🔗 API Endpoint: ${BROWSER_USE_API_BASE}`);
       addLog(`🔑 API Key configured: ${apiKey.substring(0, 10)}...`);
+      addLog(`📱 Contact Number: ${config.countryCode}${config.contactNumber}`);
+      if (config.linkedinResume) {
+        addLog(`📄 LinkedIn Resume: ${config.linkedinResume}`);
+      }
+      if (config.customInstructions) {
+        addLog(`🤖 Custom Instructions: ${config.customInstructions.substring(0, 100)}${config.customInstructions.length > 100 ? '...' : ''}`);
+      }
       
       const task = await createLinkedInTask();
       setCurrentTask(task);
@@ -661,11 +964,13 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
             const newStepCount = updatedTask.steps.length;
             
             if (newStepCount > stepCount) {
-              await trackUsage(newStepCount, task.id);
-              const currentTokens = Math.ceil(newStepCount / 10);
-              setJobTokensUsed(currentTokens);
+              // Only track the NEW steps since last update
+              const newSteps = newStepCount - stepCount;
+              await trackUsage(newSteps, task.id);
               
-              const totalTokensUsed = monthlyUsage.tokens_used + currentTokens;
+              // Calculate total tokens used including the new tokens from this session
+              const incrementalTokens = Math.ceil(newSteps / 10);
+              const totalTokensUsed = monthlyUsage.tokens_used + incrementalTokens;
               const limit = getTokenLimit();
               
               if (totalTokensUsed >= limit) {
@@ -708,19 +1013,48 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
           if (updatedTask.status === 'finished') {
             clearInterval(pollInterval);
             setIsRunning(false);
+            
+            // Mark task as completed in database
+            await markTaskCompleted(task.id, updatedTask.steps?.length || 0, 'finished');
+            
+            // Try to extract company names from the final steps
+            if (updatedTask.steps && updatedTask.steps.length > 0) {
+                              const applications = extractCompanyFromSteps(updatedTask.steps);
+                applications.forEach(app => {
+                  saveJobApplication(app.company, app.role, task.id);
+                });
+            }
+            
             addLog('✅ Automation completed successfully!', 'success');
             
             if (updatedTask.output) {
               addLog(`📊 Final Results: ${updatedTask.output}`);
             }
+            
+            // Refresh usage data
+            fetchUserSubscription();
           } else if (updatedTask.status === 'failed') {
             clearInterval(pollInterval);
             setIsRunning(false);
+            
+            // Mark task as failed in database
+            await markTaskCompleted(task.id, updatedTask.steps?.length || 0, 'failed', updatedTask.error);
+            
             addLog(`❌ Automation failed: ${updatedTask.error || 'Unknown error'}`, 'error');
+            
+            // Refresh usage data
+            fetchUserSubscription();
           } else if (updatedTask.status === 'stopped') {
             clearInterval(pollInterval);
             setIsRunning(false);
+            
+            // Mark task as stopped in database
+            await markTaskCompleted(task.id, updatedTask.steps?.length || 0, 'stopped');
+            
             addLog('⏹️ Automation stopped by user');
+            
+            // Refresh usage data
+            fetchUserSubscription();
           }
         } catch (error) {
           if (error instanceof Error && error.name !== 'AbortError') {
@@ -758,13 +1092,11 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-      const response = await fetch(`${BROWSER_USE_API_BASE}/pause-task`, {
+      const response = await fetch(`${BROWSER_USE_API_BASE}/pause-task?task_id=${currentTask.id}`, {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey.trim()}`,
         },
-        body: JSON.stringify({ task_id: currentTask.id }),
         signal: controller.signal,
       });
 
@@ -793,13 +1125,11 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-      const response = await fetch(`${BROWSER_USE_API_BASE}/resume-task`, {
+      const response = await fetch(`${BROWSER_USE_API_BASE}/resume-task?task_id=${currentTask.id}`, {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey.trim()}`,
         },
-        body: JSON.stringify({ task_id: currentTask.id }),
         signal: controller.signal,
       });
 
@@ -835,6 +1165,153 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
       console.error('Error stopping automation:', error);
       toast.error('Failed to stop automation');
     }
+  };
+
+  const markTaskCompleted = async (taskId: string, finalSteps: number, status: 'finished' | 'failed' | 'stopped', error?: string) => {
+    try {
+      if (!isSupabaseConfigured() || !user) return;
+
+      const finalCost = Math.ceil(finalSteps / 10) * 0.01;
+      
+      const { error: updateError } = await supabase
+        .from('automation_tasks')
+        .update({
+          status: status,
+          step_count: finalSteps,
+          cost_usd: finalCost,
+          completed_at: new Date().toISOString(),
+          error_message: error || null
+        })
+        .eq('task_id', taskId)
+        .eq('user_id', user.id);
+
+      if (updateError) {
+        console.error('Error updating automation task:', updateError);
+        addLog(`⚠️ Failed to mark task as completed: ${updateError.message}`, 'error');
+      } else {
+        addLog(`✅ Task ${taskId} marked as ${status}`);
+      }
+    } catch (error) {
+      console.error('Error marking task completed:', error);
+    }
+  };
+
+  const extractCompanyFromSteps = (steps: any[]): Array<{company: string, role: string}> => {
+    const applications: Array<{company: string, role: string}> = [];
+    
+    steps.forEach((step, index) => {
+      if (step.action) {
+        const actionText = JSON.stringify(step.action).toLowerCase();
+        const stepContent = step.action.text || step.action.description || step.action.selector || '';
+        
+        // Look for Easy Apply button clicks or application submissions
+        if (actionText.includes('easy apply') || 
+            actionText.includes('submit application') ||
+            actionText.includes('apply now') ||
+            (actionText.includes('click') && actionText.includes('submit'))) {
+          
+          // Try multiple extraction methods
+          let company = '';
+          let role = '';
+          
+          // Method 1: Look for company name patterns in the step content
+          const companyPatterns = [
+            /at\s+([A-Za-z0-9\s&.,'-]+?)(?:\s|$)/i,
+            /company[:\s]+([A-Za-z0-9\s&.,'-]+?)(?:\s|$)/i,
+            /employer[:\s]+([A-Za-z0-9\s&.,'-]+?)(?:\s|$)/i,
+            /([A-Za-z0-9\s&.,'-]+?)\s+(?:is hiring|hiring)/i
+          ];
+          
+          for (const pattern of companyPatterns) {
+            const match = stepContent.match(pattern);
+            if (match && match[1] && match[1].trim().length > 2) {
+              company = match[1].trim();
+              break;
+            }
+          }
+          
+          // Method 2: Look for job title patterns
+          const rolePatterns = [
+            /(?:position|role|job)[:\s]+([A-Za-z0-9\s&.,'-]+?)(?:\s|$)/i,
+            /applying\s+for[:\s]+([A-Za-z0-9\s&.,'-]+?)(?:\s|$)/i,
+            /title[:\s]+([A-Za-z0-9\s&.,'-]+?)(?:\s|$)/i
+          ];
+          
+          for (const pattern of rolePatterns) {
+            const match = stepContent.match(pattern);
+            if (match && match[1] && match[1].trim().length > 2) {
+              role = match[1].trim();
+              break;
+            }
+          }
+          
+          // Method 3: Look in surrounding steps for context
+          if (!company || !role) {
+            // Check previous 3 steps for company/role info
+            for (let i = Math.max(0, index - 3); i < index; i++) {
+              const prevStep = steps[i];
+              if (prevStep?.action) {
+                const prevContent = prevStep.action.text || prevStep.action.description || '';
+                
+                if (!company) {
+                  for (const pattern of companyPatterns) {
+                    const match = prevContent.match(pattern);
+                    if (match && match[1] && match[1].trim().length > 2) {
+                      company = match[1].trim();
+                      break;
+                    }
+                  }
+                }
+                
+                if (!role) {
+                  for (const pattern of rolePatterns) {
+                    const match = prevContent.match(pattern);
+                    if (match && match[1] && match[1].trim().length > 2) {
+                      role = match[1].trim();
+                      break;
+                    }
+                  }
+                }
+              }
+            }
+          }
+          
+          // Method 4: Extract from URL or page title if available
+          if (step.action.url) {
+            const urlMatch = step.action.url.match(/linkedin\.com\/jobs\/view\/\d+/);
+            if (urlMatch) {
+              // Could potentially extract more info from LinkedIn job URLs
+              addLog(`🔗 Found LinkedIn job URL: ${step.action.url}`);
+            }
+          }
+          
+          // Use fallbacks if extraction failed
+          if (!company || company.length < 3) {
+            company = 'LinkedIn Company';
+          }
+          if (!role || role.length < 3) {
+            role = config.jobTitle || 'Software Engineer';
+          }
+          
+          // Clean up extracted text
+          company = company.replace(/[^\w\s&.,'-]/g, '').trim();
+          role = role.replace(/[^\w\s&.,'-]/g, '').trim();
+          
+          // Avoid duplicates
+          const exists = applications.find(app => 
+            app.company.toLowerCase() === company.toLowerCase() && 
+            app.role.toLowerCase() === role.toLowerCase()
+          );
+          
+          if (!exists) {
+            applications.push({ company, role });
+            addLog(`🎯 Extracted application: ${company} - ${role}`);
+          }
+        }
+      }
+    });
+    
+    return applications;
   };
 
   if (loading) {
@@ -906,94 +1383,216 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         {/* Left Column - Configuration & Controls */}
         <div className="xl:col-span-1 space-y-6">
-          {/* Configuration Card */}
+          {/* LinkedIn Credentials Card */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           >
             <Card className="glass-card hover-lift">
-              <CardHeader>
+              <CardHeader className="pb-4">
                 <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
-                    <Settings className="w-6 h-6 text-white" />
+                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                    <User className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <CardTitle className="text-xl text-gray-900 dark:text-white">Configuration</CardTitle>
+                    <CardTitle className="text-lg text-gray-900 dark:text-white">LinkedIn Account</CardTitle>
                     <CardDescription className="text-gray-600 dark:text-gray-300">
-                      Set up your automation preferences
+                      Your LinkedIn login credentials
                     </CardDescription>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-6">
-                {/* LinkedIn Credentials */}
-                <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center">
-                    <User className="w-4 h-4 mr-2" />
-                    LinkedIn Credentials
-                  </h3>
-                  <div className="space-y-3">
-                    <Input
-                      type="email"
-                      value={config.linkedinEmail}
-                      onChange={(e) => setConfig(prev => ({ ...prev, linkedinEmail: e.target.value }))}
-                      placeholder="LinkedIn Email"
-                      className="premium-input"
-                    />
-                    <Input
-                      type="password"
-                      value={config.linkedinPassword}
-                      onChange={(e) => setConfig(prev => ({ ...prev, linkedinPassword: e.target.value }))}
-                      placeholder="LinkedIn Password"
-                      className="premium-input"
-                    />
+              <CardContent className="space-y-4">
+                <Input
+                  type="email"
+                  value={config.linkedinEmail}
+                  onChange={(e) => setConfig(prev => ({ ...prev, linkedinEmail: e.target.value }))}
+                  placeholder="LinkedIn Email"
+                  className="premium-input"
+                />
+                <Input
+                  type="password"
+                  value={config.linkedinPassword}
+                  onChange={(e) => setConfig(prev => ({ ...prev, linkedinPassword: e.target.value }))}
+                  placeholder="LinkedIn Password"
+                  className="premium-input"
+                />
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Contact & Resume Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+          >
+            <Card className="glass-card hover-lift">
+              <CardHeader className="pb-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg">
+                    <Globe className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg text-gray-900 dark:text-white">Contact & Resume</CardTitle>
+                    <CardDescription className="text-gray-600 dark:text-gray-300">
+                      Contact information and resume selection
+                    </CardDescription>
                   </div>
                 </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Contact Number with Country Code */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Contact Number
+                  </label>
+                  <div className="grid grid-cols-4 gap-2">
+                    <Select value={config.countryCode} onValueChange={(value) => setConfig(prev => ({ ...prev, countryCode: value }))}>
+                      <SelectTrigger className="premium-select">
+                        <SelectValue placeholder="Code" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {COUNTRY_CODES.map((country) => (
+                          <SelectItem key={country.code} value={country.code}>
+                            <div className="flex items-center space-x-2">
+                              <span>{country.flag}</span>
+                              <span>{country.code}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      type="tel"
+                      value={config.contactNumber}
+                      onChange={(e) => setConfig(prev => ({ ...prev, contactNumber: e.target.value.replace(/[^0-9]/g, '') }))}
+                      placeholder="Phone number"
+                      className="premium-input col-span-3"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Select your country code and enter phone number without the country code
+                  </p>
+                </div>
 
-                {/* Job Search Criteria */}
-                <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center">
-                    <Briefcase className="w-4 h-4 mr-2" />
-                    Job Search
-                  </h3>
-                  <div className="space-y-3">
+                {/* LinkedIn Resume */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    LinkedIn Resume Name
+                  </label>
+                  <Input
+                    type="text"
+                    value={config.linkedinResume}
+                    onChange={(e) => setConfig(prev => ({ ...prev, linkedinResume: e.target.value }))}
+                    placeholder="e.g., 'Software Engineer Resume', 'Updated Resume 2024'"
+                    className="premium-input"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Enter the exact name of your resume as saved on LinkedIn
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Job Search Preferences Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            <Card className="glass-card hover-lift">
+              <CardHeader className="pb-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
+                    <Briefcase className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg text-gray-900 dark:text-white">Job Preferences</CardTitle>
+                    <CardDescription className="text-gray-600 dark:text-gray-300">
+                      Define your job search criteria
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Job Title / Keywords
+                    </label>
                     <Input
                       type="text"
                       value={config.jobTitle}
                       onChange={(e) => setConfig(prev => ({ ...prev, jobTitle: e.target.value }))}
-                      placeholder="Job Title"
+                      placeholder="Software Engineer, Data Scientist, Product Manager..."
                       className="premium-input"
                     />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Location
+                    </label>
                     <Input
                       type="text"
                       value={config.location}
                       onChange={(e) => setConfig(prev => ({ ...prev, location: e.target.value }))}
-                      placeholder="Location"
+                      placeholder="San Francisco, New York, Remote..."
                       className="premium-input"
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Target Applications
+                    </label>
                     <Input
                       type="number"
                       value={config.targetCount}
                       onChange={(e) => setConfig(prev => ({ ...prev, targetCount: e.target.value }))}
-                      placeholder="Target Applications"
+                      placeholder="10"
                       min="1"
                       max="50"
                       className="premium-input"
                     />
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-                {/* Advanced Filters */}
-                <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center">
-                    <Search className="w-4 h-4 mr-2" />
-                    Filters (Optional)
-                  </h3>
-                  <div className="grid grid-cols-1 gap-3">
+          {/* Advanced Filters Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+          >
+            <Card className="glass-card hover-lift">
+              <CardHeader className="pb-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center shadow-lg">
+                    <Search className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg text-gray-900 dark:text-white">Advanced Filters</CardTitle>
+                    <CardDescription className="text-gray-600 dark:text-gray-300">
+                      Optional filters to refine your search
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Work Type
+                    </label>
                     <Select value={config.workType} onValueChange={(value) => setConfig(prev => ({ ...prev, workType: value }))}>
                       <SelectTrigger className="premium-select">
-                        <SelectValue placeholder="Work Type" />
+                        <SelectValue placeholder="Any work type" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="any">Any</SelectItem>
@@ -1002,10 +1601,15 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
                         <SelectItem value="Hybrid">Hybrid</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
 
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Experience Level
+                    </label>
                     <Select value={config.experienceLevel} onValueChange={(value) => setConfig(prev => ({ ...prev, experienceLevel: value }))}>
                       <SelectTrigger className="premium-select">
-                        <SelectValue placeholder="Experience Level" />
+                        <SelectValue placeholder="Any experience level" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="any">Any</SelectItem>
@@ -1017,10 +1621,15 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
                         <SelectItem value="Executive">Executive</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
 
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Date Posted
+                    </label>
                     <Select value={config.datePosted} onValueChange={(value) => setConfig(prev => ({ ...prev, datePosted: value }))}>
                       <SelectTrigger className="premium-select">
-                        <SelectValue placeholder="Date Posted" />
+                        <SelectValue placeholder="Any time" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="any">Any time</SelectItem>
@@ -1031,69 +1640,125 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
                     </Select>
                   </div>
                 </div>
-
-                <Button
-                  onClick={saveConfiguration}
-                  variant="outline"
-                  className="w-full"
-                >
-                  <Settings className="w-4 h-4 mr-2" />
-                  Save Configuration
-                </Button>
               </CardContent>
             </Card>
+          </motion.div>
+
+          {/* AI Custom Instructions Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <Card className="glass-card hover-lift">
+              <CardHeader className="pb-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                    <Bot className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg text-gray-900 dark:text-white">AI Instructions</CardTitle>
+                    <CardDescription className="text-gray-600 dark:text-gray-300">
+                      Customize the AI agent behavior
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-start space-x-2">
+                    <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-blue-800 dark:text-blue-200">
+                      <p className="font-medium mb-1">Powered by GPT-4o</p>
+                      <p>Our autonomous browser agent understands natural language and can adapt to your specific requirements.</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Custom Instructions (Optional)
+                  </label>
+                  <textarea
+                    value={config.customInstructions}
+                    onChange={(e) => setConfig(prev => ({ ...prev, customInstructions: e.target.value }))}
+                    placeholder="e.g., 'Focus on remote positions only', 'Skip jobs requiring security clearance', 'Prioritize startups over large corporations', 'Apply only to companies with 100+ employees'"
+                    className="premium-input min-h-[100px] resize-none"
+                    rows={4}
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Provide specific guidance to help the AI make better decisions during applications
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Save Configuration Button */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.45 }}
+          >
+            <Button
+              onClick={saveConfiguration}
+              variant="outline"
+              className="w-full h-12 text-base font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-200"
+            >
+              <Settings className="w-5 h-5 mr-2" />
+              Save Configuration
+            </Button>
           </motion.div>
 
           {/* Usage & Plan Card */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
+            transition={{ delay: 0.5 }}
           >
             <Card className="glass-card hover-lift">
-              <CardHeader>
+              <CardHeader className="pb-4">
                 <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-lg">
-                    <Crown className="w-6 h-6 text-white" />
+                  <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg">
+                    <Crown className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <CardTitle className="text-xl text-gray-900 dark:text-white">Usage & Plan</CardTitle>
+                    <CardTitle className="text-lg text-gray-900 dark:text-white">Usage & Plan</CardTitle>
                     <CardDescription className="text-gray-600 dark:text-gray-300">
                       {getPlanName()}
                     </CardDescription>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Job Tokens</span>
-                    <span className="text-sm text-gray-600 dark:text-gray-400">
-                      {monthlyUsage.tokens_used + jobTokensUsed}/{getTokenLimit()}
+                    <span className="text-sm text-gray-600 dark:text-gray-400 font-mono">
+                      {monthlyUsage.tokens_used}/{getTokenLimit()}
                     </span>
                   </div>
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                     <div
-                      className="bg-gradient-to-r from-purple-500 to-pink-600 h-3 rounded-full transition-all duration-300"
+                      className="bg-gradient-to-r from-amber-500 to-orange-600 h-2 rounded-full transition-all duration-300"
                       style={{ 
-                        width: `${Math.min(((monthlyUsage.tokens_used + jobTokensUsed) / getTokenLimit()) * 100, 100)}%` 
+                        width: `${Math.min((monthlyUsage.tokens_used / getTokenLimit()) * 100, 100)}%` 
                       }}
                     />
                   </div>
                   <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
-                    {getTokenLimit() - (monthlyUsage.tokens_used + jobTokensUsed)} tokens remaining this month
+                    {getTokenLimit() - monthlyUsage.tokens_used} tokens remaining this month
                   </div>
                 </div>
 
                 {!canStartAutomation() && (
-                  <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
+                  <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
                     <div className="flex items-center space-x-2">
-                      <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                      <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                       <span className="text-sm font-medium text-amber-800 dark:text-amber-200">
                         Usage limit reached
                       </span>
                     </div>
-                    <p className="text-sm text-amber-700 dark:text-amber-300 mt-2">
+                    <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
                       Upgrade your plan to continue using automation features.
                     </p>
                   </div>
@@ -1156,7 +1821,7 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
                       <Zap className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                       <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
                     </div>
-                    <div className="text-2xl font-bold text-gray-900 dark:text-white">{jobTokensUsed}</div>
+                    <div className="text-2xl font-bold text-gray-900 dark:text-white">{Math.ceil(stepCount / 10)}</div>
                     <div className="text-sm text-purple-600 dark:text-purple-400">Tokens</div>
                   </div>
 
@@ -1250,58 +1915,121 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
             </Card>
           </motion.div>
 
-          {/* Activity Log */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-          >
-            <Card className="glass-card hover-lift">
-              <CardHeader>
-                <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg">
-                    <Activity className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-xl text-gray-900 dark:text-white">Activity Log</CardTitle>
-                    <CardDescription className="text-gray-600 dark:text-gray-300">
-                      Real-time automation monitoring
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="bg-gray-900 dark:bg-gray-800 rounded-xl p-6 h-64 overflow-y-auto">
-                  {logs.length === 0 ? (
-                    <div className="text-center py-8">
-                      <Activity className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-400 mb-2">Monitoring Ready</p>
-                      <p className="text-sm text-gray-500">
-                        Start automation to see real-time activity logs
-                      </p>
+          {/* Browser Preview Card */}
+          {currentTask?.live_url && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+            >
+              <Card className="glass-card hover-lift">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                        <Eye className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-xl text-gray-900 dark:text-white">Live Browser Preview</CardTitle>
+                        <CardDescription className="text-gray-600 dark:text-gray-300">
+                          Watch your automation in real-time
+                        </CardDescription>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {logs.map((log, index) => (
-                        <motion.div
-                          key={index}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: index * 0.1 }}
-                          className="flex items-start space-x-3 text-sm"
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        asChild
+                        variant="outline"
+                        size="sm"
+                      >
+                        <a href={currentTask.live_url} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          Full Screen
+                        </a>
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          const iframe = document.getElementById('browser-preview-iframe') as HTMLIFrameElement;
+                          if (iframe) {
+                            iframe.src = iframe.src; // Refresh iframe
+                          }
+                        }}
+                        variant="outline"
+                        size="sm"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-2">
+                  <div className="relative w-full bg-gray-100 dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+                      <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-2">
+                          <div className="flex space-x-1">
+                            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                            <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                          </div>
+                          <div className="flex items-center space-x-2 ml-4">
+                            <Globe className="w-4 h-4 text-gray-500" />
+                            <span className="text-sm text-gray-600 dark:text-gray-400 font-mono truncate max-w-96">
+                              {currentTask.live_url}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                        <span className="text-xs text-green-600 dark:text-green-400 font-medium">LIVE</span>
+                      </div>
+                    </div>
+                    <div className="relative" style={{ paddingBottom: '56.25%', height: 0 }}>
+                      <iframe
+                        id="browser-preview-iframe"
+                        src={currentTask.live_url}
+                        className="absolute top-0 left-0 w-full h-full"
+                        style={{ border: 'none' }}
+                        allow="camera; microphone; display-capture"
+                        sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-downloads"
+                        loading="lazy"
+                      />
+                    </div>
+                    <div className="px-4 py-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center space-x-4">
+                          <div className="flex items-center space-x-2">
+                            <Activity className="w-4 h-4 text-blue-500" />
+                            <span className="text-gray-600 dark:text-gray-400">
+                              Status: <span className="font-medium text-gray-900 dark:text-white capitalize">{currentTask.status}</span>
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Clock className="w-4 h-4 text-purple-500" />
+                            <span className="text-gray-600 dark:text-gray-400">
+                              Steps: <span className="font-medium text-gray-900 dark:text-white">{stepCount}</span>
+                            </span>
+                          </div>
+                        </div>
+                        <Button
+                          asChild
+                          variant="ghost"
+                          size="sm"
+                          className="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
                         >
-                          <div className="w-2 h-2 bg-emerald-400 rounded-full mt-2 flex-shrink-0" />
-                          <span className="text-emerald-300 font-mono leading-relaxed">
-                            {log}
-                          </span>
-                        </motion.div>
-                      ))}
+                          <a href={currentTask.live_url} target="_blank" rel="noopener noreferrer">
+                            <ExternalLink className="w-4 h-4 mr-1" />
+                            Open in new tab
+                          </a>
+                        </Button>
+                      </div>
                     </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
         </div>
       </div>
     </div>
