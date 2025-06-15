@@ -152,7 +152,7 @@
 }
 
 .premium-input {
-  @apply w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white placeholder-gray-600 dark:placeholder-gray-300;
+  @apply w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white placeholder-gray-500 dark:placeholder-gray-200;
 }
 
 .premium-select {
@@ -480,7 +480,7 @@
 }
 
 .dark .premium-input {
-  @apply bg-gray-800 border-gray-600 text-white placeholder-gray-300 focus:bg-gray-700;
+  @apply bg-gray-800 border-gray-600 text-white placeholder-gray-200 focus:bg-gray-700;
 }
 
 .dark .premium-select {
@@ -499,6 +499,20 @@
   background: rgba(31, 41, 55, 0.8);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(107, 114, 128, 0.2);
+}
+
+/* Enhanced placeholder visibility for dark mode */
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #d1d5db !important; /* gray-300 */
+  opacity: 1 !important;
+}
+
+/* Light mode placeholder enhancement */
+input::placeholder,
+textarea::placeholder {
+  color: #6b7280 !important; /* gray-500 */
+  opacity: 1 !important;
 }
 
 /* Accessibility */
