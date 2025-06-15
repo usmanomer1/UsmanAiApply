@@ -25,11 +25,20 @@ import {
   BarChart3,
   MessageSquare,
   RefreshCw,
-  Loader2
+  Loader2,
+  Crown,
+  Shield,
+  Lightbulb,
+  PenTool
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { openAIService, ResumeAnalysisRequest, ResumeScore, ResumeCritique, ResumeRewrite, TokenUsageStats } from '../lib/openaiWithTokenTracking';
+import { openAIService, ResumeAnalysisRequest, ResumeScore, ResumeCritique, ResumeRewrite } from '../lib/openaiWithTokenTracking';
 import { extractTextFromPDF } from '../lib/pdfExtractor';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Badge } from './ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 type Tool = 'score' | 'judge' | 'rewrite';
 
@@ -60,20 +69,6 @@ export const ResumeTools: React.FC = () => {
     critique?: ResumeCritique;
     rewrite?: ResumeRewrite;
   }>({});
-  const [tokenUsageStats, setTokenUsageStats] = useState<TokenUsageStats | null>(null);
-
-  useEffect(() => {
-    fetchTokenUsageStats();
-  }, []);
-
-  const fetchTokenUsageStats = async () => {
-    try {
-      const stats = await openAIService.getTokenUsageStats();
-      setTokenUsageStats(stats);
-    } catch (error) {
-      console.error('Error fetching token usage stats:', error);
-    }
-  };
 
   const industries = [
     'Technology', 'Healthcare', 'Finance', 'Marketing', 'Sales', 'Education',
@@ -96,7 +91,6 @@ export const ResumeTools: React.FC = () => {
       
       try {
         if (file.type.includes('text')) {
-          // Handle text files directly
           const reader = new FileReader();
           reader.onload = (e) => {
             const text = e.target?.result as string;
@@ -106,7 +100,6 @@ export const ResumeTools: React.FC = () => {
           reader.readAsText(file);
           return;
         } else if (file.type === 'application/pdf') {
-          // Extract text from PDF
           toast.loading('Extracting text from PDF...', { id: 'pdf-extraction' });
           try {
             const extractedText = await extractTextFromPDF(file);
@@ -125,7 +118,6 @@ export const ResumeTools: React.FC = () => {
           }
           return;
         } else {
-          // Word docs and other formats
           toast.error('For Word documents, please copy your resume text and paste it in the text area below.', {
             duration: 4000
           });
@@ -188,13 +180,9 @@ export const ResumeTools: React.FC = () => {
         setResults(prev => ({ ...prev, rewrite }));
         toast.success('Resume rewrite complete!');
       }
-
-      // Refresh token usage stats after successful operation
-      await fetchTokenUsageStats();
     } catch (error: any) {
       console.error('Error processing resume:', error);
       
-      // Show more specific error messages
       if (error?.message?.includes('subscription')) {
         toast.error(error.message);
       } else if (error?.message?.includes('token')) {
@@ -247,155 +235,70 @@ export const ResumeTools: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-blue-900 dark:to-indigo-900">
-      {/* Animated Background Elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400 to-purple-600 rounded-full opacity-20 blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-br from-emerald-400 to-blue-600 rounded-full opacity-20 blur-3xl animate-pulse delay-1000"></div>
-      </div>
+    <div className="space-y-8">
+      {/* Header Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="text-center"
+      >
+        <div className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full mb-6 shadow-lg">
+          <Sparkles className="w-5 h-5 text-white mr-2" />
+          <span className="text-white font-semibold">AI-Powered Resume Tools</span>
+        </div>
+        
+        <h1 className="text-display-lg text-gray-900 dark:text-white mb-6">
+          Supercharge Your Resume with AI
+        </h1>
+        
+        <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed">
+          Leverage cutting-edge AI to score, critique, and rewrite your resume for maximum impact. 
+          Get insights from industry experts and optimize for ATS systems.
+        </p>
+      </motion.div>
 
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-12"
-        >
-          <div className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full mb-6">
-            <Sparkles className="w-5 h-5 text-white mr-2" />
-            <span className="text-white font-semibold">AI-Powered Resume Tools</span>
-          </div>
+      {/* Tool Selection Cards */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="grid grid-cols-1 md:grid-cols-3 gap-8"
+      >
+        {Object.entries(toolConfig).map(([key, config]) => {
+          const IconComponent = config.icon;
+          const isActive = activeTool === key;
           
-          <h1 className="text-5xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent mb-6">
-            Supercharge Your Resume with AI
-          </h1>
-          
-          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed">
-            Leverage cutting-edge AI to score, critique, and rewrite your resume for maximum impact. 
-            Get insights from industry experts and optimize for ATS systems.
-          </p>
-        </motion.div>
-
-        {/* Token Usage Display */}
-        {tokenUsageStats && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="mb-8"
-          >
-            <div className="premium-card p-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center">
-                  <Brain className="w-6 h-6 text-blue-600 mr-3" />
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    AI Token Usage
-                  </h3>
-                </div>
-                <div className="text-right">
-                  <div className="text-lg font-bold text-gray-900 dark:text-white">
-                    {tokenUsageStats.totalTokens.toLocaleString()}
-                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                      /{tokenUsageStats.monthlyLimit.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    tokens used this month
-                  </div>
-                </div>
-              </div>
-              
-              <div className="relative">
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
-                  <div
-                    className={`h-3 rounded-full transition-all duration-700 ${
-                      tokenUsageStats.usagePercentage >= 90
-                        ? 'bg-gradient-to-r from-red-500 to-red-600'
-                        : tokenUsageStats.usagePercentage >= 75
-                        ? 'bg-gradient-to-r from-yellow-500 to-orange-500'
-                        : 'bg-gradient-to-r from-blue-500 to-indigo-600'
-                    }`}
-                    style={{ width: `${Math.min(tokenUsageStats.usagePercentage, 100)}%` }}
-                  />
-                </div>
-                <div className="flex justify-between mt-2 text-xs">
-                  <span className="text-gray-500 dark:text-gray-400">0%</span>
-                  <span className={`font-medium ${
-                    tokenUsageStats.usagePercentage >= 90
-                      ? 'text-red-600 dark:text-red-400'
-                      : tokenUsageStats.usagePercentage >= 75
-                      ? 'text-orange-600 dark:text-orange-400'
-                      : 'text-blue-600 dark:text-blue-400'
-                  }`}>
-                    {Math.round(tokenUsageStats.usagePercentage)}% used
-                  </span>
-                  <span className="text-gray-500 dark:text-gray-400">100%</span>
-                </div>
-              </div>
-
-              <div className="mt-4 text-center">
-                <span className={`text-sm font-medium ${
-                  tokenUsageStats.usagePercentage >= 90
-                    ? 'text-red-700 dark:text-red-300'
-                    : tokenUsageStats.usagePercentage >= 75
-                    ? 'text-orange-700 dark:text-orange-300'
-                    : 'text-blue-700 dark:text-blue-300'
-                }`}>
-                  {tokenUsageStats.remainingTokens.toLocaleString()} tokens remaining
-                </span>
-                {tokenUsageStats.usagePercentage >= 90 && (
-                  <div className="mt-2 text-xs text-red-600 dark:text-red-400">
-                    ⚠️ Approaching monthly limit - consider upgrading if you need more AI processing
-                  </div>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Tool Selection */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12"
-        >
-          {Object.entries(toolConfig).map(([key, config]) => {
-            const IconComponent = config.icon;
-            const isActive = activeTool === key;
-            
-            return (
-              <motion.div
-                key={key}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setActiveTool(key as Tool)}
-                className={`relative cursor-pointer transition-all duration-300 ${
-                  isActive 
-                    ? 'transform scale-105' 
-                    : 'hover:transform hover:scale-102'
-                }`}
-              >
-                <div className={`premium-card p-8 h-full transition-all duration-300 ${
-                  isActive 
-                    ? 'border-2 border-blue-500 shadow-2xl ring-4 ring-blue-200 dark:ring-blue-800 transform translate-y-[-4px]' 
-                    : 'border border-transparent hover:border-gray-200 dark:hover:border-gray-700 hover:shadow-lg'
-                }`}>
-                  <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${config.color} p-4 mb-6 mx-auto transform transition-transform duration-300 ${
-                    isActive ? 'scale-110 shadow-lg' : ''
+          return (
+            <motion.div
+              key={key}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setActiveTool(key as Tool)}
+              className={`cursor-pointer transition-all duration-300 ${
+                isActive ? 'transform scale-105' : ''
+              }`}
+            >
+              <Card className={`glass-card hover-lift h-full transition-all duration-300 ${
+                isActive 
+                  ? 'ring-2 ring-blue-500 shadow-2xl bg-gradient-to-br from-blue-50/50 to-indigo-50/50 dark:from-blue-900/20 dark:to-indigo-900/20' 
+                  : ''
+              }`}>
+                <CardContent className="p-8 text-center">
+                  <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${config.color} p-4 mb-6 mx-auto transform transition-transform duration-300 shadow-lg ${
+                    isActive ? 'scale-110' : ''
                   }`}>
                     <IconComponent className="w-8 h-8 text-white" />
                   </div>
                   
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3 text-center">
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
                     {config.title}
                   </h3>
                   
-                  <p className="text-lg text-gray-600 dark:text-gray-300 mb-4 text-center font-medium">
+                  <p className="text-lg text-gray-600 dark:text-gray-300 mb-4 font-medium">
                     {config.subtitle}
                   </p>
                   
-                  <p className="text-sm text-gray-500 dark:text-gray-400 text-center leading-relaxed">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
                     {config.description}
                   </p>
 
@@ -408,360 +311,391 @@ export const ResumeTools: React.FC = () => {
                       <CheckCircle className="w-5 h-5 text-white" />
                     </motion.div>
                   )}
-                </div>
-              </motion.div>
-            );
-          })}
-        </motion.div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          );
+        })}
+      </motion.div>
 
-        {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* Input Form */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.4 }}
-            className="space-y-8"
-          >
-            <div className="premium-card p-8">
-              <div className="flex items-center mb-6">
-                <Upload className="w-6 h-6 text-blue-600 mr-3" />
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  Upload & Configure
-                </h2>
-      </div>
-
-              {/* File Upload */}
-              <div className="mb-8">
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-                  Resume File
-                </label>
-                <div className="relative">
+      {/* Upload & Configure Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+      >
+        <Card className="glass-card hover-lift">
+          <CardHeader>
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Upload className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-2xl text-gray-900 dark:text-white">Upload & Configure</CardTitle>
+                <CardDescription className="text-gray-600 dark:text-gray-300">
+                  Upload your resume and provide job details for AI analysis
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* File Upload */}
+            <div className="space-y-3">
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Resume File
+              </label>
+              <div className="relative">
                 <input
                   type="file"
-                    accept=".pdf,.txt,.doc,.docx"
-                    onChange={handleFileUpload}
+                  accept=".pdf,.txt,.doc,.docx"
+                  onChange={handleFileUpload}
                   className="hidden"
-                    id="resume-upload"
-                  />
-                  <label
-                    htmlFor="resume-upload"
-                    className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl cursor-pointer hover:border-blue-500 dark:hover:border-blue-400 transition-colors bg-gray-50 dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                  >
-                    <Upload className="w-8 h-8 text-gray-400 mb-2" />
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                      {formData.resumeFile ? formData.resumeFile.name : 'Choose file or drag & drop'}
-                    </span>
-                    <span className="text-xs text-gray-400">PDF, TXT, DOC up to 10MB</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Resume Text */}
-              <div className="mb-8">
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-                  Resume Text *
-                </label>
-                <textarea
-                  value={formData.resumeText}
-                  onChange={(e) => setFormData(prev => ({ ...prev, resumeText: e.target.value }))}
-                  placeholder="Paste your resume content here for AI analysis..."
-                  className="premium-input h-48 resize-none"
+                  id="resume-upload"
                 />
-                <p className="text-xs text-gray-500 mt-2">
-                  Copy and paste your resume text for the most accurate AI analysis
-                </p>
+                <label
+                  htmlFor="resume-upload"
+                  className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl cursor-pointer hover:border-blue-500 dark:hover:border-blue-400 transition-colors bg-gray-50/50 dark:bg-gray-800/50 hover:bg-blue-50/50 dark:hover:bg-blue-900/20 backdrop-blur-sm"
+                >
+                  <Upload className="w-8 h-8 text-gray-400 mb-2" />
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                    {formData.resumeFile ? formData.resumeFile.name : 'Choose file or drag & drop'}
+                  </span>
+                  <span className="text-xs text-gray-400">PDF, TXT, DOC up to 10MB</span>
+                </label>
               </div>
+            </div>
 
-              {/* Form Fields Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-                    Industry *
-                  </label>
-                  <select
-                    value={formData.industry}
-                    onChange={(e) => setFormData(prev => ({ ...prev, industry: e.target.value }))}
-                    className="premium-select"
-                  >
-                    <option value="">Select Industry</option>
-                    {industries.map(industry => (
-                      <option key={industry} value={industry}>{industry}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-                    Experience Level *
-                  </label>
-                  <select
-                    value={formData.experienceLevel}
-                    onChange={(e) => setFormData(prev => ({ ...prev, experienceLevel: e.target.value }))}
-                    className="premium-select"
-                  >
-                    <option value="">Select Level</option>
-                    {experienceLevels.map(level => (
-                      <option key={level} value={level}>{level}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-                    Target Role *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.targetRole}
-                    onChange={(e) => setFormData(prev => ({ ...prev, targetRole: e.target.value }))}
-                    placeholder="e.g., Senior Software Engineer"
-                    className="premium-input"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-                    Desired Salary
+            {/* Resume Text */}
+            <div className="space-y-3">
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Resume Text *
               </label>
-                  <input
-                    type="text"
-                    value={formData.desiredSalary}
-                    onChange={(e) => setFormData(prev => ({ ...prev, desiredSalary: e.target.value }))}
-                    placeholder="e.g., $120,000"
-                    className="premium-input"
-                  />
-                </div>
-          </div>
+              <textarea
+                value={formData.resumeText}
+                onChange={(e) => setFormData(prev => ({ ...prev, resumeText: e.target.value }))}
+                placeholder="Paste your resume content here for AI analysis..."
+                className="w-full h-48 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white/50 dark:bg-gray-800/50 placeholder-gray-400 resize-none backdrop-blur-sm"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Copy and paste your resume text for the most accurate AI analysis
+              </p>
+            </div>
 
-              <div className="mt-6">
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-                  Location
+            {/* Form Fields Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  Industry *
                 </label>
-                <input
+                <Select value={formData.industry} onValueChange={(value) => setFormData(prev => ({ ...prev, industry: value }))}>
+                  <SelectTrigger className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm">
+                    <SelectValue placeholder="Select Industry" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {industries.map(industry => (
+                      <SelectItem key={industry} value={industry}>{industry}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  Experience Level *
+                </label>
+                <Select value={formData.experienceLevel} onValueChange={(value) => setFormData(prev => ({ ...prev, experienceLevel: value }))}>
+                  <SelectTrigger className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm">
+                    <SelectValue placeholder="Select Level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {experienceLevels.map(level => (
+                      <SelectItem key={level} value={level}>{level}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  Target Role *
+                </label>
+                <Input
                   type="text"
-                  value={formData.location}
-                  onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
-                  placeholder="e.g., San Francisco, CA"
-                  className="premium-input"
+                  value={formData.targetRole}
+                  onChange={(e) => setFormData(prev => ({ ...prev, targetRole: e.target.value }))}
+                  placeholder="e.g., Senior Software Engineer"
+                  className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm"
                 />
               </div>
 
-              {/* Action Button */}
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  Desired Salary
+                </label>
+                <Input
+                  type="text"
+                  value={formData.desiredSalary}
+                  onChange={(e) => setFormData(prev => ({ ...prev, desiredSalary: e.target.value }))}
+                  placeholder="e.g., $120,000"
+                  className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Location
+              </label>
+              <Input
+                type="text"
+                value={formData.location}
+                onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
+                placeholder="e.g., San Francisco, CA"
+                className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Action Button Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        <Card className="glass-card hover-lift">
+          <CardContent className="p-8">
+            <div className="text-center">
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={processResume}
                 disabled={isProcessing}
-                className={`w-full mt-8 premium-button-primary h-14 text-lg font-semibold ${
+                className={`w-full premium-button-primary h-16 text-xl font-bold shadow-2xl ${
                   isProcessing ? 'opacity-75 cursor-not-allowed' : ''
                 }`}
               >
                 {isProcessing ? (
                   <div className="flex items-center justify-center">
-                    <Loader2 className="w-5 h-5 mr-3 animate-spin" />
+                    <Loader2 className="w-6 h-6 mr-3 animate-spin" />
                     Processing with AI...
                   </div>
                 ) : (
                   <div className="flex items-center justify-center">
-                    <Brain className="w-5 h-5 mr-3" />
+                    <Brain className="w-6 h-6 mr-3" />
                     {activeTool === 'score' && 'Analyze Resume'}
                     {activeTool === 'judge' && 'Get AI Critique'}
                     {activeTool === 'rewrite' && 'Rewrite Resume'}
-                    <ArrowRight className="w-5 h-5 ml-3" />
+                    <ArrowRight className="w-6 h-6 ml-3" />
                   </div>
                 )}
               </motion.button>
             </div>
-          </motion.div>
+          </CardContent>
+        </Card>
+      </motion.div>
 
-          {/* Results Panel */}
+      {/* Results Section */}
+      <AnimatePresence mode="wait">
+        {/* Score Results */}
+        {activeTool === 'score' && results.score && (
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.6 }}
-            className="space-y-8"
+            key="score-results"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
           >
-            <AnimatePresence mode="wait">
-              {/* Score Results */}
-              {activeTool === 'score' && results.score && (
-                <motion.div
-                  key="score-results"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  className="premium-card p-8"
-                >
-                  <div className="flex items-center mb-6">
-                    <BarChart3 className="w-6 h-6 text-blue-600 mr-3" />
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                      Resume Analysis Results
-                    </h2>
+            <Card className="glass-card hover-lift">
+              <CardHeader>
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <BarChart3 className="w-6 h-6 text-white" />
                   </div>
-
-                  {/* Overall Score */}
-                  <div className="text-center mb-8">
-                    <div className={`text-6xl font-bold ${getScoreColor(results.score.overall)} mb-2`}>
-                      {results.score.overall}
-                    </div>
-                    <div className="text-lg text-gray-600 dark:text-gray-300 font-medium">
-                      Overall Score
-                    </div>
-                    <div className={`w-full h-3 bg-gray-200 dark:bg-gray-700 rounded-full mt-4 overflow-hidden`}>
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${results.score.overall}%` }}
-                        transition={{ duration: 1, delay: 0.5 }}
-                        className={`h-full bg-gradient-to-r ${getScoreGradient(results.score.overall)}`}
-                      />
-                    </div>
+                  <div>
+                    <CardTitle className="text-2xl text-gray-900 dark:text-white">Resume Analysis Results</CardTitle>
+                    <CardDescription className="text-gray-600 dark:text-gray-300">
+                      Comprehensive AI-powered resume evaluation
+                    </CardDescription>
                   </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-8">
+                {/* Overall Score */}
+                <div className="text-center">
+                  <div className={`text-6xl font-bold ${getScoreColor(results.score.overall)} mb-2`}>
+                    {results.score.overall}
+                  </div>
+                  <div className="text-lg text-gray-600 dark:text-gray-300 font-medium mb-4">
+                    Overall Score
+                  </div>
+                  <div className="w-full h-4 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${results.score.overall}%` }}
+                      transition={{ duration: 1, delay: 0.5 }}
+                      className={`h-full bg-gradient-to-r ${getScoreGradient(results.score.overall)}`}
+                    />
+                  </div>
+                </div>
 
-                  {/* Category Scores */}
-                  <div className="space-y-4 mb-8">
-                    {Object.entries(results.score.categories).map(([category, score]) => (
-                      <div key={category} className="flex items-center justify-between">
-                        <span className="font-medium text-gray-700 dark:text-gray-300 capitalize">
-                          {category}
-                        </span>
-                        <div className="flex items-center space-x-3">
-                          <div className="w-32 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                            <motion.div
-                              initial={{ width: 0 }}
-                              animate={{ width: `${score}%` }}
-                              transition={{ duration: 0.8, delay: 0.2 }}
-                              className={`h-full bg-gradient-to-r ${getScoreGradient(score)}`}
-                            />
-                          </div>
-                          <span className={`font-bold ${getScoreColor(score)} min-w-[3rem] text-right`}>
-                            {score}
-                          </span>
+                {/* Category Scores */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">Category Breakdown</h3>
+                  {Object.entries(results.score.categories).map(([category, score]) => (
+                    <div key={category} className="flex items-center justify-between">
+                      <span className="font-medium text-gray-700 dark:text-gray-300 capitalize">
+                        {category}
+                      </span>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-32 h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${score}%` }}
+                            transition={{ duration: 0.8, delay: 0.2 }}
+                            className={`h-full bg-gradient-to-r ${getScoreGradient(score)}`}
+                          />
                         </div>
+                        <span className={`font-bold ${getScoreColor(score)} min-w-[3rem] text-right`}>
+                          {score}
+                        </span>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
+                </div>
 
-                  {/* Strengths */}
-                  <div className="mb-6">
-                    <h3 className="text-lg font-bold text-green-600 mb-3 flex items-center">
+                {/* Strengths & Weaknesses */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div>
+                    <h3 className="text-lg font-bold text-green-600 mb-4 flex items-center">
                       <TrendingUp className="w-5 h-5 mr-2" />
                       Strengths
                     </h3>
-                    <ul className="space-y-2">
+                    <ul className="space-y-3">
                       {results.score.strengths.map((strength, index) => (
                         <li key={index} className="flex items-start">
-                          <CheckCircle className="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
+                          <CheckCircle className="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
                           <span className="text-gray-700 dark:text-gray-300">{strength}</span>
                         </li>
                       ))}
                     </ul>
                   </div>
 
-                  {/* Weaknesses */}
-                  <div className="mb-6">
-                    <h3 className="text-lg font-bold text-red-600 mb-3 flex items-center">
+                  <div>
+                    <h3 className="text-lg font-bold text-red-600 mb-4 flex items-center">
                       <AlertCircle className="w-5 h-5 mr-2" />
                       Areas for Improvement
                     </h3>
-                    <ul className="space-y-2">
+                    <ul className="space-y-3">
                       {results.score.weaknesses.map((weakness, index) => (
                         <li key={index} className="flex items-start">
-                          <AlertCircle className="w-5 h-5 text-red-500 mr-2 mt-0.5 flex-shrink-0" />
+                          <AlertCircle className="w-5 h-5 text-red-500 mr-3 mt-0.5 flex-shrink-0" />
                           <span className="text-gray-700 dark:text-gray-300">{weakness}</span>
                         </li>
                       ))}
                     </ul>
                   </div>
+                </div>
 
-                  {/* Recommendations */}
+                {/* Recommendations */}
+                <div>
+                  <h3 className="text-lg font-bold text-blue-600 mb-4 flex items-center">
+                    <Target className="w-5 h-5 mr-2" />
+                    Recommendations
+                  </h3>
+                  <ul className="space-y-3">
+                    {results.score.recommendations.map((rec, index) => (
+                      <li key={index} className="flex items-start">
+                        <ChevronRight className="w-5 h-5 text-blue-500 mr-3 mt-0.5 flex-shrink-0" />
+                        <span className="text-gray-700 dark:text-gray-300">{rec}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Judge Results */}
+        {activeTool === 'judge' && results.critique && (
+          <motion.div
+            key="judge-results"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+          >
+            <Card className="glass-card hover-lift">
+              <CardHeader>
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <MessageSquare className="w-6 h-6 text-white" />
+                  </div>
                   <div>
-                    <h3 className="text-lg font-bold text-blue-600 mb-3 flex items-center">
-                      <Target className="w-5 h-5 mr-2" />
-                      Recommendations
-                    </h3>
-                    <ul className="space-y-2">
-                      {results.score.recommendations.map((rec, index) => (
-                        <li key={index} className="flex items-start">
-                          <ChevronRight className="w-5 h-5 text-blue-500 mr-2 mt-0.5 flex-shrink-0" />
-                          <span className="text-gray-700 dark:text-gray-300">{rec}</span>
-                        </li>
-                      ))}
-                    </ul>
+                    <CardTitle className="text-2xl text-gray-900 dark:text-white">AI Judge Critique</CardTitle>
+                    <CardDescription className="text-gray-600 dark:text-gray-300">
+                      Expert feedback from our AI hiring manager
+                    </CardDescription>
                   </div>
-                </motion.div>
-              )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-8">
+                {/* Overall Feedback */}
+                <div className="p-6 bg-gradient-to-r from-purple-50/50 to-violet-50/50 dark:from-purple-900/20 dark:to-violet-900/20 rounded-xl border border-purple-200 dark:border-purple-800 backdrop-blur-sm">
+                  <h3 className="text-lg font-bold text-purple-600 mb-3 flex items-center">
+                    <Eye className="w-5 h-5 mr-2" />
+                    Overall Assessment
+                  </h3>
+                  <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
+                    {results.critique.overallFeedback}
+                  </p>
+                </div>
 
-              {/* Judge Results */}
-              {activeTool === 'judge' && results.critique && (
-                <motion.div
-                  key="judge-results"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  className="premium-card p-8"
-                >
-                  <div className="flex items-center mb-6">
-                    <MessageSquare className="w-6 h-6 text-purple-600 mr-3" />
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                      AI Judge Critique
-                    </h2>
-                  </div>
-
-                  {/* Overall Feedback */}
-                  <div className="mb-8 p-6 bg-gradient-to-r from-purple-50 to-violet-50 dark:from-purple-900/20 dark:to-violet-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
-                    <h3 className="text-lg font-bold text-purple-600 mb-3 flex items-center">
-                      <Eye className="w-5 h-5 mr-2" />
-                      Overall Assessment
-                    </h3>
-                    <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                      {results.critique.overallFeedback}
-                    </p>
-                  </div>
-
-                  {/* Section Breakdown */}
-                  <div className="space-y-6 mb-8">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center">
-                      <BarChart3 className="w-5 h-5 mr-2" />
-                      Section Analysis
-                    </h3>
-                    {results.critique.sections.map((section, index) => (
-                      <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-xl p-6">
-                        <div className="flex items-center justify-between mb-4">
-                          <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
-                            {section.name}
-                          </h4>
-                          <div className="flex items-center space-x-2">
-                            <div className={`text-2xl font-bold ${getScoreColor(section.score)}`}>
-                              {section.score}
-                            </div>
-                            <div className="w-16 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full bg-gradient-to-r ${getScoreGradient(section.score)}`}
-                                style={{ width: `${section.score}%` }}
-                              />
-                            </div>
+                {/* Section Analysis */}
+                <div className="space-y-6">
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center">
+                    <BarChart3 className="w-5 h-5 mr-2" />
+                    Section Analysis
+                  </h3>
+                  {results.critique.sections.map((section, index) => (
+                    <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-xl p-6 bg-white/30 dark:bg-gray-800/30 backdrop-blur-sm">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+                          {section.name}
+                        </h4>
+                        <div className="flex items-center space-x-2">
+                          <div className={`text-2xl font-bold ${getScoreColor(section.score)}`}>
+                            {section.score}
+                          </div>
+                          <div className="w-16 h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full bg-gradient-to-r ${getScoreGradient(section.score)}`}
+                              style={{ width: `${section.score}%` }}
+                            />
                           </div>
                         </div>
-                        <p className="text-gray-700 dark:text-gray-300 mb-4 leading-relaxed">
-                          {section.feedback}
-                        </p>
-                        <div className="space-y-2">
-                          <h5 className="font-semibold text-gray-900 dark:text-white">Suggestions:</h5>
-                          <ul className="space-y-1">
-                            {section.suggestions.map((suggestion, idx) => (
-                              <li key={idx} className="flex items-start">
-                                <ChevronRight className="w-4 h-4 text-purple-500 mr-2 mt-0.5 flex-shrink-0" />
-                                <span className="text-sm text-gray-600 dark:text-gray-400">{suggestion}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
                       </div>
-                    ))}
-                  </div>
+                      <p className="text-gray-700 dark:text-gray-300 mb-4 leading-relaxed">
+                        {section.feedback}
+                      </p>
+                      <div className="space-y-2">
+                        <h5 className="font-semibold text-gray-900 dark:text-white">Suggestions:</h5>
+                        <ul className="space-y-1">
+                          {section.suggestions.map((suggestion, idx) => (
+                            <li key={idx} className="flex items-start">
+                              <ChevronRight className="w-4 h-4 text-purple-500 mr-2 mt-0.5 flex-shrink-0" />
+                              <span className="text-sm text-gray-600 dark:text-gray-400">{suggestion}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  ))}
+                </div>
 
-                  {/* Industry Alignment */}
-                  <div className="mb-6 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                {/* Industry Alignment & Action Items */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  <div className="p-6 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-800 backdrop-blur-sm">
                     <h3 className="text-lg font-bold text-blue-600 mb-3 flex items-center">
                       <Briefcase className="w-5 h-5 mr-2" />
                       Industry Alignment
@@ -769,58 +703,68 @@ export const ResumeTools: React.FC = () => {
                     <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
                       {results.critique.industryAlignment}
                     </p>
-        </div>
+                  </div>
 
-                  {/* Action Items */}
-                  <div>
+                  <div className="p-6 bg-gradient-to-r from-green-50/50 to-emerald-50/50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl border border-green-200 dark:border-green-800 backdrop-blur-sm">
                     <h3 className="text-lg font-bold text-green-600 mb-3 flex items-center">
                       <Target className="w-5 h-5 mr-2" />
-                      Priority Action Items
-            </h3>
+                      Priority Actions
+                    </h3>
                     <div className="space-y-3">
                       {results.critique.actionItems.map((item, index) => (
-                        <div key={index} className="flex items-start p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                        <div key={index} className="flex items-start">
                           <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-bold mr-3 flex-shrink-0">
                             {index + 1}
                           </div>
-                          <span className="text-gray-700 dark:text-gray-300">{item}</span>
+                          <span className="text-gray-700 dark:text-gray-300 text-sm">{item}</span>
                         </div>
                       ))}
                     </div>
                   </div>
-                </motion.div>
-              )}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
 
-              {/* Rewrite Results */}
-              {activeTool === 'rewrite' && results.rewrite && (
-                <motion.div
-                  key="rewrite-results"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  className="premium-card p-8"
-                >
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center">
-                      <Edit3 className="w-6 h-6 text-emerald-600 mr-3" />
-                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                        AI-Optimized Resume
-                      </h2>
+        {/* Rewrite Results */}
+        {activeTool === 'rewrite' && results.rewrite && (
+          <motion.div
+            key="rewrite-results"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+          >
+            <Card className="glass-card hover-lift">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg">
+                      <Edit3 className="w-6 h-6 text-white" />
                     </div>
-              <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(results.rewrite!.improvedResume);
-                        toast.success('Resume copied to clipboard!');
-                      }}
-                      className="premium-button-secondary flex items-center"
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                Copy
-              </button>
+                    <div>
+                      <CardTitle className="text-2xl text-gray-900 dark:text-white">AI-Optimized Resume</CardTitle>
+                      <CardDescription className="text-gray-600 dark:text-gray-300">
+                        Your resume rewritten for maximum impact
+                      </CardDescription>
+                    </div>
                   </div>
-
-                  {/* Strategy */}
-                  <div className="mb-6 p-6 bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20 rounded-xl border border-emerald-200 dark:border-emerald-800">
+                  <Button
+                    onClick={() => {
+                      navigator.clipboard.writeText(results.rewrite!.improvedResume);
+                      toast.success('Resume copied to clipboard!');
+                    }}
+                    variant="outline"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Copy
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-8">
+                {/* Strategy & Changes */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  <div className="p-6 bg-gradient-to-r from-emerald-50/50 to-green-50/50 dark:from-emerald-900/20 dark:to-green-900/20 rounded-xl border border-emerald-200 dark:border-emerald-800 backdrop-blur-sm">
                     <h3 className="text-lg font-bold text-emerald-600 mb-3 flex items-center">
                       <Brain className="w-5 h-5 mr-2" />
                       Rewriting Strategy
@@ -830,77 +774,79 @@ export const ResumeTools: React.FC = () => {
                     </p>
                   </div>
 
-                  {/* Key Changes */}
-                  <div className="mb-6">
+                  <div className="p-6 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-800 backdrop-blur-sm">
                     <h3 className="text-lg font-bold text-blue-600 mb-3 flex items-center">
                       <Zap className="w-5 h-5 mr-2" />
-                      Key Improvements Made
+                      Key Improvements
                     </h3>
                     <ul className="space-y-2">
-                      {results.rewrite.changes.map((change, index) => (
+                      {results.rewrite.changes.slice(0, 4).map((change, index) => (
                         <li key={index} className="flex items-start">
-                          <CheckCircle className="w-5 h-5 text-blue-500 mr-2 mt-0.5 flex-shrink-0" />
-                          <span className="text-gray-700 dark:text-gray-300">{change}</span>
+                          <CheckCircle className="w-4 h-4 text-blue-500 mr-2 mt-0.5 flex-shrink-0" />
+                          <span className="text-gray-700 dark:text-gray-300 text-sm">{change}</span>
                         </li>
                       ))}
                     </ul>
                   </div>
+                </div>
 
-                  {/* Industry Optimizations */}
-                  <div className="mb-6">
-                    <h3 className="text-lg font-bold text-purple-600 mb-3 flex items-center">
-                      <Target className="w-5 h-5 mr-2" />
-                      Industry Optimizations
-                    </h3>
-                    <ul className="space-y-2">
-                      {results.rewrite.industryOptimizations.map((optimization, index) => (
-                        <li key={index} className="flex items-start">
-                          <Star className="w-5 h-5 text-purple-500 mr-2 mt-0.5 flex-shrink-0" />
-                          <span className="text-gray-700 dark:text-gray-300">{optimization}</span>
-                        </li>
-                      ))}
-                    </ul>
-          </div>
-
-                  {/* Improved Resume */}
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3 flex items-center">
-                      <FileText className="w-5 h-5 mr-2" />
-                      Your Optimized Resume
-                    </h3>
-                    <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 max-h-96 overflow-y-auto">
-                      <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 font-mono leading-relaxed">
-                        {results.rewrite.improvedResume}
-              </pre>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Empty State */}
-              {!(activeTool === 'score' ? results.score : activeTool === 'judge' ? results.critique : results.rewrite) && (
-                <motion.div
-                  key="empty-state"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  className="premium-card p-12 text-center"
-                >
-                  <div className={`w-24 h-24 rounded-3xl bg-gradient-to-br ${toolConfig[activeTool].color} p-6 mx-auto mb-6`}>
-                    {React.createElement(toolConfig[activeTool].icon, { className: "w-12 h-12 text-white" })}
-              </div>
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-                    Ready to {activeTool === 'score' ? 'Analyze' : activeTool === 'judge' ? 'Critique' : 'Rewrite'} Your Resume
+                {/* Industry Optimizations */}
+                <div className="p-6 bg-gradient-to-r from-purple-50/50 to-pink-50/50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl border border-purple-200 dark:border-purple-800 backdrop-blur-sm">
+                  <h3 className="text-lg font-bold text-purple-600 mb-4 flex items-center">
+                    <Target className="w-5 h-5 mr-2" />
+                    Industry Optimizations
                   </h3>
-                  <p className="text-gray-600 dark:text-gray-300 max-w-md mx-auto leading-relaxed">
-                    Fill in your information and upload your resume to get started with AI-powered {activeTool === 'score' ? 'scoring' : activeTool === 'judge' ? 'feedback' : 'optimization'}.
-                  </p>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {results.rewrite.industryOptimizations.map((optimization, index) => (
+                      <div key={index} className="flex items-start">
+                        <Star className="w-4 h-4 text-purple-500 mr-2 mt-0.5 flex-shrink-0" />
+                        <span className="text-gray-700 dark:text-gray-300 text-sm">{optimization}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Improved Resume */}
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center">
+                    <FileText className="w-5 h-5 mr-2" />
+                    Your Optimized Resume
+                  </h3>
+                  <div className="bg-white/50 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700 max-h-96 overflow-y-auto backdrop-blur-sm">
+                    <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 font-mono leading-relaxed">
+                      {results.rewrite.improvedResume}
+                    </pre>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </motion.div>
-        </div>
-      </div>
+        )}
+
+        {/* Empty State */}
+        {!(activeTool === 'score' ? results.score : activeTool === 'judge' ? results.critique : results.rewrite) && (
+          <motion.div
+            key="empty-state"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+          >
+            <Card className="glass-card hover-lift">
+              <CardContent className="p-12 text-center">
+                <div className={`w-24 h-24 rounded-3xl bg-gradient-to-br ${toolConfig[activeTool].color} p-6 mx-auto mb-6 shadow-2xl`}>
+                  {React.createElement(toolConfig[activeTool].icon, { className: "w-12 h-12 text-white" })}
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                  Ready to {activeTool === 'score' ? 'Analyze' : activeTool === 'judge' ? 'Critique' : 'Rewrite'} Your Resume
+                </h3>
+                <p className="text-gray-600 dark:text-gray-300 max-w-md mx-auto leading-relaxed">
+                  Fill in your information and upload your resume to get started with AI-powered {activeTool === 'score' ? 'scoring' : activeTool === 'judge' ? 'feedback' : 'optimization'}.
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
