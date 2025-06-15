@@ -31,10 +31,7 @@ import {
   Loader2,
   Info,
   ExternalLink,
-  Camera,
-  Film,
-  Maximize2,
-  X,
+  Monitor,
   ArrowRight,
   Lightbulb
 } from 'lucide-react';
@@ -46,7 +43,6 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Checkbox } from './ui/checkbox';
 
 // Browser Use API Configuration
 const BROWSER_USE_API_KEY = import.meta.env.VITE_BROWSER_USE_API_KEY;
@@ -76,8 +72,7 @@ interface AutomationTask {
   currentAction: string;
   startTime?: Date;
   endTime?: Date;
-  screenshots: string[];
-  gifUrl?: string;
+  previewUrl?: string; // Browser Use API provides preview URL
   error?: string;
 }
 
@@ -109,8 +104,6 @@ export const LinkedInAutomationBot: React.FC = () => {
   const [currentTask, setCurrentTask] = useState<AutomationTask | null>(null);
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [selectedScreenshot, setSelectedScreenshot] = useState<string | null>(null);
-  const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
 
   const configurationSteps: ConfigurationStep[] = [
     {
@@ -358,7 +351,7 @@ Important: Only apply to jobs that have the "Easy Apply" button. Skip jobs that 
         applicationsSubmitted: 0,
         currentAction: 'Initializing LinkedIn automation...',
         startTime: new Date(),
-        screenshots: []
+        previewUrl: result.preview_url // Browser Use API provides preview URL
       };
 
       setCurrentTask(newTask);
@@ -398,27 +391,9 @@ Important: Only apply to jobs that have the "Easy Apply" button. Skip jobs that 
           status: status.status,
           progress: status.progress || prev.progress,
           currentAction: status.current_action || prev.currentAction,
-          applicationsSubmitted: status.applications_submitted || prev.applicationsSubmitted
+          applicationsSubmitted: status.applications_submitted || prev.applicationsSubmitted,
+          previewUrl: status.preview_url || prev.previewUrl // Update preview URL if available
         } : null);
-
-        // Fetch latest screenshots
-        try {
-          const screenshotResponse = await fetch(`${BROWSER_USE_API_URL}/get-task-screenshots/${taskId}`, {
-            headers: {
-              'Authorization': `Bearer ${BROWSER_USE_API_KEY}`
-            }
-          });
-
-          if (screenshotResponse.ok) {
-            const screenshots = await screenshotResponse.json();
-            setCurrentTask(prev => prev ? {
-              ...prev,
-              screenshots: screenshots.screenshots || []
-            } : null);
-          }
-        } catch (screenshotError) {
-          console.error('Error fetching screenshots:', screenshotError);
-        }
 
         // Stop polling if task is completed or failed
         if (status.status === 'completed' || status.status === 'failed') {
@@ -674,33 +649,53 @@ Important: Only apply to jobs that have the "Easy Apply" button. Skip jobs that 
                 </div>
               </div>
 
-              {/* Screenshots */}
-              {currentTask.screenshots.length > 0 && (
+              {/* Live Browser Preview */}
+              {currentTask.previewUrl && (
                 <div>
                   <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-                    <Camera className="w-5 h-5 mr-2" />
-                    Live Screenshots
+                    <Monitor className="w-5 h-5 mr-2" />
+                    Live Browser Preview
                   </h4>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {currentTask.screenshots.slice(-8).map((screenshot, index) => (
-                      <div
-                        key={index}
-                        className="relative cursor-pointer group"
-                        onClick={() => {
-                          setSelectedScreenshot(screenshot);
-                          setIsFullscreenOpen(true);
-                        }}
-                      >
-                        <img
-                          src={screenshot}
-                          alt={`Screenshot ${index + 1}`}
-                          className="w-full h-24 object-cover rounded-lg border border-gray-200 dark:border-gray-700 group-hover:shadow-lg transition-all"
-                        />
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 rounded-lg transition-all flex items-center justify-center">
-                          <Maximize2 className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="relative">
+                    <div className="bg-gray-100 dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                          <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                          <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                         </div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          Live LinkedIn Session
+                        </div>
+                        <Button
+                          onClick={() => window.open(currentTask.previewUrl, '_blank')}
+                          variant="outline"
+                          size="sm"
+                        >
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          Open in New Tab
+                        </Button>
                       </div>
-                    ))}
+                      <div className="bg-white dark:bg-gray-900 rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600">
+                        <iframe
+                          src={currentTask.previewUrl}
+                          className="w-full h-96 border-0"
+                          title="LinkedIn Automation Preview"
+                          sandbox="allow-same-origin allow-scripts"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
+                    <div className="flex items-start space-x-3">
+                      <Info className="w-5 h-5 text-green-600 mt-0.5" />
+                      <div>
+                        <h4 className="font-semibold text-green-800 dark:text-green-200">Live Preview</h4>
+                        <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                          This is a live view of the LinkedIn automation in progress. You can see exactly what the bot is doing in real-time.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -774,7 +769,7 @@ Important: Only apply to jobs that have the "Easy Apply" button. Skip jobs that 
                     variant="ghost"
                     size="icon"
                   >
-                    <X className="w-6 h-6" />
+                    ✕
                   </Button>
                 </div>
 
@@ -1169,41 +1164,6 @@ Important: Only apply to jobs that have the "Easy Apply" button. Skip jobs that 
                   )}
                 </div>
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Fullscreen Screenshot Modal */}
-      <AnimatePresence>
-        {isFullscreenOpen && selectedScreenshot && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setIsFullscreenOpen(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="relative max-w-6xl max-h-full"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <img
-                src={selectedScreenshot}
-                alt="Fullscreen screenshot"
-                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
-              />
-              <Button
-                onClick={() => setIsFullscreenOpen(false)}
-                variant="ghost"
-                size="icon"
-                className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 text-white"
-              >
-                <X className="w-6 h-6" />
-              </Button>
             </motion.div>
           </motion.div>
         )}
