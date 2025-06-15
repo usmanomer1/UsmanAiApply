@@ -40,10 +40,51 @@ export const Navbar: React.FC = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [notifications, setNotifications] = useState(3);
+  const [notifications, setNotifications] = useState(0);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [userPlan, setUserPlan] = useState<string>('Free');
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
   const [showSupabaseWarning, setShowSupabaseWarning] = useState(false);
+
+  // Sample notifications data
+  const [notificationsList, setNotificationsList] = useState([
+    {
+      id: 1,
+      title: 'Job Application Submitted',
+      message: 'Successfully applied to Software Engineer at TechCorp',
+      time: '2 minutes ago',
+      type: 'success',
+      read: false,
+      icon: Zap
+    },
+    {
+      id: 2,
+      title: 'Profile Updated',
+      message: 'Your LinkedIn profile has been optimized',
+      time: '1 hour ago',
+      type: 'info',
+      read: false,
+      icon: User
+    },
+    {
+      id: 3,
+      title: 'New Job Match',
+      message: '5 new jobs match your criteria',
+      time: '3 hours ago',
+      type: 'info',
+      read: true,
+      icon: Search
+    },
+    {
+      id: 4,
+      title: 'Automation Complete',
+      message: 'Applied to 10 jobs successfully',
+      time: '1 day ago',
+      type: 'success',
+      read: true,
+      icon: Bot
+    }
+  ]);
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: BarChart3, description: 'Overview & Analytics' },
@@ -76,6 +117,7 @@ export const Navbar: React.FC = () => {
       if (e.key === 'Escape') {
         setIsSearchOpen(false);
         setIsProfileOpen(false);
+        setIsNotificationsOpen(false);
         setIsMobileMenuOpen(false);
         setSearchQuery('');
         setSearchResults([]);
@@ -90,6 +132,12 @@ export const Navbar: React.FC = () => {
     fetchUserSubscription();
     checkSupabaseConnection();
   }, [user]);
+
+  // Update notification count when notifications list changes
+  useEffect(() => {
+    const unreadCount = notificationsList.filter(n => !n.read).length;
+    setNotifications(unreadCount);
+  }, [notificationsList]);
 
   // Search functionality
   useEffect(() => {
@@ -250,6 +298,41 @@ export const Navbar: React.FC = () => {
     }
   };
 
+  const markNotificationAsRead = (id: number) => {
+    setNotificationsList(prev => 
+      prev.map(notification => 
+        notification.id === id 
+          ? { ...notification, read: true }
+          : notification
+      )
+    );
+  };
+
+  const markAllNotificationsAsRead = () => {
+    setNotificationsList(prev => 
+      prev.map(notification => ({ ...notification, read: true }))
+    );
+  };
+
+  const clearNotification = (id: number) => {
+    setNotificationsList(prev => 
+      prev.filter(notification => notification.id !== id)
+    );
+  };
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'success':
+        return 'text-emerald-500';
+      case 'warning':
+        return 'text-amber-500';
+      case 'error':
+        return 'text-red-500';
+      default:
+        return 'text-blue-500';
+    }
+  };
+
   return (
     <>
       {/* Supabase Connection Warning */}
@@ -363,14 +446,107 @@ export const Navbar: React.FC = () => {
               </button>
 
               {/* Notifications */}
-              <button className="relative p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-                <Bell className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-                {notifications > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-                    {notifications}
-                  </span>
-                )}
-              </button>
+              <div className="relative">
+                <button 
+                  onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                  className="relative p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                >
+                  <Bell className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+                  {notifications > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                      {notifications}
+                    </span>
+                  )}
+                </button>
+
+                <AnimatePresence>
+                  {isNotificationsOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                      transition={{ duration: 0.2 }}
+                      className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50 max-h-96 overflow-hidden"
+                    >
+                      <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Notifications</h3>
+                        {notifications > 0 && (
+                          <button
+                            onClick={markAllNotificationsAsRead}
+                            className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
+                          >
+                            Mark all read
+                          </button>
+                        )}
+                      </div>
+                      
+                      <div className="max-h-80 overflow-y-auto">
+                        {notificationsList.length > 0 ? (
+                          notificationsList.map((notification) => {
+                            const Icon = notification.icon;
+                            return (
+                              <div
+                                key={notification.id}
+                                className={`px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer border-l-4 ${
+                                  !notification.read 
+                                    ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/10' 
+                                    : 'border-transparent'
+                                }`}
+                                onClick={() => markNotificationAsRead(notification.id)}
+                              >
+                                <div className="flex items-start space-x-3">
+                                  <div className={`p-2 rounded-lg ${getNotificationIcon(notification.type)} bg-gray-100 dark:bg-gray-700`}>
+                                    <Icon className="w-4 h-4" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between">
+                                      <p className={`text-sm font-medium ${
+                                        !notification.read 
+                                          ? 'text-gray-900 dark:text-white' 
+                                          : 'text-gray-600 dark:text-gray-300'
+                                      }`}>
+                                        {notification.title}
+                                      </p>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          clearNotification(notification.id);
+                                        }}
+                                        className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                      >
+                                        <X className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                      {notification.message}
+                                    </p>
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                      {notification.time}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="px-4 py-8 text-center">
+                            <Bell className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                            <p className="text-gray-500 dark:text-gray-400">No notifications</p>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {notificationsList.length > 0 && (
+                        <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700">
+                          <button className="w-full text-center text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium">
+                            View all notifications
+                          </button>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
 
               {/* Theme toggle */}
               <button
