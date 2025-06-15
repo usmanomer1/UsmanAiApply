@@ -152,7 +152,7 @@
 }
 
 .premium-input {
-  @apply w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white placeholder-gray-500 dark:placeholder-gray-400;
+  @apply w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white placeholder-gray-600 dark:placeholder-gray-300;
 }
 
 .premium-select {
@@ -480,7 +480,7 @@
 }
 
 .dark .premium-input {
-  @apply bg-gray-800 border-gray-600 text-white placeholder-gray-400 focus:bg-gray-700;
+  @apply bg-gray-800 border-gray-600 text-white placeholder-gray-300 focus:bg-gray-700;
 }
 
 .dark .premium-select {
