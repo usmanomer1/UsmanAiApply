@@ -96,7 +96,13 @@ export const BillingPage: React.FC = () => {
   const isSupabaseConfigured = () => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    return !!(supabaseUrl && supabaseKey && supabaseUrl !== 'your_supabase_url_here' && supabaseKey !== 'your_supabase_anon_key_here');
+    return !!(supabaseUrl && supabaseKey && 
+      supabaseUrl !== 'your_supabase_url_here' && 
+      supabaseKey !== 'your_supabase_anon_key_here' &&
+      supabaseUrl.startsWith('https://') &&
+      supabaseUrl.includes('.supabase.co') &&
+      supabaseKey.length > 50
+    );
   };
 
   const fetchBillingData = async (isRefresh = false) => {
@@ -264,19 +270,39 @@ export const BillingPage: React.FC = () => {
       return;
     }
 
+    if (!subscription?.customer_id) {
+      toast.error('No customer information found');
+      return;
+    }
+
     try {
-      const { data, error } = await supabase.functions.invoke('create_stripe_portal_link', {
-        body: { customer_id: subscription?.customer_id }
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create_stripe_portal_link`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customer_id: subscription.customer_id,
+          return_url: `${window.location.origin}/billing`
+        }),
       });
 
-      if (error || !data?.url) {
-        throw error || new Error('No portal url returned');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create billing portal session');
       }
-      // Redirect user
-      window.location.href = data.url as string;
-    } catch (err) {
-      console.error(err);
-      toast.error('Unable to open billing portal');
+
+      const { url } = await response.json();
+      
+      if (url) {
+        window.location.href = url;
+      } else {
+        throw new Error('No portal URL received');
+      }
+    } catch (error) {
+      console.error('Error opening billing portal:', error);
+      toast.error(error instanceof Error ? error.message : 'Unable to open billing portal');
     }
   };
 
