@@ -572,7 +572,7 @@ export const Navbar: React.FC = () => {
                     placeholder="Search for features, pages, or actions..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="flex-1 text-lg border-none shadow-none focus:ring-0 pl-0"
+                    className="flex-1 text-lg border-none shadow-none focus:ring-0 pl-2"
                     autoFocus
                   />
                   <div className="flex items-center space-x-1 text-xs text-gray-400">
