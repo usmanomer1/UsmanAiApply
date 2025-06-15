@@ -63,7 +63,7 @@ const DEMO_SUBSCRIPTION: UserSubscription = {
   customer_id: 'cus_demo123',
   subscription_id: 'sub_demo123',
   subscription_status: 'active',
-  price_id: 'price_1RaM5LQGabzJD80B3zGbTHcZ', // Pro plan
+  price_id: 'price_1RaM5LQGabzJD80B3zGbTHcZ', // Pro plan - this should match stripe-config.ts
   current_period_start: Math.floor(Date.now() / 1000),
   current_period_end: Math.floor((Date.now() + 30 * 24 * 60 * 60 * 1000) / 1000),
   cancel_at_period_end: false,
@@ -87,6 +87,7 @@ export const BillingPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'subscriptions' | 'tokens'>('subscriptions');
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     fetchBillingData();
@@ -98,9 +99,13 @@ export const BillingPage: React.FC = () => {
     return !!(supabaseUrl && supabaseKey && supabaseUrl !== 'your_supabase_url_here' && supabaseKey !== 'your_supabase_anon_key_here');
   };
 
-  const fetchBillingData = async () => {
+  const fetchBillingData = async (isRefresh = false) => {
     try {
-      setLoading(true);
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
 
       if (!isSupabaseConfigured()) {
         setSubscription(DEMO_SUBSCRIPTION);
@@ -109,8 +114,8 @@ export const BillingPage: React.FC = () => {
       }
 
       if (!user) {
-        setSubscription(DEMO_SUBSCRIPTION);
-        setUsage(DEMO_USAGE);
+        setSubscription(null);
+        setUsage({ total_steps: 0, total_cost: 0, job_tokens: 0, applications_count: 0, ai_requests_count: 0, ai_tokens_used: 0 });
         return;
       }
 
@@ -178,14 +183,16 @@ export const BillingPage: React.FC = () => {
         const totalCost = usageData?.reduce((sum, log) => sum + parseFloat(log.cost_usd.toString()), 0) || 0;
         const jobTokens = Math.ceil(totalSteps / 10); // This is for reference, but we use applicationsCount for the actual metric
 
-        setUsage({
+        const currentUsage = {
           total_steps: totalSteps,
           total_cost: totalCost,
           job_tokens: applicationsCount, // Use actual applications count, not calculated tokens
           applications_count: applicationsCount,
           ai_requests_count: aiRequestsCount,
           ai_tokens_used: aiTokensUsed // This now uses max_tokens_requested
-        });
+        };
+        
+        setUsage(currentUsage);
       } else {
         setUsage({ total_steps: 0, total_cost: 0, job_tokens: 0, applications_count: 0, ai_requests_count: 0, ai_tokens_used: 0 });
       }
@@ -195,7 +202,12 @@ export const BillingPage: React.FC = () => {
       setUsage({ total_steps: 0, total_cost: 0, job_tokens: 0, applications_count: 0, ai_requests_count: 0, ai_tokens_used: 0 });
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    await fetchBillingData(true);
   };
 
   const handlePurchase = async (priceId: string) => {
@@ -246,8 +258,26 @@ export const BillingPage: React.FC = () => {
     }
   };
 
-  const openBillingPortal = () => {
-    toast.success('Opening billing portal...');
+  const openBillingPortal = async () => {
+    if (!isSupabaseConfigured()) {
+      toast.error('Billing portal not available in demo mode');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('create_stripe_portal_link', {
+        body: { customer_id: subscription?.customer_id }
+      });
+
+      if (error || !data?.url) {
+        throw error || new Error('No portal url returned');
+      }
+      // Redirect user
+      window.location.href = data.url as string;
+    } catch (err) {
+      console.error(err);
+      toast.error('Unable to open billing portal');
+    }
   };
 
   const formatDate = (timestamp: number) => {
@@ -265,12 +295,26 @@ export const BillingPage: React.FC = () => {
 
   // Get plan limits based on current subscription using the helper function
   const getPlanUsageLimits = () => {
-    if (!subscription?.price_id) {
-      return { applications: 0, aiTokens: 0, isSubscription: false };
+    if (!subscription) return { applications: 0, aiTokens: 0, isSubscription: false };
+
+    // 1) try strict priceId match
+    if (subscription.price_id) {
+      const direct = getPlanLimits(subscription.price_id.trim());
+      if (direct) return direct;
     }
-    
-    const limits = getPlanLimits(subscription.price_id);
-    return limits || { applications: 0, aiTokens: 0, isSubscription: false };
+
+    // 2) try derive from product object resolved elsewhere
+    const prod = getCurrentProduct();
+    if (prod) {
+      return {
+        applications: prod.applicationCount || 0,
+        aiTokens: prod.aiTokenCount || 0,
+        isSubscription: prod.mode === 'subscription'
+      };
+    }
+
+    // 3) final default
+    return { applications: 0, aiTokens: 0, isSubscription: false };
   };
 
   const getUsageProgress = (used: number, limit: number) => {
@@ -325,17 +369,20 @@ export const BillingPage: React.FC = () => {
         </div>
 
         {/* Current Plan Status & Usage */}
-        {subscription && subscription.subscription_status === 'active' && (
+        {subscription && (subscription.subscription_status === 'active' || !isSupabaseConfigured()) && (
           <div className="max-w-4xl mx-auto mb-12 space-y-6">
             {/* Current Plan Card */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Current Plan</h3>
                 <button
-                  onClick={fetchBillingData}
-                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  type="button"
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+                  title="Refresh billing data"
                 >
-                  <RefreshCw className="w-4 h-4 text-gray-500" />
+                  <RefreshCw className={`w-4 h-4 text-gray-500 ${refreshing ? 'animate-spin' : ''}`} />
                 </button>
               </div>
               
@@ -348,7 +395,7 @@ export const BillingPage: React.FC = () => {
                     {getCurrentProduct()?.name?.replace('AIApply ', '') || 'Pro'}
                   </div>
                   <div className="text-sm text-emerald-600 dark:text-emerald-400">
-                    Active Plan
+                    {!isSupabaseConfigured() ? 'Demo Plan' : 'Active Plan'}
                   </div>
                 </div>
               </div>
@@ -361,8 +408,9 @@ export const BillingPage: React.FC = () => {
               )}
 
               <button
+                type="button"
                 onClick={openBillingPortal}
-                className="w-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white py-2 px-4 rounded-lg transition-colors text-sm font-medium"
+                className="w-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white py-2 px-4 rounded-lg transition-colors text-sm font-medium cursor-pointer"
               >
                 <ExternalLink className="w-4 h-4 inline mr-2" />
                 Manage Subscription
@@ -393,7 +441,7 @@ export const BillingPage: React.FC = () => {
                       {usage?.applications_count || 0}
                     </span>
                     <span className="text-sm text-gray-500 dark:text-gray-400">
-                      of {limits.applications} included
+                      {limits.applications > 0 ? `of ${limits.applications} included` : 'No plan limits available'}
                     </span>
                   </div>
                   
@@ -410,14 +458,18 @@ export const BillingPage: React.FC = () => {
                   
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-500 dark:text-gray-400">
-                      {applicationProgress >= 100 ? 
-                        'Additional: $0.80 each' :
-                        `${limits.applications - (usage?.applications_count || 0)} remaining`
+                      {limits.applications === 0 ? 
+                        'Subscribe to get applications' :
+                        applicationProgress >= 100 ? 
+                          'Additional: $0.80 each' :
+                          `${Math.max(0, limits.applications - (usage?.applications_count || 0))} remaining`
                       }
                     </span>
-                    <span className={`font-bold ${getUsageStatusColor(applicationProgress)}`}>
-                      {Math.round(applicationProgress)}% used
-                    </span>
+                    {limits.applications > 0 && (
+                      <span className={`font-bold ${getUsageStatusColor(applicationProgress)}`}>
+                        {Math.round(applicationProgress)}% used
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -444,7 +496,7 @@ export const BillingPage: React.FC = () => {
                       {(usage?.ai_tokens_used || 0).toLocaleString()}
                     </span>
                     <span className="text-sm text-gray-500 dark:text-gray-400">
-                      of {limits.aiTokens.toLocaleString()} included
+                      {limits.aiTokens > 0 ? `of ${limits.aiTokens.toLocaleString()} included` : 'No plan limits available'}
                     </span>
                   </div>
                   
@@ -461,14 +513,18 @@ export const BillingPage: React.FC = () => {
                   
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-500 dark:text-gray-400">
-                      {aiTokenProgress >= 100 ? 
-                        'Additional: $0.10 per 1,000' :
-                        `${(limits.aiTokens - (usage?.ai_tokens_used || 0)).toLocaleString()} remaining`
+                      {limits.aiTokens === 0 ? 
+                        'Subscribe to get AI tokens' :
+                        aiTokenProgress >= 100 ? 
+                          'Additional: $0.10 per 1,000' :
+                          `${Math.max(0, limits.aiTokens - (usage?.ai_tokens_used || 0)).toLocaleString()} remaining`
                       }
                     </span>
-                    <span className={`font-bold ${getUsageStatusColor(aiTokenProgress)}`}>
-                      {Math.round(aiTokenProgress)}% used
-                    </span>
+                    {limits.aiTokens > 0 && (
+                      <span className={`font-bold ${getUsageStatusColor(aiTokenProgress)}`}>
+                        {Math.round(aiTokenProgress)}% used
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -517,11 +573,12 @@ export const BillingPage: React.FC = () => {
         )}
 
         {/* Plan Toggle */}
-        <div className="flex justify-center mb-12">
+        <div className="flex justify-center mb-12 relative z-10">
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-1 shadow-lg border border-gray-200 dark:border-gray-700">
             <button
+              type="button"
               onClick={() => setActiveTab('subscriptions')}
-              className={`px-6 py-3 rounded-xl font-semibold transition-all ${
+              className={`px-6 py-3 rounded-xl font-semibold transition-all cursor-pointer ${
                 activeTab === 'subscriptions'
                   ? 'bg-blue-600 text-white shadow-lg'
                   : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
@@ -531,8 +588,9 @@ export const BillingPage: React.FC = () => {
               Subscriptions
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab('tokens')}
-              className={`px-6 py-3 rounded-xl font-semibold transition-all ${
+              className={`px-6 py-3 rounded-xl font-semibold transition-all cursor-pointer ${
                 activeTab === 'tokens'
                   ? 'bg-blue-600 text-white shadow-lg'
                   : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
@@ -759,7 +817,14 @@ export const BillingPage: React.FC = () => {
           <p className="text-gray-600 dark:text-gray-300 mb-4">
             Have questions about our pricing?
           </p>
-          <button className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium inline-flex items-center">
+          <button 
+            type="button"
+            onClick={() => {
+              // You can replace this with your actual FAQ page URL or modal
+              window.open('https://docs.aiapply.com/pricing-faq', '_blank');
+            }}
+            className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium inline-flex items-center transition-colors cursor-pointer"
+          >
             <HelpCircle className="w-4 h-4 mr-2" />
             View Pricing FAQ
           </button>
