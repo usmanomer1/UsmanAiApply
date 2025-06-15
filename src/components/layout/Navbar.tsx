@@ -21,7 +21,14 @@ import {
   ChevronDown,
   Crown,
   Sparkles,
-  AlertTriangle
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  TrendingUp,
+  Building,
+  Send,
+  AlertCircle,
+  Info
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -29,6 +36,17 @@ import { supabase } from '../../lib/supabase';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
+
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'success' | 'info' | 'warning' | 'error';
+  time: string;
+  read: boolean;
+  icon: React.ComponentType<{ className?: string }>;
+  data?: any;
+}
 
 export const Navbar: React.FC = () => {
   const location = useLocation();
@@ -40,51 +58,11 @@ export const Navbar: React.FC = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [notifications, setNotifications] = useState(0);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [userPlan, setUserPlan] = useState<string>('Free');
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
   const [showSupabaseWarning, setShowSupabaseWarning] = useState(false);
-
-  // Sample notifications data
-  const [notificationsList, setNotificationsList] = useState([
-    {
-      id: 1,
-      title: 'Job Application Submitted',
-      message: 'Successfully applied to Software Engineer at TechCorp',
-      time: '2 minutes ago',
-      type: 'success',
-      read: false,
-      icon: Zap
-    },
-    {
-      id: 2,
-      title: 'Profile Updated',
-      message: 'Your LinkedIn profile has been optimized',
-      time: '1 hour ago',
-      type: 'info',
-      read: false,
-      icon: User
-    },
-    {
-      id: 3,
-      title: 'New Job Match',
-      message: '5 new jobs match your criteria',
-      time: '3 hours ago',
-      type: 'info',
-      read: true,
-      icon: Search
-    },
-    {
-      id: 4,
-      title: 'Automation Complete',
-      message: 'Applied to 10 jobs successfully',
-      time: '1 day ago',
-      type: 'success',
-      read: true,
-      icon: Bot
-    }
-  ]);
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: BarChart3, description: 'Overview & Analytics' },
@@ -131,13 +109,13 @@ export const Navbar: React.FC = () => {
   useEffect(() => {
     fetchUserSubscription();
     checkSupabaseConnection();
+    fetchNotifications();
+    
+    // Set up real-time notifications
+    const interval = setInterval(fetchNotifications, 30000); // Check every 30 seconds
+    
+    return () => clearInterval(interval);
   }, [user]);
-
-  // Update notification count when notifications list changes
-  useEffect(() => {
-    const unreadCount = notificationsList.filter(n => !n.read).length;
-    setNotifications(unreadCount);
-  }, [notificationsList]);
 
   // Search functionality
   useEffect(() => {
@@ -273,6 +251,209 @@ export const Navbar: React.FC = () => {
     }
   };
 
+  const fetchNotifications = async () => {
+    try {
+      if (!isSupabaseConfigured() || !user) {
+        // Use demo notifications if not configured
+        setNotifications([
+          {
+            id: 'demo-1',
+            title: 'Welcome to AIApply',
+            message: 'Connect Supabase to see real notifications',
+            type: 'info',
+            time: 'Just now',
+            read: false,
+            icon: Info
+          }
+        ]);
+        return;
+      }
+
+      const realNotifications: Notification[] = [];
+
+      // Fetch recent automation tasks
+      const { data: automationTasks } = await supabase
+        .from('automation_tasks')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (automationTasks) {
+        automationTasks.forEach(task => {
+          const timeAgo = getTimeAgo(new Date(task.created_at));
+          
+          if (task.status === 'completed') {
+            realNotifications.push({
+              id: `task-${task.id}`,
+              title: 'Automation Completed',
+              message: `${task.task_type} task finished successfully`,
+              type: 'success',
+              time: timeAgo,
+              read: false,
+              icon: CheckCircle,
+              data: { taskId: task.task_id, type: task.task_type }
+            });
+          } else if (task.status === 'failed') {
+            realNotifications.push({
+              id: `task-${task.id}`,
+              title: 'Automation Failed',
+              message: task.error_message || 'Task encountered an error',
+              type: 'error',
+              time: timeAgo,
+              read: false,
+              icon: AlertCircle,
+              data: { taskId: task.task_id, error: task.error_message }
+            });
+          } else if (task.status === 'running') {
+            realNotifications.push({
+              id: `task-${task.id}`,
+              title: 'Automation Running',
+              message: `${task.task_type} task is in progress`,
+              type: 'info',
+              time: timeAgo,
+              read: false,
+              icon: Clock,
+              data: { taskId: task.task_id, type: task.task_type }
+            });
+          }
+        });
+      }
+
+      // Fetch recent applications
+      const { data: recentApplications } = await supabase
+        .from('applications')
+        .select(`
+          *,
+          job_campaigns!campaign_id(
+            profiles!inner(user_id)
+          )
+        `)
+        .eq('job_campaigns.profiles.user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+      if (recentApplications) {
+        recentApplications.forEach(app => {
+          const timeAgo = getTimeAgo(new Date(app.created_at));
+          
+          realNotifications.push({
+            id: `app-${app.id}`,
+            title: 'Job Application Submitted',
+            message: `Applied to ${app.role || 'position'} at ${app.company || 'company'}`,
+            type: 'success',
+            time: timeAgo,
+            read: false,
+            icon: Send,
+            data: { applicationId: app.id, company: app.company, role: app.role }
+          });
+        });
+      }
+
+      // Check token usage and add warnings if needed
+      const { data: tokenUsage } = await supabase.rpc('get_user_monthly_ai_tokens', {
+        user_uuid: user.id,
+        target_date: new Date().toISOString().split('T')[0]
+      });
+
+      if (tokenUsage) {
+        const result = Array.isArray(tokenUsage) ? tokenUsage[0] : tokenUsage;
+        const totalTokens = Number(result?.total_tokens) || 0;
+        const usagePercentage = (totalTokens / 150000) * 100; // 150k monthly limit
+
+        if (usagePercentage >= 90) {
+          realNotifications.unshift({
+            id: 'token-warning-critical',
+            title: 'Token Limit Critical',
+            message: 'You\'ve used 90% of your monthly AI tokens',
+            type: 'error',
+            time: 'Now',
+            read: false,
+            icon: AlertTriangle
+          });
+        } else if (usagePercentage >= 75) {
+          realNotifications.unshift({
+            id: 'token-warning',
+            title: 'Token Usage High',
+            message: 'You\'ve used 75% of your monthly AI tokens',
+            type: 'warning',
+            time: 'Now',
+            read: false,
+            icon: AlertCircle
+          });
+        }
+      }
+
+      // Check browser use logs for recent activity
+      const { data: browserLogs } = await supabase
+        .from('browser_use_logs')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(2);
+
+      if (browserLogs) {
+        browserLogs.forEach(log => {
+          const timeAgo = getTimeAgo(new Date(log.created_at));
+          
+          realNotifications.push({
+            id: `browser-${log.id}`,
+            title: 'Automation Activity',
+            message: `${log.step_count} automation steps completed`,
+            type: 'info',
+            time: timeAgo,
+            read: false,
+            icon: Bot,
+            data: { stepCount: log.step_count, cost: log.cost_usd }
+          });
+        });
+      }
+
+      // Sort by time and limit to 10 most recent
+      realNotifications.sort((a, b) => {
+        const timeA = parseTimeAgo(a.time);
+        const timeB = parseTimeAgo(b.time);
+        return timeA - timeB;
+      });
+
+      setNotifications(realNotifications.slice(0, 10));
+
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      // Fallback to demo notification
+      setNotifications([
+        {
+          id: 'error-1',
+          title: 'Notification Error',
+          message: 'Unable to load recent notifications',
+          type: 'error',
+          time: 'Just now',
+          read: false,
+          icon: AlertCircle
+        }
+      ]);
+    }
+  };
+
+  const getTimeAgo = (date: Date): string => {
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (diffInSeconds < 60) return 'Just now';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+    return date.toLocaleDateString();
+  };
+
+  const parseTimeAgo = (timeStr: string): number => {
+    if (timeStr === 'Just now' || timeStr === 'Now') return 0;
+    if (timeStr.includes('minute')) return parseInt(timeStr) * 60;
+    if (timeStr.includes('hour')) return parseInt(timeStr) * 3600;
+    if (timeStr.includes('day')) return parseInt(timeStr) * 86400;
+    return 999999; // Old notifications
+  };
+
   const handleSignOut = async () => {
     try {
       await signOut();
@@ -298,8 +479,8 @@ export const Navbar: React.FC = () => {
     }
   };
 
-  const markNotificationAsRead = (id: number) => {
-    setNotificationsList(prev => 
+  const markNotificationAsRead = (id: string) => {
+    setNotifications(prev => 
       prev.map(notification => 
         notification.id === id 
           ? { ...notification, read: true }
@@ -309,13 +490,13 @@ export const Navbar: React.FC = () => {
   };
 
   const markAllNotificationsAsRead = () => {
-    setNotificationsList(prev => 
+    setNotifications(prev => 
       prev.map(notification => ({ ...notification, read: true }))
     );
   };
 
-  const clearNotification = (id: number) => {
-    setNotificationsList(prev => 
+  const clearNotification = (id: string) => {
+    setNotifications(prev => 
       prev.filter(notification => notification.id !== id)
     );
   };
@@ -332,6 +513,8 @@ export const Navbar: React.FC = () => {
         return 'text-blue-500';
     }
   };
+
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
     <>
@@ -452,9 +635,9 @@ export const Navbar: React.FC = () => {
                   className="relative p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
                   <Bell className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-                  {notifications > 0 && (
+                  {unreadCount > 0 && (
                     <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-                      {notifications}
+                      {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                   )}
                 </button>
@@ -470,7 +653,7 @@ export const Navbar: React.FC = () => {
                     >
                       <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Notifications</h3>
-                        {notifications > 0 && (
+                        {unreadCount > 0 && (
                           <button
                             onClick={markAllNotificationsAsRead}
                             className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
@@ -481,8 +664,8 @@ export const Navbar: React.FC = () => {
                       </div>
                       
                       <div className="max-h-80 overflow-y-auto">
-                        {notificationsList.length > 0 ? (
-                          notificationsList.map((notification) => {
+                        {notifications.length > 0 ? (
+                          notifications.map((notification) => {
                             const Icon = notification.icon;
                             return (
                               <div
@@ -536,10 +719,13 @@ export const Navbar: React.FC = () => {
                         )}
                       </div>
                       
-                      {notificationsList.length > 0 && (
+                      {notifications.length > 0 && (
                         <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700">
-                          <button className="w-full text-center text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium">
-                            View all notifications
+                          <button 
+                            onClick={fetchNotifications}
+                            className="w-full text-center text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
+                          >
+                            Refresh notifications
                           </button>
                         </div>
                       )}
