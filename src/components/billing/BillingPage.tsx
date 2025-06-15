@@ -26,11 +26,23 @@ import {
   Brain,
   Activity,
   Target,
-  Lightbulb
+  Lightbulb,
+  Package,
+  ShoppingCart,
+  Coins
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { STRIPE_PRODUCTS, getProductByPriceId } from '../../stripe-config';
+import { 
+  STRIPE_PRODUCTS, 
+  getProductByPriceId, 
+  getSubscriptionProducts, 
+  getTokenProducts, 
+  formatPrice, 
+  getCurrencySymbol,
+  getPlanLimits,
+  calculateOverageCost
+} from '../../stripe-config';
 import toast from 'react-hot-toast';
 
 interface UserSubscription {
@@ -59,7 +71,7 @@ const DEMO_SUBSCRIPTION: UserSubscription = {
   customer_id: 'cus_demo123',
   subscription_id: 'sub_demo123',
   subscription_status: 'active',
-  price_id: 'price_1RYvf7QGabzJD80Bhd4V99CB',
+  price_id: 'price_1RaM5LQGabzJD80B3zGbTHcZ',
   current_period_start: Math.floor(Date.now() / 1000),
   current_period_end: Math.floor((Date.now() + 30 * 24 * 60 * 60 * 1000) / 1000),
   cancel_at_period_end: false,
@@ -73,7 +85,7 @@ const DEMO_USAGE: UsageStats = {
   job_tokens: 125, // 1250 steps / 10 = 125 tokens
   applications_count: 23,
   ai_requests_count: 15,
-  ai_tokens_used: 45000 // 15 requests * 3000 tokens = 45k tokens
+  ai_tokens_used: 15000 // 15k tokens used
 };
 
 // Tooltip component for usage explanations
@@ -106,8 +118,9 @@ export const BillingPage: React.FC = () => {
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [usage, setUsage] = useState<UsageStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [upgrading, setUpgrading] = useState<string | null>(null);
+  const [purchasing, setPurchasing] = useState<string | null>(null);
   const [showFAQ, setShowFAQ] = useState(false);
+  const [activeTab, setActiveTab] = useState<'subscriptions' | 'tokens'>('subscriptions');
 
   useEffect(() => {
     fetchBillingData();
@@ -186,22 +199,17 @@ export const BillingPage: React.FC = () => {
           // Get AI token usage for current month
           const { data: aiUsageData, error: aiUsageError } = await supabase
             .from('ai_token_usage')
-            .select('max_tokens_requested, operation_type')
+            .select('total_tokens, operation_type')
             .eq('user_id', user.id)
             .gte('created_at', currentMonthStart.toISOString())
             .lt('created_at', nextMonthStart.toISOString());
 
-          // Calculate AI requests based on token usage
-          // Each request is counted as: 3000 tokens = 1 request, 6000 tokens = 2 requests
+          // Calculate AI token usage
           let aiRequestsCount = 0;
           let aiTokensUsed = 0;
           if (aiUsageData && !aiUsageError) {
-            aiTokensUsed = aiUsageData.reduce((sum, log) => sum + (log.max_tokens_requested || 0), 0);
-            aiRequestsCount = aiUsageData.reduce((sum, log) => {
-              const tokens = log.max_tokens_requested || 0;
-              // Convert tokens to request count (3000 tokens = 1 request)
-              return sum + Math.ceil(tokens / 3000);
-            }, 0);
+            aiTokensUsed = aiUsageData.reduce((sum, log) => sum + (log.total_tokens || 0), 0);
+            aiRequestsCount = aiUsageData.length;
           }
 
           setUsage({
@@ -216,7 +224,7 @@ export const BillingPage: React.FC = () => {
       } else {
         setUsage({ total_steps: 0, total_cost: 0, job_tokens: 0, applications_count: 0, ai_requests_count: 0, ai_tokens_used: 0 });
       }
-          } catch (error) {
+    } catch (error) {
       console.error('Error fetching billing data:', error);
       setSubscription(null);
       setUsage({ total_steps: 0, total_cost: 0, job_tokens: 0, applications_count: 0, ai_requests_count: 0, ai_tokens_used: 0 });
@@ -225,13 +233,13 @@ export const BillingPage: React.FC = () => {
     }
   };
 
-  const handleUpgrade = async (priceId: string) => {
+  const handlePurchase = async (priceId: string) => {
     if (!isSupabaseConfigured() || !user || !session) {
       toast.error('Please connect Supabase to enable payments');
       return;
     }
 
-    setUpgrading(priceId);
+    setPurchasing(priceId);
     
     try {
       const product = getProductByPriceId(priceId);
@@ -248,7 +256,7 @@ export const BillingPage: React.FC = () => {
         body: JSON.stringify({
           price_id: priceId,
           mode: product.mode,
-          success_url: `${window.location.origin}/billing?success=true`,
+          success_url: `${window.location.origin}/success?session_id={CHECKOUT_SESSION_ID}&price_id=${priceId}&type=${product.category}`,
           cancel_url: `${window.location.origin}/billing?canceled=true`,
         }),
       });
@@ -269,7 +277,7 @@ export const BillingPage: React.FC = () => {
       console.error('Error creating checkout session:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to start checkout');
     } finally {
-      setUpgrading(null);
+      setPurchasing(null);
     }
   };
 
@@ -292,41 +300,23 @@ export const BillingPage: React.FC = () => {
     return getProductByPriceId(subscription.price_id);
   };
 
-  const getJobApplicationsLimit = () => {
-    const currentProduct = getCurrentProduct();
-    if (!currentProduct) return 0;
-    
-    if (currentProduct.name.includes('Extreme')) return 150;
-    if (currentProduct.name.includes('Plus')) return 75;
-    return 50;
+  const getCurrentPlanLimits = () => {
+    if (!subscription?.price_id) return null;
+    return getPlanLimits(subscription.price_id);
   };
 
-  const getAIRequestsLimit = () => {
-    const currentProduct = getCurrentProduct();
-    if (!currentProduct) return 0;
-    // 150k tokens / 3000 tokens per request = 50 requests
-    return 50; // All plans include 150k tokens = 50 AI requests (3000 tokens each)
-  };
-
-  const getJobApplicationsUsed = () => {
-    // Return pre-calculated job tokens from usage data
-    return usage?.job_tokens || 0;
-  };
-
-  const getAIRequestsUsed = () => {
-    return usage?.ai_requests_count || 0;
-  };
-
-  const getJobApplicationsProgress = () => {
-    const limit = getJobApplicationsLimit();
-    const used = getJobApplicationsUsed();
+  const getUsageProgress = (used: number, limit: number) => {
     return limit > 0 ? Math.min((used / limit) * 100, 100) : 0;
   };
 
-  const getAIRequestsProgress = () => {
-    const limit = getAIRequestsLimit();
-    const used = getAIRequestsUsed();
-    return limit > 0 ? Math.min((used / limit) * 100, 100) : 0;
+  const getOverageCosts = () => {
+    const limits = getCurrentPlanLimits();
+    if (!limits || !usage) return null;
+
+    return calculateOverageCost(
+      { applications: usage.job_tokens, aiTokens: usage.ai_tokens_used },
+      { applications: limits.applications, aiTokens: limits.aiTokens }
+    );
   };
 
   // FAQ Component
@@ -339,7 +329,7 @@ export const BillingPage: React.FC = () => {
       >
         <div className="p-8">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Usage & Billing FAQ</h2>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Pricing & Usage FAQ</h2>
             <button
               onClick={() => setShowFAQ(false)}
               className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
@@ -352,66 +342,39 @@ export const BillingPage: React.FC = () => {
             <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-xl">
               <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-3 flex items-center">
                 <Bot className="w-5 h-5 mr-2" />
-                Job Tokens Usage
+                Subscription Plans
               </h3>
               <div className="space-y-3 text-blue-800 dark:text-blue-200">
-                <p><strong>How it works:</strong> Our AI agent performs automated browser actions to apply to jobs on your behalf.</p>
-                <p><strong>What counts:</strong> Every 10 automation steps (clicking, typing, navigating) equals exactly 1 job token.</p>
-                <p><strong>Plan limits:</strong> Pro (50 tokens), Pro Plus (75 tokens), Extreme (150 tokens). Usage is strictly capped to prevent overuse.</p>
-                <p><strong>Tracking:</strong> Usage resets monthly on your billing cycle date.</p>
+                <p><strong>Pro Plan ($25/month):</strong> 37 job applications + 30,000 AI tokens</p>
+                <p><strong>Pro Plus ($50/month):</strong> 77 job applications + 30,000 AI tokens</p>
+                <p><strong>Extreme ($100/month):</strong> 158 job applications + 30,000 AI tokens + priority support</p>
+                <p><strong>Overage:</strong> Additional applications $0.80 each, AI tokens $0.10 per 1,000</p>
               </div>
             </div>
 
             <div className="bg-purple-50 dark:bg-purple-900/20 p-6 rounded-xl">
               <h3 className="text-lg font-semibold text-purple-900 dark:text-purple-100 mb-3 flex items-center">
-                <Brain className="w-5 h-5 mr-2" />
-                AI Resume & Cover Letter Usage
+                <Package className="w-5 h-5 mr-2" />
+                Token Packs
               </h3>
               <div className="space-y-3 text-purple-800 dark:text-purple-200">
-                <p><strong>How it works:</strong> AI generates personalized resumes and cover letters using advanced language models.</p>
-                <p><strong>What counts:</strong> Resume scoring/critique = 1 request (3000 tokens), Resume/CV rewriting = 2 requests (6000 tokens), Cover letters = 2 requests (6000 tokens).</p>
-                <p><strong>Monthly limit:</strong> All plans include 150,000 tokens monthly = 50 AI requests (calculated as 3000 tokens per request).</p>
-                <p><strong>Quality:</strong> Uses premium OpenAI models (GPT-4o-mini) for high-quality, personalized content.</p>
+                <p><strong>Job Application Tokens:</strong> $0.80 per token (1 token = 10 automation steps)</p>
+                <p><strong>AI ToolSuite Tokens:</strong> $0.10 per 1,000 tokens for resume/CV/cover letter tools</p>
+                <p><strong>Flexibility:</strong> Buy only what you need, no monthly commitments</p>
+                <p><strong>Perfect for:</strong> Users who prefer pay-as-you-go pricing</p>
               </div>
             </div>
 
             <div className="bg-emerald-50 dark:bg-emerald-900/20 p-6 rounded-xl">
               <h3 className="text-lg font-semibold text-emerald-900 dark:text-emerald-100 mb-3 flex items-center">
                 <Shield className="w-5 h-5 mr-2" />
-                Billing & Security
+                Payment & Security
               </h3>
               <div className="space-y-3 text-emerald-800 dark:text-emerald-200">
-                <p><strong>Transparent pricing:</strong> No hidden fees. You only pay for what you use beyond your plan limits.</p>
-                <p><strong>Secure payments:</strong> All payments processed securely through Stripe with bank-level encryption.</p>
-                <p><strong>Cancel anytime:</strong> No long-term contracts. Cancel or change plans anytime from your billing portal.</p>
-                <p><strong>Usage alerts:</strong> Get notified when approaching your monthly limits to avoid unexpected charges.</p>
-              </div>
-            </div>
-
-            <div className="bg-amber-50 dark:bg-amber-900/20 p-6 rounded-xl">
-              <h3 className="text-lg font-semibold text-amber-900 dark:text-amber-100 mb-3 flex items-center">
-                <Lightbulb className="w-5 h-5 mr-2" />
-                Tips to Optimize Usage
-              </h3>
-              <div className="space-y-3 text-amber-800 dark:text-amber-200">
-                <p><strong>Job tokens:</strong> Each token represents exactly 10 automation steps. Use smart filtering to maximize efficiency and target the most relevant positions.</p>
-                <p><strong>AI requests:</strong> Batch similar requests together and reuse generated content when appropriate.</p>
-                <p><strong>Plan selection:</strong> Choose a plan that matches your job search intensity to get the best value.</p>
-                <p><strong>Monitor usage:</strong> Check your usage regularly to stay within limits and plan accordingly.</p>
-              </div>
-            </div>
-
-            {/* AI Automation Accuracy Disclaimer */}
-            <div className="bg-orange-50 dark:bg-orange-900/20 p-6 rounded-xl border border-orange-200 dark:border-orange-800">
-              <h3 className="text-lg font-semibold text-orange-900 dark:text-orange-100 mb-3 flex items-center">
-                <AlertCircle className="w-5 h-5 mr-2" />
-                AI Automation Accuracy
-              </h3>
-              <div className="space-y-3 text-orange-800 dark:text-orange-200">
-                <p><strong>Important Notice:</strong> While our AI strives for accuracy, dynamic and situational form fields may sometimes be filled with generic responses.</p>
-                <p><strong>Recommendation:</strong> We recommend reviewing all submitted applications to confirm details and ensure accuracy.</p>
-                <p><strong>Manual Override:</strong> The system will pause for unclear questions, allowing you to provide specific answers when needed.</p>
-                <p><strong>Quality Assurance:</strong> Always verify application details in your LinkedIn account after submission.</p>
+                <p><strong>Secure payments:</strong> All transactions processed through Stripe</p>
+                <p><strong>Multiple currencies:</strong> USD supported with more coming soon</p>
+                <p><strong>Cancel anytime:</strong> No long-term contracts for subscriptions</p>
+                <p><strong>Instant access:</strong> Tokens and features available immediately after purchase</p>
               </div>
             </div>
           </div>
@@ -443,6 +406,11 @@ export const BillingPage: React.FC = () => {
     );
   }
 
+  const subscriptionProducts = getSubscriptionProducts();
+  const tokenProducts = getTokenProducts();
+  const currentPlanLimits = getCurrentPlanLimits();
+  const overageCosts = getOverageCosts();
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -452,11 +420,11 @@ export const BillingPage: React.FC = () => {
       >
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-display-lg text-gray-900 dark:text-white mb-3">Billing & Usage</h1>
-            <p className="text-xl text-gray-600 dark:text-gray-300">Manage your subscription and track usage across all features</p>
+            <h1 className="text-display-lg text-gray-900 dark:text-white mb-3">Billing & Plans</h1>
+            <p className="text-xl text-gray-600 dark:text-gray-300">Choose the perfect plan for your job search needs</p>
             {!isSupabaseConfigured() && (
               <div className="mt-2 text-sm text-amber-600 dark:text-amber-400">
-                Demo mode - Connect Supabase to see real billing data
+                Demo mode - Connect Supabase to enable payments
               </div>
             )}
           </div>
@@ -465,14 +433,13 @@ export const BillingPage: React.FC = () => {
             className="premium-button-secondary flex items-center"
           >
             <HelpCircle className="w-4 h-4 mr-2" />
-            Usage FAQ
+            Pricing FAQ
           </button>
         </div>
       </motion.div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Current Plan Card */}
+      {/* Current Plan Card */}
+      {subscription && subscription.subscription_status !== 'not_started' && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -490,92 +457,58 @@ export const BillingPage: React.FC = () => {
           </div>
 
           <div className="space-y-6">
-            {subscription && subscription.subscription_status !== 'not_started' ? (
-              <>
-                <div className="flex items-center space-x-4">
-                  <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl">
-                    {getCurrentProduct()?.name.includes('Extreme') ? (
-                      <Crown className="w-6 h-6 text-white" />
-                    ) : (
-                      <Star className="w-6 h-6 text-white" />
-                    )}
-                  </div>
-                  <div>
-                    <div className="text-3xl font-bold text-gray-900 dark:text-white">
-                      {getCurrentProduct()?.name.replace(' Subscription', '') || 'Pro'}
-                    </div>
-                    <div className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">
-                      {subscription.subscription_status === 'active' ? 'Active Plan' : subscription.subscription_status}
-                    </div>
-                  </div>
+            <div className="flex items-center space-x-4">
+              <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl">
+                {getCurrentProduct()?.name.includes('Extreme') ? (
+                  <Crown className="w-6 h-6 text-white" />
+                ) : (
+                  <Star className="w-6 h-6 text-white" />
+                )}
+              </div>
+              <div>
+                <div className="text-3xl font-bold text-gray-900 dark:text-white">
+                  {getCurrentProduct()?.name || 'Pro'}
                 </div>
+                <div className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">
+                  {subscription.subscription_status === 'active' ? 'Active Plan' : subscription.subscription_status}
+                </div>
+              </div>
+            </div>
 
-                {subscription.current_period_end && (
-                  <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl">
-                    <div className="flex items-center text-gray-600 dark:text-gray-300 mb-2">
-                      <Calendar className="w-4 h-4 mr-2" />
-                      <span className="font-medium">Next renewal: {formatDate(subscription.current_period_end)}</span>
-                    </div>
-                    {subscription.payment_method_brand && subscription.payment_method_last4 && (
-                      <div className="flex items-center text-gray-500 dark:text-gray-400 text-sm">
-                        <CreditCard className="w-4 h-4 mr-2" />
-                        <span>{subscription.payment_method_brand.toUpperCase()} •••• {subscription.payment_method_last4}</span>
-                      </div>
-                    )}
+            {subscription.current_period_end && (
+              <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl">
+                <div className="flex items-center text-gray-600 dark:text-gray-300 mb-2">
+                  <Calendar className="w-4 h-4 mr-2" />
+                  <span className="font-medium">Next renewal: {formatDate(subscription.current_period_end)}</span>
+                </div>
+                {subscription.payment_method_brand && subscription.payment_method_last4 && (
+                  <div className="flex items-center text-gray-500 dark:text-gray-400 text-sm">
+                    <CreditCard className="w-4 h-4 mr-2" />
+                    <span>{subscription.payment_method_brand.toUpperCase()} •••• {subscription.payment_method_last4}</span>
                   </div>
                 )}
-
-                <button
-                  onClick={openBillingPortal}
-                  className="premium-button-secondary w-full"
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Manage Subscription
-                </button>
-              </>
-            ) : (
-              <div className="text-center py-8">
-                <Gift className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No Active Subscription</h3>
-                <p className="text-gray-600 dark:text-gray-300 mb-6">
-                  Subscribe to a plan to start using AI-powered job automation tokens.
-                </p>
-                <button
-                  onClick={() => handleUpgrade(STRIPE_PRODUCTS[0].priceId)}
-                  disabled={upgrading === STRIPE_PRODUCTS[0].priceId}
-                  className="premium-button-primary"
-                >
-                  {upgrading === STRIPE_PRODUCTS[0].priceId ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Loading...
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="w-4 h-4 mr-2" />
-                      Choose a Plan
-                    </>
-                  )}
-                </button>
               </div>
             )}
+
+            <button
+              onClick={openBillingPortal}
+              className="premium-button-secondary w-full"
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Manage Subscription
+            </button>
           </div>
         </motion.div>
+      )}
 
-        {/* Enhanced Usage Overview */}
+      {/* Usage Overview */}
+      {subscription && subscription.subscription_status === 'active' && currentPlanLimits && usage && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="space-y-6"
+          className="grid grid-cols-1 lg:grid-cols-2 gap-6"
         >
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">Usage Overview</h2>
-            <UsageTooltip content="Usage resets monthly on your billing cycle date">
-              <Info className="w-5 h-5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
-            </UsageTooltip>
-          </div>
-          
           {/* Job Applications Usage */}
           <div className="premium-card p-6 hover-lift">
             <div className="flex items-center justify-between mb-4">
@@ -584,10 +517,10 @@ export const BillingPage: React.FC = () => {
                   <Bot className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Job Tokens</h3>
-                <UsageTooltip content="Automation tokens used for job application processes. Each token represents exactly 10 automation steps (form filling, clicking, navigation).">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Job Applications</h3>
+                  <UsageTooltip content="Monthly job application allowance with your subscription plan">
                     <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center cursor-help">
-                      AI-powered automated applications
+                      Automated applications
                       <HelpCircle className="w-3 h-3 ml-1" />
                     </p>
                   </UsageTooltip>
@@ -598,37 +531,35 @@ export const BillingPage: React.FC = () => {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {getJobApplicationsUsed()}
+                  {usage.job_tokens}
                 </span>
                 <span className="text-sm text-gray-500 dark:text-gray-400">
-                  of {getJobApplicationsLimit()} included
+                  of {currentPlanLimits.applications} included
                 </span>
               </div>
               
-              {subscription && (
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                  <div
-                    className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-300"
-                    style={{ width: `${getJobApplicationsProgress()}%` }}
-                  ></div>
-                </div>
-              )}
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                <div
+                  className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-300"
+                  style={{ width: `${getUsageProgress(usage.job_tokens, currentPlanLimits.applications)}%` }}
+                ></div>
+              </div>
               
               <div className="flex items-center justify-between text-xs">
                 <span className="text-gray-500 dark:text-gray-400">
-                  {getJobApplicationsUsed() >= getJobApplicationsLimit() ? 
-                    `Additional: $${getCurrentProduct()?.name.includes('Extreme') ? '0.75' : '0.80'} each` :
-                    `${getJobApplicationsLimit() - getJobApplicationsUsed()} remaining`
+                  {usage.job_tokens >= currentPlanLimits.applications ? 
+                    'Additional: $0.80 each' :
+                    `${currentPlanLimits.applications - usage.job_tokens} remaining`
                   }
                 </span>
                 <span className="text-blue-600 dark:text-blue-400">
-                  {Math.round(getJobApplicationsProgress())}% used
+                  {Math.round(getUsageProgress(usage.job_tokens, currentPlanLimits.applications))}% used
                 </span>
               </div>
             </div>
           </div>
 
-          {/* AI Requests Usage */}
+          {/* AI Tokens Usage */}
           <div className="premium-card p-6 hover-lift">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-3">
@@ -636,10 +567,10 @@ export const BillingPage: React.FC = () => {
                   <Brain className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Resume & Cover Letters</h3>
-                  <UsageTooltip content={`AI-powered content generation. Current usage: ${usage?.ai_tokens_used || 0} tokens out of 150,000 monthly limit. Resume scoring = 1 request (3000 tokens), Resume/CV rewriting = 2 requests (6000 tokens), Cover letters = 2 requests (6000 tokens).`}>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">AI Tokens</h3>
+                  <UsageTooltip content="AI tokens for resume, CV, and cover letter generation. Complex requests use 2x tokens.">
                     <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center cursor-help">
-                      AI content generation requests
+                      Resume & cover letter tools
                       <HelpCircle className="w-3 h-3 ml-1" />
                     </p>
                   </UsageTooltip>
@@ -650,161 +581,43 @@ export const BillingPage: React.FC = () => {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {getAIRequestsUsed()}
+                  {usage.ai_tokens_used.toLocaleString()}
                 </span>
                 <span className="text-sm text-gray-500 dark:text-gray-400">
-                  of {getAIRequestsLimit()} included
+                  of {currentPlanLimits.aiTokens.toLocaleString()} included
                 </span>
               </div>
               
-              {subscription && (
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                  <div
-                    className="bg-gradient-to-r from-purple-500 to-purple-600 h-3 rounded-full transition-all duration-300"
-                    style={{ width: `${getAIRequestsProgress()}%` }}
-                  ></div>
-                </div>
-              )}
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                <div
+                  className="bg-gradient-to-r from-purple-500 to-purple-600 h-3 rounded-full transition-all duration-300"
+                  style={{ width: `${getUsageProgress(usage.ai_tokens_used, currentPlanLimits.aiTokens)}%` }}
+                ></div>
+              </div>
               
               <div className="flex items-center justify-between text-xs">
                 <span className="text-gray-500 dark:text-gray-400">
-                  {getAIRequestsUsed() >= getAIRequestsLimit() ? 
-                    'Additional: $0.18 each' :
-                    `${getAIRequestsLimit() - getAIRequestsUsed()} remaining`
+                  {usage.ai_tokens_used >= currentPlanLimits.aiTokens ? 
+                    'Additional: $0.10 per 1,000' :
+                    `${(currentPlanLimits.aiTokens - usage.ai_tokens_used).toLocaleString()} remaining`
                   }
                 </span>
                 <span className="text-purple-600 dark:text-purple-400">
-                  {Math.round(getAIRequestsProgress())}% used
+                  {Math.round(getUsageProgress(usage.ai_tokens_used, currentPlanLimits.aiTokens))}% used
                 </span>
               </div>
             </div>
           </div>
         </motion.div>
-      </div>
+      )}
 
-      {/* Upgrade Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="space-y-6"
-      >
-        <div className="text-center">
-          <h2 className="text-display-md text-gray-900 dark:text-white mb-4">Upgrade Your Plan</h2>
-          <p className="text-xl text-gray-600 dark:text-gray-300">Choose the plan that fits your automation needs</p>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-          {STRIPE_PRODUCTS.map((product, index) => {
-            const isCurrentPlan = subscription?.price_id === product.priceId;
-            const isPopular = product.name.includes('Plus');
-            
-            return (
-              <motion.div
-                key={product.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 + index * 0.1 }}
-                className={`relative premium-card p-8 hover-lift transition-all duration-300 ${
-                  isCurrentPlan
-                    ? 'ring-2 ring-blue-500 shadow-2xl scale-105'
-                    : isPopular
-                    ? 'ring-2 ring-purple-400 shadow-2xl'
-                    : ''
-                }`}
-              >
-                {isPopular && (
-                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <span className="bg-gradient-to-r from-purple-400 to-purple-500 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg">
-                      Most Popular
-                    </span>
-                  </div>
-                )}
-
-                {isCurrentPlan && (
-                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <span className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg">
-                      Current Plan
-                    </span>
-                  </div>
-                )}
-
-                <div className="text-center mb-8">
-                  <div className={`w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center ${
-                    product.name.includes('Extreme') ? 'bg-gradient-to-br from-purple-500 to-purple-600' :
-                    product.name.includes('Plus') ? 'bg-gradient-to-br from-indigo-500 to-indigo-600' :
-                    'bg-gradient-to-br from-blue-500 to-blue-600'
-                  }`}>
-                    {product.name.includes('Extreme') ? (
-                      <Crown className="w-8 h-8 text-white" />
-                    ) : (
-                      <Star className="w-8 h-8 text-white" />
-                    )}
-                  </div>
-                  
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                    {product.name.replace(' Subscription', '')}
-                  </h3>
-                  
-                  <div className="mb-4">
-                    <div className="flex items-baseline justify-center">
-                      <span className="text-4xl font-bold text-gray-900 dark:text-white">
-                        ${product.price}
-                      </span>
-                      <span className="text-lg text-gray-500 dark:text-gray-400 ml-2">
-                        /{product.interval}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mb-8">
-                  <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
-                    {product.description}
-                  </p>
-                </div>
-
-                <button
-                  onClick={() => handleUpgrade(product.priceId)}
-                  disabled={isCurrentPlan || upgrading === product.priceId}
-                  className={`w-full py-4 px-6 rounded-xl font-bold text-lg transition-all ${
-                    isCurrentPlan
-                      ? 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-                      : isPopular
-                      ? 'premium-button-primary shadow-xl hover:shadow-2xl hover:-translate-y-1'
-                      : 'premium-button-secondary hover:shadow-lg hover:-translate-y-1'
-                  }`}
-                >
-                  {upgrading === product.priceId ? (
-                    <div className="flex items-center justify-center">
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      Loading...
-                    </div>
-                  ) : isCurrentPlan ? (
-                    <div className="flex items-center justify-center">
-                      <Shield className="w-5 h-5 mr-2" />
-                      Current Plan
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center">
-                      Upgrade to {product.name.replace(' Subscription', '')}
-                      <ArrowRight className="w-5 h-5 ml-2" />
-                    </div>
-                  )}
-                </button>
-              </motion.div>
-            );
-          })}
-        </div>
-      </motion.div>
-
-      {/* Usage Warning for High Usage */}
-      {subscription && (getJobApplicationsUsed() >= getJobApplicationsLimit() * 0.8 || getAIRequestsUsed() >= getAIRequestsLimit() * 0.8) && (
+      {/* Overage Warning */}
+      {overageCosts && overageCosts.totalCost > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="premium-card p-8 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-amber-200 dark:border-amber-800"
+          transition={{ delay: 0.25 }}
+          className="premium-card p-6 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-amber-200 dark:border-amber-800"
         >
           <div className="flex items-start space-x-4">
             <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-xl">
@@ -812,42 +625,256 @@ export const BillingPage: React.FC = () => {
             </div>
             <div className="flex-1">
               <h3 className="text-xl font-semibold text-amber-800 dark:text-amber-200 mb-3">
-                Approaching Usage Limits
+                Overage Charges This Month
               </h3>
-              <p className="text-amber-700 dark:text-amber-300 mb-6 leading-relaxed">
-                You're approaching your monthly limits. Consider upgrading to get more applications and AI requests 
-                to continue using the service without interruption.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <button
-                  onClick={() => handleUpgrade(STRIPE_PRODUCTS[2].priceId)}
-                  disabled={upgrading === STRIPE_PRODUCTS[2].priceId}
-                  className="premium-button-primary"
-                >
-                  {upgrading === STRIPE_PRODUCTS[2].priceId ? (
-                    <>
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      Loading...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-5 h-5 mr-2" />
-                      Upgrade Plan
-                    </>
-                  )}
-                </button>
-                <button 
-                  onClick={() => setShowFAQ(true)}
-                  className="premium-button-secondary"
-                >
-                  <HelpCircle className="w-5 h-5 mr-2" />
-                  Learn More
-                </button>
+              <div className="space-y-2 text-amber-700 dark:text-amber-300">
+                {overageCosts.applicationOverage > 0 && (
+                  <p>• {overageCosts.applicationOverage} extra applications: ${overageCosts.applicationCost.toFixed(2)}</p>
+                )}
+                {overageCosts.aiTokenOverage > 0 && (
+                  <p>• {overageCosts.aiTokenOverage.toLocaleString()} extra AI tokens: ${overageCosts.aiTokenCost.toFixed(2)}</p>
+                )}
+                <p className="font-semibold">Total overage: ${overageCosts.totalCost.toFixed(2)}</p>
               </div>
             </div>
           </div>
         </motion.div>
       )}
+
+      {/* Plan Selection Tabs */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        <div className="flex items-center justify-center mb-8">
+          <div className="bg-gray-100 dark:bg-gray-800 rounded-2xl p-1 flex">
+            <button
+              onClick={() => setActiveTab('subscriptions')}
+              className={`px-6 py-3 rounded-xl font-semibold transition-all ${
+                activeTab === 'subscriptions'
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-lg'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              <Crown className="w-4 h-4 mr-2 inline" />
+              Subscription Plans
+            </button>
+            <button
+              onClick={() => setActiveTab('tokens')}
+              className={`px-6 py-3 rounded-xl font-semibold transition-all ${
+                activeTab === 'tokens'
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-lg'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              <Coins className="w-4 h-4 mr-2 inline" />
+              Token Packs
+            </button>
+          </div>
+        </div>
+
+        {/* Subscription Plans */}
+        {activeTab === 'subscriptions' && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            {subscriptionProducts.map((product, index) => {
+              const isCurrentPlan = subscription?.price_id === product.priceId;
+              const isPopular = product.name.includes('Plus');
+              
+              return (
+                <motion.div
+                  key={product.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 + index * 0.1 }}
+                  className={`relative premium-card p-8 hover-lift transition-all duration-300 hover:shadow-2xl hover:scale-105 ${
+                    isCurrentPlan
+                      ? 'ring-2 ring-blue-500 shadow-2xl scale-105'
+                      : isPopular
+                      ? 'ring-2 ring-purple-400 shadow-2xl'
+                      : ''
+                  }`}
+                >
+                  {isPopular && (
+                    <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                      <span className="bg-gradient-to-r from-purple-400 to-purple-500 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg">
+                        Most Popular
+                      </span>
+                    </div>
+                  )}
+
+                  {isCurrentPlan && (
+                    <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                      <span className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg">
+                        Current Plan
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="text-center mb-8">
+                    <div className={`w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center ${
+                      product.name.includes('Extreme') ? 'bg-gradient-to-br from-purple-500 to-purple-600' :
+                      product.name.includes('Plus') ? 'bg-gradient-to-br from-indigo-500 to-indigo-600' :
+                      'bg-gradient-to-br from-blue-500 to-blue-600'
+                    }`}>
+                      {product.name.includes('Extreme') ? (
+                        <Crown className="w-8 h-8 text-white" />
+                      ) : (
+                        <Star className="w-8 h-8 text-white" />
+                      )}
+                    </div>
+                    
+                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                      {product.name.replace('AIApply ', '')}
+                    </h3>
+                    
+                    <div className="mb-4">
+                      <div className="flex items-baseline justify-center">
+                        <span className="text-sm text-gray-500 dark:text-gray-400 mr-1">
+                          {getCurrencySymbol(product.currency)}
+                        </span>
+                        <span className="text-4xl font-bold text-gray-900 dark:text-white">
+                          {product.price}
+                        </span>
+                        <span className="text-lg text-gray-500 dark:text-gray-400 ml-2">
+                          /{product.interval}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mb-8">
+                    <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed mb-6">
+                      {product.description}
+                    </p>
+
+                    {product.features && (
+                      <ul className="space-y-3">
+                        {product.features.map((feature, idx) => (
+                          <li key={idx} className="flex items-start">
+                            <Check className="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
+                            <span className="text-sm text-gray-700 dark:text-gray-300">{feature}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => handlePurchase(product.priceId)}
+                    disabled={isCurrentPlan || purchasing === product.priceId}
+                    className={`w-full py-4 px-6 rounded-xl font-bold text-lg transition-all ${
+                      isCurrentPlan
+                        ? 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                        : isPopular
+                        ? 'premium-button-primary shadow-xl hover:shadow-2xl hover:-translate-y-1'
+                        : 'premium-button-secondary hover:shadow-lg hover:-translate-y-1'
+                    }`}
+                  >
+                    {purchasing === product.priceId ? (
+                      <div className="flex items-center justify-center">
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        Loading...
+                      </div>
+                    ) : isCurrentPlan ? (
+                      <div className="flex items-center justify-center">
+                        <Shield className="w-5 h-5 mr-2" />
+                        Current Plan
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center">
+                        Subscribe Now
+                        <ArrowRight className="w-5 h-5 ml-2" />
+                      </div>
+                    )}
+                  </button>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Token Packs */}
+        {activeTab === 'tokens' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            {tokenProducts.map((product, index) => (
+              <motion.div
+                key={product.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 + index * 0.1 }}
+                className="premium-card p-8 hover-lift transition-all duration-300 hover:shadow-2xl hover:scale-105"
+              >
+                <div className="text-center mb-8">
+                  <div className={`w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center ${
+                    product.name.includes('Job') ? 'bg-gradient-to-br from-emerald-500 to-emerald-600' :
+                    'bg-gradient-to-br from-amber-500 to-amber-600'
+                  }`}>
+                    {product.name.includes('Job') ? (
+                      <Bot className="w-8 h-8 text-white" />
+                    ) : (
+                      <Brain className="w-8 h-8 text-white" />
+                    )}
+                  </div>
+                  
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                    {product.name}
+                  </h3>
+                  
+                  <div className="mb-4">
+                    <div className="flex items-baseline justify-center">
+                      <span className="text-sm text-gray-500 dark:text-gray-400 mr-1">
+                        {getCurrencySymbol(product.currency)}
+                      </span>
+                      <span className="text-4xl font-bold text-gray-900 dark:text-white">
+                        {product.price.toFixed(2)}
+                      </span>
+                      <span className="text-lg text-gray-500 dark:text-gray-400 ml-2">
+                        per {product.name.includes('Job') ? 'token' : '1,000 tokens'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mb-8">
+                  <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed mb-6">
+                    {product.description}
+                  </p>
+
+                  {product.features && (
+                    <ul className="space-y-3">
+                      {product.features.map((feature, idx) => (
+                        <li key={idx} className="flex items-start">
+                          <Check className="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
+                          <span className="text-sm text-gray-700 dark:text-gray-300">{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => handlePurchase(product.priceId)}
+                  disabled={purchasing === product.priceId}
+                  className="w-full premium-button-primary py-4 px-6 rounded-xl font-bold text-lg transition-all hover:shadow-lg hover:-translate-y-1"
+                >
+                  {purchasing === product.priceId ? (
+                    <div className="flex items-center justify-center">
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      Loading...
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center">
+                      <ShoppingCart className="w-5 h-5 mr-2" />
+                      Buy Now
+                    </div>
+                  )}
+                </button>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </motion.div>
 
       {/* FAQ Modal */}
       {showFAQ && <FAQModal />}
