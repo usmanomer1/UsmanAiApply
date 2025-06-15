@@ -106,11 +106,13 @@ export const DashboardHome: React.FC = () => {
   const fetchDashboardData = async () => {
     try {
       if (!isSupabaseConfigured() || !user) {
-        // Demo data
+        // Demo data with corrected success rate calculation
+        const totalApps = 23;
+        const acceptedApps = 3; // 3 accepted out of 23 applications
         setStats({
-          totalApplications: 23,
+          totalApplications: totalApps,
           thisWeekApplications: 8,
-          successRate: 12,
+          successRate: Math.round((acceptedApps / totalApps) * 100), // 3/23 * 100 = 13%
           activeJobs: 5,
           tokensUsed: 15,
           tokensRemaining: 60
@@ -161,6 +163,12 @@ export const DashboardHome: React.FC = () => {
         .select('*', { count: 'exact', head: true })
         .gte('created_at', weekAgo.toISOString());
 
+      // Get accepted applications for success rate calculation
+      const { count: acceptedCount } = await supabase
+        .from('applications')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'ACCEPTED');
+
       // Get recent applications
       const { data: applicationsData } = await supabase
         .from('applications')
@@ -187,10 +195,15 @@ export const DashboardHome: React.FC = () => {
       const totalSteps = usageData?.reduce((sum, log) => sum + log.step_count, 0) || 0;
       const tokensUsed = Math.ceil(totalSteps / 10);
 
+      // Calculate success rate as accepted/applied * 100
+      const successRate = totalCount && totalCount > 0 
+        ? Math.round(((acceptedCount || 0) / totalCount) * 100)
+        : 0;
+
       setStats({
         totalApplications: totalCount || 0,
         thisWeekApplications: weekCount || 0,
-        successRate: totalCount ? Math.round(((weekCount || 0) / totalCount) * 100) : 0,
+        successRate,
         activeJobs: applicationsData?.filter(app => ['SENT', 'PENDING', 'INTERVIEW'].includes(app.status)).length || 0,
         tokensUsed,
         tokensRemaining: Math.max(0, 75 - tokensUsed)
@@ -350,7 +363,7 @@ export const DashboardHome: React.FC = () => {
             </div>
             <div className="mt-4 flex items-center">
               <CheckCircle className="w-4 h-4 text-emerald-500 mr-1" />
-              <span className="text-sm text-emerald-600 dark:text-emerald-400">Above average</span>
+              <span className="text-sm text-emerald-600 dark:text-emerald-400">Accepted/Applied</span>
             </div>
           </CardContent>
         </Card>
