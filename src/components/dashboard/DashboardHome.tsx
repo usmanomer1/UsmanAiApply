@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   BarChart3, 
   TrendingUp, 
@@ -22,7 +22,13 @@ import {
   RefreshCw,
   Download,
   PieChart,
-  Activity
+  Activity,
+  X,
+  Briefcase,
+  User,
+  Mail,
+  Phone,
+  Loader2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -32,6 +38,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
 
 interface DashboardStats {
@@ -66,6 +73,16 @@ interface StatusDistributionData {
   color: string;
 }
 
+interface NewApplicationData {
+  company: string;
+  role: string;
+  location: string;
+  status: 'SENT' | 'PENDING' | 'INTERVIEW' | 'ACCEPTED' | 'REJECTED';
+  appliedDate: string;
+  jobUrl?: string;
+  notes?: string;
+}
+
 export const DashboardHome: React.FC = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
@@ -82,6 +99,17 @@ export const DashboardHome: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [newApplicationData, setNewApplicationData] = useState<NewApplicationData>({
+    company: '',
+    role: '',
+    location: '',
+    status: 'SENT',
+    appliedDate: new Date().toISOString().split('T')[0],
+    jobUrl: '',
+    notes: ''
+  });
 
   const isSupabaseConfigured = () => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -515,6 +543,125 @@ export const DashboardHome: React.FC = () => {
     }
   };
 
+  const handleAddApplication = async () => {
+    if (!isSupabaseConfigured() || !user) {
+      // Demo mode - just add to local state
+      const newApp: RecentApplication = {
+        id: Date.now().toString(),
+        company: newApplicationData.company,
+        role: newApplicationData.role,
+        status: newApplicationData.status,
+        applied_at: newApplicationData.appliedDate,
+        campaign: {
+          location: newApplicationData.location
+        }
+      };
+      
+      setRecentApplications(prev => [newApp, ...prev.slice(0, 4)]);
+      setStats(prev => ({
+        ...prev,
+        totalApplications: prev.totalApplications + 1,
+        thisWeekApplications: prev.thisWeekApplications + 1
+      }));
+      
+      setIsAddModalOpen(false);
+      setNewApplicationData({
+        company: '',
+        role: '',
+        location: '',
+        status: 'SENT',
+        appliedDate: new Date().toISOString().split('T')[0],
+        jobUrl: '',
+        notes: ''
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Get user's profile
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profileError || !profileData) {
+        throw new Error('Profile not found');
+      }
+
+      // Create or get a "Manual Applications" campaign
+      let { data: campaignData, error: campaignError } = await supabase
+        .from('job_campaigns')
+        .select('id')
+        .eq('profile_id', profileData.id)
+        .eq('job_title', 'Manual Applications')
+        .single();
+
+      if (campaignError || !campaignData) {
+        // Create the manual campaign
+        const { data: newCampaign, error: createError } = await supabase
+          .from('job_campaigns')
+          .insert({
+            profile_id: profileData.id,
+            job_title: 'Manual Applications',
+            location: 'Various',
+            job_type: 'Manual',
+            work_type: 'Various',
+            experience_level: 'Various',
+            target_count: null
+          })
+          .select('id')
+          .single();
+
+        if (createError || !newCampaign) {
+          throw new Error('Failed to create manual campaign');
+        }
+        campaignData = newCampaign;
+      }
+
+      // Add the application
+      const { error: appError } = await supabase
+        .from('applications')
+        .insert({
+          campaign_id: campaignData.id,
+          company: newApplicationData.company,
+          role: newApplicationData.role,
+          status: newApplicationData.status,
+          applied_at: newApplicationData.appliedDate,
+          details: {
+            location: newApplicationData.location,
+            jobUrl: newApplicationData.jobUrl,
+            notes: newApplicationData.notes,
+            source: 'manual'
+          }
+        });
+
+      if (appError) {
+        throw appError;
+      }
+
+      // Refresh dashboard data
+      await fetchDashboardData();
+      
+      setIsAddModalOpen(false);
+      setNewApplicationData({
+        company: '',
+        role: '',
+        location: '',
+        status: 'SENT',
+        appliedDate: new Date().toISOString().split('T')[0],
+        jobUrl: '',
+        notes: ''
+      });
+    } catch (error) {
+      console.error('Error adding application:', error);
+      alert('Failed to add application. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'SENT': return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800';
@@ -536,27 +683,6 @@ export const DashboardHome: React.FC = () => {
     
     return matchesSearch && matchesStatus;
   });
-
-  const exportData = () => {
-    const csvContent = [
-      ['Company', 'Role', 'Status', 'Applied Date', 'Location'],
-      ...recentApplications.map(app => [
-        app.company,
-        app.role,
-        app.status,
-        new Date(app.applied_at).toLocaleDateString(),
-        app.campaign.location
-      ])
-    ].map(row => row.join(',')).join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'applications.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
-  };
 
   if (loading) {
     return (
@@ -599,7 +725,26 @@ export const DashboardHome: React.FC = () => {
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
-          <Button onClick={exportData} variant="outline" size="sm">
+          <Button onClick={() => {
+            const csvContent = [
+              ['Company', 'Role', 'Status', 'Applied Date', 'Location'],
+              ...recentApplications.map(app => [
+                app.company,
+                app.role,
+                app.status,
+                new Date(app.applied_at).toLocaleDateString(),
+                app.campaign.location
+              ])
+            ].map(row => row.join(',')).join('\n');
+
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'applications.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
+          }} variant="outline" size="sm">
             <Download className="w-4 h-4 mr-2" />
             Export
           </Button>
@@ -893,15 +1038,25 @@ export const DashboardHome: React.FC = () => {
                   Recent job applications and their status
                 </CardDescription>
               </div>
-              <Link to="/applications">
-                <Button variant="outline" size="sm">
-                  <Eye className="w-4 h-4 mr-2" />
-                  View All
+              <div className="flex items-center space-x-3">
+                <Button
+                  onClick={() => setIsAddModalOpen(true)}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Application
                 </Button>
-              </Link>
+                <Link to="/applications">
+                  <Button variant="outline" size="sm">
+                    <Eye className="w-4 h-4 mr-2" />
+                    View All
+                  </Button>
+                </Link>
+              </div>
             </div>
             
-            {/* Search and Filter Controls - Moved here */}
+            {/* Search and Filter Controls */}
             <div className="flex flex-col sm:flex-row gap-4 mt-6">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none z-10" />
@@ -942,12 +1097,10 @@ export const DashboardHome: React.FC = () => {
                     : 'Try adjusting your search or filter criteria.'
                   }
                 </p>
-                <Link to="/auto-apply">
-                  <Button>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Start Applying
-                  </Button>
-                </Link>
+                <Button onClick={() => setIsAddModalOpen(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Application
+                </Button>
               </div>
             ) : (
               <div className="space-y-4">
@@ -1003,6 +1156,178 @@ export const DashboardHome: React.FC = () => {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Add Application Modal */}
+      <AnimatePresence>
+        {isAddModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setIsAddModalOpen(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.2 }}
+              className="w-full max-w-2xl glass-card rounded-3xl shadow-3xl border border-white/20 dark:border-gray-700/30 overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center">
+                      <Plus className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Add Application</h2>
+                      <p className="text-gray-600 dark:text-gray-300">Manually track a job application</p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => setIsAddModalOpen(false)}
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-xl"
+                  >
+                    <X className="w-5 h-5" />
+                  </Button>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        Company Name *
+                      </label>
+                      <Input
+                        type="text"
+                        value={newApplicationData.company}
+                        onChange={(e) => setNewApplicationData(prev => ({ ...prev, company: e.target.value }))}
+                        placeholder="e.g., Google"
+                        className="premium-input"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        Job Title *
+                      </label>
+                      <Input
+                        type="text"
+                        value={newApplicationData.role}
+                        onChange={(e) => setNewApplicationData(prev => ({ ...prev, role: e.target.value }))}
+                        placeholder="e.g., Software Engineer"
+                        className="premium-input"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        Location
+                      </label>
+                      <Input
+                        type="text"
+                        value={newApplicationData.location}
+                        onChange={(e) => setNewApplicationData(prev => ({ ...prev, location: e.target.value }))}
+                        placeholder="e.g., San Francisco, CA"
+                        className="premium-input"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        Status
+                      </label>
+                      <Select 
+                        value={newApplicationData.status} 
+                        onValueChange={(value) => setNewApplicationData(prev => ({ ...prev, status: value as any }))}
+                      >
+                        <SelectTrigger className="premium-select">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="SENT">Sent</SelectItem>
+                          <SelectItem value="PENDING">Pending</SelectItem>
+                          <SelectItem value="INTERVIEW">Interview</SelectItem>
+                          <SelectItem value="ACCEPTED">Accepted</SelectItem>
+                          <SelectItem value="REJECTED">Rejected</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        Applied Date
+                      </label>
+                      <Input
+                        type="date"
+                        value={newApplicationData.appliedDate}
+                        onChange={(e) => setNewApplicationData(prev => ({ ...prev, appliedDate: e.target.value }))}
+                        className="premium-input"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        Job URL (Optional)
+                      </label>
+                      <Input
+                        type="url"
+                        value={newApplicationData.jobUrl}
+                        onChange={(e) => setNewApplicationData(prev => ({ ...prev, jobUrl: e.target.value }))}
+                        placeholder="https://..."
+                        className="premium-input"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      Notes (Optional)
+                    </label>
+                    <textarea
+                      value={newApplicationData.notes}
+                      onChange={(e) => setNewApplicationData(prev => ({ ...prev, notes: e.target.value }))}
+                      placeholder="Any additional notes about this application..."
+                      className="premium-input h-24 resize-none"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200 dark:border-gray-700">
+                    <Button
+                      onClick={() => setIsAddModalOpen(false)}
+                      variant="outline"
+                      disabled={isSubmitting}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleAddApplication}
+                      disabled={!newApplicationData.company || !newApplicationData.role || isSubmitting}
+                      className="premium-button-primary"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Adding...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Application
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
