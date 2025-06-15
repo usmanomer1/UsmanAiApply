@@ -78,12 +78,12 @@ const LinkedInAutomationBot: React.FC = () => {
     linkedinPassword: '',
     jobTitle: '',
     location: '',
-    jobType: '',
-    workType: '',
-    experienceLevel: '',
-    salaryRange: '',
-    companySize: '',
-    datePosted: '',
+    jobType: undefined,
+    workType: undefined,
+    experienceLevel: undefined,
+    salaryRange: undefined,
+    companySize: undefined,
+    datePosted: undefined,
     targetCount: '10'
   });
   const [isRunning, setIsRunning] = useState(false);
@@ -143,7 +143,14 @@ const LinkedInAutomationBot: React.FC = () => {
         console.error('Error loading configuration:', error);
         toast.error('Failed to load configuration');
       } else if (data?.config) {
-        setConfig(prev => ({ ...prev, ...data.config }));
+        // Map empty strings and null values to undefined for select components
+        const loadedConfig = { ...data.config };
+        Object.keys(loadedConfig).forEach(key => {
+          if (loadedConfig[key] === '' || loadedConfig[key] === null) {
+            loadedConfig[key] = undefined;
+          }
+        });
+        setConfig(prev => ({ ...prev, ...loadedConfig }));
       }
     } catch (error) {
       console.error('Error loading configuration:', error);
@@ -195,22 +202,22 @@ const LinkedInAutomationBot: React.FC = () => {
     if (config.location) {
       params.append('location', config.location);
     }
-    if (config.jobType) {
+    if (config.jobType && config.jobType !== 'any') {
       params.append('f_JT', config.jobType);
     }
-    if (config.workType) {
+    if (config.workType && config.workType !== 'any') {
       params.append('f_WT', config.workType);
     }
-    if (config.experienceLevel) {
+    if (config.experienceLevel && config.experienceLevel !== 'any') {
       params.append('f_E', config.experienceLevel);
     }
-    if (config.salaryRange) {
+    if (config.salaryRange && config.salaryRange !== 'any') {
       params.append('f_SB2', config.salaryRange);
     }
-    if (config.companySize) {
+    if (config.companySize && config.companySize !== 'any') {
       params.append('f_C', config.companySize);
     }
-    if (config.datePosted) {
+    if (config.datePosted && config.datePosted !== 'any') {
       params.append('f_TPR', config.datePosted);
     }
 
@@ -679,7 +686,7 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
                       <SelectValue placeholder="Any" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Any</SelectItem>
+                      <SelectItem value="any">Any</SelectItem>
                       <SelectItem value="F">Full-time</SelectItem>
                       <SelectItem value="P">Part-time</SelectItem>
                       <SelectItem value="C">Contract</SelectItem>
@@ -698,7 +705,7 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
                       <SelectValue placeholder="Any" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Any</SelectItem>
+                      <SelectItem value="any">Any</SelectItem>
                       <SelectItem value="1">On-site</SelectItem>
                       <SelectItem value="2">Remote</SelectItem>
                       <SelectItem value="3">Hybrid</SelectItem>
@@ -715,7 +722,7 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
                       <SelectValue placeholder="Any" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Any</SelectItem>
+                      <SelectItem value="any">Any</SelectItem>
                       <SelectItem value="1">Internship</SelectItem>
                       <SelectItem value="2">Entry level</SelectItem>
                       <SelectItem value="3">Associate</SelectItem>
@@ -735,7 +742,7 @@ Apply to as many relevant jobs as possible using Easy Apply. Focus on jobs that 
                       <SelectValue placeholder="Any time" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Any time</SelectItem>
+                      <SelectItem value="any">Any time</SelectItem>
                       <SelectItem value="r86400">Past 24 hours</SelectItem>
                       <SelectItem value="r604800">Past week</SelectItem>
                       <SelectItem value="r2592000">Past month</SelectItem>
