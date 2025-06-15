@@ -17,7 +17,12 @@ import {
   Brain,
   Package,
   ShoppingCart,
-  Coins
+  Coins,
+  BarChart3,
+  TrendingUp,
+  Activity,
+  AlertCircle,
+  CheckCircle
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -255,6 +260,36 @@ export const BillingPage: React.FC = () => {
     return getProductByPriceId(subscription.price_id);
   };
 
+  // Get plan limits based on current subscription
+  const getPlanUsageLimits = () => {
+    const currentProduct = getCurrentProduct();
+    if (!currentProduct) return { applications: 0, aiTokens: 0 };
+    
+    return {
+      applications: currentProduct.applicationCount || 0,
+      aiTokens: currentProduct.aiTokenCount || 0
+    };
+  };
+
+  const getUsageProgress = (used: number, limit: number) => {
+    if (limit === 0) return 0;
+    return Math.min((used / limit) * 100, 100);
+  };
+
+  const getProgressBarColor = (percentage: number) => {
+    if (percentage >= 90) return 'from-red-500 to-red-600';
+    if (percentage >= 75) return 'from-orange-500 to-red-500';
+    if (percentage >= 50) return 'from-yellow-500 to-orange-500';
+    return 'from-green-500 to-blue-500';
+  };
+
+  const getUsageStatusColor = (percentage: number) => {
+    if (percentage >= 90) return 'text-red-600 dark:text-red-400';
+    if (percentage >= 75) return 'text-orange-600 dark:text-orange-400';
+    if (percentage >= 50) return 'text-yellow-600 dark:text-yellow-400';
+    return 'text-green-600 dark:text-green-400';
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -265,6 +300,9 @@ export const BillingPage: React.FC = () => {
 
   const subscriptionProducts = getSubscriptionProducts();
   const tokenProducts = getTokenProducts();
+  const limits = getPlanUsageLimits();
+  const applicationProgress = getUsageProgress(usage?.applications_count || 0, limits.applications);
+  const aiTokenProgress = getUsageProgress(usage?.ai_tokens_used || 0, limits.aiTokens);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12">
@@ -284,9 +322,10 @@ export const BillingPage: React.FC = () => {
           )}
         </div>
 
-        {/* Current Plan Status */}
+        {/* Current Plan Status & Usage */}
         {subscription && subscription.subscription_status === 'active' && (
-          <div className="max-w-md mx-auto mb-12">
+          <div className="max-w-4xl mx-auto mb-12 space-y-6">
+            {/* Current Plan Card */}
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Current Plan</h3>
@@ -327,6 +366,147 @@ export const BillingPage: React.FC = () => {
                 Manage Subscription
               </button>
             </div>
+
+            {/* Usage Metrics */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Job Applications Usage */}
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg">
+                      <Bot className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Job Applications</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Automated applications this month
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {usage?.applications_count || 0}
+                    </span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      of {limits.applications} included
+                    </span>
+                  </div>
+                  
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${applicationProgress}%` }}
+                      transition={{ duration: 1, delay: 0.5 }}
+                      className={`h-3 rounded-full bg-gradient-to-r ${getProgressBarColor(applicationProgress)}`}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-500 dark:text-gray-400">
+                      {applicationProgress >= 100 ? 
+                        'Additional: $0.80 each' :
+                        `${limits.applications - (usage?.applications_count || 0)} remaining`
+                      }
+                    </span>
+                    <span className={`font-bold ${getUsageStatusColor(applicationProgress)}`}>
+                      {Math.round(applicationProgress)}% used
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* AI Tokens Usage */}
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg">
+                      <Brain className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">AI Tokens</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Resume & cover letter generation
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {(usage?.ai_tokens_used || 0).toLocaleString()}
+                    </span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      of {limits.aiTokens.toLocaleString()} included
+                    </span>
+                  </div>
+                  
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${aiTokenProgress}%` }}
+                      transition={{ duration: 1, delay: 0.7 }}
+                      className={`h-3 rounded-full bg-gradient-to-r ${getProgressBarColor(aiTokenProgress)}`}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-500 dark:text-gray-400">
+                      {aiTokenProgress >= 100 ? 
+                        'Additional: $0.10 per 1,000' :
+                        `${(limits.aiTokens - (usage?.ai_tokens_used || 0)).toLocaleString()} remaining`
+                      }
+                    </span>
+                    <span className={`font-bold ${getUsageStatusColor(aiTokenProgress)}`}>
+                      {Math.round(aiTokenProgress)}% used
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Usage Warning */}
+            {(applicationProgress >= 80 || aiTokenProgress >= 80) && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-6"
+              >
+                <div className="flex items-start space-x-4">
+                  <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-xl">
+                    <AlertCircle className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-xl font-semibold text-amber-800 dark:text-amber-200 mb-3">
+                      Approaching Usage Limits
+                    </h3>
+                    <p className="text-amber-700 dark:text-amber-300 mb-6 leading-relaxed">
+                      You're approaching your monthly limits. Consider upgrading to get more applications and AI tokens 
+                      to continue using the service without interruption.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <button
+                        onClick={() => setActiveTab('subscriptions')}
+                        className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-3 rounded-xl font-semibold transition-colors"
+                      >
+                        <TrendingUp className="w-5 h-5 mr-2 inline" />
+                        Upgrade Plan
+                      </button>
+                      <button 
+                        onClick={() => setActiveTab('tokens')}
+                        className="bg-white dark:bg-gray-800 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 hover:bg-amber-50 dark:hover:bg-amber-900/20 px-6 py-3 rounded-xl font-semibold transition-colors"
+                      >
+                        <Package className="w-5 h-5 mr-2 inline" />
+                        Buy Token Packs
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
           </div>
         )}
 
