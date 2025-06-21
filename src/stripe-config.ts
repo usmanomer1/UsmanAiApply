@@ -165,19 +165,19 @@ export const getPlanLimits = (priceId: string) => {
   };
 };
 
-// Helper function to calculate overage costs
-export const calculateOverageCost = (usage: { applications: number; aiTokens: number }, limits: { applications: number; aiTokens: number }) => {
-  const applicationOverage = Math.max(0, usage.applications - limits.applications);
+// Helper function to calculate overage costs (now step-based instead of application-based)
+export const calculateOverageCost = (usage: { steps: number; aiTokens: number }, limits: { steps: number; aiTokens: number }) => {
+  const stepOverage = Math.max(0, usage.steps - limits.steps);
   const aiTokenOverage = Math.max(0, usage.aiTokens - limits.aiTokens);
   
-  const applicationCost = applicationOverage * 0.80; // $0.80 per application
+  const stepCost = stepOverage * 0.001; // $0.001 per step
   const aiTokenCost = Math.ceil(aiTokenOverage / 1000) * 0.10; // $0.10 per 1,000 tokens
   
   return {
-    applicationOverage,
+    stepOverage,
     aiTokenOverage,
-    applicationCost,
+    stepCost,
     aiTokenCost,
-    totalCost: applicationCost + aiTokenCost
+    totalCost: stepCost + aiTokenCost
   };
 };

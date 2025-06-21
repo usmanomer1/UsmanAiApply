@@ -74,7 +74,6 @@ interface NewApplicationData {
   role: string;
   status: string;
   location: string;
-  notes: string;
 }
 
 export const DashboardHome: React.FC = () => {
@@ -99,8 +98,7 @@ export const DashboardHome: React.FC = () => {
     company: '',
     role: '',
     status: 'SENT',
-    location: '',
-    notes: ''
+    location: ''
   });
 
   const isSupabaseConfigured = () => {
@@ -520,7 +518,6 @@ export const DashboardHome: React.FC = () => {
           applied_at: new Date().toISOString(),
           details: {
             location: newApplication.location.trim() || null,
-            notes: newApplication.notes.trim() || null,
             source: 'manual'
           }
         });
@@ -534,8 +531,7 @@ export const DashboardHome: React.FC = () => {
         company: '',
         role: '',
         status: 'SENT',
-        location: '',
-        notes: ''
+        location: ''
       });
       setIsAddModalOpen(false);
       
@@ -1050,28 +1046,18 @@ export const DashboardHome: React.FC = () => {
 
       {/* Add Application Modal */}
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-        <DialogContent className="sm:max-w-md glass-card border-0 shadow-2xl">
+        <DialogContent className="sm:max-w-md bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-0 shadow-2xl rounded-3xl">
           <DialogHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
-                  <Plus className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <DialogTitle className="text-xl text-gray-900 dark:text-white">Add Application</DialogTitle>
-                  <DialogDescription className="text-gray-600 dark:text-gray-300">
-                    Manually add a job application to track
-                  </DialogDescription>
-                </div>
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
+                <Plus className="w-5 h-5 text-white" />
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsAddModalOpen(false)}
-                className="hover:bg-gray-100 dark:hover:bg-gray-800"
-              >
-                <X className="w-4 h-4" />
-              </Button>
+              <div>
+                <DialogTitle className="text-xl text-gray-900 dark:text-white">Add Application</DialogTitle>
+                <DialogDescription className="text-gray-600 dark:text-gray-300">
+                  Manually add a job application to track
+                </DialogDescription>
+              </div>
             </div>
           </DialogHeader>
           
@@ -1135,17 +1121,7 @@ export const DashboardHome: React.FC = () => {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Notes
-              </label>
-              <textarea
-                placeholder="Additional notes about this application..."
-                value={newApplication.notes}
-                onChange={(e) => setNewApplication(prev => ({ ...prev, notes: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm resize-none h-20"
-              />
-            </div>
+
 
             <div className="flex justify-end space-x-3 pt-4">
               <Button
