@@ -178,22 +178,43 @@ export const BillingPage: React.FC = () => {
           aiRequestsCount = aiUsageData.length;
         }
 
-        // Get browser use logs for step count (for reference)
+        // Get browser use logs for step count - only count the FINAL step count per task
         const { data: usageData, error: usageError } = await supabase
           .from('browser_use_logs')
-          .select('step_count, cost_usd')
+          .select('task_id, step_count, cost_usd')
           .eq('user_id', user.id)
           .gte('created_at', currentMonthStart.toISOString())
           .lt('created_at', nextMonthStart.toISOString());
 
-        const totalSteps = usageData?.reduce((sum, log) => sum + log.step_count, 0) || 0;
-        const totalCost = usageData?.reduce((sum, log) => sum + parseFloat(log.cost_usd.toString()), 0) || 0;
-        const jobTokens = Math.ceil(totalSteps / 10); // This is for reference, but we use applicationsCount for the actual metric
+        // Calculate total steps correctly: only count the MAX step_count per task_id
+        let totalSteps = 0;
+        let totalCost = 0;
+        
+        if (usageData && !usageError) {
+          const taskSteps: Record<string, number> = {};
+          const taskCosts: Record<string, number> = {};
+          
+          // Group by task_id and find the maximum step_count for each task
+          usageData.forEach(log => {
+            const currentSteps = taskSteps[log.task_id] || 0;
+            const currentCost = taskCosts[log.task_id] || 0;
+            
+            // Only keep the highest step count and cost for each task
+            if (log.step_count > currentSteps) {
+              taskSteps[log.task_id] = log.step_count;
+              taskCosts[log.task_id] = parseFloat(log.cost_usd.toString());
+            }
+          });
+          
+          // Sum up the final step counts and costs for all tasks
+          totalSteps = Object.values(taskSteps).reduce((sum, steps) => sum + steps, 0);
+          totalCost = Object.values(taskCosts).reduce((sum, cost) => sum + cost, 0);
+        }
 
         const currentUsage = {
           total_steps: totalSteps,
           total_cost: totalCost,
-          job_tokens: applicationsCount, // Use actual applications count, not calculated tokens
+          job_tokens: totalSteps, // Track total steps instead of token count
           applications_count: applicationsCount,
           ai_requests_count: aiRequestsCount,
           ai_tokens_used: aiTokensUsed // This now uses max_tokens_requested
@@ -404,7 +425,7 @@ This will create the default configuration needed for the billing portal to work
   const subscriptionProducts = getSubscriptionProducts();
   const tokenProducts = getTokenProducts();
   const limits = getPlanUsageLimits();
-  const applicationProgress = getUsageProgress(usage?.applications_count || 0, limits.applications);
+  const applicationProgress = getUsageProgress(usage?.job_tokens || 0, limits.applications * 10); // Convert application limit to step limit
   const aiTokenProgress = getUsageProgress(usage?.ai_tokens_used || 0, limits.aiTokens);
 
   return (
@@ -476,7 +497,7 @@ This will create the default configuration needed for the billing portal to work
 
             {/* Usage Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Job Applications Usage */}
+              {/* Automation Steps Usage */}
               <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center space-x-3">
@@ -484,9 +505,9 @@ This will create the default configuration needed for the billing portal to work
                       <Bot className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Job Applications</h3>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Automation Steps</h3>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Automated applications this month
+                        Bot automation steps this month
                       </p>
                     </div>
                   </div>
@@ -495,10 +516,10 @@ This will create the default configuration needed for the billing portal to work
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {usage?.applications_count || 0}
+                      {usage?.job_tokens || 0}
                     </span>
                     <span className="text-sm text-gray-500 dark:text-gray-400">
-                      {limits.applications > 0 ? `of ${limits.applications} included` : 'No plan limits available'}
+                      {limits.applications > 0 ? `of ${limits.applications * 10} included` : 'No plan limits available'}
                     </span>
                   </div>
                   
@@ -516,10 +537,10 @@ This will create the default configuration needed for the billing portal to work
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-500 dark:text-gray-400">
                       {limits.applications === 0 ? 
-                        'Subscribe to get applications' :
+                        'Subscribe to get automation steps' :
                         applicationProgress >= 100 ? 
-                          'Additional: $0.80 each' :
-                          `${Math.max(0, limits.applications - (usage?.applications_count || 0))} remaining`
+                          'Additional: $0.001 per step' :
+                          `${Math.max(0, (limits.applications * 10) - (usage?.job_tokens || 0))} remaining`
                       }
                     </span>
                     {limits.applications > 0 && (

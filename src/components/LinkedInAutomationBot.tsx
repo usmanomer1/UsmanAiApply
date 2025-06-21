@@ -199,7 +199,7 @@ const LinkedInAutomationBot: React.FC = () => {
     linkedinEmail: '',
     linkedinPassword: '',
     contactNumber: '',
-    countryCode: '+1',
+    countryCode: '+1-US',
     linkedinResume: '',
     customInstructions: '',
     jobTitle: 'Software Engineer',
@@ -515,11 +515,11 @@ const LinkedInAutomationBot: React.FC = () => {
 
   const trackUsage = async (steps: number, taskId: string) => {
     try {
-      const jobTokens = Math.ceil(steps / 10);
-      const costUsd = jobTokens * 0.01; // $0.01 per token
+      const costPerStep = 0.001; // $0.001 per step for direct step billing
+      const costUsd = steps * costPerStep;
       
       if (isSupabaseConfigured() && user) {
-        addLog(`💰 Used ${jobTokens} job token${jobTokens > 1 ? 's' : ''} (${steps} steps, $${costUsd.toFixed(2)})`);
+        addLog(`💰 Used ${steps} step${steps > 1 ? 's' : ''} ($${costUsd.toFixed(3)})`);
         
         try {
           // Log to browser_use_logs table
@@ -552,13 +552,13 @@ const LinkedInAutomationBot: React.FC = () => {
             console.error('Error saving to automation_tasks:', taskError);
             // Don't log this error since it's not critical and might be a duplicate
           } else {
-            addLog(`📊 Usage tracked: ${steps} steps, ${jobTokens} tokens, $${costUsd.toFixed(2)}`);
+            addLog(`📊 Usage tracked: ${steps} steps, $${costUsd.toFixed(3)}`);
           }
 
-          // Update the monthly usage immediately with the new tokens only
+          // Update the monthly usage immediately with the new steps only
           setMonthlyUsage(prev => ({
             ...prev,
-            tokens_used: prev.tokens_used + jobTokens,
+            tokens_used: prev.tokens_used + steps, // Track total steps instead of tokens
             cost_usd: prev.cost_usd + costUsd
           }));
 
@@ -751,7 +751,7 @@ FORM HANDLING GUIDELINES:
 - Skip optional fields if they're complex, but fill required fields
 - If a form seems stuck, try scrolling up and down to find missing elements
 - When filling contact information:
-  * If there's a country code dropdown, select: ${config.countryCode}
+  * If there's a country code dropdown, select: ${config.countryCode.split('-')[0]}
   * For the phone number field, use ONLY the number WITHOUT country code: ${config.contactNumber}
   * Do NOT add the country code to the phone number field if you already selected it in a dropdown
 
@@ -765,7 +765,7 @@ IMPORTANT SCROLLING BEHAVIORS:
 CREDENTIALS:
 - Email: ${config.linkedinEmail}
 - Password: ${config.linkedinPassword}
-- Country Code: ${config.countryCode}
+- Country Code: ${config.countryCode.split('-')[0]}
 - Phone Number (without country code): ${config.contactNumber}
 - Resume to Use: ${config.linkedinResume || 'Most recent available'}
 
@@ -933,13 +933,13 @@ This helps track which companies you applied to. Use the exact company names and
     }
 
     if (!canStartAutomation()) {
-      const limit = getTokenLimit();
+      const limit = getTokenLimit() * 10; // Convert to step limit
       if (limit === 0) {
-        toast.error(`No tokens available. Current plan: ${getPlanName()}. Please upgrade your subscription.`);
-        addLog(`❌ No tokens available. Current plan: ${getPlanName()}`, 'error');
+        toast.error(`No steps available. Current plan: ${getPlanName()}. Please upgrade your subscription.`);
+        addLog(`❌ No steps available. Current plan: ${getPlanName()}`, 'error');
       } else {
-        toast.error(`Usage limit reached! You have used ${monthlyUsage.tokens_used}/${limit} job tokens this month.`);
-        addLog(`❌ Cannot start automation: Monthly limit of ${limit} job tokens reached (${monthlyUsage.tokens_used} used)`, 'error');
+        toast.error(`Usage limit reached! You have used ${monthlyUsage.tokens_used}/${limit} steps this month.`);
+        addLog(`❌ Cannot start automation: Monthly limit of ${limit} steps reached (${monthlyUsage.tokens_used} used)`, 'error');
       }
       return;
     }
@@ -984,40 +984,45 @@ This helps track which companies you applied to. Use the exact company names and
               const newSteps = newStepCount - stepCount;
               await trackUsage(newSteps, task.id);
               
-              // Calculate total tokens used including the new tokens from this session
-              const incrementalTokens = Math.ceil(newSteps / 10);
-              const totalTokensUsed = monthlyUsage.tokens_used + incrementalTokens;
-              const limit = getTokenLimit();
+              // Calculate total steps used including the new steps from this session
+              const totalStepsUsed = monthlyUsage.tokens_used + newSteps;
+              const limit = getTokenLimit() * 10; // Convert token limit to step limit (1 token = 10 steps originally)
               
-              if (totalTokensUsed >= limit) {
+              if (totalStepsUsed >= limit) {
                 clearInterval(pollInterval);
                 setIsRunning(false);
                 await stopTask(task.id);
-                addLog(`🛑 Automation stopped: Monthly limit of ${limit} job tokens reached!`, 'error');
+                addLog(`🛑 Automation stopped: Monthly limit of ${limit} steps reached!`, 'error');
                 toast.error('Automation stopped due to usage limit');
                 return;
-              } else if (totalTokensUsed >= limit * 0.9) {
-                addLog(`⚠️ Warning: Approaching monthly limit (${totalTokensUsed}/${limit} tokens used)`);
+              } else if (totalStepsUsed >= limit * 0.9) {
+                addLog(`⚠️ Warning: Approaching monthly limit (${totalStepsUsed}/${limit} steps used)`);
               }
             }
             
             setStepCount(newStepCount);
             
+            // Look for steps that contain actual application submissions
             const applicationSteps = updatedTask.steps.filter(step => {
-              if (!step.action) return false;
+              if (!step.action && !step.output) return false;
               
-              const actionText = JSON.stringify(step.action).toLowerCase();
-              return actionText.includes('submit application') || 
-                     actionText.includes('easy apply') ||
-                     (actionText.includes('click') && actionText.includes('submit'));
+              const stepText = (JSON.stringify(step.action) + ' ' + (step.output || '')).toLowerCase();
+              return stepText.includes('submitting application to:') || 
+                     stepText.includes('applying to:') ||
+                     stepText.includes('submit application') ||
+                     (stepText.includes('submit') && stepText.includes('successfully'));
             });
             
             if (applicationSteps.length > appliedCount) {
-              const newApplications = applicationSteps.length - appliedCount;
-              for (let i = 0; i < newApplications; i++) {
+              const newApplications = applicationSteps.slice(appliedCount);
+              for (const appStep of newApplications) {
+                // Try to extract company and role from the step
+                const stepText = JSON.stringify(appStep.action) + ' ' + (appStep.output || '');
+                const companyRole = extractCompanyRoleFromStep(stepText);
+                
                 await saveJobApplication(
-                  'LinkedIn Company',
-                  config.jobTitle || 'Software Engineer',
+                  companyRole.company || 'LinkedIn Company',
+                  companyRole.role || config.jobTitle || 'Software Engineer',
                   task.id
                 );
               }
@@ -1330,6 +1335,27 @@ This helps track which companies you applied to. Use the exact company names and
     return applications;
   };
 
+  const extractCompanyRoleFromStep = (stepText: string): { company: string | null; role: string | null } => {
+    // Look for patterns like "APPLYING TO: Company Name - Job Title" or "SUBMITTING APPLICATION TO: Company Name - Job Title"
+    const patterns = [
+      /(?:APPLYING TO|SUBMITTING APPLICATION TO):\s*(.+?)\s*-\s*(.+)/i,
+      /applying to\s+(.+?)\s+for\s+(.+)/i,
+      /submitting application to\s+(.+?)\s+for\s+(.+)/i
+    ];
+    
+    for (const pattern of patterns) {
+      const match = stepText.match(pattern);
+      if (match) {
+        return {
+          company: match[1]?.trim() || null,
+          role: match[2]?.trim() || null
+        };
+      }
+    }
+    
+    return { company: null, role: null };
+  };
+
   if (loading) {
     return (
       <div className="space-y-8">
@@ -1492,8 +1518,8 @@ This helps track which companies you applied to. Use the exact company names and
                     value={config.countryCode}
                     onChange={(e) => setConfig(prev => ({ ...prev, countryCode: e.target.value }))}
                   >
-                    <option value="+1">🇺🇸 +1</option>
-                    <option value="+1">🇨🇦 +1</option>
+                    <option value="+1-US">🇺🇸 +1 (US)</option>
+                    <option value="+1-CA">🇨🇦 +1 (Canada)</option>
                     <option value="+44">🇬🇧 +44</option>
                     <option value="+33">🇫🇷 +33</option>
                     <option value="+49">🇩🇪 +49</option>

@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { getMaintenanceConfig, canAccessDuringMaintenance } from '../../lib/maintenance';
 
 export const AuthPage: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -19,6 +20,9 @@ export const AuthPage: React.FC = () => {
 
   const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
+
+  // Import maintenance utilities
+  const { isMaintenanceMode, maintenanceMessage } = getMaintenanceConfig();
 
   // Check if Supabase is configured
   const isSupabaseConfigured = () => {
@@ -36,12 +40,24 @@ export const AuthPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check maintenance mode for non-admin users
+    if (!canAccessDuringMaintenance(formData.email)) {
+      alert(maintenanceMessage);
+      return;
+    }
+
     setLoading(true);
 
     try {
       if (isLogin) {
         await signIn(formData.email, formData.password);
       } else {
+        // Disable signup during maintenance mode
+        if (isMaintenanceMode) {
+          alert('New registrations are temporarily disabled during maintenance.');
+          return;
+        }
         await signUp(formData.email, formData.password, formData.fullName);
       }
     } catch (error) {
@@ -196,6 +212,21 @@ export const AuthPage: React.FC = () => {
             </CardHeader>
 
             <CardContent>
+              {/* Maintenance Mode Banner */}
+              {isMaintenanceMode && (
+                <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <Shield className="w-5 h-5 text-amber-600" />
+                    <span className="text-amber-800 font-medium">Maintenance Mode</span>
+                  </div>
+                  <p className="text-amber-700 text-sm mt-1">
+                    {maintenanceMessage}
+                  </p>
+                  <p className="text-amber-600 text-xs mt-2">
+                    Admin access only during this period.
+                  </p>
+                </div>
+              )}
 
             {/* Demo Credentials - Only show if Supabase is not configured */}
             {!isSupabaseConfigured() && (
