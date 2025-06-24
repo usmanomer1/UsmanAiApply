@@ -251,7 +251,7 @@ export type Database = {
 export const uploadResume = async (file: File, userId: string): Promise<string | null> => {
   try {
     if (!isSupabaseConfigured()) {
-      return 'demo-resume.pdf';
+      throw new Error('Supabase not configured for file uploads');
     }
 
     const fileExt = file.name.split('.').pop();
@@ -277,7 +277,7 @@ export const uploadResume = async (file: File, userId: string): Promise<string |
 export const getSignedResumeUrl = async (path: string): Promise<string | null> => {
   try {
     if (!isSupabaseConfigured()) {
-      return 'https://demo.example.com/resume.pdf';
+      throw new Error('Supabase not configured for file access');
     }
 
     const { data, error } = await supabase.storage

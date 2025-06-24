@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Logo } from '../ui/Logo';
 import { getMaintenanceConfig, canAccessDuringMaintenance } from '../../lib/maintenance';
 
 export const AuthPage: React.FC = () => {
@@ -122,11 +123,11 @@ export const AuthPage: React.FC = () => {
             transition={{ duration: 0.8 }}
           >
             <div className="flex items-center space-x-3 mb-8">
-              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
-                <Bot className="w-7 h-7 text-white" />
+              <div className="p-2 bg-white/90 backdrop-blur-sm rounded-2xl">
+                <Logo width={48} height={48} />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-white">AIApply</h1>
+                <h1 className="text-2xl font-bold text-white">Jobotic</h1>
                 <p className="text-blue-100 text-sm">Premium Job Search Platform</p>
               </div>
             </div>
@@ -173,7 +174,7 @@ export const AuthPage: React.FC = () => {
                 <span className="text-white font-semibold">Success Story</span>
               </div>
               <p className="text-blue-100 text-sm italic">
-                "AIApply helped me land my dream job at Google in just 2 weeks. The AI automation saved me hours of manual applications!"
+                "Jobotic helped me land my dream job at Google in just 2 weeks. The AI automation saved me hours of manual applications!"
               </p>
               <p className="text-blue-200 text-xs mt-2">- Sarah Chen, Software Engineer</p>
             </motion.div>
@@ -192,10 +193,10 @@ export const AuthPage: React.FC = () => {
           <Card className="bg-white/90 backdrop-blur-xl border-white/50 shadow-3xl">
             {/* Mobile Logo */}
             <div className="lg:hidden text-center mb-8 pt-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl mb-4">
-                <Bot className="w-8 h-8 text-white" />
+              <div className="inline-flex items-center justify-center mb-4">
+                <Logo width={64} height={64} />
               </div>
-              <h1 className="text-2xl font-bold text-gray-900">AIApply</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Jobotic</h1>
               <p className="text-gray-600 mt-1">Premium Job Search Platform</p>
             </div>
 
@@ -228,24 +229,7 @@ export const AuthPage: React.FC = () => {
                 </div>
               )}
 
-            {/* Demo Credentials - Only show if Supabase is not configured */}
-            {!isSupabaseConfigured() && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.2 }}
-                className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200"
-              >
-                <div className="flex items-center space-x-2 mb-2">
-                  <Sparkles className="w-4 h-4 text-blue-600" />
-                  <h3 className="text-sm font-semibold text-blue-800">Demo Access</h3>
-                </div>
-                <div className="space-y-1 text-xs text-blue-700">
-                  <p><span className="font-medium">Email:</span> demo@aiapply.com</p>
-                  <p><span className="font-medium">Password:</span> demo123</p>
-                </div>
-              </motion.div>
-            )}
+
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-6">

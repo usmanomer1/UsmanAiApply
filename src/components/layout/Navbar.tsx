@@ -8,6 +8,7 @@ import {
   PenTool, 
   CreditCard, 
   User, 
+  Users,
   Settings, 
   LogOut,
   Moon,
@@ -33,9 +34,11 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { supabase } from '../../lib/supabase';
+import { getPlanNameByPriceId } from '../../stripe-config';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
+import { Logo } from '../ui/Logo';
 
 interface Notification {
   id: string;
@@ -67,6 +70,7 @@ export const Navbar: React.FC = () => {
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: BarChart3, description: 'Overview & Analytics' },
     { name: 'Auto Apply', href: '/auto-apply', icon: Zap, description: 'AI Job Applications', badge: 'New' },
+    { name: 'Interview Practice', href: '/interview-practice', icon: Users, description: 'CS Interview Coaching with Voice AI', badge: 'Beta' },
     { name: 'Cover Letters', href: '/cover-letter', icon: PenTool, description: 'AI-Generated Letters' },
     { name: 'Resume Tools', href: '/resume', icon: FileText, description: 'Resume Optimization' },
     { name: 'CV Generator', href: '/cv-generator', icon: Bot, description: 'AI CV Generation', badge: 'AI' },
@@ -76,6 +80,7 @@ export const Navbar: React.FC = () => {
 
   const quickActions = [
     { name: 'Start Auto Apply', href: '/auto-apply', icon: Zap, description: 'Begin automated job applications' },
+    { name: 'Practice Interview', href: '/interview-practice', icon: Users, description: 'CS interview coaching with voice AI (Beta)' },
     { name: 'Generate CV', href: '/cv-generator', icon: Bot, description: 'Create AI-powered CV' },
     { name: 'Generate Cover Letter', href: '/cover-letter', icon: PenTool, description: 'Write personalized cover letters' },
     { name: 'Analyze Resume', href: '/resume', icon: FileText, description: 'Get AI resume feedback' },
@@ -230,13 +235,8 @@ export const Navbar: React.FC = () => {
       }
 
       if (subData && subData.subscription_status === 'active') {
-        // Determine plan name from price_id
-        let planName = 'Pro';
-        if (subData.price_id === 'price_1RYvjSQGabzJD80BbbXxTq2S') {
-          planName = 'Pro Plus';
-        } else if (subData.price_id === 'price_1RYvocQGabzJD80BEVgRcdSa') {
-          planName = 'Extreme';
-        }
+        // Determine plan name from price_id using stripe config
+        const planName = getPlanNameByPriceId(subData.price_id) || 'Pro';
         
         setUserPlan(planName);
         setHasActiveSubscription(true);
@@ -258,7 +258,7 @@ export const Navbar: React.FC = () => {
         setNotifications([
           {
             id: 'demo-1',
-            title: 'Welcome to AIApply',
+            title: 'Welcome to Jobotic',
             message: 'Connect Supabase to see real notifications',
             type: 'info',
             time: 'Just now',
@@ -549,10 +549,12 @@ export const Navbar: React.FC = () => {
             {/* Logo */}
             <div className="flex items-center">
               <Link to="/dashboard" className="flex items-center space-x-3 group">
-                <div className="relative">
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300">
-                    <Bot className="w-6 h-6 text-white" />
-                  </div>
+                <div className="relative w-10 h-10 bg-white dark:bg-gray-800 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300">
+                  <Logo 
+                    width={32} 
+                    height={32} 
+                    className="object-contain"
+                  />
                   {hasActiveSubscription && (
                     <div className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full flex items-center justify-center">
                       <Sparkles className="w-2.5 h-2.5 text-white" />
@@ -561,7 +563,7 @@ export const Navbar: React.FC = () => {
                 </div>
                 <div className="hidden sm:block">
                   <span className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
-                    AIApply
+                    Jobotic
                   </span>
                   <div className="text-xs text-gray-500 dark:text-gray-400 -mt-1">
                     {hasActiveSubscription ? 'Premium' : isSupabaseConfigured() ? 'Free' : 'Demo'}
@@ -789,7 +791,7 @@ export const Navbar: React.FC = () => {
                               {user?.email?.split('@')[0] || 'Demo User'}
                             </p>
                             <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                              {user?.email || 'demo@aiapply.com'}
+                              {user?.email || 'demo@jobotic.ai'}
                             </p>
                             <div className="flex items-center mt-1">
                               {hasActiveSubscription && <Crown className="w-3 h-3 mr-1 text-yellow-500" />}

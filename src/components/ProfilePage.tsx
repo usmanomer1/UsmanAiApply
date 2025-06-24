@@ -10,7 +10,8 @@ import {
   Trash2,
   CheckCircle,
   AlertCircle,
-  Loader2
+  Loader2,
+  Mic
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, uploadResume, getSignedResumeUrl } from '../lib/supabase';
@@ -19,6 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
+import VoiceAdminPanel from './voice/VoiceAdminPanel';
 
 interface Profile {
   id: string;
@@ -29,15 +31,7 @@ interface Profile {
   created_at: string;
 }
 
-// Demo profile for when Supabase is not configured
-const DEMO_PROFILE: Profile = {
-  id: 'demo-profile-1',
-  user_id: 'demo-user-1',
-  full_name: 'Demo User',
-  phone: '+1 (555) 123-4567',
-  resume_url: null,
-  created_at: new Date().toISOString()
-};
+
 
 export const ProfilePage: React.FC = () => {
   const { user } = useAuth();
@@ -51,6 +45,10 @@ export const ProfilePage: React.FC = () => {
   });
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [resumeUrl, setResumeUrl] = useState<string | null>(null);
+  const [showVoiceAdmin, setShowVoiceAdmin] = useState(false);
+
+  // Simple admin check - you can replace this with your actual admin logic
+  const isAdmin = user?.email === 'admin@jobotic.ai' || user?.email === 'usman@jobotic.ai';
 
   useEffect(() => {
     // Always fetch profile, regardless of user state
@@ -68,12 +66,10 @@ export const ProfilePage: React.FC = () => {
       setLoading(true);
 
       if (!isSupabaseConfigured() || !user) {
-        // Use demo data if Supabase is not configured or no user
-        console.log('Using demo data for profile');
-        setProfile(DEMO_PROFILE);
+        setProfile(null);
         setFormData({
-          full_name: DEMO_PROFILE.full_name,
-          phone: DEMO_PROFILE.phone || '',
+          full_name: '',
+          phone: '',
         });
         return;
       }
@@ -86,12 +82,12 @@ export const ProfilePage: React.FC = () => {
 
       if (error) {
         console.error('Error fetching profile:', error);
-        // Fall back to demo data
-        setProfile(DEMO_PROFILE);
+        setProfile(null);
         setFormData({
-          full_name: DEMO_PROFILE.full_name,
-          phone: DEMO_PROFILE.phone || '',
+          full_name: '',
+          phone: '',
         });
+        toast.error('Failed to load profile data');
       } else if (data) {
         setProfile(data);
         setFormData({
@@ -105,21 +101,21 @@ export const ProfilePage: React.FC = () => {
           setResumeUrl(signedUrl);
         }
       } else {
-        // No profile found, use demo data
-        setProfile(DEMO_PROFILE);
+        // No profile found
+        setProfile(null);
         setFormData({
-          full_name: DEMO_PROFILE.full_name,
-          phone: DEMO_PROFILE.phone || '',
+          full_name: '',
+          phone: '',
         });
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
-      // Fall back to demo data
-      setProfile(DEMO_PROFILE);
+      setProfile(null);
       setFormData({
-        full_name: DEMO_PROFILE.full_name,
-        phone: DEMO_PROFILE.phone || '',
+        full_name: '',
+        phone: '',
       });
+      toast.error('Failed to load profile data');
     } finally {
       setLoading(false);
     }
@@ -203,11 +199,8 @@ export const ProfilePage: React.FC = () => {
           resume_url: resumePath,
         } : null);
       } else {
-        // Demo mode - just simulate upload
-        setProfile(prev => prev ? {
-          ...prev,
-          resume_url: 'demo-resume.pdf',
-        } : null);
+        toast.error('Resume upload not available - database not configured');
+        return;
       }
 
       setResumeFile(file);
@@ -287,10 +280,40 @@ export const ProfilePage: React.FC = () => {
         <p className="text-xl text-gray-600 dark:text-gray-300">Manage your personal information and resume</p>
         {!isSupabaseConfigured() && (
           <div className="mt-2 text-sm text-amber-600 dark:text-amber-400">
-            Demo mode - Connect Supabase to save real profile data
+                          Database not configured
           </div>
         )}
       </motion.div>
+
+      {/* Voice Admin Panel Toggle */}
+      {isAdmin && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+        >
+          <Button
+            onClick={() => setShowVoiceAdmin(!showVoiceAdmin)}
+            variant="outline"
+            className="mb-6 bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+          >
+            <Mic className="w-4 h-4 mr-2" />
+            {showVoiceAdmin ? 'Hide Voice Admin' : 'Show Voice Admin Panel'}
+          </Button>
+        </motion.div>
+      )}
+
+      {/* Voice Admin Panel */}
+      {showVoiceAdmin && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="mb-8"
+        >
+          <VoiceAdminPanel isAdmin={isAdmin} />
+        </motion.div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Personal Information */}
@@ -338,7 +361,7 @@ export const ProfilePage: React.FC = () => {
               </label>
               <input
                 type="email"
-                value={user?.email || 'demo@aiapply.com'}
+                value={user?.email || 'demo@jobotic.ai'}
                 disabled
                 className="premium-input opacity-50 cursor-not-allowed"
               />

@@ -14,12 +14,23 @@ export interface StripeProduct {
   aiTokenCount?: number; // For AI tokens
 }
 
+// Get price IDs from environment variables with fallbacks for development
+const getStripeConfig = () => ({
+  PRO_PRICE_ID: import.meta.env.VITE_STRIPE_PRO_PRICE_ID || 'price_1RaM5LQGabzJD80B3zGbTHcZ',
+  PRO_PLUS_PRICE_ID: import.meta.env.VITE_STRIPE_PRO_PLUS_PRICE_ID || 'price_1RYvjSQGabzJD80BbbXxTq2S',
+  EXTREME_PRICE_ID: import.meta.env.VITE_STRIPE_EXTREME_PRICE_ID || 'price_1RYvocQGabzJD80BEVgRcdSa',
+  JOB_TOKEN_PRICE_ID: import.meta.env.VITE_STRIPE_JOB_TOKEN_PRICE_ID || 'price_1RaMKDQGabzJD80BKxOyfLX3',
+  AI_TOKEN_PRICE_ID: import.meta.env.VITE_STRIPE_AI_TOKEN_PRICE_ID || 'price_1RaMIgQGabzJD80B2aVeDPYZ'
+});
+
+const stripeConfig = getStripeConfig();
+
 export const STRIPE_PRODUCTS: StripeProduct[] = [
   // Subscription Plans
   {
     id: 'prod_STtSVTDQXrXzYM',
-    priceId: 'price_1RaM5LQGabzJD80B3zGbTHcZ',
-    name: 'AIApply Pro',
+    priceId: stripeConfig.PRO_PRICE_ID,
+    name: 'Jobotic Pro',
     description: 'Unlock up to 37 automated job applications per month with AI-powered job matching. Includes 30,000 AI tokens for resume and cover letter generation, where complex requests count as double token usage. Additional job applications cost $0.80 each; extra AI tokens are billed at $0.10 per 1,000 tokens. Enjoy seamless automation',
     mode: 'subscription',
     price: 25.00,
@@ -33,13 +44,14 @@ export const STRIPE_PRODUCTS: StripeProduct[] = [
       '30,000 AI tokens for resume & cover letters',
       'Complex requests count as 2x tokens',
       'Additional applications: $0.80 each',
-      'Extra AI tokens: $0.10 per 1,000'
+      'Extra AI tokens: $0.10 per 1,000',
+      'Voice AI features included'
     ]
   },
   {
     id: 'prod_ALT_PRO_PLUS',
-    priceId: 'price_1RYvjSQGabzJD80BbbXxTq2S',
-    name: 'AIApply Pro Plus',
+    priceId: stripeConfig.PRO_PLUS_PRICE_ID,
+    name: 'Jobotic Pro Plus',
     description: 'Legacy price id for Pro Plus – same limits as standard Pro Plus plan.',
     mode: 'subscription',
     price: 50.00,
@@ -54,13 +66,14 @@ export const STRIPE_PRODUCTS: StripeProduct[] = [
       'Complex requests count as 2x tokens',
       'Additional applications: $0.80 each',
       'Extra AI tokens: $0.10 per 1,000',
+      'Voice AI features included',
       'Priority support'
     ]
   },
   {
     id: 'prod_STtb6RASMEP4t2',
-    priceId: 'price_1RYvocQGabzJD80BEVgRcdSa',
-    name: 'AIApply Extreme',
+    priceId: stripeConfig.EXTREME_PRICE_ID,
+    name: 'Jobotic Extreme',
     description: 'Experience premium access with 158 automated job applications per month plus 30,000 AI tokens for resume and cover letter generation (complex requests charged at 2× tokens). Benefit from priority support and early feature access. Additional job applications are billed at $0.80 each, and extra AI tokens at $0.10 per 1,000 tokens. Ideal for power users demanding maximum productivity.',
     mode: 'subscription',
     price: 100.00,
@@ -76,13 +89,14 @@ export const STRIPE_PRODUCTS: StripeProduct[] = [
       'Priority support & early access',
       'Additional applications: $0.80 each',
       'Extra AI tokens: $0.10 per 1,000',
+      'Voice AI features included',
       'Dedicated account manager'
     ]
   },
   // Token Packs
   {
     id: 'prod_SVN42LIZP5sFxh',
-    priceId: 'price_1RaMKDQGabzJD80BKxOyfLX3',
+    priceId: stripeConfig.JOB_TOKEN_PRICE_ID,
     name: 'Job Application Token Pack',
     description: 'Buy individual tokens to automate job applications using AI powered autonomous web agent. Each token covers 10 steps of our AI agent. Scale your applications easily with flexible token quantities.',
     mode: 'payment',
@@ -100,7 +114,7 @@ export const STRIPE_PRODUCTS: StripeProduct[] = [
   },
   {
     id: 'prod_SVN2ST7bWhXL6K',
-    priceId: 'price_1RaMIgQGabzJD80B2aVeDPYZ',
+    priceId: stripeConfig.AI_TOKEN_PRICE_ID,
     name: 'AI ToolSuite Token Pack',
     description: 'Purchase 1,000 AI tokens for resume, CV, and cover letter generation and analysis. Tokens are used based on request complexity. Perfect for powering all your AI-powered document tools with flexible pay-as-you-go usage.',
     mode: 'payment',
@@ -165,6 +179,18 @@ export const getPlanLimits = (priceId: string) => {
   };
 };
 
+// Helper function to get plan name from price ID
+export const getPlanNameByPriceId = (priceId: string): string => {
+  const product = getProductByPriceId(priceId);
+  return product?.name || 'Unknown Plan';
+};
+
+// Helper function to check if plan includes voice features
+export const planIncludesVoiceFeatures = (priceId: string): boolean => {
+  const product = getProductByPriceId(priceId);
+  return product?.category === 'subscription'; // All subscription plans include voice
+};
+
 // Helper function to calculate overage costs (now step-based instead of application-based)
 export const calculateOverageCost = (usage: { steps: number; aiTokens: number }, limits: { steps: number; aiTokens: number }) => {
   const stepOverage = Math.max(0, usage.steps - limits.steps);
@@ -179,5 +205,23 @@ export const calculateOverageCost = (usage: { steps: number; aiTokens: number },
     stepCost,
     aiTokenCost,
     totalCost: stepCost + aiTokenCost
+  };
+};
+
+// Validate environment configuration
+export const validateStripeConfig = (): { isValid: boolean; missingVars: string[] } => {
+  const requiredVars = [
+    'VITE_STRIPE_PRO_PRICE_ID',
+    'VITE_STRIPE_PRO_PLUS_PRICE_ID', 
+    'VITE_STRIPE_EXTREME_PRICE_ID',
+    'VITE_STRIPE_JOB_TOKEN_PRICE_ID',
+    'VITE_STRIPE_AI_TOKEN_PRICE_ID'
+  ];
+  
+  const missingVars = requiredVars.filter(varName => !import.meta.env[varName]);
+  
+  return {
+    isValid: missingVars.length === 0,
+    missingVars
   };
 };

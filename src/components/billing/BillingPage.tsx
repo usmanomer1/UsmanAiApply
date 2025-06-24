@@ -59,27 +59,7 @@ interface UsageStats {
   ai_tokens_used: number;
 }
 
-// Demo data for when Supabase is not configured
-const DEMO_SUBSCRIPTION: UserSubscription = {
-  customer_id: 'cus_demo123',
-  subscription_id: 'sub_demo123',
-  subscription_status: 'active',
-  price_id: 'price_1RaM5LQGabzJD80B3zGbTHcZ', // Pro plan - this should match stripe-config.ts
-  current_period_start: Math.floor(Date.now() / 1000),
-  current_period_end: Math.floor((Date.now() + 30 * 24 * 60 * 60 * 1000) / 1000),
-  cancel_at_period_end: false,
-  payment_method_brand: 'visa',
-  payment_method_last4: '4242'
-};
 
-const DEMO_USAGE: UsageStats = {
-  total_steps: 1250,
-  total_cost: 12.50,
-  job_tokens: 15, // 15 job applications used
-  applications_count: 15,
-  ai_requests_count: 20,
-  ai_tokens_used: 6000 // 6000 AI tokens used out of 30000
-};
 
 export const BillingPage: React.FC = () => {
   const { user, session } = useAuth();
@@ -115,9 +95,7 @@ export const BillingPage: React.FC = () => {
       }
 
       if (!isSupabaseConfigured()) {
-        setSubscription(DEMO_SUBSCRIPTION);
-        setUsage(DEMO_USAGE);
-        return;
+        throw new Error('Billing service not configured. Please check your environment variables.');
       }
 
       if (!user) {
@@ -240,7 +218,7 @@ export const BillingPage: React.FC = () => {
 
   const handlePurchase = async (priceId: string) => {
     if (!isSupabaseConfigured() || !user || !session) {
-      toast.error('Please connect Supabase to enable payments');
+      toast.error('Billing service not available. Please check your configuration.');
       return;
     }
 
@@ -288,7 +266,7 @@ export const BillingPage: React.FC = () => {
 
   const openBillingPortal = async () => {
     if (!isSupabaseConfigured()) {
-      toast.error('Billing portal not available in demo mode');
+      toast.error('Billing service not configured. Please check your environment variables.');
       return;
     }
 
@@ -441,7 +419,7 @@ This will create the default configuration needed for the billing portal to work
           </p>
           {!isSupabaseConfigured() && (
             <div className="mt-4 text-sm text-amber-600 dark:text-amber-400">
-              Demo mode - Connect Supabase to enable payments
+                              Billing service not configured
             </div>
           )}
         </div>
@@ -470,10 +448,10 @@ This will create the default configuration needed for the billing portal to work
                 </div>
                 <div>
                   <div className="text-xl font-bold text-gray-900 dark:text-white">
-                    {getCurrentProduct()?.name?.replace('AIApply ', '') || 'Pro'}
+                    {getCurrentProduct()?.name?.replace('Jobotic ', '') || 'Pro'}
                   </div>
                   <div className="text-sm text-emerald-600 dark:text-emerald-400">
-                    {!isSupabaseConfigured() ? 'Demo Plan' : 'Active Plan'}
+                    {!isSupabaseConfigured() ? 'Service Unavailable' : 'Active Plan'}
                   </div>
                 </div>
               </div>
@@ -721,7 +699,7 @@ This will create the default configuration needed for the billing portal to work
                     {/* Plan Header */}
                     <div className="text-center mb-8">
                       <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                        {product.name.replace('AIApply ', '')}
+                        {product.name.replace('Jobotic ', '')}
                       </h3>
                       
                       <div className="mb-4">
@@ -899,7 +877,7 @@ This will create the default configuration needed for the billing portal to work
             type="button"
             onClick={() => {
               // You can replace this with your actual FAQ page URL or modal
-              window.open('https://docs.aiapply.com/pricing-faq', '_blank');
+              window.open('https://docs.jobotic.ai/pricing-faq', '_blank');
             }}
             className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium inline-flex items-center transition-colors cursor-pointer"
           >

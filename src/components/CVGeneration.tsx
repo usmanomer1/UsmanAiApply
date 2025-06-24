@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FileText, 
@@ -33,10 +33,16 @@ import {
   Shield,
   Lightbulb,
   PenTool,
-  Zap
+  Zap,
+  X,
+  Copy,
+  Bot
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { openAIService } from '../lib/openaiWithTokenTracking';
+import { usePaywall } from '../hooks/usePaywall';
+import PaywallModal from './ui/PaywallModal';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -130,10 +136,15 @@ const templates = {
 };
 
 export const CVGeneration: React.FC = () => {
+  const navigate = useNavigate();
+  const { checkFeatureAccess, isAuthenticated } = usePaywall();
+  
   const [currentStep, setCurrentStep] = useState<Step>('personal');
   const [selectedTemplate, setSelectedTemplate] = useState<Template>('modern');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedCV, setGeneratedCV] = useState<string>('');
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [accessCheckComplete, setAccessCheckComplete] = useState(false);
   
   const [cvData, setCvData] = useState<CVData>({
     personalInfo: {
@@ -236,7 +247,50 @@ export const CVGeneration: React.FC = () => {
     }));
   };
 
+  // Check access on component mount
+  useEffect(() => {
+    const checkAccess = async () => {
+      if (!isAuthenticated) {
+        setShowPaywall(true);
+        setAccessCheckComplete(true);
+        return;
+      }
+
+      try {
+        const accessResult = await checkFeatureAccess('advanced_ai');
+        if (!accessResult.hasAccess) {
+          setShowPaywall(true);
+        }
+      } catch (error) {
+        console.error('Error checking feature access:', error);
+        setShowPaywall(true);
+      } finally {
+        setAccessCheckComplete(true);
+      }
+    };
+
+    checkAccess();
+  }, [isAuthenticated, checkFeatureAccess]);
+
   const generateCV = async () => {
+    // Check access before generating
+    if (!isAuthenticated) {
+      setShowPaywall(true);
+      return;
+    }
+
+    try {
+      const accessResult = await checkFeatureAccess('advanced_ai');
+      if (!accessResult.hasAccess) {
+        setShowPaywall(true);
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking access before generation:', error);
+      setShowPaywall(true);
+      return;
+    }
+
     if (!cvData.personalInfo.fullName || !cvData.targetRole || !cvData.industry) {
       toast.error('Please fill in your name, target role, and industry');
       return;
@@ -323,8 +377,34 @@ ${cvData.projects.filter(proj => proj.name).length > 0 ? 'PROJECTS\n' + cvData.p
     }
   };
 
+  const handleUpgrade = () => {
+    navigate('/billing');
+  };
+
+  // Show loading state while checking access
+  if (!accessCheckComplete) {
+    return (
+      <div className="space-y-8">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+          <span className="ml-3 text-gray-600 dark:text-gray-300">Checking access...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
+      {/* Paywall Modal */}
+      <PaywallModal
+        isOpen={showPaywall}
+        onClose={() => setShowPaywall(false)}
+        feature="AI CV Generation"
+        description="Create professional, ATS-optimized CVs with AI that are tailored to your industry and role"
+        onUpgrade={handleUpgrade}
+        requiredPlan="any"
+      />
+      
       {/* Header Section */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}

@@ -117,36 +117,12 @@ export const DashboardHome: React.FC = () => {
     fetchDashboardData();
   }, [user]);
 
-  const generateDemoTrendData = (): ApplicationTrendData[] => {
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const today = new Date();
-    
-    return days.map((day, index) => {
-      const date = new Date(today);
-      date.setDate(today.getDate() - (6 - index)); // Last 7 days
-      
-      return {
-        name: day,
-        applications: Math.floor(Math.random() * 8) + 1, // Random 1-8 applications
-        date: date.toISOString().split('T')[0]
-      };
-    });
-  };
 
-  const generateDemoStatusData = (): StatusDistributionData[] => {
-    return [
-      { name: 'Sent', value: 45, color: '#3B82F6' },
-      { name: 'Pending', value: 25, color: '#F59E0B' },
-      { name: 'Interview', value: 20, color: '#8B5CF6' },
-      { name: 'Rejected', value: 10, color: '#EF4444' },
-    ];
-  };
 
   const fetchApplicationTrendData = async () => {
     try {
       if (!isSupabaseConfigured() || !user) {
-        // Generate demo data
-        setApplicationTrendData(generateDemoTrendData());
+        setApplicationTrendData([]);
         return;
       }
 
@@ -171,7 +147,7 @@ export const DashboardHome: React.FC = () => {
 
       if (error) {
         console.error('Error fetching trend data:', error);
-        setApplicationTrendData(generateDemoTrendData());
+        setApplicationTrendData([]);
         return;
       }
 
@@ -202,15 +178,14 @@ export const DashboardHome: React.FC = () => {
       setApplicationTrendData(trendData);
     } catch (error) {
       console.error('Error fetching application trend data:', error);
-      setApplicationTrendData(generateDemoTrendData());
+      setApplicationTrendData([]);
     }
   };
 
   const fetchStatusDistributionData = async () => {
     try {
       if (!isSupabaseConfigured() || !user) {
-        // Generate demo data
-        setStatusDistributionData(generateDemoStatusData());
+        setStatusDistributionData([]);
         return;
       }
 
@@ -229,7 +204,7 @@ export const DashboardHome: React.FC = () => {
 
       if (error) {
         console.error('Error fetching status distribution data:', error);
-        setStatusDistributionData(generateDemoStatusData());
+        setStatusDistributionData([]);
         return;
       }
 
@@ -266,56 +241,24 @@ export const DashboardHome: React.FC = () => {
       setStatusDistributionData(distributionData);
     } catch (error) {
       console.error('Error fetching status distribution data:', error);
-      setStatusDistributionData(generateDemoStatusData());
+      setStatusDistributionData([]);
     }
   };
 
   const fetchDashboardData = async () => {
     try {
       if (!isSupabaseConfigured() || !user) {
-        // Demo data with corrected success rate calculation
-        const totalApps = 23;
-        const acceptedApps = 3; // 3 accepted out of 23 applications
         setStats({
-          totalApplications: totalApps,
-          thisWeekApplications: 8,
-          successRate: Math.round((acceptedApps / totalApps) * 100), // 3/23 * 100 = 13%
-          activeJobs: 5,
-          tokensUsed: 15,
-          tokensRemaining: 60
+          totalApplications: 0,
+          thisWeekApplications: 0,
+          successRate: 0,
+          activeJobs: 0,
+          tokensUsed: 0,
+          tokensRemaining: 0
         });
-        setRecentApplications([
-          {
-            id: '1',
-            company: 'TechCorp Inc.',
-            role: 'Senior Software Engineer',
-            status: 'SENT',
-            applied_at: new Date().toISOString(),
-            campaign: { location: 'San Francisco, CA' }
-          },
-          {
-            id: '2',
-            company: 'StartupXYZ',
-            role: 'Full Stack Developer',
-            status: 'INTERVIEW',
-            applied_at: new Date(Date.now() - 86400000).toISOString(),
-            campaign: { location: 'Remote' }
-          },
-          {
-            id: '3',
-            company: 'BigTech Solutions',
-            role: 'Frontend Engineer',
-            status: 'PENDING',
-            applied_at: new Date(Date.now() - 172800000).toISOString(),
-            campaign: { location: 'New York, NY' }
-          }
-        ]);
-        
-        // Fetch chart data separately
-        await Promise.all([
-          fetchApplicationTrendData(),
-          fetchStatusDistributionData()
-        ]);
+        setRecentApplications([]);
+        setApplicationTrendData([]);
+        setStatusDistributionData([]);
         setLoading(false);
         return;
       }
@@ -621,7 +564,7 @@ export const DashboardHome: React.FC = () => {
           </p>
           {!isSupabaseConfigured() && (
             <div className="mt-2 text-sm text-amber-600 dark:text-amber-400">
-              Demo mode - Connect Supabase to see real data
+                              Database not configured
             </div>
           )}
         </div>
@@ -856,7 +799,7 @@ export const DashboardHome: React.FC = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
-        className="grid grid-cols-1 md:grid-cols-3 gap-6"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
       >
         <Link to="/auto-apply">
           <Card className="premium-card hover-lift cursor-pointer group transition-all duration-300 hover:shadow-2xl hover:scale-105">
@@ -870,6 +813,31 @@ export const DashboardHome: React.FC = () => {
                   <p className="text-sm text-gray-600 dark:text-gray-400">Begin automated job applications</p>
                 </div>
                 <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link to="/interview-practice">
+          <Card className="premium-card hover-lift cursor-pointer group transition-all duration-300 hover:shadow-2xl hover:scale-105">
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Users className="w-6 h-6 text-white" />
+                </div>
+                                 <div className="flex-1">
+                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">CS Interview Practice</h3>
+                   <p className="text-sm text-gray-600 dark:text-gray-400">AI voice coaching for coding interviews</p>
+                   <div className="flex space-x-1 mt-1">
+                     <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                       Voice AI
+                     </Badge>
+                     <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                       Beta
+                     </Badge>
+                   </div>
+                 </div>
+                <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-purple-600 group-hover:translate-x-1 transition-all" />
               </div>
             </CardContent>
           </Card>
@@ -896,14 +864,14 @@ export const DashboardHome: React.FC = () => {
           <Card className="premium-card hover-lift cursor-pointer group transition-all duration-300 hover:shadow-2xl hover:scale-105">
             <CardContent className="p-6">
               <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                <div className="w-12 h-12 bg-gradient-to-br from-orange-600 to-pink-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
                   <FileText className="w-6 h-6 text-white" />
                 </div>
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Generate Cover Letter</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Create personalized letters</p>
                 </div>
-                <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-purple-600 group-hover:translate-x-1 transition-all" />
+                <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-orange-600 group-hover:translate-x-1 transition-all" />
               </div>
             </CardContent>
           </Card>
@@ -1048,16 +1016,16 @@ export const DashboardHome: React.FC = () => {
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
         <DialogContent className="sm:max-w-md bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-0 shadow-2xl rounded-3xl">
           <DialogHeader>
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
-                <Plus className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <DialogTitle className="text-xl text-gray-900 dark:text-white">Add Application</DialogTitle>
-                <DialogDescription className="text-gray-600 dark:text-gray-300">
-                  Manually add a job application to track
-                </DialogDescription>
-              </div>
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
+                  <Plus className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <DialogTitle className="text-xl text-gray-900 dark:text-white">Add Application</DialogTitle>
+                  <DialogDescription className="text-gray-600 dark:text-gray-300">
+                    Manually add a job application to track
+                  </DialogDescription>
+                </div>
             </div>
           </DialogHeader>
           

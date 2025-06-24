@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { getMaintenanceConfig, isAdminEmail } from '../lib/maintenance';
 import toast from 'react-hot-toast';
 
 interface AuthContextType {
@@ -22,35 +23,6 @@ export const useAuth = () => {
   return context;
 };
 
-// Demo credentials for testing
-const DEMO_CREDENTIALS = {
-  email: 'demo@aiapply.com',
-  password: 'demo123',
-  fullName: 'Demo User'
-};
-
-const createDummyUser = (): User => ({
-  id: 'dummy-user-id-123',
-  email: DEMO_CREDENTIALS.email,
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-  aud: 'authenticated',
-  role: 'authenticated',
-  app_metadata: {},
-  user_metadata: {
-    full_name: DEMO_CREDENTIALS.fullName
-  }
-} as User);
-
-const createDummySession = (user: User): Session => ({
-  access_token: 'dummy-access-token',
-  refresh_token: 'dummy-refresh-token',
-  expires_in: 3600,
-  expires_at: Math.floor(Date.now() / 1000) + 3600,
-  token_type: 'bearer',
-  user
-});
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -59,7 +31,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isSupabaseConfigured = () => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    return !!(supabaseUrl && supabaseKey && supabaseUrl !== 'your_supabase_url_here' && supabaseKey !== 'your_supabase_anon_key_here');
+    return !!(
+      supabaseUrl && 
+      supabaseKey && 
+      supabaseUrl.startsWith('https://') &&
+      supabaseUrl.includes('.supabase.co') &&
+      supabaseKey.length > 50 &&
+      supabaseUrl !== 'your_supabase_url_here' && 
+      supabaseKey !== 'your_supabase_anon_key_here'
+    );
   };
 
   useEffect(() => {
@@ -67,18 +47,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const initializeAuth = async () => {
       try {
-        // Check if user was previously logged in (localStorage)
-        const savedUser = localStorage.getItem('aiapply-auth-user');
-        if (savedUser && mounted) {
-          const userData = JSON.parse(savedUser);
-          const dummyUser = createDummyUser();
-          const dummySession = createDummySession(dummyUser);
-          setUser(dummyUser);
-          setSession(dummySession);
-          setLoading(false);
-          return;
-        }
-
         if (!isSupabaseConfigured()) {
           if (mounted) {
             setLoading(false);
@@ -144,33 +112,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     try {
       if (!isSupabaseConfigured()) {
-        // Demo mode
-        if (email === DEMO_CREDENTIALS.email && password === DEMO_CREDENTIALS.password) {
-          const dummyUser = createDummyUser();
-          const dummySession = createDummySession(dummyUser);
-          
-          setUser(dummyUser);
-          setSession(dummySession);
-          localStorage.setItem('aiapply-auth-user', JSON.stringify(dummyUser));
-          
-          toast.success('Welcome back!');
-        } else {
-          toast.error('Invalid credentials. Use demo@aiapply.com / demo123');
-          throw new Error('Invalid credentials');
-        }
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (error) {
-          toast.error(error.message);
-          throw error;
-        }
-
-        toast.success('Welcome back!');
+        toast.error('Authentication service not configured. Please check your environment variables.');
+        throw new Error('Supabase not configured');
       }
+
+      // Check maintenance mode
+      const { isMaintenanceMode, maintenanceMessage } = getMaintenanceConfig();
+      if (isMaintenanceMode && !isAdminEmail(email)) {
+        toast.error(maintenanceMessage);
+        throw new Error('Maintenance mode');
+      }
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+
+      toast.success('Welcome back!');
     } catch (error) {
       throw error;
     } finally {
@@ -182,33 +145,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     try {
       if (!isSupabaseConfigured()) {
-        // Demo mode - just sign them in
-        const dummyUser = createDummyUser();
-        const dummySession = createDummySession(dummyUser);
-        
-        setUser(dummyUser);
-        setSession(dummySession);
-        localStorage.setItem('aiapply-auth-user', JSON.stringify(dummyUser));
-        
-        toast.success('Account created successfully!');
-      } else {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: fullName,
-            },
-          },
-        });
-
-        if (error) {
-          toast.error(error.message);
-          throw error;
-        }
-
-        toast.success('Account created successfully! Please check your email to verify your account.');
+        toast.error('Authentication service not configured. Please check your environment variables.');
+        throw new Error('Supabase not configured');
       }
+
+      // Check maintenance mode for new registrations
+      const { isMaintenanceMode, maintenanceMessage } = getMaintenanceConfig();
+      if (isMaintenanceMode) {
+        toast.error(maintenanceMessage);
+        throw new Error('Maintenance mode');
+      }
+
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+          },
+        },
+      });
+
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+
+      toast.success('Account created successfully! Please check your email to verify your account.');
     } catch (error) {
       throw error;
     } finally {
@@ -229,14 +192,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setUser(null);
       setSession(null);
-      localStorage.removeItem('aiapply-auth-user');
       toast.success('Signed out successfully');
     } catch (error) {
       console.error('Error signing out:', error);
       // Force sign out even if there's an error
       setUser(null);
       setSession(null);
-      localStorage.removeItem('aiapply-auth-user');
       toast.success('Signed out successfully');
     }
   };

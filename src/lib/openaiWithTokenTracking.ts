@@ -503,6 +503,28 @@ Return only the cover letter text, properly formatted.`
     return response.content;
   }
 
+  async generateInterviewResponse(systemPrompt: string, userMessage: string): Promise<string> {
+    const messages = [
+      {
+        role: 'system',
+        content: systemPrompt
+      },
+      {
+        role: 'user',
+        content: userMessage
+      }
+    ];
+
+    const response = await this.makeRequest(
+      messages, 
+      800, // Smaller token limit for interview responses
+      'company_research', // Reuse existing operation type
+      { interviewResponse: true }
+    );
+    
+    return response.content;
+  }
+
   // Helper method to check if a user can perform an operation
   async canPerformOperation(operationType: OperationType): Promise<boolean> {
     try {

@@ -135,7 +135,6 @@ async function syncCustomerFromStripe(customerId: string) {
       expand: ['data.default_payment_method'],
     });
 
-    // TODO verify if needed
     if (subscriptions.data.length === 0) {
       console.info(`No active subscriptions found for customer: ${customerId}`);
       const { error: noSubError } = await supabase.from('stripe_subscriptions').upsert(
