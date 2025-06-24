@@ -29,7 +29,8 @@ import {
   Building,
   Send,
   AlertCircle,
-  Info
+  Info,
+  Briefcase
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -59,6 +60,7 @@ export const Navbar: React.FC = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isCareerToolsOpen, setIsCareerToolsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -67,13 +69,17 @@ export const Navbar: React.FC = () => {
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
   const [showSupabaseWarning, setShowSupabaseWarning] = useState(false);
 
+  // Career tools dropdown items
+  const careerTools = [
+    { name: 'Resume Tools', href: '/resume', icon: FileText, description: 'Resume Optimization' },
+    { name: 'CV Generator', href: '/cv-generator', icon: Bot, description: 'AI CV Generation', badge: 'AI' },
+    { name: 'Cover Letters', href: '/cover-letter', icon: PenTool, description: 'AI-Generated Letters' },
+  ];
+
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: BarChart3, description: 'Overview & Analytics' },
     { name: 'Auto Apply', href: '/auto-apply', icon: Zap, description: 'AI Job Applications', badge: 'New' },
     { name: 'Interview Practice', href: '/interview-practice', icon: Users, description: 'CS Interview Coaching with Voice AI', badge: 'Beta' },
-    { name: 'Cover Letters', href: '/cover-letter', icon: PenTool, description: 'AI-Generated Letters' },
-    { name: 'Resume Tools', href: '/resume', icon: FileText, description: 'Resume Optimization' },
-    { name: 'CV Generator', href: '/cv-generator', icon: Bot, description: 'AI CV Generation', badge: 'AI' },
     { name: 'Profile', href: '/profile', icon: User, description: 'Personal Information' },
     { name: 'Billing', href: '/billing', icon: CreditCard, description: 'Plans & Usage' },
   ];
@@ -102,6 +108,7 @@ export const Navbar: React.FC = () => {
         setIsProfileOpen(false);
         setIsNotificationsOpen(false);
         setIsMobileMenuOpen(false);
+        setIsCareerToolsOpen(false);
         setSearchQuery('');
         setSearchResults([]);
       }
@@ -605,6 +612,77 @@ export const Navbar: React.FC = () => {
                   </Link>
                 );
               })}
+              
+              {/* Career Tools Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setIsCareerToolsOpen(!isCareerToolsOpen)}
+                  className={`relative flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 group ${
+                    careerTools.some(tool => location.pathname === tool.href)
+                      ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800/50'
+                  }`}
+                >
+                  <Briefcase className="w-4 h-4" />
+                  <span>Career Tools</span>
+                  <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isCareerToolsOpen ? 'rotate-180' : ''}`} />
+                  {careerTools.some(tool => tool.badge) && (
+                    <span className="absolute -top-0.5 -right-0.5 px-1.5 py-0.5 bg-gradient-to-r from-emerald-400 to-emerald-500 text-white text-xs font-bold rounded-full">
+                      AI
+                    </span>
+                  )}
+                  {careerTools.some(tool => location.pathname === tool.href) && (
+                    <motion.div
+                      layoutId="activeTab"
+                      className="absolute inset-0 bg-blue-50 dark:bg-blue-900/20 rounded-xl -z-10"
+                      transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                    />
+                  )}
+                </button>
+
+                <AnimatePresence>
+                  {isCareerToolsOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute left-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50 backdrop-blur-xl"
+                    >
+                      {careerTools.map((tool) => {
+                        const Icon = tool.icon;
+                        const isActive = location.pathname === tool.href;
+                        
+                        return (
+                          <Link
+                            key={tool.name}
+                            to={tool.href}
+                            onClick={() => setIsCareerToolsOpen(false)}
+                            className={`flex items-center justify-between px-4 py-3 text-sm transition-colors ${
+                              isActive
+                                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                            }`}
+                          >
+                            <div className="flex items-center space-x-3">
+                              <Icon className="w-4 h-4" />
+                              <div>
+                                <div className="font-medium">{tool.name}</div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400">{tool.description}</div>
+                              </div>
+                            </div>
+                            {tool.badge && (
+                              <span className="px-2 py-1 bg-gradient-to-r from-emerald-400 to-emerald-500 text-white text-xs font-bold rounded-full">
+                                {tool.badge}
+                              </span>
+                            )}
+                          </Link>
+                        );
+                      })}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
 
             {/* Right side actions */}
@@ -899,6 +977,43 @@ export const Navbar: React.FC = () => {
                       </Link>
                     );
                   })}
+                  
+                  {/* Career Tools Section for Mobile */}
+                  <div className="pt-2 border-t border-gray-200 dark:border-gray-700 mt-4">
+                    <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Career Tools
+                    </div>
+                    {careerTools.map((tool) => {
+                      const Icon = tool.icon;
+                      const isActive = location.pathname === tool.href;
+                      
+                      return (
+                        <Link
+                          key={tool.name}
+                          to={tool.href}
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          className={`flex items-center justify-between px-3 py-3 rounded-xl text-sm font-medium transition-colors ${
+                            isActive
+                              ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                              : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-3">
+                            <Icon className="w-5 h-5" />
+                            <div>
+                              <div>{tool.name}</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">{tool.description}</div>
+                            </div>
+                          </div>
+                          {tool.badge && (
+                            <span className="px-2 py-1 bg-gradient-to-r from-emerald-400 to-emerald-500 text-white text-xs font-bold rounded-full">
+                              {tool.badge}
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
                 </div>
               </motion.div>
             )}
