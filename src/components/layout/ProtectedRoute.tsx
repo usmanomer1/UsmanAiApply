@@ -41,12 +41,12 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
             className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full mx-auto mb-6"
           />
           
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Loading AIApply</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Loading Jobotic</h2>
           <p className="text-gray-600 dark:text-gray-300">Preparing your premium job search experience...</p>
           
           {!isSupabaseConfigured() && (
             <div className="mt-4 text-sm text-amber-600 dark:text-amber-400">
-              Demo mode - Connect Supabase for full functionality
+              Database not configured
             </div>
           )}
         </motion.div>

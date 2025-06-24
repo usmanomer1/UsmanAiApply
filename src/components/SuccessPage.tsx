@@ -14,7 +14,7 @@ export const SuccessPage: React.FC = () => {
 
   useEffect(() => {
     // You could fetch session details here if needed
-    console.log('Payment successful for session:', sessionId);
+
     
     // For demo purposes, we'll simulate purchase details based on URL params
     // In a real app, you'd fetch this from your backend using the session_id
@@ -36,7 +36,7 @@ export const SuccessPage: React.FC = () => {
       // Fallback for demo
       setPurchaseDetails({
         type: 'subscription',
-        productName: 'AIApply Pro',
+        productName: 'Jobotic Pro',
         amount: '$25.00 USD',
         mode: 'subscription',
         currency: 'usd',
@@ -67,7 +67,7 @@ export const SuccessPage: React.FC = () => {
     if (mode === 'subscription') {
       return {
         title: 'Subscription Activated!',
-        subtitle: 'Welcome to AIApply Premium',
+        subtitle: 'Welcome to Jobotic Premium',
         description: 'Your subscription is now active and you have access to all premium features including automated job applications and AI-powered tools.'
       };
     } else if (type === 'tokens') {

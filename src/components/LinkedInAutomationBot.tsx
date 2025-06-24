@@ -22,16 +22,22 @@ import {
   Building, 
   Loader2, 
   Sparkles,
-  Shield 
+  Shield,
+  Mic,
+  MessageSquare
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { usePaywall } from '../hooks/usePaywall';
+import PaywallModal from './ui/PaywallModal';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import LinkedInVoiceSetup from './voice/LinkedInVoiceSetup';
 
 interface TaskStatus {
   id: string;
@@ -190,6 +196,8 @@ const EXPERIENCE_LEVEL_MAP = {
 
 const LinkedInAutomationBot: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const { checkFeatureAccess, isAuthenticated } = usePaywall();
   
   // Get API key from environment variable with proper fallback
   const apiKey = import.meta.env.VITE_BROWSER_USE_API_KEY || import.meta.env.VITE_BROWSERUSE_API_KEY || '';
@@ -226,6 +234,9 @@ const LinkedInAutomationBot: React.FC = () => {
   const [monthlyUsage, setMonthlyUsage] = useState({ tokens_used: 0, ai_requests_used: 0, cost_usd: 0 });
   const [loading, setLoading] = useState(true);
   const [showConfigPanel, setShowConfigPanel] = useState(false);
+  const [showVoiceSetup, setShowVoiceSetup] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [accessCheckComplete, setAccessCheckComplete] = useState(false);
 
   const isSupabaseConfigured = () => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -242,7 +253,29 @@ const LinkedInAutomationBot: React.FC = () => {
   useEffect(() => {
     loadConfiguration();
     fetchUserSubscription();
+    checkAccess();
   }, [user]);
+
+  // Check access on component mount
+  const checkAccess = async () => {
+    if (!isAuthenticated) {
+      setShowPaywall(true);
+      setAccessCheckComplete(true);
+      return;
+    }
+
+    try {
+      const accessResult = await checkFeatureAccess('auto_apply');
+      if (!accessResult.hasAccess) {
+        setShowPaywall(true);
+      }
+    } catch (error) {
+      console.error('Error checking auto apply access:', error);
+      setShowPaywall(true);
+    } finally {
+      setAccessCheckComplete(true);
+    }
+  };
 
   const addLog = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
@@ -319,6 +352,19 @@ const LinkedInAutomationBot: React.FC = () => {
     }
   };
 
+  const handleVoiceConfigurationComplete = (voiceConfig: Record<string, string>) => {
+    // Update the main config with voice-configured data
+    setConfig(prev => ({
+      ...prev,
+      ...voiceConfig
+    }));
+    
+    // Save the configuration
+    saveConfiguration();
+    
+    toast.success('Voice configuration completed! Your settings have been saved.');
+  };
+
   const fetchUserSubscription = async () => {
     try {
       if (!isSupabaseConfigured() || !user) {
@@ -353,7 +399,7 @@ const LinkedInAutomationBot: React.FC = () => {
       const startDate = firstDayOfMonth.toISOString();
       const endDate = nextMonth.toISOString();
 
-      console.log(`📊 Fetching usage from ${startDate} to ${endDate}`);
+      
 
       const { data: usageData, error: usageError } = await supabase
         .from('browser_use_logs')
@@ -377,7 +423,7 @@ const LinkedInAutomationBot: React.FC = () => {
 
       const totalCost = usageData?.reduce((sum, log) => sum + (log.cost_usd || 0), 0) || 0;
 
-      console.log(`📈 Monthly usage: ${jobTokens} tokens (${totalTokens} steps), $${totalCost.toFixed(2)} cost`);
+      
       
       setMonthlyUsage({ 
         tokens_used: jobTokens, 
@@ -514,62 +560,58 @@ const LinkedInAutomationBot: React.FC = () => {
   };
 
   const trackUsage = async (steps: number, taskId: string) => {
+    if (!user) {
+      addLog('❌ User not authenticated - cannot track usage', 'error');
+      return;
+    }
+
     try {
-      const costPerStep = 0.001; // $0.001 per step for direct step billing
+      const costPerStep = 0.001; // $0.001 per step
       const costUsd = steps * costPerStep;
       
-      if (isSupabaseConfigured() && user) {
-        addLog(`💰 Used ${steps} step${steps > 1 ? 's' : ''} ($${costUsd.toFixed(3)})`);
-        
-        try {
-          // Log to browser_use_logs table
-          const { error: logError } = await supabase.from('browser_use_logs').insert({
-            user_id: user.id,
-            task_id: taskId,
-            step_count: steps,
-            cost_usd: costUsd,
-            task_type: 'linkedin_auto_apply',
-            campaign_id: null
-          });
-
-          if (logError) {
-            console.error('Error saving to browser_use_logs:', logError);
-            addLog(`⚠️ Browser use logging failed: ${logError.message}`, 'error');
-          }
-
-          // Also log to automation_tasks table for better tracking
-          const { error: taskError } = await supabase.from('automation_tasks').insert({
-            user_id: user.id,
-            task_id: taskId,
-            task_type: 'linkedin_auto_apply',
-            status: 'running',
-            step_count: steps,
-            cost_usd: costUsd,
-            started_at: new Date().toISOString()
-          });
-
-          if (taskError) {
-            console.error('Error saving to automation_tasks:', taskError);
-            // Don't log this error since it's not critical and might be a duplicate
-          } else {
-            addLog(`📊 Usage tracked: ${steps} steps, $${costUsd.toFixed(3)}`);
-          }
-
-          // Update the monthly usage immediately with the new steps only
-          setMonthlyUsage(prev => ({
-            ...prev,
-            tokens_used: prev.tokens_used + steps, // Track total steps instead of tokens
-            cost_usd: prev.cost_usd + costUsd
-          }));
-
-        } catch (dbError) {
-          console.error('Error saving usage to database:', dbError);
-          addLog(`⚠️ Usage tracking failed - data not saved`, 'error');
+      // 🔒 SECURE SERVER-SIDE USAGE RECORDING WITH VALIDATION
+      const { subscriptionService } = await import('../lib/subscriptionService');
+      const result = await subscriptionService.recordSecureFeatureUsage(
+        user.id,
+        'auto_apply',
+        steps,
+        costUsd,
+        {
+          task_id: taskId,
+          task_type: 'linkedin_auto_apply',
+          target_location: config.location,
+          target_role: config.jobTitle,
+          session_timestamp: new Date().toISOString()
         }
+      );
+
+      if (!result.success) {
+        console.error('Server-side usage recording failed:', result.error);
+        addLog(`❌ Usage validation failed: ${result.error}`, 'error');
+        
+        // If server-side validation fails, stop automation for security
+        if (result.error?.includes('Access denied') || result.error?.includes('limit exceeded')) {
+          addLog('🛑 Stopping automation due to usage limit violation', 'error');
+          await stopAutomation();
+          toast.error('Automation stopped: Usage limit validation failed');
+          return;
+        }
+      } else {
+        addLog(`✅ Usage validated & recorded: ${steps} steps ($${costUsd.toFixed(3)})`, 'success');
       }
+
+      // Update local state for immediate UI feedback
+      setMonthlyUsage(prev => ({
+        ...prev,
+        tokens_used: prev.tokens_used + steps,
+        cost_usd: prev.cost_usd + costUsd
+      }));
+      
     } catch (error) {
-      console.error('Error tracking usage:', error);
-      addLog(`❌ Error tracking usage: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      console.error('Critical error in usage tracking:', error);
+      addLog('🛑 Critical usage tracking error - stopping automation', 'error');
+      await stopAutomation();
+      toast.error('Automation stopped due to usage tracking failure');
     }
   };
 
@@ -906,6 +948,31 @@ This helps track which companies you applied to. Use the exact company names and
   };
 
   const startAutomation = async () => {
+    // 🔒 BULLETPROOF SECURITY CHECK - Server-side validation first
+    if (!user) {
+      setShowPaywall(true);
+      addLog('❌ Authentication required to start automation', 'error');
+      return;
+    }
+
+    try {
+      // Server-side access validation with estimated usage
+      const accessResult = await checkFeatureAccess('auto_apply');
+      if (!accessResult.hasAccess) {
+        addLog(`❌ Access denied: ${accessResult.reason}`, 'error');
+        toast.error('Access denied - subscription validation failed');
+        setShowPaywall(true);
+        return;
+      }
+
+      addLog(`✅ Access validated - automation authorized for current subscription`, 'success');
+    } catch (error) {
+      console.error('Security validation failed:', error);
+      addLog('❌ Security validation failed', 'error');
+      toast.error('Unable to validate access - please try again');
+      return;
+    }
+
     if (!config.jobTitle.trim()) {
       toast.error('Please enter a job title or keywords to search for');
       return;
@@ -1367,8 +1434,33 @@ This helps track which companies you applied to. Use the exact company names and
     );
   }
 
+  const handleUpgrade = () => {
+    navigate('/billing');
+  };
+
+  // Show loading state while checking access
+  if (!accessCheckComplete) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-8">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <span className="ml-3 text-gray-600 dark:text-gray-300">Checking access...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto space-y-8">
+      {/* Paywall Modal */}
+      <PaywallModal
+        isOpen={showPaywall}
+        onClose={() => setShowPaywall(false)}
+        feature="LinkedIn Auto Apply"
+        description="Automate your job applications with AI-powered LinkedIn bot that applies to relevant positions based on your preferences"
+        onUpgrade={handleUpgrade}
+        requiredPlan="any"
+      />
       {/* Simple Header */}
       <div className="text-center">
         <div className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full mb-6 shadow-lg">
@@ -1405,7 +1497,7 @@ This helps track which companies you applied to. Use the exact company names and
       )}
 
       {/* Configuration Panel Toggle */}
-      <div className="flex justify-center mb-8">
+      <div className="flex justify-center gap-4 mb-8">
         <button
           onClick={() => setShowConfigPanel(!showConfigPanel)}
           className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
@@ -1421,6 +1513,15 @@ This helps track which companies you applied to. Use the exact company names and
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           )}
+        </button>
+        
+        <button
+          onClick={() => setShowVoiceSetup(true)}
+          className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+        >
+          <Mic className="w-5 h-5 mr-2" />
+          Voice-Guided Setup
+          <Sparkles className="w-4 h-4 ml-2" />
         </button>
       </div>
 
@@ -1451,6 +1552,16 @@ This helps track which companies you applied to. Use the exact company names and
                 </div>
               </div>
               <div className="flex items-center space-x-3">
+                <button
+                  onClick={() => {
+                    setShowConfigPanel(false);
+                    setShowVoiceSetup(true);
+                  }}
+                  className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+                >
+                  <Mic className="w-5 h-5 mr-2" />
+                  Voice Setup
+                </button>
                 <button
                   onClick={saveConfiguration}
                   className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
@@ -1959,6 +2070,15 @@ This helps track which companies you applied to. Use the exact company names and
             </div>
           </div>
         </div>
+      )}
+
+      {/* Voice Setup Modal */}
+      {showVoiceSetup && (
+        <LinkedInVoiceSetup
+          onConfigurationComplete={handleVoiceConfigurationComplete}
+          onClose={() => setShowVoiceSetup(false)}
+          initialConfig={config}
+        />
       )}
     </div>
   );

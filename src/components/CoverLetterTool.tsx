@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FileText, 
@@ -28,10 +28,14 @@ import {
   Shield,
   Lightbulb,
   MessageSquare,
-  PenTool
+  PenTool,
+  Bot
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { openAIService, TokenUsageStats } from '../lib/openaiWithTokenTracking';
+import { usePaywall } from '../hooks/usePaywall';
+import PaywallModal from './ui/PaywallModal';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -59,6 +63,9 @@ interface GeneratedCoverLetter {
 }
 
 export const CoverLetterTool: React.FC = () => {
+  const navigate = useNavigate();
+  const { checkFeatureAccess, isAuthenticated } = usePaywall();
+  
   const [formData, setFormData] = useState<CoverLetterData>({
     jobTitle: '',
     companyName: '',
@@ -76,6 +83,8 @@ export const CoverLetterTool: React.FC = () => {
   const [generatedLetter, setGeneratedLetter] = useState<GeneratedCoverLetter | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [isResearching, setIsResearching] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [accessCheckComplete, setAccessCheckComplete] = useState(false);
 
   const tones = [
     { value: 'professional', label: 'Professional', desc: 'Formal and business-focused', color: 'from-blue-600 to-indigo-600' },
@@ -119,6 +128,31 @@ export const CoverLetterTool: React.FC = () => {
     }));
   };
 
+  // Check access on component mount
+  useEffect(() => {
+    const checkAccess = async () => {
+      if (!isAuthenticated) {
+        setShowPaywall(true);
+        setAccessCheckComplete(true);
+        return;
+      }
+
+      try {
+        const accessResult = await checkFeatureAccess('advanced_ai');
+        if (!accessResult.hasAccess) {
+          setShowPaywall(true);
+        }
+      } catch (error) {
+        console.error('Error checking feature access:', error);
+        setShowPaywall(true);
+      } finally {
+        setAccessCheckComplete(true);
+      }
+    };
+
+    checkAccess();
+  }, [isAuthenticated, checkFeatureAccess]);
+
   const researchCompany = async () => {
     if (!formData.companyName) {
       toast.error('Please enter a company name first');
@@ -147,6 +181,24 @@ export const CoverLetterTool: React.FC = () => {
   };
 
   const generateCoverLetter = async () => {
+    // Check access before generating
+    if (!isAuthenticated) {
+      setShowPaywall(true);
+      return;
+    }
+
+    try {
+      const accessResult = await checkFeatureAccess('advanced_ai');
+      if (!accessResult.hasAccess) {
+        setShowPaywall(true);
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking access before generation:', error);
+      setShowPaywall(true);
+      return;
+    }
+
     if (!formData.jobTitle || !formData.companyName || !formData.applicantName) {
       toast.error('Please fill in the required fields');
       return;
@@ -217,8 +269,34 @@ ${formData.achievements.filter(ach => ach.trim()).map(ach => `• ${ach}`).join(
     toast.success('Cover letter downloaded!');
   };
 
+  const handleUpgrade = () => {
+    navigate('/billing');
+  };
+
+  // Show loading state while checking access
+  if (!accessCheckComplete) {
+    return (
+      <div className="space-y-8">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+          <span className="ml-3 text-gray-600 dark:text-gray-300">Checking access...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
+      {/* Paywall Modal */}
+      <PaywallModal
+        isOpen={showPaywall}
+        onClose={() => setShowPaywall(false)}
+        feature="AI Cover Letter Generator"
+        description="Generate personalized, professional cover letters with AI that capture attention and showcase your unique value proposition"
+        onUpgrade={handleUpgrade}
+        requiredPlan="any"
+      />
+      
       {/* Header Section */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}

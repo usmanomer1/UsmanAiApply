@@ -1,4 +1,4 @@
-# AIApply - LinkedIn Auto Apply Dashboard
+# Jobotic - AI-Powered Job Application Platform
 
 A comprehensive job search automation platform with AI-powered LinkedIn Easy Apply functionality.
 

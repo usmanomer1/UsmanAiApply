@@ -29,11 +29,15 @@ import {
   Crown,
   Shield,
   Lightbulb,
-  PenTool
+  PenTool,
+  Bot
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { openAIService, ResumeAnalysisRequest, ResumeScore, ResumeCritique, ResumeRewrite } from '../lib/openaiWithTokenTracking';
 import { extractTextFromPDF } from '../lib/pdfExtractor';
+import { usePaywall } from '../hooks/usePaywall';
+import PaywallModal from './ui/PaywallModal';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -53,6 +57,9 @@ interface FormData {
 }
 
 export const ResumeTools: React.FC = () => {
+  const navigate = useNavigate();
+  const { checkFeatureAccess, isAuthenticated } = usePaywall();
+  
   const [activeTool, setActiveTool] = useState<Tool>('score');
   const [formData, setFormData] = useState<FormData>({
     resumeFile: null,
@@ -69,6 +76,8 @@ export const ResumeTools: React.FC = () => {
     critique?: ResumeCritique;
     rewrite?: ResumeRewrite;
   }>({});
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [accessCheckComplete, setAccessCheckComplete] = useState(false);
 
   const industries = [
     'Technology', 'Healthcare', 'Finance', 'Marketing', 'Sales', 'Education',
@@ -152,7 +161,50 @@ export const ResumeTools: React.FC = () => {
     return true;
   };
 
+  // Check access on component mount
+  useEffect(() => {
+    const checkAccess = async () => {
+      if (!isAuthenticated) {
+        setShowPaywall(true);
+        setAccessCheckComplete(true);
+        return;
+      }
+
+      try {
+        const accessResult = await checkFeatureAccess('advanced_ai');
+        if (!accessResult.hasAccess) {
+          setShowPaywall(true);
+        }
+      } catch (error) {
+        console.error('Error checking feature access:', error);
+        setShowPaywall(true);
+      } finally {
+        setAccessCheckComplete(true);
+      }
+    };
+
+    checkAccess();
+  }, [isAuthenticated, checkFeatureAccess]);
+
   const processResume = async () => {
+    // Check access before processing
+    if (!isAuthenticated) {
+      setShowPaywall(true);
+      return;
+    }
+
+    try {
+      const accessResult = await checkFeatureAccess('advanced_ai');
+      if (!accessResult.hasAccess) {
+        setShowPaywall(true);
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking access before processing:', error);
+      setShowPaywall(true);
+      return;
+    }
+
     if (!validateForm()) return;
 
     setIsProcessing(true);
@@ -234,8 +286,34 @@ export const ResumeTools: React.FC = () => {
     }
   };
 
+  const handleUpgrade = () => {
+    navigate('/billing');
+  };
+
+  // Show loading state while checking access
+  if (!accessCheckComplete) {
+    return (
+      <div className="space-y-8">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <span className="ml-3 text-gray-600 dark:text-gray-300">Checking access...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
+      {/* Paywall Modal */}
+      <PaywallModal
+        isOpen={showPaywall}
+        onClose={() => setShowPaywall(false)}
+        feature="AI Resume Tools"
+        description="Score, critique, and rewrite your resume with AI-powered analysis for maximum impact and ATS optimization"
+        onUpgrade={handleUpgrade}
+        requiredPlan="any"
+      />
+      
       {/* Header Section */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
