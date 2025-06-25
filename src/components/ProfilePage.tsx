@@ -20,7 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import Silk from './ui/Silk';
+import ConditionalBackground from './ui/ConditionalBackground';
 import VoiceAdminPanel from './voice/VoiceAdminPanel';
 
 interface Profile {
@@ -281,8 +281,7 @@ export const ProfilePage: React.FC = () => {
 
   return (
     <>
-      <Silk className="fixed inset-0 z-0" animate={false} />
-      <div className="fixed inset-0 bg-white/30 dark:bg-black/20 z-0"></div>
+              <ConditionalBackground className="fixed inset-0 z-0" animate={false} />
       <div className="relative min-h-screen space-y-8 z-10">
       {/* Header */}
       <motion.div

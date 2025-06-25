@@ -13,7 +13,7 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import Silk from './ui/Silk';
+import ConditionalBackground from './ui/ConditionalBackground';
 
 // Session type descriptions for CS interview practice
 const SESSION_DESCRIPTIONS = {
@@ -128,8 +128,7 @@ export const InterviewPractice: React.FC<InterviewPracticeProps> = ({ className 
 
   return (
     <>
-      <Silk className="fixed inset-0 z-0" animate={false} />
-      <div className="fixed inset-0 bg-white/30 dark:bg-black/20 z-0"></div>
+              <ConditionalBackground className="fixed inset-0 z-0" animate={false} />
       <div className={`relative min-h-screen max-w-4xl mx-auto p-6 space-y-6 z-10 ${className}`}>
       {/* Paywall Modal */}
       <PaywallModal

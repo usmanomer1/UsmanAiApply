@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
-import Silk from '../ui/Silk';
+import ConditionalBackground from '../ui/ConditionalBackground';
 import { 
   STRIPE_PRODUCTS, 
   getProductByPriceId, 
@@ -409,8 +409,7 @@ This will create the default configuration needed for the billing portal to work
 
   return (
     <>
-      <Silk className="fixed inset-0 z-0" animate={false} />
-      <div className="fixed inset-0 bg-white/30 dark:bg-black/20 z-0"></div>
+              <ConditionalBackground className="fixed inset-0 z-0" animate={false} />
       <div className="relative min-h-screen py-12 z-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}

@@ -37,7 +37,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import Silk from './ui/Silk';
+import ConditionalBackground from './ui/ConditionalBackground';
 import LinkedInVoiceSetup from './voice/LinkedInVoiceSetup';
 
 interface TaskStatus {
@@ -1453,8 +1453,7 @@ This helps track which companies you applied to. Use the exact company names and
 
   return (
     <>
-      <Silk className="fixed inset-0 z-0" animate={false} />
-      <div className="fixed inset-0 bg-white/30 dark:bg-black/20 z-0"></div>
+                      <ConditionalBackground className="fixed inset-0 z-0" animate={false} />
       <div className="relative min-h-screen max-w-4xl mx-auto space-y-8 z-10">
       {/* Paywall Modal */}
       <PaywallModal
