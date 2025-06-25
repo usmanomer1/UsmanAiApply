@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -36,6 +37,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import toast from 'react-hot-toast';
+import Silk from '../ui/Silk';
 
 interface DashboardStats {
   totalApplications: number;
@@ -78,6 +80,7 @@ interface NewApplicationData {
 
 export const DashboardHome: React.FC = () => {
   const { user } = useAuth();
+  const { isDark } = useTheme();
   const [stats, setStats] = useState<DashboardStats>({
     totalApplications: 0,
     thisWeekApplications: 0,
@@ -537,20 +540,24 @@ export const DashboardHome: React.FC = () => {
     return (
       <div className="space-y-8">
         <div className="animate-pulse">
-          <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded-lg w-1/3 mb-4"></div>
+          <div className="h-10 bg-white/20 dark:bg-white/20 rounded-lg w-1/3 mb-4 shimmer"></div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-32 bg-gray-200 dark:bg-gray-700 rounded-2xl"></div>
+              <div key={i} className="h-32 bg-white/20 dark:bg-white/20 rounded-2xl shimmer"></div>
             ))}
           </div>
-          <div className="h-96 bg-gray-200 dark:bg-gray-700 rounded-2xl"></div>
+          <div className="h-96 bg-white/20 dark:bg-white/20 rounded-2xl shimmer"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
+    <>
+      <Silk className="fixed inset-0 z-0" animate={false} />
+      {/* Subtle overlay for better text contrast */}
+      <div className="fixed inset-0 bg-white/30 dark:bg-black/20 z-0"></div>
+      <div className="relative min-h-screen space-y-8 z-10">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -570,16 +577,26 @@ export const DashboardHome: React.FC = () => {
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
-          <Button onClick={fetchDashboardData} variant="outline" size="sm">
+          <Button 
+            onClick={fetchDashboardData} 
+            variant="outline" 
+            size="sm"
+            className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"
+          >
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
-          <Button onClick={exportData} variant="outline" size="sm">
+          <Button 
+            onClick={exportData} 
+            variant="outline" 
+            size="sm"
+            className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"
+          >
             <Download className="w-4 h-4 mr-2" />
             Export
           </Button>
           <Link to="/auto-apply">
-            <Button size="sm" className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
+            <Button size="sm" className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white">
               <Zap className="w-4 h-4 mr-2" />
               Start Auto Apply
             </Button>
@@ -606,8 +623,8 @@ export const DashboardHome: React.FC = () => {
               </div>
             </div>
             <div className="mt-4 flex items-center">
-              <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-              <span className="text-sm text-green-600 dark:text-green-400">+{stats.thisWeekApplications} this week</span>
+              <TrendingUp className="w-5 h-5 text-green-800 dark:text-green-300 mr-2 font-bold" />
+              <span className="text-base font-semibold text-green-800 dark:text-green-300">+{stats.thisWeekApplications} this week</span>
             </div>
           </CardContent>
         </Card>
@@ -624,8 +641,8 @@ export const DashboardHome: React.FC = () => {
               </div>
             </div>
             <div className="mt-4 flex items-center">
-              <CheckCircle className="w-4 h-4 text-emerald-500 mr-1" />
-              <span className="text-sm text-emerald-600 dark:text-emerald-400">Accepted/Applied</span>
+              <CheckCircle className="w-5 h-5 text-emerald-800 dark:text-emerald-300 mr-2 font-bold" />
+              <span className="text-base font-semibold text-emerald-800 dark:text-emerald-300">Accepted/Applied</span>
             </div>
           </CardContent>
         </Card>
@@ -642,8 +659,8 @@ export const DashboardHome: React.FC = () => {
               </div>
             </div>
             <div className="mt-4 flex items-center">
-              <Clock className="w-4 h-4 text-purple-500 mr-1" />
-              <span className="text-sm text-purple-600 dark:text-purple-400">In progress</span>
+              <Clock className="w-5 h-5 text-purple-800 dark:text-purple-300 mr-2 font-bold" />
+              <span className="text-base font-semibold text-purple-800 dark:text-purple-300">In progress</span>
             </div>
           </CardContent>
         </Card>
@@ -660,8 +677,8 @@ export const DashboardHome: React.FC = () => {
               </div>
             </div>
             <div className="mt-4 flex items-center">
-              <Zap className="w-4 h-4 text-amber-500 mr-1" />
-              <span className="text-sm text-amber-600 dark:text-amber-400">{stats.tokensUsed} used</span>
+              <Zap className="w-5 h-5 text-amber-800 dark:text-amber-300 mr-2 font-bold" />
+              <span className="text-base font-semibold text-amber-800 dark:text-amber-300">{stats.tokensUsed} used</span>
             </div>
           </CardContent>
         </Card>
@@ -682,7 +699,7 @@ export const DashboardHome: React.FC = () => {
                 <Activity className="w-5 h-5 text-white" />
               </div>
               <div>
-                <CardTitle className="text-xl text-gray-900 dark:text-white">Application Trend</CardTitle>
+                <CardTitle className="text-xl text-gray-900 dark:text-white">Application Trends</CardTitle>
                 <CardDescription className="text-gray-600 dark:text-gray-300">
                   Daily applications over the past week
                 </CardDescription>
@@ -693,16 +710,34 @@ export const DashboardHome: React.FC = () => {
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={applicationTrendData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-                  <XAxis dataKey="name" stroke="#6B7280" />
-                  <YAxis stroke="#6B7280" />
+                  <CartesianGrid 
+                    strokeDasharray="3 3" 
+                    stroke="currentColor" 
+                    opacity={0.2}
+                    className="text-gray-300 dark:text-gray-600"
+                  />
+                  <XAxis 
+                    dataKey="name" 
+                    stroke="currentColor"
+                    className="text-gray-700 dark:text-gray-300"
+                    tick={{ fill: 'currentColor', fontSize: 12 }}
+                  />
+                  <YAxis 
+                    stroke="currentColor"
+                    className="text-gray-700 dark:text-gray-300"
+                    tick={{ fill: 'currentColor', fontSize: 12 }}
+                  />
                   <Tooltip 
                     contentStyle={{ 
-                      backgroundColor: '#1F2937', 
-                      border: 'none', 
+                      backgroundColor: isDark ? 'rgba(31, 41, 55, 0.95)' : 'rgba(255, 255, 255, 0.95)', 
+                      border: isDark ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.1)', 
                       borderRadius: '8px',
-                      color: '#F9FAFB'
-                    }} 
+                      color: isDark ? '#f9fafb' : '#111827',
+                      backdropFilter: 'blur(10px)',
+                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
+                    }}
+                    labelStyle={{ color: isDark ? '#f9fafb' : '#111827', fontWeight: 'bold' }}
+                    itemStyle={{ color: isDark ? '#d1d5db' : '#374151' }}
                   />
                   <Line 
                     type="monotone" 
@@ -754,11 +789,15 @@ export const DashboardHome: React.FC = () => {
                       </Pie>
                       <Tooltip 
                         contentStyle={{ 
-                          backgroundColor: '#1F2937', 
-                          border: 'none', 
+                          backgroundColor: isDark ? 'rgba(31, 41, 55, 0.95)' : 'rgba(255, 255, 255, 0.95)', 
+                          border: isDark ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.1)', 
                           borderRadius: '8px',
-                          color: '#F9FAFB'
-                        }} 
+                          color: isDark ? '#f9fafb' : '#111827',
+                          backdropFilter: 'blur(10px)',
+                          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
+                        }}
+                        labelStyle={{ color: isDark ? '#f9fafb' : '#111827', fontWeight: 'bold' }}
+                        itemStyle={{ color: isDark ? '#d1d5db' : '#374151' }}
                       />
                     </RechartsPieChart>
                   </ResponsiveContainer>
@@ -897,13 +936,17 @@ export const DashboardHome: React.FC = () => {
                 <Button 
                   onClick={() => setIsAddModalOpen(true)}
                   size="sm"
-                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Add Application
                 </Button>
                 <Link to="/applications">
-                  <Button variant="outline" size="sm">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"
+                  >
                     <Eye className="w-4 h-4 mr-2" />
                     View All
                   </Button>
@@ -914,18 +957,18 @@ export const DashboardHome: React.FC = () => {
             {/* Search and Filter Controls */}
             <div className="flex flex-col sm:flex-row gap-4 mt-6">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none z-10" />
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none z-10" />
                 <Input
                   type="text"
                   placeholder="Search applications..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm"
+                  className="pl-12 premium-input"
                 />
               </div>
               
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full sm:w-48 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm">
+                <SelectTrigger className="w-full sm:w-48 premium-select">
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -952,7 +995,10 @@ export const DashboardHome: React.FC = () => {
                     : 'Try adjusting your search or filter criteria.'
                   }
                 </p>
-                <Button onClick={() => setIsAddModalOpen(true)}>
+                <Button 
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+                >
                   <Plus className="w-4 h-4 mr-2" />
                   Add Application
                 </Button>
@@ -965,7 +1011,7 @@ export const DashboardHome: React.FC = () => {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.1 }}
-                    className="flex items-center justify-between p-4 bg-white/50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-all duration-200 backdrop-blur-sm"
+                    className="flex items-center justify-between p-4 glass-card rounded-xl hover:shadow-lg transition-all duration-200"
                   >
                     <div className="flex items-center space-x-4">
                       <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-800 dark:to-blue-700 rounded-xl flex items-center justify-center">
@@ -988,7 +1034,11 @@ export const DashboardHome: React.FC = () => {
                         {application.status}
                       </Badge>
                       <Link to="/applications">
-                        <Button variant="ghost" size="sm">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          className="text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white"
+                        >
                           <Eye className="w-4 h-4" />
                         </Button>
                       </Link>
@@ -999,7 +1049,10 @@ export const DashboardHome: React.FC = () => {
                 {filteredApplications.length > 0 && (
                   <div className="text-center pt-4">
                     <Link to="/applications">
-                      <Button variant="outline">
+                      <Button 
+                        variant="outline"
+                        className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"
+                      >
                         View All Applications
                         <ArrowRight className="w-4 h-4 ml-2" />
                       </Button>
@@ -1039,7 +1092,7 @@ export const DashboardHome: React.FC = () => {
                   placeholder="Company name"
                   value={newApplication.company}
                   onChange={(e) => setNewApplication(prev => ({ ...prev, company: e.target.value }))}
-                  className="bg-white/60 dark:bg-gray-800/60"
+                  className="premium-input"
                 />
               </div>
               <div className="space-y-2">
@@ -1050,7 +1103,7 @@ export const DashboardHome: React.FC = () => {
                   placeholder="Job title"
                   value={newApplication.role}
                   onChange={(e) => setNewApplication(prev => ({ ...prev, role: e.target.value }))}
-                  className="bg-white/60 dark:bg-gray-800/60"
+                  className="premium-input"
                 />
               </div>
             </div>
@@ -1064,7 +1117,7 @@ export const DashboardHome: React.FC = () => {
                   value={newApplication.status} 
                   onValueChange={(value) => setNewApplication(prev => ({ ...prev, status: value }))}
                 >
-                  <SelectTrigger className="bg-white/60 dark:bg-gray-800/60">
+                  <SelectTrigger className="premium-select">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1084,7 +1137,7 @@ export const DashboardHome: React.FC = () => {
                   placeholder="City, State"
                   value={newApplication.location}
                   onChange={(e) => setNewApplication(prev => ({ ...prev, location: e.target.value }))}
-                  className="bg-white/60 dark:bg-gray-800/60"
+                  className="premium-input"
                 />
               </div>
             </div>
@@ -1120,6 +1173,7 @@ export const DashboardHome: React.FC = () => {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </>
   );
 };

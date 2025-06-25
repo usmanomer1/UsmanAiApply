@@ -3,6 +3,7 @@ import React, { forwardRef, useMemo, useRef, useLayoutEffect } from "react";
 import { Canvas, useFrame, useThree, RootState } from "@react-three/fiber";
 import { Color, Mesh, ShaderMaterial } from "three";
 import { IUniform } from "three";
+import { useTheme } from "../../contexts/ThemeContext";
 
 type NormalizedRGB = [number, number, number];
 
@@ -74,11 +75,8 @@ void main() {
   tex.y += 0.03 * sin(8.0 * tex.x - tOffset);
 
   float pattern = 0.6 +
-                  0.4 * sin(5.0 * (tex.x + tex.y +
-                                   cos(3.0 * tex.x + 5.0 * tex.y) +
-                                   0.02 * tOffset) +
-                           sin(20.0 * (tex.x + tex.y - 0.1 * tOffset)));
-
+                  0.4 * sin(5.0 * (tex.x + tex.y + cos(3.0 * tex.x + 5.0 * tex.y) + 0.02 * tOffset) + sin(20.0 * (tex.x + tex.y - 0.1 * tOffset)));
+   
   vec4 col = vec4(uColor, 1.0) * vec4(pattern) - rnd / 15.0 * uNoiseIntensity;
   col.a = 1.0;
   gl_FragColor = col;
@@ -87,10 +85,11 @@ void main() {
 
 interface SilkPlaneProps {
   uniforms: SilkUniforms;
+  animate?: boolean;
 }
 
 const SilkPlane = forwardRef<Mesh, SilkPlaneProps>(function SilkPlane(
-  { uniforms },
+  { uniforms, animate = true },
   ref
 ) {
   const { viewport } = useThree();
@@ -103,6 +102,7 @@ const SilkPlane = forwardRef<Mesh, SilkPlaneProps>(function SilkPlane(
   }, [ref, viewport]);
 
   useFrame((_state: RootState, delta: number) => {
+    if (!animate) return; // Skip animation if disabled
     const mesh = ref as React.MutableRefObject<Mesh | null>;
     if (mesh.current) {
       const material = mesh.current.material as ShaderMaterial & {
@@ -129,36 +129,55 @@ export interface SilkProps {
   speed?: number;
   scale?: number;
   color?: string;
+  lightColor?: string;
+  darkColor?: string;
   noiseIntensity?: number;
   rotation?: number;
+  className?: string;
+  animate?: boolean;
 }
 
-const Silk: React.FC<SilkProps> = ({
+const Silk: React.FC<SilkProps> = ({ 
   speed = 5,
   scale = 1,
-  color = "#7B7481",
+  color,
+  lightColor = "#F8FAFC", // Extra-light gray-blue for light mode
+  darkColor = "#374151",   // Dark gray for dark mode
   noiseIntensity = 1.5,
   rotation = 0,
+  className = "absolute inset-0",
+  animate = true
 }) => {
+  const { isDark } = useTheme();
   const meshRef = useRef<Mesh>(null);
+
+  // Determine which color to use - prioritize explicit color, then theme-based colors
+  const effectiveColor = color || (isDark ? darkColor : lightColor);
 
   const uniforms = useMemo<SilkUniforms>(
     () => ({
       uSpeed: { value: speed },
       uScale: { value: scale },
       uNoiseIntensity: { value: noiseIntensity },
-      uColor: { value: new Color(...hexToNormalizedRGB(color)) },
+      uColor: { value: new Color(...hexToNormalizedRGB(effectiveColor)) },
       uRotation: { value: rotation },
       uTime: { value: 0 },
     }),
-    [speed, scale, noiseIntensity, color, rotation]
+    [speed, scale, noiseIntensity, effectiveColor, rotation]
   );
-
+   
   return (
-    <Canvas dpr={[1, 2]} frameloop="always">
-      <SilkPlane ref={meshRef} uniforms={uniforms} />
-    </Canvas>
+    <div className={className}>
+      <Canvas 
+        key={isDark ? 'dark' : 'light'} 
+        dpr={[1, 2]} 
+        frameloop="always" 
+        style={{ background: "transparent" }}
+      >
+        <SilkPlane ref={meshRef} uniforms={uniforms} animate={animate} />
+      </Canvas>
+    </div>
   );
 };
 
-export default Silk; 
+export default Silk;

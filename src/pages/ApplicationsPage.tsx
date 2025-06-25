@@ -30,6 +30,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
+import Silk from '../components/ui/Silk';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
@@ -265,7 +266,10 @@ export const ApplicationsPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-8">
+    <>
+      <Silk className="fixed inset-0 z-0" animate={false} />
+      <div className="fixed inset-0 bg-white/30 dark:bg-black/20 z-0"></div>
+      <div className="relative min-h-screen space-y-8 z-10">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -291,18 +295,18 @@ export const ApplicationsPage: React.FC = () => {
         {!error && (
           <div className="flex items-center space-x-3">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none z-10" />
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 w-4 h-4 pointer-events-none z-10" />
               <Input
                 type="text"
                 placeholder="Search applications..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-64"
+                className="pl-12 w-64 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 placeholder-gray-500 dark:placeholder-gray-400"
               />
             </div>
             
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-48 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800">
                 <SelectValue placeholder="All Status" />
               </SelectTrigger>
               <SelectContent>
@@ -324,7 +328,7 @@ export const ApplicationsPage: React.FC = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
       >
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden glass-card">
         {error ? (
           <div className="text-center py-12">
             <Building className="w-16 h-16 text-red-400 mx-auto mb-4" />
@@ -366,53 +370,53 @@ export const ApplicationsPage: React.FC = () => {
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Company & Role</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Applied Date</TableHead>
-                  <TableHead>Actions</TableHead>
+                <TableRow className="border-b border-gray-200 dark:border-gray-700">
+                  <TableHead className="text-base font-bold text-gray-900 dark:text-white py-4">Company & Role</TableHead>
+                  <TableHead className="text-base font-bold text-gray-900 dark:text-white py-4">Location</TableHead>
+                  <TableHead className="text-base font-bold text-gray-900 dark:text-white py-4">Status</TableHead>
+                  <TableHead className="text-base font-bold text-gray-900 dark:text-white py-4">Applied Date</TableHead>
+                  <TableHead className="text-base font-bold text-gray-900 dark:text-white py-4">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredApplications.map((app, index) => (
-                  <TableRow key={app.id}>
-                    <TableCell>
+                  <TableRow key={app.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                    <TableCell className="py-5">
                       <div className="flex items-center">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-800 dark:to-blue-700 rounded-lg flex items-center justify-center mr-4">
-                          <Building className="w-5 h-5 text-blue-600 dark:text-blue-300" />
+                        <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-800 dark:to-blue-700 rounded-xl flex items-center justify-center mr-4">
+                          <Building className="w-6 h-6 text-blue-600 dark:text-blue-300" />
                         </div>
                         <div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">{app.company}</div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">{app.role}</div>
+                          <div className="text-base font-bold text-gray-900 dark:text-white">{app.company}</div>
+                          <div className="text-sm font-medium text-gray-700 dark:text-gray-300">{app.role}</div>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                        <MapPin className="w-4 h-4 mr-1" />
+                    <TableCell className="py-5">
+                      <div className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <MapPin className="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400" />
                         {app.campaign.location}
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-5">
                       <Badge className={getStatusColor(app.status)}>
                         {getStatusIcon(app.status)}
-                        <span className="ml-2">{app.status}</span>
+                        <span className="ml-2 font-semibold">{app.status}</span>
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                        <Calendar className="w-4 h-4 mr-1" />
+                    <TableCell className="py-5">
+                      <div className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <Calendar className="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400" />
                         {new Date(app.applied_at).toLocaleDateString()}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right py-5">
                       <div className="flex items-center justify-end space-x-2">
                         <Button 
                           variant="ghost" 
                           size="icon"
                           onClick={() => handleViewApplication(app)}
-                          className="hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                          className="hover:bg-blue-50 dark:hover:bg-blue-900/20 text-gray-600 dark:text-gray-300 hover:text-blue-700 dark:hover:text-blue-300"
                         >
                           <Eye className="w-4 h-4" />
                         </Button>
@@ -420,7 +424,7 @@ export const ApplicationsPage: React.FC = () => {
                           variant="ghost" 
                           size="icon"
                           onClick={() => handleEditApplication(app)}
-                          className="hover:bg-green-50 dark:hover:bg-green-900/20"
+                          className="hover:bg-green-50 dark:hover:bg-green-900/20 text-gray-600 dark:text-gray-300 hover:text-green-700 dark:hover:text-green-300"
                         >
                           <Edit3 className="w-4 h-4" />
                         </Button>
@@ -431,7 +435,7 @@ export const ApplicationsPage: React.FC = () => {
                             setSelectedApplication(app);
                             setIsDeleteDialogOpen(true);
                           }}
-                          className="hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 hover:text-red-700"
+                          className="hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -448,37 +452,37 @@ export const ApplicationsPage: React.FC = () => {
 
       {/* View Application Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center space-x-2">
-              <Building className="w-5 h-5" />
+        <DialogContent className="max-w-3xl bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border border-white/25 dark:border-white/15 shadow-2xl rounded-3xl">
+          <DialogHeader className="pb-6">
+            <DialogTitle className="flex items-center space-x-3 text-2xl font-bold text-gray-900 dark:text-white">
+              <Building className="w-7 h-7" />
               <span>Application Details</span>
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-base text-gray-700 dark:text-gray-300 mt-2">
               View detailed information about this job application
             </DialogDescription>
           </DialogHeader>
           {selectedApplication && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Company</label>
-                  <p className="text-lg font-semibold text-gray-900 dark:text-white">{selectedApplication.company}</p>
+            <div className="space-y-8">
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-base font-bold text-gray-800 dark:text-gray-200">Company</label>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">{selectedApplication.company}</p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Role</label>
-                  <p className="text-lg font-semibold text-gray-900 dark:text-white">{selectedApplication.role}</p>
+                <div className="space-y-2">
+                  <label className="text-base font-bold text-gray-800 dark:text-gray-200">Role</label>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">{selectedApplication.role}</p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
-                  <Badge className={getStatusColor(selectedApplication.status)}>
+                <div className="space-y-2">
+                  <label className="text-base font-bold text-gray-800 dark:text-gray-200">Status</label>
+                  <Badge className={`${getStatusColor(selectedApplication.status)} text-base px-4 py-2`}>
                     {getStatusIcon(selectedApplication.status)}
-                    <span className="ml-2">{selectedApplication.status}</span>
+                    <span className="ml-2 font-bold">{selectedApplication.status}</span>
                   </Badge>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Applied Date</label>
-                  <p className="text-gray-900 dark:text-white">
+                <div className="space-y-2">
+                  <label className="text-base font-bold text-gray-800 dark:text-gray-200">Applied Date</label>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-white">
                     {new Date(selectedApplication.applied_at).toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'long',
@@ -486,26 +490,15 @@ export const ApplicationsPage: React.FC = () => {
                     })}
                   </p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Location</label>
-                  <p className="text-gray-900 dark:text-white">{selectedApplication.campaign.location}</p>
+                <div className="space-y-2">
+                  <label className="text-base font-bold text-gray-800 dark:text-gray-200">Location</label>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-white">{selectedApplication.campaign.location}</p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Job Title</label>
-                  <p className="text-gray-900 dark:text-white">{selectedApplication.campaign.job_title}</p>
+                <div className="space-y-2">
+                  <label className="text-base font-bold text-gray-800 dark:text-gray-200">Job Title</label>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-white">{selectedApplication.campaign.job_title}</p>
                 </div>
               </div>
-              
-              {selectedApplication.details && Object.keys(selectedApplication.details).length > 0 && (
-                <div>
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">Additional Details</label>
-                  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                    <pre className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                      {JSON.stringify(selectedApplication.details, null, 2)}
-                    </pre>
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </DialogContent>
@@ -606,6 +599,7 @@ export const ApplicationsPage: React.FC = () => {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </>
   );
 };

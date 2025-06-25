@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { 
   User, 
@@ -20,6 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
+import Silk from './ui/Silk';
 import VoiceAdminPanel from './voice/VoiceAdminPanel';
 
 interface Profile {
@@ -47,8 +48,17 @@ export const ProfilePage: React.FC = () => {
   const [resumeUrl, setResumeUrl] = useState<string | null>(null);
   const [showVoiceAdmin, setShowVoiceAdmin] = useState(false);
 
-  // Simple admin check - you can replace this with your actual admin logic
-  const isAdmin = user?.email === 'admin@jobotic.ai' || user?.email === 'usman@jobotic.ai';
+  // Admin check using environment variable
+  const isAdmin = useMemo(() => {
+    if (!user?.email) return false;
+    
+    const adminEmails = import.meta.env.VITE_ADMIN_EMAILS;
+    if (!adminEmails) return false;
+    
+    // Split by comma and trim whitespace, then check if user email is in the list
+    const adminEmailList = adminEmails.split(',').map((email: string) => email.trim().toLowerCase());
+    return adminEmailList.includes(user.email.toLowerCase());
+  }, [user?.email]);
 
   useEffect(() => {
     // Always fetch profile, regardless of user state
@@ -256,12 +266,12 @@ export const ProfilePage: React.FC = () => {
     return (
       <div className="space-y-8">
         <div className="animate-pulse">
-          <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded-lg w-1/3 mb-4"></div>
-          <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mb-8"></div>
+          <div className="h-10 bg-white/20 dark:bg-white/20 rounded-lg w-1/3 mb-4 shimmer"></div>
+          <div className="h-6 bg-white/20 dark:bg-white/20 rounded w-1/2 mb-8 shimmer"></div>
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {[...Array(2)].map((_, i) => (
-              <div key={i} className="h-96 bg-gray-200 dark:bg-gray-700 rounded-2xl shimmer"></div>
+              <div key={i} className="h-96 bg-white/20 dark:bg-white/20 rounded-2xl shimmer"></div>
             ))}
           </div>
         </div>
@@ -270,7 +280,10 @@ export const ProfilePage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-8">
+    <>
+      <Silk className="fixed inset-0 z-0" animate={false} />
+      <div className="fixed inset-0 bg-white/30 dark:bg-black/20 z-0"></div>
+      <div className="relative min-h-screen space-y-8 z-10">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -295,7 +308,7 @@ export const ProfilePage: React.FC = () => {
           <Button
             onClick={() => setShowVoiceAdmin(!showVoiceAdmin)}
             variant="outline"
-            className="mb-6 bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+            className="mb-6 premium-button-ghost"
           >
             <Mic className="w-4 h-4 mr-2" />
             {showVoiceAdmin ? 'Hide Voice Admin' : 'Show Voice Admin Panel'}
@@ -489,6 +502,7 @@ export const ProfilePage: React.FC = () => {
           </div>
         </motion.div>
       </div>
-    </div>
+      </div>
+    </>
   );
 };

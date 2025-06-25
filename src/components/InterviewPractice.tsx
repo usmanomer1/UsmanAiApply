@@ -13,6 +13,7 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import Silk from './ui/Silk';
 
 // Session type descriptions for CS interview practice
 const SESSION_DESCRIPTIONS = {
@@ -126,7 +127,10 @@ export const InterviewPractice: React.FC<InterviewPracticeProps> = ({ className 
   }
 
   return (
-    <div className={`max-w-4xl mx-auto p-6 space-y-6 ${className}`}>
+    <>
+      <Silk className="fixed inset-0 z-0" animate={false} />
+      <div className="fixed inset-0 bg-white/30 dark:bg-black/20 z-0"></div>
+      <div className={`relative min-h-screen max-w-4xl mx-auto p-6 space-y-6 z-10 ${className}`}>
       {/* Paywall Modal */}
       <PaywallModal
         isOpen={showPaywall}
@@ -385,7 +389,11 @@ export const InterviewPractice: React.FC<InterviewPracticeProps> = ({ className 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
-        className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4"
+                        className="rounded-lg p-4"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02))',
+                  backdropFilter: 'blur(10px)'
+                }}
       >
         <h3 className="font-medium text-gray-900 dark:text-white mb-2 flex items-center">
           <BookOpen className="w-4 h-4 mr-2" />
@@ -400,7 +408,8 @@ export const InterviewPractice: React.FC<InterviewPracticeProps> = ({ className 
           <li>• <strong>Ask for Clarification:</strong> Don't hesitate to ask the interviewer to clarify questions</li>
         </ul>
       </motion.div>
-    </div>
+      </div>
+    </>
   );
 };
 

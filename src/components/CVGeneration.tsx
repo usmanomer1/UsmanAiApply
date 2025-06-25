@@ -48,6 +48,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import Silk from './ui/Silk';
 
 interface PersonalInfo {
   fullName: string;
@@ -394,7 +395,10 @@ ${cvData.projects.filter(proj => proj.name).length > 0 ? 'PROJECTS\n' + cvData.p
   }
 
   return (
-    <div className="space-y-8">
+    <>
+      <Silk className="fixed inset-0 z-0" animate={false} />
+      <div className="fixed inset-0 bg-white/30 dark:bg-black/20 z-0"></div>
+      <div className="relative min-h-screen space-y-8 z-10">
       {/* Paywall Modal */}
       <PaywallModal
         isOpen={showPaywall}
@@ -449,8 +453,12 @@ ${cvData.projects.filter(proj => proj.name).length > 0 ? 'PROJECTS\n' + cvData.p
                             ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white scale-110' 
                             : isCompleted
                             ? 'bg-gradient-to-br from-green-500 to-emerald-600 text-white'
-                            : 'bg-white/50 dark:bg-gray-800/50 text-gray-400 backdrop-blur-sm'
+                            : 'text-gray-400 backdrop-blur-sm'
                         }`}
+                        style={!isActive && !isCompleted ? {
+                          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05))',
+                          backdropFilter: 'blur(10px) saturate(180%)'
+                        } : {}}
                       >
                         {isCompleted ? (
                           <CheckCircle className="w-6 h-6" />
@@ -728,7 +736,11 @@ ${cvData.projects.filter(proj => proj.name).length > 0 ? 'PROJECTS\n' + cvData.p
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-8 max-h-96 overflow-y-auto backdrop-blur-sm">
+                  <div className="border border-white/20 dark:border-white/10 rounded-xl p-8 max-h-96 overflow-y-auto backdrop-blur-sm"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05))',
+                    backdropFilter: 'blur(15px) saturate(180%)'
+                  }}>
                     <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 font-mono leading-relaxed">
                       {generatedCV}
                     </pre>
@@ -796,6 +808,7 @@ ${cvData.projects.filter(proj => proj.name).length > 0 ? 'PROJECTS\n' + cvData.p
           </CardContent>
         </Card>
       </motion.div>
-    </div>
+      </div>
+    </>
   );
 };

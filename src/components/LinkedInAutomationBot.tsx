@@ -37,6 +37,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import Silk from './ui/Silk';
 import LinkedInVoiceSetup from './voice/LinkedInVoiceSetup';
 
 interface TaskStatus {
@@ -1427,8 +1428,8 @@ This helps track which companies you applied to. Use the exact company names and
     return (
       <div className="space-y-8">
         <div className="animate-pulse">
-          <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded-lg w-1/3 mb-4"></div>
-          <div className="h-96 bg-gray-200 dark:bg-gray-700 rounded-2xl"></div>
+                      <div className="h-10 bg-white/20 dark:bg-white/20 rounded-lg w-1/3 mb-4 shimmer"></div>
+            <div className="h-96 bg-white/20 dark:bg-white/20 rounded-2xl shimmer"></div>
         </div>
       </div>
     );
@@ -1451,7 +1452,10 @@ This helps track which companies you applied to. Use the exact company names and
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <>
+      <Silk className="fixed inset-0 z-0" animate={false} />
+      <div className="fixed inset-0 bg-white/30 dark:bg-black/20 z-0"></div>
+      <div className="relative min-h-screen max-w-4xl mx-auto space-y-8 z-10">
       {/* Paywall Modal */}
       <PaywallModal
         isOpen={showPaywall}
@@ -1535,7 +1539,7 @@ This helps track which companies you applied to. Use the exact company names and
           />
           
           {/* Modal */}
-          <div className="relative bg-white/20 dark:bg-gray-900/20 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/30 dark:border-gray-700/30 p-8 w-full max-w-5xl max-h-[90vh] overflow-y-auto animate-modal-popup">
+          <div className="relative glass-card rounded-3xl p-8 w-full max-w-5xl max-h-[90vh] overflow-y-auto animate-modal-popup">
             {/* Premium Header */}
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center space-x-4">
@@ -1571,7 +1575,7 @@ This helps track which companies you applied to. Use the exact company names and
                 </button>
                 <button
                   onClick={() => setShowConfigPanel(false)}
-                  className="p-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
+                  className="p-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-white/10 dark:hover:bg-white/10 rounded-xl transition-colors"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1899,7 +1903,7 @@ This helps track which companies you applied to. Use the exact company names and
       )}
 
       {/* Control Panel */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-8">
+                      <div className="glass-card rounded-xl p-8">
         <div className="flex items-center space-x-4 mb-8">
           <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg">
             <Activity className="w-6 h-6 text-white" />
@@ -1996,14 +2000,18 @@ This helps track which companies you applied to. Use the exact company names and
 
         {/* Status Display */}
         {currentTask && (
-          <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-xl">
+                          <div className="mt-6 p-4 rounded-xl"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02))',
+                    backdropFilter: 'blur(10px)'
+                  }}>
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Current Status</span>
               <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                 currentTask.status === 'running' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' :
                 currentTask.status === 'paused' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400' :
                 currentTask.status === 'finished' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400' :
-                'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
+                                  'bg-white/10 text-gray-800 dark:bg-white/10 dark:text-gray-400 backdrop-blur-sm'
               }`}>
                 {currentTask.status}
               </span>
@@ -2017,7 +2025,7 @@ This helps track which companies you applied to. Use the exact company names and
 
       {/* Browser Preview */}
       {currentTask?.live_url && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+                  <div className="glass-card rounded-xl p-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
@@ -2039,8 +2047,16 @@ This helps track which companies you applied to. Use the exact company names and
             </a>
           </div>
           
-          <div className="relative w-full bg-gray-100 dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+          <div className="relative w-full rounded-xl overflow-hidden border border-white/20 dark:border-white/10"
+            style={{
+              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02))',
+              backdropFilter: 'blur(10px)'
+            }}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/20 dark:border-white/10"
+              style={{
+                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03))',
+                backdropFilter: 'blur(15px)'
+              }}>
               <div className="flex items-center space-x-2">
                 <div className="flex space-x-1">
                   <div className="w-3 h-3 bg-red-500 rounded-full"></div>
@@ -2080,7 +2096,8 @@ This helps track which companies you applied to. Use the exact company names and
           initialConfig={config}
         />
       )}
-    </div>
+      </div>
+    </>
   );
 };
 

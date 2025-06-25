@@ -41,6 +41,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import Silk from './ui/Silk';
 
 interface CoverLetterData {
   jobTitle: string;
@@ -286,7 +287,10 @@ ${formData.achievements.filter(ach => ach.trim()).map(ach => `• ${ach}`).join(
   }
 
   return (
-    <div className="space-y-8">
+    <>
+      <Silk className="fixed inset-0 z-0" animate={false} />
+      <div className="fixed inset-0 bg-white/30 dark:bg-black/20 z-0"></div>
+      <div className="relative min-h-screen space-y-8 z-10">
       {/* Paywall Modal */}
       <PaywallModal
         isOpen={showPaywall}
@@ -710,7 +714,11 @@ ${formData.achievements.filter(ach => ach.trim()).map(ach => `• ${ach}`).join(
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="bg-white/50 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700 max-h-96 overflow-y-auto backdrop-blur-sm">
+                <div className="rounded-xl p-6 border border-white/20 dark:border-white/10 max-h-96 overflow-y-auto backdrop-blur-sm"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05))',
+                    backdropFilter: 'blur(15px) saturate(180%)'
+                  }}>
                   <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-sans">
                     {generatedLetter.coverLetter}
                   </pre>
@@ -819,6 +827,7 @@ ${formData.achievements.filter(ach => ach.trim()).map(ach => `• ${ach}`).join(
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+      </div>
+    </>
   );
 };
