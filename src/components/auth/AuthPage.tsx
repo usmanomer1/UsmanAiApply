@@ -142,11 +142,11 @@ export const AuthPage: React.FC = () => {
         {/* Silk Background */}
         <div className="absolute inset-0">
           <Silk
-            speed={3}
-            scale={1.2}
-            color="#4338ca"
-            noiseIntensity={0.8}
-            rotation={0.1}
+            speed={5}
+            scale={1}
+            color="#7B7481"
+            noiseIntensity={1.5}
+            rotation={0}
           />
         </div>
         
