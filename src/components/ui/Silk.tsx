@@ -1,6 +1,131 @@
-import React from 'react';
+/* eslint-disable react/no-unknown-property */
+import React, { forwardRef, useMemo, useRef, useLayoutEffect } from "react";
+import { Canvas, useFrame, useThree, RootState } from "@react-three/fiber";
+import { Color, Mesh, ShaderMaterial } from "three";
+import { IUniform } from "three";
 
-interface SilkProps {
+type NormalizedRGB = [number, number, number];
+
+const hexToNormalizedRGB = (hex: string): NormalizedRGB => {
+  const clean = hex.replace("#", "");
+  const r = parseInt(clean.slice(0, 2), 16) / 255;
+  const g = parseInt(clean.slice(2, 4), 16) / 255;
+  const b = parseInt(clean.slice(4, 6), 16) / 255;
+  return [r, g, b];
+};
+
+interface UniformValue<T = number | Color> {
+  value: T;
+}
+
+interface SilkUniforms {
+  uSpeed: UniformValue<number>;
+  uScale: UniformValue<number>;
+  uNoiseIntensity: UniformValue<number>;
+  uColor: UniformValue<Color>;
+  uRotation: UniformValue<number>;
+  uTime: UniformValue<number>;
+  [uniform: string]: IUniform;
+}
+
+const vertexShader = `
+varying vec2 vUv;
+varying vec3 vPosition;
+
+void main() {
+  vPosition = position;
+  vUv = uv;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+
+const fragmentShader = `
+varying vec2 vUv;
+varying vec3 vPosition;
+
+uniform float uTime;
+uniform vec3  uColor;
+uniform float uSpeed;
+uniform float uScale;
+uniform float uRotation;
+uniform float uNoiseIntensity;
+
+const float e = 2.71828182845904523536;
+
+float noise(vec2 texCoord) {
+  float G = e;
+  vec2  r = (G * sin(G * texCoord));
+  return fract(r.x * r.y * (1.0 + texCoord.x));
+}
+
+vec2 rotateUvs(vec2 uv, float angle) {
+  float c = cos(angle);
+  float s = sin(angle);
+  mat2  rot = mat2(c, -s, s, c);
+  return rot * uv;
+}
+
+void main() {
+  float rnd        = noise(gl_FragCoord.xy);
+  vec2  uv         = rotateUvs(vUv * uScale, uRotation);
+  vec2  tex        = uv * uScale;
+  float tOffset    = uSpeed * uTime;
+
+  tex.y += 0.03 * sin(8.0 * tex.x - tOffset);
+
+  float pattern = 0.6 +
+                  0.4 * sin(5.0 * (tex.x + tex.y +
+                                   cos(3.0 * tex.x + 5.0 * tex.y) +
+                                   0.02 * tOffset) +
+                           sin(20.0 * (tex.x + tex.y - 0.1 * tOffset)));
+
+  vec4 col = vec4(uColor, 1.0) * vec4(pattern) - rnd / 15.0 * uNoiseIntensity;
+  col.a = 1.0;
+  gl_FragColor = col;
+}
+`;
+
+interface SilkPlaneProps {
+  uniforms: SilkUniforms;
+}
+
+const SilkPlane = forwardRef<Mesh, SilkPlaneProps>(function SilkPlane(
+  { uniforms },
+  ref
+) {
+  const { viewport } = useThree();
+
+  useLayoutEffect(() => {
+    const mesh = ref as React.MutableRefObject<Mesh | null>;
+    if (mesh.current) {
+      mesh.current.scale.set(viewport.width, viewport.height, 1);
+    }
+  }, [ref, viewport]);
+
+  useFrame((_state: RootState, delta: number) => {
+    const mesh = ref as React.MutableRefObject<Mesh | null>;
+    if (mesh.current) {
+      const material = mesh.current.material as ShaderMaterial & {
+        uniforms: SilkUniforms;
+      };
+      material.uniforms.uTime.value += 0.1 * delta;
+    }
+  });
+
+  return (
+    <mesh ref={ref}>
+      <planeGeometry args={[1, 1, 1, 1]} />
+      <shaderMaterial
+        uniforms={uniforms}
+        vertexShader={vertexShader}
+        fragmentShader={fragmentShader}
+      />
+    </mesh>
+  );
+});
+SilkPlane.displayName = "SilkPlane";
+
+export interface SilkProps {
   speed?: number;
   scale?: number;
   color?: string;
@@ -11,168 +136,28 @@ interface SilkProps {
 const Silk: React.FC<SilkProps> = ({
   speed = 5,
   scale = 1,
-  color = "#4338ca",
+  color = "#7B7481",
   noiseIntensity = 1.5,
   rotation = 0,
 }) => {
-  const animationDuration = 20 / speed;
-  const animationDurationReverse = animationDuration * 1.5;
-  const animationDurationTexture = animationDuration * 2;
-  
+  const meshRef = useRef<Mesh>(null);
+
+  const uniforms = useMemo<SilkUniforms>(
+    () => ({
+      uSpeed: { value: speed },
+      uScale: { value: scale },
+      uNoiseIntensity: { value: noiseIntensity },
+      uColor: { value: new Color(...hexToNormalizedRGB(color)) },
+      uRotation: { value: rotation },
+      uTime: { value: 0 },
+    }),
+    [speed, scale, noiseIntensity, color, rotation]
+  );
+
   return (
-    <div 
-      className="absolute inset-0 overflow-hidden"
-      style={{
-        background: `linear-gradient(45deg, ${color}22, ${color}44, ${color}66)`,
-      }}
-    >
-      {/* Primary Wave */}
-      <div
-        className="absolute inset-0 opacity-30"
-        style={{
-          background: `
-            radial-gradient(circle at 20% 80%, ${color} 0%, transparent 50%),
-            radial-gradient(circle at 80% 20%, ${color} 0%, transparent 50%),
-            radial-gradient(circle at 40% 40%, ${color}88 0%, transparent 50%)
-          `,
-          animation: `silk-wave ${animationDuration}s ease-in-out infinite`,
-          transform: `scale(${scale}) rotate(${rotation}rad)`,
-        }}
-      />
-
-      {/* Secondary Wave */}  
-      <div
-        className="absolute inset-0 opacity-20"
-        style={{
-          background: `
-            conic-gradient(from 0deg at 50% 50%, ${color}44, transparent, ${color}44),
-            radial-gradient(ellipse at center, transparent 40%, ${color}22 70%)
-          `,
-          animation: `silk-wave-reverse ${animationDurationReverse}s ease-in-out infinite`,
-          transform: `scale(${scale * 1.1}) rotate(${-rotation}rad)`,
-        }}
-      />
-
-      {/* Tertiary Layer for Texture */}
-      <div
-        className="absolute inset-0 opacity-15"
-        style={{
-          background: `
-            repeating-linear-gradient(
-              45deg,
-              ${color}11 0px,
-              transparent 2px,
-              transparent 20px,
-              ${color}22 22px
-            ),
-            repeating-linear-gradient(
-              -45deg,
-              ${color}11 0px,
-              transparent 2px,
-              transparent 30px,
-              ${color}33 32px
-            )
-          `,
-          animation: `silk-texture ${animationDurationTexture}s linear infinite`,
-          filter: `blur(${noiseIntensity}px)`,
-        }}
-      />
-
-      {/* Floating Particles */}
-      <div className="absolute inset-0">
-        {[...Array(8)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute rounded-full opacity-20"
-            style={{
-              width: `${Math.random() * 4 + 2}px`,
-              height: `${Math.random() * 4 + 2}px`,
-              backgroundColor: color,
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animation: `silk-float-${i % 3} ${5 + Math.random() * 10}s ease-in-out infinite`,
-              animationDelay: `${Math.random() * 5}s`,
-            }}
-          />
-        ))}
-      </div>
-
-      {/* CSS Animations */}
-      <style>{`
-        @keyframes silk-wave {
-          0%, 100% {
-            transform: scale(${scale}) rotate(${rotation}rad) translate(0%, 0%);
-          }
-          25% {
-            transform: scale(${scale * 1.05}) rotate(${rotation + 0.1}rad) translate(-2%, 1%);
-          }
-          50% {
-            transform: scale(${scale}) rotate(${rotation}rad) translate(1%, -1%);
-          }
-          75% {
-            transform: scale(${scale * 0.95}) rotate(${rotation - 0.1}rad) translate(-1%, 2%);
-          }
-        }
-
-        @keyframes silk-wave-reverse {
-          0%, 100% {
-            transform: scale(${scale * 1.1}) rotate(${-rotation}rad) translate(0%, 0%);
-          }
-          33% {
-            transform: scale(${scale * 1.15}) rotate(${-rotation - 0.15}rad) translate(2%, -1%);
-          }
-          67% {
-            transform: scale(${scale * 1.05}) rotate(${-rotation + 0.1}rad) translate(-1%, 1%);
-          }
-        }
-
-        @keyframes silk-texture {
-          0% {
-            transform: translate(0px, 0px);
-          }
-          100% {
-            transform: translate(-50px, -50px);
-          }
-        }
-
-        @keyframes silk-float-0 {
-          0%, 100% {
-            transform: translateY(0px) translateX(0px);
-            opacity: 0.1;
-          }
-          50% {
-            transform: translateY(-20px) translateX(10px);
-            opacity: 0.3;
-          }
-        }
-
-        @keyframes silk-float-1 {
-          0%, 100% {
-            transform: translateY(0px) translateX(0px) rotate(0deg);
-            opacity: 0.2;
-          }
-          33% {
-            transform: translateY(-15px) translateX(-5px) rotate(120deg);
-            opacity: 0.4;
-          }
-          67% {
-            transform: translateY(10px) translateX(15px) rotate(240deg);
-            opacity: 0.1;
-          }
-        }
-
-        @keyframes silk-float-2 {
-          0%, 100% {
-            transform: scale(1) translateY(0px);
-            opacity: 0.15;
-          }
-          50% {
-            transform: scale(1.2) translateY(-25px);
-            opacity: 0.25;
-          }
-        }
-      `}</style>
-    </div>
+    <Canvas dpr={[1, 2]} frameloop="always">
+      <SilkPlane ref={meshRef} uniforms={uniforms} />
+    </Canvas>
   );
 };
 
