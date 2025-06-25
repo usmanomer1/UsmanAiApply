@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, Mail, Lock, User, Eye, EyeOff, Sparkles, Shield, Zap, CheckCircle, ArrowRight } from 'lucide-react';
+import { Bot, Mail, Lock, User, Eye, EyeOff, Sparkles, Shield, Zap, CheckCircle, ArrowRight, ArrowLeft, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
@@ -8,11 +8,16 @@ import { Input } from '../ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Logo } from '../ui/Logo';
 import { getMaintenanceConfig, canAccessDuringMaintenance } from '../../lib/maintenance';
+import Silk from '../ui/Silk';
+import { supabase } from '../../lib/supabase';
+
+type AuthMode = 'login' | 'signup' | 'forgot-password' | 'reset-password';
 
 export const AuthPage: React.FC = () => {
-  const [isLogin, setIsLogin] = useState(true);
+  const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -39,30 +44,54 @@ export const AuthPage: React.FC = () => {
     }
   }, [user, navigate]);
 
+  // Clear message after 5 seconds
+  useEffect(() => {
+    if (message) {
+      const timer = setTimeout(() => setMessage(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setMessage(null);
     
     // Check maintenance mode for non-admin users
     if (!canAccessDuringMaintenance(formData.email)) {
-      alert(maintenanceMessage);
+      setMessage({ type: 'error', text: maintenanceMessage });
       return;
     }
 
     setLoading(true);
 
     try {
-      if (isLogin) {
+      if (authMode === 'login') {
         await signIn(formData.email, formData.password);
-      } else {
+      } else if (authMode === 'signup') {
         // Disable signup during maintenance mode
         if (isMaintenanceMode) {
-          alert('New registrations are temporarily disabled during maintenance.');
+          setMessage({ type: 'error', text: 'New registrations are temporarily disabled during maintenance.' });
           return;
         }
         await signUp(formData.email, formData.password, formData.fullName);
+      } else if (authMode === 'forgot-password') {
+        const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
+          redirectTo: `${window.location.origin}/auth?mode=reset-password`,
+        });
+        
+        if (error) {
+          setMessage({ type: 'error', text: error.message });
+        } else {
+          setMessage({ 
+            type: 'success', 
+            text: 'Password reset email sent! Check your inbox and follow the instructions.' 
+          });
+          // Reset form
+          setFormData({ email: '', password: '', fullName: '' });
+        }
       }
-    } catch (error) {
-      // Error handling is done in the auth context
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error.message || 'An error occurred' });
     } finally {
       setLoading(false);
     }
@@ -86,36 +115,45 @@ export const AuthPage: React.FC = () => {
     }
   ];
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex">
-      {/* Left Side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700"></div>
-        <div className="absolute inset-0 bg-black/20"></div>
-        
-        {/* Animated Background Elements */}
-        <div className="absolute inset-0">
-          {[...Array(20)].map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute w-2 h-2 bg-white/20 rounded-full"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-              }}
-              animate={{
-                y: [0, -20, 0],
-                opacity: [0.2, 0.8, 0.2],
-              }}
-              transition={{
-                duration: 3 + Math.random() * 2,
-                repeat: Infinity,
-                delay: Math.random() * 2,
-              }}
-            />
-          ))}
-        </div>
+  const getFormTitle = () => {
+    switch (authMode) {
+      case 'login': return 'Welcome Back';
+      case 'signup': return 'Get Started';
+      case 'forgot-password': return 'Reset Password';
+      case 'reset-password': return 'Set New Password';
+      default: return 'Welcome';
+    }
+  };
 
+  const getFormDescription = () => {
+    switch (authMode) {
+      case 'login': return 'Sign in to continue your job search journey';
+      case 'signup': return 'Create your account and start applying with AI';
+      case 'forgot-password': return 'Enter your email to receive reset instructions';
+      case 'reset-password': return 'Enter your new password';
+      default: return '';
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex">
+      {/* Left Side - Silk Background with Branding */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
+        {/* Silk Background */}
+        <div className="absolute inset-0">
+          <Silk
+            speed={3}
+            scale={1.2}
+            color="#4338ca"
+            noiseIntensity={0.8}
+            rotation={0.1}
+          />
+        </div>
+        
+        {/* Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/90 via-purple-600/80 to-blue-800/90"></div>
+        
+        {/* Content */}
         <div className="relative z-10 flex flex-col justify-center px-12 py-16">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -123,12 +161,12 @@ export const AuthPage: React.FC = () => {
             transition={{ duration: 0.8 }}
           >
             <div className="flex items-center space-x-3 mb-8">
-              <div className="p-2 bg-white/90 backdrop-blur-sm rounded-2xl">
+              <div className="p-3 bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg">
                 <Logo width={48} height={48} />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-white">Jobotic</h1>
-                <p className="text-blue-100 text-sm">Premium Job Search Platform</p>
+                <h1 className="text-3xl font-bold text-white">Jobotic</h1>
+                <p className="text-indigo-100 text-sm font-medium">Premium Job Search Platform</p>
               </div>
             </div>
 
@@ -136,7 +174,7 @@ export const AuthPage: React.FC = () => {
               Land Your Dream Job with AI-Powered Automation
             </h2>
             
-            <p className="text-xl text-blue-100 mb-12 leading-relaxed">
+            <p className="text-xl text-indigo-100 mb-12 leading-relaxed">
               Join thousands of professionals who've accelerated their job search with our intelligent automation platform.
             </p>
 
@@ -151,12 +189,12 @@ export const AuthPage: React.FC = () => {
                     transition={{ duration: 0.6, delay: 0.2 + index * 0.1 }}
                     className="flex items-start space-x-4"
                   >
-                    <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center flex-shrink-0">
-                      <Icon className="w-5 h-5 text-white" />
+                    <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
+                      <Icon className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                      <h3 className="text-white font-semibold mb-1">{feature.title}</h3>
-                      <p className="text-blue-100 text-sm">{feature.description}</p>
+                      <h3 className="text-white font-semibold mb-2 text-lg">{feature.title}</h3>
+                      <p className="text-indigo-100 text-sm leading-relaxed">{feature.description}</p>
                     </div>
                   </motion.div>
                 );
@@ -167,34 +205,36 @@ export const AuthPage: React.FC = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.8 }}
-              className="mt-12 p-6 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20"
+              className="mt-12 p-6 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20 shadow-xl"
             >
               <div className="flex items-center space-x-3 mb-3">
-                <CheckCircle className="w-5 h-5 text-emerald-300" />
-                <span className="text-white font-semibold">Success Story</span>
+                <CheckCircle className="w-6 h-6 text-emerald-300" />
+                <span className="text-white font-semibold text-lg">Success Story</span>
               </div>
-              <p className="text-blue-100 text-sm italic">
+              <p className="text-indigo-100 text-sm italic leading-relaxed">
                 "Jobotic helped me land my dream job at Google in just 2 weeks. The AI automation saved me hours of manual applications!"
               </p>
-              <p className="text-blue-200 text-xs mt-2">- Sarah Chen, Software Engineer</p>
+              <p className="text-indigo-200 text-xs mt-3 font-medium">- Sarah Chen, Software Engineer</p>
             </motion.div>
           </motion.div>
         </div>
       </div>
 
       {/* Right Side - Auth Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gradient-to-br from-gray-50 to-white">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
           className="w-full max-w-md"
         >
-          <Card className="bg-white/90 backdrop-blur-xl border-white/50 shadow-3xl">
+          <Card className="bg-white/95 backdrop-blur-xl border-gray-200/50 shadow-2xl">
             {/* Mobile Logo */}
             <div className="lg:hidden text-center mb-8 pt-8">
               <div className="inline-flex items-center justify-center mb-4">
-                <Logo width={64} height={64} />
+                <div className="p-3 bg-indigo-100 rounded-2xl">
+                  <Logo width={64} height={64} />
+                </div>
               </div>
               <h1 className="text-2xl font-bold text-gray-900">Jobotic</h1>
               <p className="text-gray-600 mt-1">Premium Job Search Platform</p>
@@ -202,20 +242,21 @@ export const AuthPage: React.FC = () => {
 
             <CardHeader className="text-center pb-4">
               <CardTitle className="text-3xl font-bold text-gray-900 mb-2">
-                {isLogin ? 'Welcome Back' : 'Get Started'}
+                {getFormTitle()}
               </CardTitle>
               <CardDescription className="text-gray-600 text-base">
-                {isLogin 
-                  ? 'Sign in to continue your job search journey' 
-                  : 'Create your account and start applying with AI'
-                }
+                {getFormDescription()}
               </CardDescription>
             </CardHeader>
 
             <CardContent>
               {/* Maintenance Mode Banner */}
               {isMaintenanceMode && (
-                <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl"
+                >
                   <div className="flex items-center space-x-2">
                     <Shield className="w-5 h-5 text-amber-600" />
                     <span className="text-amber-800 font-medium">Maintenance Mode</span>
@@ -226,135 +267,192 @@ export const AuthPage: React.FC = () => {
                   <p className="text-amber-600 text-xs mt-2">
                     Admin access only during this period.
                   </p>
-                </div>
+                </motion.div>
               )}
 
-
-
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <AnimatePresence mode="wait">
-                {!isLogin && (
+              {/* Message Display */}
+              <AnimatePresence>
+                {message && (
                   <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.3 }}
+                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                    className={`mb-6 p-4 rounded-xl border ${
+                      message.type === 'success'
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                        : 'bg-red-50 border-red-200 text-red-800'
+                    }`}
                   >
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Full Name
-                    </label>
-                    <div className="relative">
-                      <User className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
-                      <Input
-                        type="text"
-                        required
-                        value={formData.fullName}
-                        onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                        className="pl-12"
-                        placeholder="Enter your full name"
-                      />
+                    <div className="flex items-start space-x-2">
+                      {message.type === 'success' ? (
+                        <CheckCircle className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
+                      ) : (
+                        <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                      )}
+                      <p className="text-sm leading-relaxed">{message.text}</p>
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Email Address
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
-                  <Input
-                    type="email"
-                    required
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="pl-12"
-                    placeholder="Enter your email"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Password
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
-                  <Input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="pl-12 pr-12"
-                    placeholder="Enter your password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors z-10"
-                  >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
-              </div>
-
-              <motion.div
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  size="lg"
-                  className="w-full text-lg font-bold shadow-xl"
-                >
-                  {loading ? (
-                    <div className="flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
-                      Processing...
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center">
-                      {isLogin ? 'Sign In' : 'Create Account'}
-                      <ArrowRight className="w-5 h-5 ml-2" />
-                    </div>
+              {/* Form */}
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <AnimatePresence mode="wait">
+                  {authMode === 'signup' && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Full Name
+                      </label>
+                      <div className="relative">
+                        <User className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
+                        <Input
+                          type="text"
+                          required
+                          value={formData.fullName}
+                          onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                          className="pl-12 h-12 text-base border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                          placeholder="Enter your full name"
+                        />
+                      </div>
+                    </motion.div>
                   )}
-                </Button>
-              </motion.div>
-            </form>
+                </AnimatePresence>
 
-            {/* Toggle */}
-            <div className="mt-8 text-center">
-              <button
-                onClick={() => setIsLogin(!isLogin)}
-                className="text-blue-600 hover:text-blue-700 font-semibold transition-colors"
-              >
-                {isLogin 
-                  ? "Don't have an account? Sign up" 
-                  : 'Already have an account? Sign in'
-                }
-              </button>
-            </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Email Address
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
+                    <Input
+                      type="email"
+                      required
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      className="pl-12 h-12 text-base border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                      placeholder="Enter your email"
+                    />
+                  </div>
+                </div>
 
-            {/* Trust Indicators */}
-            <div className="mt-8 pt-6 border-t border-gray-200">
-              <div className="flex items-center justify-center space-x-6 text-xs text-gray-500">
-                <div className="flex items-center">
-                  <Shield className="w-4 h-4 mr-1" />
-                  <span>256-bit SSL</span>
-                </div>
-                <div className="flex items-center">
-                  <CheckCircle className="w-4 h-4 mr-1" />
-                  <span>GDPR Compliant</span>
-                </div>
-                <div className="flex items-center">
-                  <Sparkles className="w-4 h-4 mr-1" />
-                  <span>SOC 2 Certified</span>
+                {authMode !== 'forgot-password' && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Password
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
+                      <Input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        className="pl-12 pr-12 h-12 text-base border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                        placeholder="Enter your password"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors z-10"
+                      >
+                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Forgot Password Link */}
+                {authMode === 'login' && (
+                  <div className="text-right">
+                    <button
+                      type="button"
+                      onClick={() => setAuthMode('forgot-password')}
+                      className="text-sm text-indigo-600 hover:text-indigo-700 font-medium transition-colors"
+                    >
+                      Forgot your password?
+                    </button>
+                  </div>
+                )}
+
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Button
+                    type="submit"
+                    disabled={loading}
+                    size="lg"
+                    className="w-full text-lg font-bold shadow-xl h-12 bg-indigo-600 hover:bg-indigo-700"
+                  >
+                    {loading ? (
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+                        Processing...
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center">
+                        {authMode === 'login' && 'Sign In'}
+                        {authMode === 'signup' && 'Create Account'}
+                        {authMode === 'forgot-password' && 'Send Reset Email'}
+                        {authMode === 'reset-password' && 'Update Password'}
+                        <ArrowRight className="w-5 h-5 ml-2" />
+                      </div>
+                    )}
+                  </Button>
+                </motion.div>
+              </form>
+
+              {/* Navigation Links */}
+              <div className="mt-8 space-y-4">
+                {authMode === 'forgot-password' && (
+                  <div className="text-center">
+                    <button
+                      onClick={() => setAuthMode('login')}
+                      className="text-indigo-600 hover:text-indigo-700 font-semibold transition-colors flex items-center justify-center"
+                    >
+                      <ArrowLeft className="w-4 h-4 mr-2" />
+                      Back to Sign In
+                    </button>
+                  </div>
+                )}
+
+                {(authMode === 'login' || authMode === 'signup') && (
+                  <div className="text-center">
+                    <button
+                      onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
+                      className="text-indigo-600 hover:text-indigo-700 font-semibold transition-colors"
+                    >
+                      {authMode === 'login'
+                        ? "Don't have an account? Sign up"
+                        : 'Already have an account? Sign in'
+                      }
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Trust Indicators */}
+              <div className="mt-8 pt-6 border-t border-gray-200">
+                <div className="flex items-center justify-center space-x-6 text-xs text-gray-500">
+                  <div className="flex items-center">
+                    <Shield className="w-4 h-4 mr-1" />
+                    <span>256-bit SSL</span>
+                  </div>
+                  <div className="flex items-center">
+                    <CheckCircle className="w-4 h-4 mr-1" />
+                    <span>GDPR Compliant</span>
+                  </div>
+                  <div className="flex items-center">
+                    <Sparkles className="w-4 h-4 mr-1" />
+                    <span>SOC 2 Certified</span>
+                  </div>
                 </div>
               </div>
-            </div>
             </CardContent>
           </Card>
         </motion.div>
