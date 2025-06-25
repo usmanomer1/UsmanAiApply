@@ -23,3 +23,78 @@ dist-ssr
 *.sln
 *.sw?
 .env
+
+# Local Netlify folder
+.netlify
+
+# =========================================
+# SECURITY & PERFORMANCE OPTIMIZATIONS
+# =========================================
+
+# Supabase - Backend files (SECURITY CRITICAL)
+supabase/migrations/
+supabase/functions/
+supabase/config.toml
+supabase/.temp/
+.supabase/
+
+# Environment and secrets
+.env*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Database and migration files
+*.sql
+*.sqlite
+*.db
+
+# Development and build tools (PERFORMANCE)
+.bolt/
+.turbo/
+.parcel-cache/
+.cache/
+.temp/
+.tmp/
+*.tsbuildinfo
+*.tgz
+*.tar.gz
+
+# Testing and coverage
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+*.lcov
+
+# Documentation and README files (optional)
+docs/
+*.md
+!README.md
+
+# Package manager alternative files
+yarn.lock
+pnpm-lock.yaml
+
+# IDE and system files
+.DS_Store
+Thumbs.db
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# Deployment and CI/CD
+.vercel/
+.now/
+.github/
+.gitlab-ci.yml
+netlify.toml
+!netlify.toml
+
+# Analytics and tracking
+.analytics/
+stats.html
+bundle-analyzer/
