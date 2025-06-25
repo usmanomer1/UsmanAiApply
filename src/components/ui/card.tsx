@@ -5,16 +5,20 @@ import { cn } from "../../lib/utils"
 const Card = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn(
-      "glass-card rounded-3xl transition-all duration-300",
-      className
-    )}
-    {...props}
-  />
-))
+>(({ className, ...props }, ref) => {
+  // Use premium-card if provided, otherwise default to glass-card
+  const baseClass = className?.includes('premium-card') 
+    ? "rounded-3xl transition-all duration-300" 
+    : "glass-card rounded-3xl transition-all duration-300";
+  
+  return (
+    <div
+      ref={ref}
+      className={cn(baseClass, className)}
+      {...props}
+    />
+  );
+})
 Card.displayName = "Card"
 
 const CardHeader = React.forwardRef<

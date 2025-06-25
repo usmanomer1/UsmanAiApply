@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
+import Silk from '../ui/Silk';
 import { 
   STRIPE_PRODUCTS, 
   getProductByPriceId, 
@@ -407,7 +408,10 @@ This will create the default configuration needed for the billing portal to work
   const aiTokenProgress = getUsageProgress(usage?.ai_tokens_used || 0, limits.aiTokens);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12">
+    <>
+      <Silk className="fixed inset-0 z-0" animate={false} />
+      <div className="fixed inset-0 bg-white/30 dark:bg-black/20 z-0"></div>
+      <div className="relative min-h-screen py-12 z-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-12">
@@ -428,14 +432,14 @@ This will create the default configuration needed for the billing portal to work
         {subscription && (subscription.subscription_status === 'active' || !isSupabaseConfigured()) && (
           <div className="max-w-4xl mx-auto mb-12 space-y-6">
             {/* Current Plan Card */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
+            <div className="glass-card rounded-2xl p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Current Plan</h3>
                 <button
                   type="button"
                   onClick={handleRefresh}
                   disabled={refreshing}
-                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+                  className="p-2 hover:bg-white/10 dark:hover:bg-white/10 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
                   title="Refresh billing data"
                 >
                   <RefreshCw className={`w-4 h-4 text-gray-500 ${refreshing ? 'animate-spin' : ''}`} />
@@ -466,7 +470,7 @@ This will create the default configuration needed for the billing portal to work
               <button
                 type="button"
                 onClick={openBillingPortal}
-                className="w-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white py-2 px-4 rounded-lg transition-colors text-sm font-medium cursor-pointer"
+                className="w-full bg-white/10 dark:bg-white/10 hover:bg-white/20 dark:hover:bg-white/20 text-gray-900 dark:text-white py-2 px-4 rounded-lg transition-colors text-sm font-medium cursor-pointer backdrop-blur-sm"
               >
                 <ExternalLink className="w-4 h-4 inline mr-2" />
                 Manage Subscription
@@ -476,7 +480,7 @@ This will create the default configuration needed for the billing portal to work
             {/* Usage Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Automation Steps Usage */}
-              <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
+              <div className="glass-card rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center space-x-3">
                     <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg">
@@ -502,7 +506,7 @@ This will create the default configuration needed for the billing portal to work
                   </div>
                   
                   {limits.applications > 0 && (
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                    <div className="w-full bg-white/20 dark:bg-white/20 rounded-full h-3">
                       <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${applicationProgress}%` }}
@@ -531,7 +535,7 @@ This will create the default configuration needed for the billing portal to work
               </div>
 
               {/* AI Tokens Usage */}
-              <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
+              <div className="glass-card rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center space-x-3">
                     <div className="p-2 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg">
@@ -557,7 +561,7 @@ This will create the default configuration needed for the billing portal to work
                   </div>
                   
                   {limits.aiTokens > 0 && (
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                    <div className="w-full bg-white/20 dark:bg-white/20 rounded-full h-3">
                       <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${aiTokenProgress}%` }}
@@ -615,7 +619,7 @@ This will create the default configuration needed for the billing portal to work
                       </button>
                       <button 
                         onClick={() => setActiveTab('tokens')}
-                        className="bg-white dark:bg-gray-800 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 hover:bg-amber-50 dark:hover:bg-amber-900/20 px-6 py-3 rounded-xl font-semibold transition-colors"
+                        className="bg-white/10 dark:bg-white/10 border border-amber-200/50 dark:border-amber-400/50 text-amber-800 dark:text-amber-200 hover:bg-white/20 dark:hover:bg-white/20 px-6 py-3 rounded-xl font-semibold transition-colors backdrop-blur-sm"
                       >
                         <Package className="w-5 h-5 mr-2 inline" />
                         Buy Token Packs
@@ -630,7 +634,7 @@ This will create the default configuration needed for the billing portal to work
 
         {/* Plan Toggle */}
         <div className="flex justify-center mb-12 relative z-10">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-1 shadow-lg border border-gray-200 dark:border-gray-700">
+          <div className="glass-card rounded-2xl p-1">
             <button
               type="button"
               onClick={() => setActiveTab('subscriptions')}
@@ -671,7 +675,7 @@ This will create the default configuration needed for the billing portal to work
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  className={`relative bg-white dark:bg-gray-800 rounded-2xl shadow-lg border transition-all duration-300 hover:shadow-xl ${
+                  className={`relative glass-card rounded-2xl transition-all duration-300 hover:shadow-xl ${
                     isCurrentPlan
                       ? 'border-blue-500 ring-2 ring-blue-500 ring-opacity-20'
                       : isPopular
@@ -757,7 +761,7 @@ This will create the default configuration needed for the billing portal to work
                       disabled={isCurrentPlan || purchasing === product.priceId}
                       className={`w-full py-3 px-4 rounded-xl font-semibold transition-all ${
                         isCurrentPlan
-                          ? 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                          ? 'bg-white/10 dark:bg-white/10 text-gray-500 dark:text-gray-400 cursor-not-allowed backdrop-blur-sm'
                           : isPopular
                           ? 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl'
                           : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl'
@@ -790,7 +794,7 @@ This will create the default configuration needed for the billing portal to work
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
-                className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-300 hover:shadow-xl"
+                className="glass-card rounded-2xl transition-all duration-300 hover:shadow-xl"
               >
                 <div className="p-8">
                   {/* Token Pack Header */}
@@ -886,6 +890,7 @@ This will create the default configuration needed for the billing portal to work
           </button>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 };

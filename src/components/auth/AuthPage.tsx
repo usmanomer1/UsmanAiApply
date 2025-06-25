@@ -144,14 +144,13 @@ export const AuthPage: React.FC = () => {
           <Silk
             speed={5}
             scale={1}
-            color="#7B7481"
             noiseIntensity={1.5}
             rotation={0}
           />
         </div>
         
-        {/* Subtle Overlay to enhance readability */}
-        <div className="absolute inset-0 bg-black/10"></div>
+        {/* Enhanced Overlay for better text readability */}
+        <div className="absolute inset-0 bg-black/60"></div>
         
         {/* Content */}
         <div className="relative z-10 flex flex-col justify-center px-12 py-16">

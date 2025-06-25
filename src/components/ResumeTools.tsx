@@ -43,6 +43,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import Silk from './ui/Silk';
 
 type Tool = 'score' | 'judge' | 'rewrite';
 
@@ -303,7 +304,10 @@ export const ResumeTools: React.FC = () => {
   }
 
   return (
-    <div className="space-y-8">
+    <>
+      <Silk className="fixed inset-0 z-0" animate={false} />
+      <div className="fixed inset-0 bg-white/30 dark:bg-black/20 z-0"></div>
+      <div className="relative min-h-screen space-y-8 z-10">
       {/* Paywall Modal */}
       <PaywallModal
         isOpen={showPaywall}
@@ -432,7 +436,11 @@ export const ResumeTools: React.FC = () => {
                 />
                 <label
                   htmlFor="resume-upload"
-                  className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl cursor-pointer hover:border-blue-500 dark:hover:border-blue-400 transition-colors bg-gray-50/50 dark:bg-gray-800/50 hover:bg-blue-50/50 dark:hover:bg-blue-900/20 backdrop-blur-sm"
+                  className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-white/30 dark:border-white/20 rounded-xl cursor-pointer hover:border-blue-400/50 dark:hover:border-blue-400/50 transition-colors hover:bg-white/10 dark:hover:bg-white/5 backdrop-blur-sm"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    backdropFilter: 'blur(10px)'
+                  }}
                 >
                   <Upload className="w-8 h-8 text-gray-400 mb-2" />
                   <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
@@ -452,7 +460,7 @@ export const ResumeTools: React.FC = () => {
                 value={formData.resumeText}
                 onChange={(e) => setFormData(prev => ({ ...prev, resumeText: e.target.value }))}
                 placeholder="Paste your resume content here for AI analysis..."
-                className="w-full h-48 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white/50 dark:bg-gray-800/50 placeholder-gray-400 resize-none backdrop-blur-sm"
+                className="w-full h-48 px-4 py-3 border border-white/30 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all placeholder-gray-400 resize-none premium-input"
               />
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 Copy and paste your resume text for the most accurate AI analysis
@@ -466,9 +474,9 @@ export const ResumeTools: React.FC = () => {
                   Industry *
                 </label>
                 <Select value={formData.industry} onValueChange={(value) => setFormData(prev => ({ ...prev, industry: value }))}>
-                  <SelectTrigger className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm">
-                    <SelectValue placeholder="Select Industry" />
-                  </SelectTrigger>
+                                  <SelectTrigger className="premium-select">
+                  <SelectValue placeholder="Select Industry" />
+                </SelectTrigger>
                   <SelectContent>
                     {industries.map(industry => (
                       <SelectItem key={industry} value={industry}>{industry}</SelectItem>
@@ -482,9 +490,9 @@ export const ResumeTools: React.FC = () => {
                   Experience Level *
                 </label>
                 <Select value={formData.experienceLevel} onValueChange={(value) => setFormData(prev => ({ ...prev, experienceLevel: value }))}>
-                  <SelectTrigger className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm">
-                    <SelectValue placeholder="Select Level" />
-                  </SelectTrigger>
+                                  <SelectTrigger className="premium-select">
+                  <SelectValue placeholder="Select Level" />
+                </SelectTrigger>
                   <SelectContent>
                     {experienceLevels.map(level => (
                       <SelectItem key={level} value={level}>{level}</SelectItem>
@@ -502,7 +510,7 @@ export const ResumeTools: React.FC = () => {
                   value={formData.targetRole}
                   onChange={(e) => setFormData(prev => ({ ...prev, targetRole: e.target.value }))}
                   placeholder="e.g., Senior Software Engineer"
-                  className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm"
+                  className="premium-input"
                 />
               </div>
 
@@ -515,7 +523,7 @@ export const ResumeTools: React.FC = () => {
                   value={formData.desiredSalary}
                   onChange={(e) => setFormData(prev => ({ ...prev, desiredSalary: e.target.value }))}
                   placeholder="e.g., $120,000"
-                  className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm"
+                  className="premium-input"
                 />
               </div>
             </div>
@@ -529,7 +537,7 @@ export const ResumeTools: React.FC = () => {
                 value={formData.location}
                 onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
                 placeholder="e.g., San Francisco, CA"
-                className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm"
+                className="premium-input"
               />
             </div>
           </CardContent>
@@ -736,7 +744,11 @@ export const ResumeTools: React.FC = () => {
                     Section Analysis
                   </h3>
                   {results.critique.sections.map((section, index) => (
-                    <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-xl p-6 bg-white/30 dark:bg-gray-800/30 backdrop-blur-sm">
+                    <div key={index} className="border border-white/20 dark:border-white/10 rounded-xl p-6 backdrop-blur-sm"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05))',
+                    backdropFilter: 'blur(15px) saturate(180%)'
+                  }}>
                       <div className="flex items-center justify-between mb-4">
                         <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
                           {section.name}
@@ -890,7 +902,11 @@ export const ResumeTools: React.FC = () => {
                     <FileText className="w-5 h-5 mr-2" />
                     Your Optimized Resume
                   </h3>
-                  <div className="bg-white/50 dark:bg-gray-800/50 rounded-xl p-6 border border-gray-200 dark:border-gray-700 max-h-96 overflow-y-auto backdrop-blur-sm">
+                  <div className="rounded-xl p-6 border border-white/20 dark:border-white/10 max-h-96 overflow-y-auto backdrop-blur-sm"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05))',
+                    backdropFilter: 'blur(15px) saturate(180%)'
+                  }}>
                     <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 font-mono leading-relaxed">
                       {results.rewrite.improvedResume}
                     </pre>
@@ -925,6 +941,7 @@ export const ResumeTools: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+      </div>
+    </>
   );
 };
