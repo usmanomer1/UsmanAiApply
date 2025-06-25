@@ -150,8 +150,8 @@ export const AuthPage: React.FC = () => {
           />
         </div>
         
-        {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/90 via-purple-600/80 to-blue-800/90"></div>
+        {/* Subtle Overlay to enhance readability */}
+        <div className="absolute inset-0 bg-black/10"></div>
         
         {/* Content */}
         <div className="relative z-10 flex flex-col justify-center px-12 py-16">
@@ -166,7 +166,7 @@ export const AuthPage: React.FC = () => {
               </div>
               <div>
                 <h1 className="text-3xl font-bold text-white">Jobotic</h1>
-                <p className="text-indigo-100 text-sm font-medium">Premium Job Search Platform</p>
+                <p className="text-gray-100 text-sm font-medium">Premium Job Search Platform</p>
               </div>
             </div>
 
@@ -174,7 +174,7 @@ export const AuthPage: React.FC = () => {
               Land Your Dream Job with AI-Powered Automation
             </h2>
             
-            <p className="text-xl text-indigo-100 mb-12 leading-relaxed">
+            <p className="text-xl text-gray-100 mb-12 leading-relaxed">
               Join thousands of professionals who've accelerated their job search with our intelligent automation platform.
             </p>
 
@@ -194,7 +194,7 @@ export const AuthPage: React.FC = () => {
                     </div>
                     <div>
                       <h3 className="text-white font-semibold mb-2 text-lg">{feature.title}</h3>
-                      <p className="text-indigo-100 text-sm leading-relaxed">{feature.description}</p>
+                      <p className="text-gray-100 text-sm leading-relaxed">{feature.description}</p>
                     </div>
                   </motion.div>
                 );
@@ -211,10 +211,10 @@ export const AuthPage: React.FC = () => {
                 <CheckCircle className="w-6 h-6 text-emerald-300" />
                 <span className="text-white font-semibold text-lg">Success Story</span>
               </div>
-              <p className="text-indigo-100 text-sm italic leading-relaxed">
+              <p className="text-gray-100 text-sm italic leading-relaxed">
                 "Jobotic helped me land my dream job at Google in just 2 weeks. The AI automation saved me hours of manual applications!"
               </p>
-              <p className="text-indigo-200 text-xs mt-3 font-medium">- Sarah Chen, Software Engineer</p>
+              <p className="text-gray-200 text-xs mt-3 font-medium">- Sarah Chen, Software Engineer</p>
             </motion.div>
           </motion.div>
         </div>
