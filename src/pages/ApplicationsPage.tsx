@@ -30,7 +30,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
-import Silk from '../components/ui/Silk';
+import ConditionalBackground from '../components/ui/ConditionalBackground';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
@@ -267,8 +267,7 @@ export const ApplicationsPage: React.FC = () => {
 
   return (
     <>
-      <Silk className="fixed inset-0 z-0" animate={false} />
-      <div className="fixed inset-0 bg-white/30 dark:bg-black/20 z-0"></div>
+      <ConditionalBackground className="fixed inset-0 z-0" animate={false} />
       <div className="relative min-h-screen space-y-8 z-10">
       <motion.div
         initial={{ opacity: 0, y: 20 }}

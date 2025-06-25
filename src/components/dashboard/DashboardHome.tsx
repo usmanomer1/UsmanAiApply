@@ -37,7 +37,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import toast from 'react-hot-toast';
-import Silk from '../ui/Silk';
+import ConditionalBackground from '../ui/ConditionalBackground';
 
 interface DashboardStats {
   totalApplications: number;
@@ -554,9 +554,7 @@ export const DashboardHome: React.FC = () => {
 
   return (
     <>
-      <Silk className="fixed inset-0 z-0" animate={false} />
-      {/* Subtle overlay for better text contrast */}
-      <div className="fixed inset-0 bg-white/30 dark:bg-black/20 z-0"></div>
+      <ConditionalBackground className="fixed inset-0 z-0" animate={false} />
       <div className="relative min-h-screen space-y-8 z-10">
       {/* Header */}
       <motion.div
