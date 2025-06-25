@@ -28,11 +28,24 @@ export const usePaywall = () => {
     setIsCheckingAccess(true);
     
     try {
+      // First check if user has any active subscription
+      const hasActiveSub = await subscriptionService.hasActiveSubscription(user.id);
+      
+      // If user has active subscription, never show paywall regardless of feature access
+      if (hasActiveSub) {
+        return {
+          hasAccess: true,
+          showPaywall: false,
+          reason: 'subscribed_user'
+        };
+      }
+      
+      // If user is free, check feature access and show paywall if no access
       const accessCheck = await subscriptionService.checkFeatureAccess(user.id, feature);
       
       return {
         hasAccess: accessCheck.hasAccess,
-        showPaywall: !accessCheck.hasAccess,
+        showPaywall: !accessCheck.hasAccess, // Only show paywall for free users without access
         reason: accessCheck.reason,
         requiredPlan: accessCheck.requiredPlan
       };
@@ -64,11 +77,24 @@ export const usePaywall = () => {
     setIsCheckingAccess(true);
     
     try {
+      // First check if user has any active subscription
+      const hasActiveSub = await subscriptionService.hasActiveSubscription(user.id);
+      
+      // If user has active subscription, never show paywall regardless of voice access
+      if (hasActiveSub) {
+        return {
+          hasAccess: true,
+          showPaywall: false,
+          reason: 'subscribed_user'
+        };
+      }
+      
+      // If user is free, check voice access and show paywall if no access
       const voiceCheck = await subscriptionService.canUseVoiceFeatures(user.id, estimatedCharacters);
       
       return {
         hasAccess: voiceCheck.allowed,
-        showPaywall: !voiceCheck.allowed,
+        showPaywall: !voiceCheck.allowed, // Only show paywall for free users without access
         reason: voiceCheck.reason,
         requiredPlan: voiceCheck.reason === 'subscription_required' ? 'any' : undefined
       };
