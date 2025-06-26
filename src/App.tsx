@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { AuthPage } from './components/auth/AuthPage';
+import CustomAuthPage from './components/auth/CustomAuthPage';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { Navbar } from './components/layout/Navbar';
 import { DashboardHome } from './components/dashboard/DashboardHome';
@@ -24,7 +25,8 @@ function App() {
         <Router>
           <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors relative overflow-hidden">
             <Routes>
-              <Route path="/auth" element={<AuthPage />} />
+              <Route path="/auth" element={<CustomAuthPage />} />
+              <Route path="/legacy-auth" element={<AuthPage />} />
               <Route path="/success" element={<SuccessPage />} />
               <Route
                 path="/*"
