@@ -30,7 +30,7 @@ export const STRIPE_PRODUCTS: StripeProduct[] = [
   {
     id: 'prod_STtSVTDQXrXzYM',
     priceId: stripeConfig.PRO_PRICE_ID,
-    name: 'Jobotic Pro',
+    name: 'Plus',
     description: 'Unlock up to 37 automated job applications per month with AI-powered job matching. Includes 30,000 AI tokens for resume and cover letter generation, where complex requests count as double token usage. Additional job applications cost $0.80 each; extra AI tokens are billed at $0.10 per 1,000 tokens. Enjoy seamless automation',
     mode: 'subscription',
     price: 25.00,
@@ -51,7 +51,7 @@ export const STRIPE_PRODUCTS: StripeProduct[] = [
   {
     id: 'prod_ALT_PRO_PLUS',
     priceId: stripeConfig.PRO_PLUS_PRICE_ID,
-    name: 'Jobotic Pro Plus',
+    name: 'Pro',
     description: 'Legacy price id for Pro Plus – same limits as standard Pro Plus plan.',
     mode: 'subscription',
     price: 50.00,
@@ -73,7 +73,7 @@ export const STRIPE_PRODUCTS: StripeProduct[] = [
   {
     id: 'prod_STtb6RASMEP4t2',
     priceId: stripeConfig.EXTREME_PRICE_ID,
-    name: 'Jobotic Extreme',
+    name: 'Max',
     description: 'Experience premium access with 158 automated job applications per month plus 30,000 AI tokens for resume and cover letter generation (complex requests charged at 2× tokens). Benefit from priority support and early feature access. Additional job applications are billed at $0.80 each, and extra AI tokens at $0.10 per 1,000 tokens. Ideal for power users demanding maximum productivity.',
     mode: 'subscription',
     price: 100.00,
