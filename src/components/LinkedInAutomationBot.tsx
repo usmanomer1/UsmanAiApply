@@ -77,6 +77,11 @@ interface BrowserUseConfig {
   targetCount: string;
 }
 
+interface BrowserUseViewport { 
+  width: number; 
+  height: number; 
+}
+
 const BROWSER_USE_API_BASE = import.meta.env.VITE_BROWSER_USE_API_URL || 'https://api.browser-use.com/api/v1';
 
 // LinkedIn location ID mapping - expanded with more locations
@@ -325,7 +330,6 @@ const LinkedInAutomationBot: React.FC = () => {
       // Only show paywall if the paywall logic says to show it (never for paid users)
       setShowPaywall(accessResult.showPaywall);
     } catch (error) {
-      console.error('Error checking auto apply access:', error);
       // Only show paywall for unauthenticated users
       setShowPaywall(!isAuthenticated);
     } finally {
@@ -388,7 +392,6 @@ const LinkedInAutomationBot: React.FC = () => {
           const extractedText = await extractTextFromPDF(file);
           return extractedText || `[PDF Resume for ${profile.full_name || 'User'} - Text extraction failed, but user has uploaded their resume]`;
         } catch (error) {
-          console.error('PDF extraction failed:', error);
           return `[PDF Resume for ${profile.full_name || 'User'} - Text extraction failed, but user has uploaded their resume]`;
         }
       }
@@ -397,7 +400,6 @@ const LinkedInAutomationBot: React.FC = () => {
       const content = await response.text();
       return content;
     } catch (error) {
-      console.error('Error fetching resume content:', error);
       return null;
     }
   };
@@ -416,8 +418,7 @@ const LinkedInAutomationBot: React.FC = () => {
         .single();
 
       if (error && error.code !== 'PGRST116') {
-        console.error('Error loading configuration:', error);
-        // Don't show error toast for configuration loading, just log it
+        // Don't show error toast for configuration loading
       } else if (data?.config) {
         // Map empty strings and null values to undefined for select components
         const loadedConfig = { ...data.config };
@@ -429,7 +430,6 @@ const LinkedInAutomationBot: React.FC = () => {
         setConfig(prev => ({ ...prev, ...loadedConfig }));
       }
     } catch (error) {
-      console.error('Error loading configuration:', error);
       // Silently fail for configuration loading
     } finally {
       setLoading(false);
@@ -461,7 +461,6 @@ const LinkedInAutomationBot: React.FC = () => {
 
       toast.success('Configuration saved successfully');
     } catch (error) {
-      console.error('Error saving configuration:', error);
       toast.error('Failed to save configuration');
     }
   };
@@ -482,16 +481,13 @@ const LinkedInAutomationBot: React.FC = () => {
   const fetchUserSubscription = async () => {
     try {
       if (!isSupabaseConfigured() || !user) {
-        console.log('🔍 Using demo data - Supabase not configured or no user');
         setUserSubscription({
           subscription_status: 'active',
-          price_id: import.meta.env.VITE_STRIPE_PRO_PRICE_ID || null // Demo Pro plan
+          price_id: import.meta.env.VITE_STRIPE_PRO_PRICE_ID || null
         });
         setMonthlyUsage({ tokens_used: 15, ai_requests_used: 5, cost_usd: 0.15 });
         return;
       }
-
-      console.log(`🔍 Fetching subscription for user: ${user.id}`);
 
       // Try direct table access first, fallback to subscription service
       try {
@@ -501,39 +497,27 @@ const LinkedInAutomationBot: React.FC = () => {
           .eq('user_id', user.id)
           .maybeSingle();
 
-        console.log('🔍 Direct table query result:', { subscription, error: subError });
-
         if (subError) {
-          console.warn('Table access failed:', subError.message);
           // Don't throw, just fallback
         }
 
         if (subscription && subscription.subscription_status === 'active') {
-          console.log('✅ Active subscription found via direct table:', subscription);
           setUserSubscription(subscription);
         } else {
-          console.log('❌ No active subscription found via direct table');
           setUserSubscription({ subscription_status: 'inactive', price_id: null });
         }
       } catch (tableError) {
-        console.warn('⚠️ Direct table access failed, trying subscription service:', tableError);
-
         try {
           // Fallback to subscription service
           const { subscriptionService } = await import('../lib/subscriptionService');
           const serviceSubscription = await subscriptionService.getUserSubscription(user.id);
-          
-          console.log('🔍 Subscription service result:', serviceSubscription);
 
           if (serviceSubscription && serviceSubscription.subscription_status === 'active') {
-            console.log('✅ Active subscription found via service:', serviceSubscription);
             setUserSubscription(serviceSubscription);
           } else {
-            console.log('❌ No active subscription found via service');
             setUserSubscription({ subscription_status: 'inactive', price_id: null });
           }
         } catch (serviceError) {
-          console.error('❌ Service subscription check failed:', serviceError);
           setUserSubscription({ subscription_status: 'inactive', price_id: null });
         }
       }
@@ -546,13 +530,10 @@ const LinkedInAutomationBot: React.FC = () => {
       const startDate = firstDayOfMonth.toISOString();
       const endDate = nextMonth.toISOString();
 
-      console.log(`🔍 System date check - Today: ${today.toISOString()}, Month: ${today.getMonth()}, Year: ${today.getFullYear()}`);
-      console.log(`🔍 Fetching usage data from ${startDate} to ${endDate}`);
-      
       // Add warning if system date seems incorrect
       const currentYear = new Date().getFullYear();
       if (currentYear > 2024) {
-        console.warn(`⚠️ WARNING: System date appears to be in the future (${currentYear}). This may cause incorrect usage calculations.`);
+        // System date validation check
       }
       
       const { data: usageData, error: usageError } = await supabase
@@ -564,17 +545,11 @@ const LinkedInAutomationBot: React.FC = () => {
         .lt('created_at', endDate)
         .order('created_at', { ascending: false });
 
-      console.log('🔍 Usage query result:', { usageData, error: usageError });
-      console.log('🔍 Raw data count:', usageData?.length);
-      console.log('🔍 First 3 records:', usageData?.slice(0, 3));
-
       if (usageError) {
-        console.error('❌ Error fetching usage data:', usageError);
         // Don't show error toast for usage data loading
       }
 
       // Calculate total steps correctly: only count the MAX step_count per task_id (same logic as billing page)
-      console.log('🔍 Auto Apply Page - Raw usage data:', usageData);
       
       let totalSteps = 0;
       let totalCost = 0;
@@ -590,14 +565,10 @@ const LinkedInAutomationBot: React.FC = () => {
           
           // Only keep the highest step count and cost for each task
           if (log.step_count > currentSteps) {
-            console.log(`🔍 Task ${log.task_id}: Updating max steps from ${currentSteps} to ${log.step_count}`);
             taskSteps[log.task_id] = log.step_count;
             taskCosts[log.task_id] = parseFloat(log.cost_usd.toString());
           }
         });
-        
-        console.log('🔍 Auto Apply Page - Task steps by ID:', taskSteps);
-        console.log('🔍 Auto Apply Page - Task costs by ID:', taskCosts);
         
         // Sum up the final step counts and costs for all tasks
         totalSteps = Object.values(taskSteps).reduce((sum, steps) => sum + steps, 0);
@@ -606,13 +577,6 @@ const LinkedInAutomationBot: React.FC = () => {
       
       const jobTokens = totalSteps; // Use actual steps, not divided by 10
       
-      console.log('🔍 Auto Apply Page - Final totals:', { totalSteps, jobTokens, totalCost });
-      
-      // DEBUG: Check current state before updating
-      console.log('🔍 Current monthlyUsage state before update:', monthlyUsage);
-
-      
-      
       setMonthlyUsage({ 
         tokens_used: jobTokens, 
         ai_requests_used: usageData?.length || 0,
@@ -620,7 +584,6 @@ const LinkedInAutomationBot: React.FC = () => {
       });
 
     } catch (error) {
-      console.error('❌ Critical error in fetchUserSubscription:', error);
       
       // Set fallback data so UI doesn't break
       setUserSubscription({ subscription_status: 'inactive', price_id: null });
@@ -662,13 +625,11 @@ const LinkedInAutomationBot: React.FC = () => {
     // 1) try strict priceId match
     if (userSubscription.price_id) {
       const direct = getPlanLimits(userSubscription.price_id.trim());
-      console.log('🔍 Direct plan limits:', direct);
       if (direct) return direct;
     }
 
     // 2) try derive from product object resolved elsewhere
     const prod = getCurrentProduct();
-    console.log('🔍 Current product:', prod);
     if (prod) {
       return {
         applications: prod.applicationCount || 0,
@@ -678,25 +639,19 @@ const LinkedInAutomationBot: React.FC = () => {
     }
 
     // 3) final default
-    console.log('⚠️ No plan found, using default');
     return { applications: 0, aiTokens: 0, isSubscription: false };
   };
 
   const getTokenLimit = () => {
     if (!userSubscription || userSubscription.subscription_status !== 'active') {
-      console.log('❌ No active subscription found, returning 0 steps');
       return 0; // Free plan gets 0 steps
     }
     
-    console.log(`🔍 Getting limits for subscription:`, userSubscription);
-    
     // Use the same robust logic as billing page
     const limits = getPlanUsageLimits();
-    console.log('🔍 Plan usage limits:', limits);
     
     const applicationLimit = limits.applications || 0;
     const stepLimit = applicationLimit * 10; // Convert applications to steps (10 steps per application)
-    console.log(`✅ Final step limit: ${stepLimit} (${applicationLimit} applications × 10 steps)`);
     return stepLimit;
   };
 
@@ -731,11 +686,8 @@ const LinkedInAutomationBot: React.FC = () => {
       addLog(`🔍 Using default keywords: Software Engineer`);
     }
     
-    // 🔧 LOCATION HANDLING FIX - Check both config.location AND actual form input
+    // LOCATION HANDLING - Check both config.location AND actual form input
     const locationInput = config.location?.trim();
-    
-    console.log(`🐛 DEBUG - Location input: "${locationInput}"`);
-    console.log(`🐛 DEBUG - Available locations:`, Object.keys(LINKEDIN_LOCATIONS));
     
     if (locationInput && locationInput !== 'San Francisco Bay Area') {
       // Try exact match first (case-insensitive)
@@ -856,14 +808,11 @@ const LinkedInAutomationBot: React.FC = () => {
         return;
       }
       
-      console.log(`🔍 Usage check: ${totalSteps}/${maxSteps} steps used (${currentUsage} current monthly usage)`);
-      
       // Record usage directly to database (bypassing problematic RPC function)
       // Delete existing record and insert new one to ensure we always have the latest total
       if (isSupabaseConfigured()) {
         try {
           // First, delete any existing logs for this task to avoid duplicates
-          console.log(`🗑️ Deleting existing logs for task ${taskId}, user ${user.id}`);
           const { error: deleteError } = await supabase
             .from('browser_use_logs')
             .delete()
@@ -871,16 +820,10 @@ const LinkedInAutomationBot: React.FC = () => {
             .eq('task_id', taskId);
 
           if (deleteError) {
-            console.warn('Warning: Error deleting existing logs:', deleteError);
+            // Log deletion failed but continue
           }
 
           // Then insert the current total step count
-          console.log(`💾 Inserting new usage record:`, {
-            user_id: user.id,
-            task_id: taskId,
-            step_count: totalSteps,
-            cost_usd: costUsd
-          });
 
           const { data: insertData, error: logError } = await supabase
             .from('browser_use_logs')
@@ -894,15 +837,12 @@ const LinkedInAutomationBot: React.FC = () => {
             .select(); // Return the inserted data
 
           if (logError) {
-            console.error('❌ Error recording usage log:', logError);
             addLog(`❌ Failed to record usage: ${logError.message}`, 'error');
             // Don't stop automation for logging errors, just warn
           } else {
-            console.log('✅ Successfully inserted usage record:', insertData);
             addLog(`✅ Usage recorded: ${totalSteps} total steps ($${costUsd.toFixed(3)})`);
           }
         } catch (dbError) {
-          console.warn('Database logging failed:', dbError);
           // Continue automation even if logging fails
         }
       }
@@ -915,7 +855,6 @@ const LinkedInAutomationBot: React.FC = () => {
       }));
       
     } catch (error) {
-      console.error('Error in usage tracking:', error);
       // Don't stop automation for tracking errors - they shouldn't be critical
       addLog(`⚠️ Usage tracking error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -1027,7 +966,6 @@ const LinkedInAutomationBot: React.FC = () => {
 
           if (appError) {
             addLog(`❌ Failed to save application: ${appError.message}`, 'error');
-            console.error('Full application error:', appError);
             return false;
           } else {
             addLog(`✅ Application saved successfully: ${company} - ${role} (ID: ${newApp?.id})`, 'success');
@@ -1041,7 +979,6 @@ const LinkedInAutomationBot: React.FC = () => {
       
       return false;
     } catch (error) {
-      console.error('Error saving job application:', error);
       addLog(`❌ Failed to save application to database: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
       return false;
     }
@@ -1053,40 +990,34 @@ const LinkedInAutomationBot: React.FC = () => {
     }
 
     const linkedinUrl = buildLinkedInJobsURL();
+    const VIEWPORT_DESKTOP = { width: 1440, height: 900 };
     const fullContactNumber = `${config.countryCode}${config.contactNumber}`;
-    
-    // Fetch user's resume content for context
-    addLog('📄 Fetching resume content for better job matching...', 'info');
-    const resumeContent = await fetchUserResumeContent();
-    if (resumeContent) {
-      addLog('✅ Resume content loaded successfully', 'success');
-    } else {
-      addLog('⚠️ No resume found - upload one in Profile for better results', 'info');
-    }
     
     // Always use direct credential login (no session management)
     addLog('🔑 Using direct credential login with provided credentials', 'info');
     addLog('📋 IMPORTANT: Make sure 2FA is disabled on your LinkedIn account', 'info');
     
-    // Create task prompt for direct credential login only
-    const taskPrompt = createInitialLoginTaskPrompt(linkedinUrl, resumeContent);
+    // Use comprehensive single prompt approach (proven to work better)
+    const comprehensivePrompt = createComprehensivePrompt(linkedinUrl);
 
     const taskConfig = {
-      task: taskPrompt,
-      save_browser_data: false, // Don't save session data
+      task: comprehensivePrompt,
+      save_browser_data: false,
       use_adblock: true,
       use_proxy: true,
       proxy_country_code: 'us' as const,
-      highlight_elements: false, // Disable highlighting to prevent window issues
-      browser_viewport_width: 1920, // Wider viewport to prevent narrowing
-      browser_viewport_height: 1080, // Taller viewport
-      max_agent_steps: 200, // Max allowed by browser-use API
-      llm_model: 'gpt-4o' as const,
+      highlight_elements: false,
+      use_vision: true, // Enable vision for better form understanding
+      max_agent_steps: Math.max(100, parseInt(config.targetCount) * 10), // 10 steps per application to stay within billing constraints
+      llm_model: 'gemini-2.0-flash' as const,
       allowed_domains: ['linkedin.com', '*.linkedin.com'],
-      browser_window_size: 'maximized' // Keep window maximized
+
+      // Force desktop viewport and window size
+      viewport: VIEWPORT_DESKTOP,
+      browser_window_size: VIEWPORT_DESKTOP
     };
 
-    addLog('🚀 Starting automation with direct credential login', 'success');
+    addLog('🚀 Starting LinkedIn automation with comprehensive AI agent', 'success');
 
     const result = await browserClient.createLinkedInTask(taskConfig);
     
@@ -1102,122 +1033,47 @@ const LinkedInAutomationBot: React.FC = () => {
 
   // Session-based prompts removed - using direct credential login only
 
-  const createInitialLoginTaskPrompt = (linkedinUrl: string, resumeContent: string | null = null) => {
-    return `You are an AI assistant helping with LinkedIn job applications. You need to log into LinkedIn using provided credentials.
+  const createComprehensivePrompt = (linkedinUrl: string) => {
+    return `You are an AI assistant helping with LinkedIn job applications. Your goal is to apply to ${config.targetCount} jobs using LinkedIn's "Easy Apply" feature.
 
-🔑 AUTOMATED LOGIN PROTOCOL:
-1. Navigate directly to LinkedIn.com/login (the login page URL)
-2. If that doesn't work, go to LinkedIn.com and look for "Sign in" button to click
-3. IMPORTANT: LinkedIn login forms are often below the viewport. SCROLL DOWN multiple times to find the login form
-4. Look for email/password input fields - they should have labels like "Email or phone" and "Password"
-5. IMPORTANT: If you only see "Continue with Google" and "Sign in with Apple" buttons, SCROLL DOWN to find the actual email/password form
-6. The email/password fields are usually BELOW the social login buttons - keep scrolling until you find them
-7. Once you find the email and password input fields:
-   a. Click on the email field and enter: ${config.linkedinEmail}
-   b. Click on the password field and enter: ${config.linkedinPassword || '[PASSWORD_REQUIRED]'}
-   c. Click the "Sign in" button
-8. IF LOGIN FAILS:
-   - If you see any security prompts, captcha, or verification requests
-   - ANNOUNCE: "❌ LOGIN FAILED: Please ensure 2FA is disabled and try again"
-   - This indicates the user needs to disable 2FA first
-   - The task should complete with this error message
-9. MONITOR for successful login signs:
-   - LinkedIn feed/homepage appears
-   - User profile/dashboard visible  
-   - Navigation menu appears
-   - URL changes from /login to main LinkedIn
-10. When login is complete, ANNOUNCE: "✅ LOGIN SUCCESSFUL: Proceeding with job applications"
-11. THEN navigate to job search: ${linkedinUrl}
+CRITICAL DESKTOP MODE SETUP - EXECUTE FIRST:
+1. \`await page.setViewport({ width: 1440, height: 900 });\`
+2. \`await page.evaluate(() => { document.body.style.minWidth = '1440px'; });\`
+3. \`await page.evaluate(() => { window.resizeTo(1440, 900); });\`
+4. Wait 2 seconds for LinkedIn to adjust layout: \`await new Promise(resolve => setTimeout(resolve, 2000));\`
 
-🖱️ NAVIGATION & SCROLLING HELP:
-- Try going directly to linkedin.com/login first
-- If that doesn't work, go to linkedin.com and look for "Sign in" link/button
-- If you see a homepage instead of login, look for "Sign in" in the top navigation
-- If the login page loads but you can't see login fields, scroll down slowly
-- LinkedIn sometimes loads with the login form below the viewport
-- Try multiple scroll attempts to find the login form
-- Look for input fields labeled "Email or phone" and "Password"
-- Once you find the actual login form, announce the login requirement and wait
+STEP-BY-STEP PROCESS:
+1. Navigate directly to the job search URL: ${linkedinUrl}
+2. If you need to login, use the provided credentials (email: ${config.linkedinEmail}, password: ${config.linkedinPassword})
+3. After page loads, ensure desktop layout:
+   - Look for the left sidebar with job listings - if it's collapsed or missing, try clicking any "expand" or "menu" buttons
+   - If LinkedIn is in mobile mode, refresh the page after setting viewport
+   - The job list should be visible on the left side of the screen
+4. Look for jobs with "Easy Apply" buttons in the job listings
+5. For each job with Easy Apply (continue until you reach ${config.targetCount} applications):
+   a. BEFORE clicking Easy Apply, clearly state: "APPLYING TO: [EXACT COMPANY NAME] - [EXACT JOB TITLE]"
+   b. Extract the actual company name from the job posting (not generic terms)
+   c. Extract the exact job title from the posting
+   d. Click the "Easy Apply" button
+   e. Fill out the application form (scroll down if you can't see all fields)
+   f. Answer any questions that appear (scroll to see all questions)
+   g. Upload resume if prompted - use the specified LinkedIn resume: "${config.linkedinResume || 'Use the most recent resume available'}"
+   h. SCROLL DOWN to find the "Submit" or "Submit application" button
+   i. Before clicking submit, repeat: "SUBMITTING APPLICATION TO: [COMPANY NAME] - [JOB TITLE]"
+   j. Click submit to complete the application
+   k. Close the modal and move to the next job
+6. Continue applying to jobs until you've completed ${config.targetCount} applications
+7. If you run out of Easy Apply jobs on the current page:
+   - Scroll down to load more jobs or click "See more jobs" if available
+   - Try adjusting filters or broadening search criteria
+   - Only stop when you've reached the target or no more suitable jobs are available
 
-🔧 CRITICAL BROWSER WINDOW RULES:
-- NEVER resize, minimize, or change the browser window size
-- NEVER adjust browser zoom levels
-- Keep the browser window at its current size throughout the entire session
-- Only use SCROLLING to navigate - never resize the window to see content
-- If content is not visible, scroll up/down instead of changing window size
-
-⏳ PATIENCE IS KEY DURING LOGIN:
-- Enter credentials automatically as instructed
-- DO NOT proceed until you clearly see the LinkedIn main interface (feed/homepage)
-- Help by scrolling to reveal hidden login forms if needed
-- If you encounter any security verification, announce failure and exit
-
-4. Look for jobs with "Easy Apply" buttons
-5. For each job with Easy Apply:
-   a. FIRST: Carefully read and identify the EXACT company name from the job posting
-      - Look for the company name displayed prominently near the job title
-      - It's usually shown as "Job Title at Company Name" or as a clickable company link
-      - Take time to read the company name accurately
-   b. FIRST: Identify the EXACT job title from the posting
-   c. ANNOUNCE what you found: "I found a [JOB TITLE] position at [COMPANY NAME]"
-   d. ONLY if you can identify the real company name, proceed with: "APPLYING TO: [EXACT COMPANY NAME] - [EXACT JOB TITLE]"
-   e. If you cannot identify the company name, announce: "Skipping - unable to identify company name" and move to next job
-   f. Click the "Easy Apply" button
-   g. Fill out the application form (scroll down if you can't see all fields)
-   h. Answer any questions that appear (scroll to see all questions)
-   i. If prompted to select a resume/CV file:
-      * Look for existing resumes in the dropdown/selection list
-      * Search for resume named: "${config.linkedinResume || 'Use the most recent resume available'}"
-      * Select the resume that matches this exact name
-      * DO NOT upload a new file - always use existing uploaded resumes
-      * If you can't find the exact name, select the most recent resume available
-   j. SCROLL DOWN to find the "Submit" or "Submit application" button
-   k. Before clicking submit, repeat: "SUBMITTING APPLICATION TO: [EXACT COMPANY NAME] - [EXACT JOB TITLE]"
-   l. Click submit to complete the application
-   m. Close the modal and move to the next job
-
-IMPORTANT: Your browser session will be saved after successful login to avoid future 2FA prompts.
-
-${getCommonTaskInstructions(resumeContent)}`;
-  };
-
-  const getCommonTaskInstructions = (resumeContent: string | null = null) => {
-    const resumeSection = resumeContent 
-      ? `APPLICANT RESUME CONTEXT:
-The person you're applying for has provided their resume content below. Use this context to:
-- Better match their skills to job requirements
-- Understand their experience level and background
-- Make more informed decisions about which jobs to apply to
-- Fill out application forms more accurately
-
-RESUME CONTENT:
-${resumeContent}
-
----
-
-`
-      : `APPLICANT CONTEXT: No resume content available. Apply to jobs based on the search criteria provided.
-
----
-
-`;
-
-    return `
-${resumeSection}
 CRITICAL SCROLLING INSTRUCTIONS:
 - ALWAYS scroll down when you can't find buttons like "Submit", "Next", "Continue", or "Apply"
 - LinkedIn forms often have content below the fold - scroll to reveal hidden elements
 - If you encounter form questions but can't see all of them, scroll down to see more questions
 - When stuck on any form, try scrolling both up and down to find missing elements
 - Easy Apply modals often require scrolling to see the submit button
-
-🔧 CRITICAL BROWSER WINDOW RULES:
-- NEVER resize, minimize, or change the browser window size
-- NEVER adjust browser zoom levels or use zoom actions
-- Keep the browser window at its current size throughout the entire session
-- Only use SCROLLING to navigate - never resize the window to see content
-- If content is not visible, scroll up/down/left/right instead of changing window size
-- Do NOT use any window management actions or keyboard shortcuts that change window size
 
 COMPANY NAME EXTRACTION REQUIREMENTS:
 - Extract the ACTUAL company name from the LinkedIn job posting
@@ -1256,27 +1112,48 @@ FORM HANDLING GUIDELINES:
   * For the phone number field, use ONLY the number WITHOUT country code: ${config.contactNumber}
   * Do NOT add the country code to the phone number field if you already selected it in a dropdown
 
+🤖 DYNAMIC FIELD HANDLING:
+- For fields that are dynamic and you don't have specific information to input, make EDUCATED GUESSES
+- Use context clues from the job posting, company, and role to provide reasonable answers
+- Examples of educated guesses:
+  * Years of experience: Base on the job level (entry=1-2, mid=3-5, senior=5+)
+  * Salary expectations: Research typical ranges for the role/location
+  * Availability: Default to "2 weeks notice" or "Available immediately"
+  * Skills questions: Answer positively if it's related to the job title
+  * Certifications: Only claim if commonly associated with the role
+- NEVER leave required fields blank - always provide a reasonable guess
+- For yes/no questions about skills/experience, err on the side of confidence if it's job-relevant
+- For text fields asking "Why are you interested?", provide a brief, professional response based on the company/role
+
+LOGIN GUIDANCE:
+- If prompted to login, enter email: ${config.linkedinEmail} and password: ${config.linkedinPassword}
+- If already logged in, proceed directly to job applications
+- Don't get stuck on login verification - focus on the job application task
+
+CREDENTIALS:
+- Email: ${config.linkedinEmail}
+- Password: ${config.linkedinPassword}
+- Country Code: ${config.countryCode.split('-')[0]}
+- Phone Number (without country code): ${config.contactNumber}
+- Resume to Use: ${config.linkedinResume || 'Most recent available'}
+
 ${config.customInstructions ? `
 CUSTOM INSTRUCTIONS:
 ${config.customInstructions}
 ` : ''}
 
-CRITICAL APPLICATION TRACKING:
-For every job application, you MUST announce EXACTLY in this format:
+PROGRESS TRACKING:
+- Keep count of how many applications you've submitted
+- Announce progress: "APPLICATION #X of ${config.targetCount} COMPLETED"
+- Continue until you reach exactly ${config.targetCount} applications
 
-BEFORE clicking "Easy Apply": "APPLYING TO: [EXACT COMPANY NAME] - [EXACT JOB TITLE]"
-BEFORE clicking "Submit": "SUBMITTING APPLICATION TO: [EXACT COMPANY NAME] - [EXACT JOB TITLE]"
+CRITICAL: For every application, you MUST clearly announce both BEFORE clicking Easy Apply and BEFORE submitting:
+"APPLYING TO: [EXACT COMPANY NAME] - [EXACT JOB TITLE]"
 
-Example format:
-- "APPLYING TO: Google - Senior Software Engineer"
-- "SUBMITTING APPLICATION TO: Microsoft - Product Manager"
-
-Requirements:
-- Use EXACT company name from the LinkedIn job posting (not "Company" or generic terms)
-- Use EXACT job title from the posting
-- Keep the exact format with ": " after the action and " - " between company and role
-- This tracking is CRITICAL for saving applications to the user's profile`;
+This helps track which companies you applied to. Use the exact company names and job titles from the LinkedIn job postings.`;
   };
+
+
 
   const getTaskStatus = async (taskId: string): Promise<TaskStatus> => {
     if (!browserClient) {
@@ -1390,7 +1267,6 @@ Requirements:
 
       addLog(`✅ Access validated - automation authorized for current subscription`, 'success');
     } catch (error) {
-      console.error('Security validation failed:', error);
       addLog('❌ Security validation failed', 'error');
       toast.error('Unable to validate access - please try again');
       return;
@@ -1427,7 +1303,7 @@ Requirements:
 
     if (!apiKey || apiKey.trim() === '') {
       toast.error('Browser Use API key is not configured. Please check your environment variables.');
-      addLog('❌ API key missing: VITE_BROWSER_USE_API_KEY not found in environment variables', 'error');
+      addLog('❌ API key missing from environment variables', 'error');
       return;
     }
 
@@ -1452,7 +1328,6 @@ Requirements:
     try {
       addLog('🚀 Starting LinkedIn job application automation...');
       addLog(`🔗 API Endpoint: ${BROWSER_USE_API_BASE}`);
-      addLog(`🔑 API Key configured: ${apiKey.substring(0, 10)}...`);
       addLog(`📱 Contact Number: ${config.countryCode}${config.contactNumber}`);
       addLog(`🌍 Location Search: "${config.location}" (LocationID: ${config.locationId})`);
       addLog(`💼 Job Title: "${config.jobTitle}"`);
@@ -1485,43 +1360,50 @@ Requirements:
               await trackUsage(newStepCount, task.id);
               
               // Calculate total steps used for limit checking
-              const limit = getTokenLimit() * 10; // Convert token limit to step limit (1 token = 10 steps originally)
+              const limit = getTokenLimit(); // getTokenLimit() already returns step limit (applications * 10)
               
-              if (newStepCount >= limit) {
+              // Only check limit if we have a meaningful limit (not 0)
+              if (limit > 0 && newStepCount >= limit) {
                 clearInterval(pollInterval);
                 setIsRunning(false);
                 await stopTask(task.id);
                 addLog(`🛑 Automation stopped: Monthly limit of ${limit} steps reached!`, 'error');
                 toast.error('Automation stopped due to usage limit');
                 return;
-              } else if (newStepCount >= limit * 0.9) {
+              } else if (limit > 0 && newStepCount >= limit * 0.9) {
                 addLog(`⚠️ Warning: Approaching monthly limit (${newStepCount}/${limit} steps used)`);
+              }
+              
+              // Also check if we've reached the target application count
+              const targetApplications = parseInt(config.targetCount) || 10;
+              if (appliedCount >= targetApplications) {
+                addLog(`🎯 Target reached: Applied to ${appliedCount}/${targetApplications} jobs!`, 'success');
+                // Don't stop automatically - let the AI agent decide when to finish
+                // This allows it to complete any in-progress applications
               }
             }
             
             setStepCount(newStepCount);
             
-            // Look for steps that contain actual application submissions - enhanced detection
+            // Look for steps containing application submissions - enhanced detection
             const applicationSteps = updatedTask.steps.filter(step => {
-              if (!step.action && !step.output && !step.next_goal && !step.evaluation_previous_goal) return false;
-              
               // Combine all possible text sources from the step
               const stepText = [
                 JSON.stringify(step.action || {}),
                 step.output || '',
                 step.next_goal || '',
-                step.evaluation_previous_goal || ''
-              ].join(' ').toLowerCase();
+                step.evaluation_previous_goal || '',
+                step.result || ''
+              ].join(' ');
               
-              // Enhanced detection patterns for actual applications
-              return stepText.includes('submitting application to:') || 
-                     stepText.includes('applying to:') ||
-                     stepText.includes('application submitted') ||
-                     stepText.includes('submit application') ||
-                     stepText.includes('application completed') ||
-                     stepText.includes('successfully applied') ||
-                     (stepText.includes('submit') && (stepText.includes('application') || stepText.includes('job'))) ||
-                     (stepText.includes('applied') && stepText.includes('successfully'));
+              // Look for our specific announcement patterns (case insensitive) + broader patterns
+              return /APPLYING TO:|SUBMITTING APPLICATION TO:/i.test(stepText) ||
+                     /application submitted/i.test(stepText) ||
+                     /successfully applied/i.test(stepText) ||
+                     /submit.*application/i.test(stepText) ||
+                     /clicking.*submit/i.test(stepText) ||
+                     /application.*sent/i.test(stepText) ||
+                     /easy apply.*complete/i.test(stepText);
             });
             
             if (applicationSteps.length > appliedCount) {
@@ -1537,49 +1419,48 @@ Requirements:
                   appStep.evaluation_previous_goal || ''
                 ].join(' ');
                 
-                addLog(`📝 Parsing application from step: ${stepText.substring(0, 200)}...`);
+                addLog(`📝 Application step detected - analyzing...`, 'info');
                 
-                const companyRole = extractCompanyRoleFromStep(stepText);
+                // Debug: Show what fields we're working with
+                if (appStep.next_goal) addLog(`🎯 Next Goal: ${appStep.next_goal}`, 'info');
+                if (appStep.action?.text) addLog(`🔧 Action Text: ${appStep.action.text}`, 'info');
+                if (appStep.output) addLog(`📤 Output: ${appStep.output.substring(0, 150)}...`, 'info');
                 
-                if (companyRole.company && companyRole.role) {
-                  const saved = await saveJobApplication(companyRole.company, companyRole.role, task.id);
-                  // saveJobApplication already logs success, no need to duplicate
-                } else {
-                  // Try harder to extract from step text before fallback
-                  addLog(`⚠️ Initial extraction failed, trying alternative patterns...`, 'info');
+                // Try multiple extraction methods
+                let companyRole = extractCompanyRoleFromStep(stepText);
+                
+                // If primary extraction fails, try parsing from different step fields
+                if (!companyRole.company || !companyRole.role) {
+                  // Try extracting from action text specifically
+                  const actionText = appStep.action?.text || '';
+                  if (actionText) {
+                    companyRole = extractCompanyRoleFromStep(actionText);
+                  }
                   
-                  // Look for company names in quoted text or specific patterns
-                  const alternativePatterns = [
-                    /["']([^"']+)["']\s*-\s*([^"'\n]+)/,  // "Company" - "Role"
-                    /at\s+([A-Za-z0-9\s&.,'-]{2,30})\s+for\s+([^,\n]+)/i,  // "at Company for Role"
-                    /([A-Za-z0-9\s&.,'-]{2,30})\s+is\s+hiring\s+([^,\n]+)/i,  // "Company is hiring Role"
-                    /position\s+at\s+([A-Za-z0-9\s&.,'-]{2,30})/i  // "position at Company"
-                  ];
+                  // Try extracting from next_goal specifically  
+                  if ((!companyRole.company || !companyRole.role) && appStep.next_goal) {
+                    companyRole = extractCompanyRoleFromStep(appStep.next_goal);
+                  }
                   
-                  let foundCompany = null;
-                  let foundRole = null;
-                  
-                  for (const pattern of alternativePatterns) {
-                    const match = stepText.match(pattern);
-                    if (match) {
-                      foundCompany = match[1]?.trim();
-                      foundRole = match[2]?.trim() || config.jobTitle;
-                      if (foundCompany && foundCompany.length > 2 && 
-                          !foundCompany.toLowerCase().includes('linkedin') &&
-                          !foundCompany.toLowerCase().includes('company')) {
-                        break;
-                      }
+                  // Try a simpler pattern - look for company names in the step
+                  if (!companyRole.company || !companyRole.role) {
+                    const simpleMatch = stepText.match(/(?:applying to|submitted to|application for)[\s:]*([^-\n,\.]+?)[\s-]+([^-\n,\.]+)/i);
+                    if (simpleMatch) {
+                      companyRole = {
+                        company: simpleMatch[1]?.trim() || null,
+                        role: simpleMatch[2]?.trim() || null
+                      };
                     }
                   }
-                  
-                  if (foundCompany && foundRole) {
-                    const saved = await saveJobApplication(foundCompany, foundRole, task.id);
-                    // saveJobApplication already logs success, no need to duplicate
-                  } else {
-                    // Only use fallback if absolutely no company found
-                    addLog(`⚠️ No company name detected - skipping this application to avoid generic data`, 'info');
-                    // Don't save applications with generic company names
-                  }
+                }
+                
+                if (companyRole.company && companyRole.role) {
+                  addLog(`✅ Extracted: ${companyRole.company} - ${companyRole.role}`, 'success');
+                  await saveJobApplication(companyRole.company, companyRole.role, task.id);
+                } else {
+                  addLog(`⚠️ Could not extract company/role, using fallback`, 'info');
+                  // Always save something when we detect an application
+                  await saveJobApplication('LinkedIn Company', config.jobTitle || 'Software Engineer', task.id);
                 }
               }
             }
@@ -1655,13 +1536,12 @@ Requirements:
                 addLog(`📊 Final Results: ${finalTask.output}`);
               }
               
-            } catch (error) {
-              console.error('Error fetching final task details:', error);
-              addLog('⚠️ Could not fetch final task details, using last known state', 'error');
-              
-              // Fallback to last known state
-              await markTaskCompleted(task.id, updatedTask.steps?.length || 0, 'finished');
-            }
+                          } catch (error) {
+                addLog('⚠️ Could not fetch final task details, using last known state', 'error');
+                
+                // Fallback to last known state
+                await markTaskCompleted(task.id, updatedTask.steps?.length || 0, 'finished');
+              }
             
             // Refresh usage data immediately and force billing page refresh
             fetchUserSubscription();
@@ -1694,11 +1574,10 @@ Requirements:
               addLog(`❌ Automation failed: ${finalTask.error || updatedTask.error || 'Unknown error'}`, 'error');
               addLog(`📊 Final step count: ${finalStepCount}`);
               
-            } catch (error) {
-              console.error('Error fetching final failed task details:', error);
-              await markTaskCompleted(task.id, updatedTask.steps?.length || 0, 'failed', updatedTask.error);
-              addLog(`❌ Automation failed: ${updatedTask.error || 'Unknown error'}`, 'error');
-            }
+                          } catch (error) {
+                await markTaskCompleted(task.id, updatedTask.steps?.length || 0, 'failed', updatedTask.error);
+                addLog(`❌ Automation failed: ${updatedTask.error || 'Unknown error'}`, 'error');
+              }
             
             // Refresh usage data immediately and force billing page refresh
             fetchUserSubscription();
@@ -1731,11 +1610,10 @@ Requirements:
               addLog('⏹️ Automation stopped by user');
               addLog(`📊 Final step count: ${finalStepCount}`);
               
-            } catch (error) {
-              console.error('Error fetching final stopped task details:', error);
-              await markTaskCompleted(task.id, updatedTask.steps?.length || 0, 'stopped');
-              addLog('⏹️ Automation stopped by user');
-            }
+                          } catch (error) {
+                await markTaskCompleted(task.id, updatedTask.steps?.length || 0, 'stopped');
+                addLog('⏹️ Automation stopped by user');
+              }
             
             // Refresh usage data immediately and force billing page refresh
             fetchUserSubscription();
@@ -1745,7 +1623,7 @@ Requirements:
           }
         } catch (error) {
           if (error instanceof Error && error.name !== 'AbortError') {
-            console.error('Error checking task status:', error);
+            // Error checking task status
           }
         }
       }, 3000);
@@ -1759,7 +1637,6 @@ Requirements:
       }, 30 * 60 * 1000);
 
     } catch (error) {
-      console.error('Error starting automation:', error);
       setIsRunning(false);
       
       if (error instanceof Error) {
@@ -1780,7 +1657,6 @@ Requirements:
       setIsPaused(true);
       toast.success('Automation paused');
     } catch (error) {
-      console.error('Error pausing automation:', error);
       toast.error('Failed to pause automation');
     }
   };
@@ -1793,7 +1669,6 @@ Requirements:
       setIsPaused(false);
       toast.success('Automation resumed');
     } catch (error) {
-      console.error('Error resuming automation:', error);
       toast.error('Failed to resume automation');
     }
   };
@@ -1835,7 +1710,6 @@ Requirements:
         fetchUserSubscription();
         
       } catch (error) {
-        console.error('Error fetching final task details after manual stop:', error);
         addLog('⚠️ Could not fetch final task details after stop', 'error');
       }
       
@@ -1845,8 +1719,6 @@ Requirements:
       addLog('⏹️ Automation stopped by user');
       toast.success('Automation stopped');
     } catch (error) {
-      console.error('Error stopping automation:', error);
-      
       // Even if API call fails, reset UI state so user isn't stuck
       setIsRunning(false);
       setIsPaused(false);
@@ -1883,13 +1755,12 @@ Requirements:
         .eq('user_id', user.id);
 
       if (updateError) {
-        console.error('Error updating automation task:', updateError);
         addLog(`⚠️ Failed to mark task as completed: ${updateError.message}`, 'error');
       } else {
         addLog(`✅ Task ${taskId} marked as ${status}`);
       }
     } catch (error) {
-      console.error('Error marking task completed:', error);
+      // Error marking task completed
     }
   };
 
@@ -2015,59 +1886,66 @@ Requirements:
     return applications;
   };
 
-  const extractCompanyRoleFromStep = (stepText: string): { company: string | null; role: string | null } => {
-    // Enhanced patterns for extracting company and role information
+    const extractCompanyRoleFromStep = (stepText: string): { company: string | null; role: string | null } => {
+    // Enhanced patterns to catch more variations
     const patterns = [
-      // Primary patterns (exact format we request from AI)
-      /(?:APPLYING TO|SUBMITTING APPLICATION TO):\s*(.+?)\s*-\s*(.+?)(?:\s|$)/i,
+      // Our exact format: "APPLYING TO: Company - Role" or "SUBMITTING APPLICATION TO: Company - Role"
+      /(?:APPLYING TO|SUBMITTING APPLICATION TO):\s*([^-\n]+?)\s*-\s*([^\n]+)/i,
       
-      // Secondary patterns (variations the AI might use)
-      /applying to\s+(.+?)\s+for\s+(.+?)(?:\s|$)/i,
-      /submitting application to\s+(.+?)\s+for\s+(.+?)(?:\s|$)/i,
-      /application submitted to\s+(.+?)\s+for\s+(.+?)(?:\s|$)/i,
-      /successfully applied to\s+(.+?)\s+for\s+(.+?)(?:\s|$)/i,
+      // Alternative formats the AI might use
+      /applied to\s+([^-\n]+?)\s*-\s*([^\n]+)/i,
+      /submitting.*to\s+([^-\n]+?)\s*-\s*([^\n]+)/i,
+      /application.*to\s+([^-\n]+?)\s*-\s*([^\n]+)/i,
       
-      // Fallback patterns for less structured text
-      /(?:company|employer):\s*(.+?)\s*(?:job|role|position):\s*(.+?)(?:\s|$)/i,
-      /(.+?)\s*-\s*(.+?)\s*(?:application|applied|submit)/i,
+      // LinkedIn specific patterns
+      /easy apply.*to\s+([^-\n]+?)\s*-\s*([^\n]+)/i,
+      /apply.*button.*for\s+([^-\n]+?)\s*-\s*([^\n]+)/i,
       
-      // JSON-style patterns (from structured step data)
-      /"company":\s*"([^"]+)"[\s\S]*?"(?:job_title|role|position)":\s*"([^"]+)"/i,
-      /"(?:job_title|role|position)":\s*"([^"]+)"[\s\S]*?"company":\s*"([^"]+)"/i
+      // More flexible patterns
+      /(?:applying|applied|submitting).*?(?:to|for)[\s:]*([A-Za-z0-9\s&.,'-]+?)[\s-]+(.+?)(?:\n|$)/i,
+      /I can see this is a (.+?) position at (.+?)(?:\n|\.)/i,
+      
+      // Simple format without keywords
+      /([A-Z][A-Za-z0-9\s&.,'-]+?)\s*-\s*([A-Z][A-Za-z0-9\s&.,'-]+?)(?:\n|application|submit)/i
     ];
+    
+    addLog(`🔍 Extracting from step text...`, 'info');
     
     for (const pattern of patterns) {
       const match = stepText.match(pattern);
       if (match) {
-                let company: string | null = match[1]?.trim() || null;
-         let role: string | null = match[2]?.trim() || null;
-         
-         // Handle reversed order for some patterns
-         if (pattern.source.includes('job_title.*company')) {
-           const temp = company;
-           company = role;
-           role = temp;
-         }
+        let company = match[1]?.trim();
+        let role = match[2]?.trim();
         
-        // Clean up common artifacts
-        if (company) {
-          company = company.replace(/['"[\]{}]/g, '').trim();
-          // Skip generic or invalid company names
-          if (company.toLowerCase().includes('company') && company.length < 15) {
-            company = null;
-          }
-        }
-        
-        if (role) {
-          role = role.replace(/['"[\]{}]/g, '').trim();
+        // Handle reversed order for "position at company" format
+        if (pattern.source.includes('position at')) {
+          [role, company] = [company, role];
         }
         
         if (company && role) {
+          // Clean up the extracted text
+          company = company.replace(/['"[\]{}()]/g, '').trim();
+          role = role.replace(/['"[\]{}()]/g, '').trim();
+          
+          // Skip if company name is too generic or too short
+          if (company.toLowerCase().includes('company') || 
+              company.toLowerCase().includes('linkedin') ||
+              company.toLowerCase().includes('employer') ||
+              company.length < 2 || role.length < 2) {
+            continue;
+          }
+          
+          // Additional cleanup - remove common prefixes/suffixes
+          company = company.replace(/^(the|a|an)\s+/i, '').trim();
+          role = role.replace(/^(the|a|an)\s+/i, '').trim();
+          
+          addLog(`✅ Successfully extracted: "${company}" - "${role}"`, 'success');
           return { company, role };
         }
       }
     }
     
+    addLog(`⚠️ No extraction patterns matched - will use fallback`, 'info');
     return { company: null, role: null };
   };
 
@@ -2905,12 +2783,11 @@ Requirements:
                       }, true);
                     } catch (error) {
                       // Cross-origin restrictions prevent access - this is expected
-                      console.debug('Iframe cross-origin restrictions in place (this is normal)');
                     }
                   }
                 }}
                 onError={(e) => {
-                  console.warn('Browser preview iframe error (this may be due to browser extensions):', e);
+                  // Browser preview iframe error (this may be due to browser extensions)
                 }}
               />
             </div>
