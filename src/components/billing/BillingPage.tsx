@@ -81,6 +81,19 @@ export const BillingPage: React.FC = () => {
     }
     
     fetchBillingData();
+
+    // Listen for billing refresh events from automation completion
+    const handleBillingRefresh = () => {
+      console.log('🔄 Billing refresh event received from automation');
+      fetchBillingData(true);
+    };
+
+    window.addEventListener('billing-refresh-needed', handleBillingRefresh);
+
+    // Cleanup event listener
+    return () => {
+      window.removeEventListener('billing-refresh-needed', handleBillingRefresh);
+    };
   }, [user]);
 
   const isSupabaseConfigured = () => {
@@ -167,18 +180,29 @@ export const BillingPage: React.FC = () => {
         }
 
         // Get browser use logs for step count - only count the FINAL step count per task
+        console.log('🔍 Billing Page - Date range:', {
+          start: currentMonthStart.toISOString(),
+          end: nextMonthStart.toISOString(),
+          userId: user.id
+        });
+
         const { data: usageData, error: usageError } = await supabase
           .from('browser_use_logs')
-          .select('task_id, step_count, cost_usd')
+          .select('task_id, step_count, cost_usd, created_at, user_id')
           .eq('user_id', user.id)
           .gte('created_at', currentMonthStart.toISOString())
-          .lt('created_at', nextMonthStart.toISOString());
+          .lt('created_at', nextMonthStart.toISOString())
+          .order('created_at', { ascending: false });
+
+        console.log('🔍 Billing Page - Database query result:', { usageData, usageError });
 
         // Calculate total steps correctly: only count the MAX step_count per task_id
         let totalSteps = 0;
         let totalCost = 0;
         
         if (usageData && !usageError) {
+          console.log('🔍 Billing Page - Raw usage data:', usageData);
+          
           const taskSteps: Record<string, number> = {};
           const taskCosts: Record<string, number> = {};
           
@@ -194,9 +218,14 @@ export const BillingPage: React.FC = () => {
             }
           });
           
+          console.log('🔍 Billing Page - Task steps by ID:', taskSteps);
+          console.log('🔍 Billing Page - Task costs by ID:', taskCosts);
+          
           // Sum up the final step counts and costs for all tasks
           totalSteps = Object.values(taskSteps).reduce((sum, steps) => sum + steps, 0);
           totalCost = Object.values(taskCosts).reduce((sum, cost) => sum + cost, 0);
+          
+          console.log('🔍 Billing Page - Final totals:', { totalSteps, totalCost });
         }
 
         const currentUsage = {

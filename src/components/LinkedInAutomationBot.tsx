@@ -42,7 +42,9 @@ import LinkedInVoiceSetup from './voice/LinkedInVoiceSetup';
 import { extensionSuppressor } from '../lib/extensionSuppressor';
 import ExtensionErrorStatus from './ui/ExtensionErrorStatus';
 import UsageStatusDisplay from './ui/UsageStatusDisplay';
+import SessionStatusDisplay from './ui/SessionStatusDisplay';
 import { getPlanLimits, getProductByPriceId } from '../stripe-config';
+import { BrowserUseClient } from '../lib/browserUseClient';
 
 interface TaskStatus {
   id: string;
@@ -56,7 +58,7 @@ interface TaskStatus {
 interface BrowserUseConfig {
   apiKey: string;
   linkedinEmail: string;
-  linkedinPassword: string;
+  linkedinPassword?: string; // For automated login
   contactNumber: string;
   countryCode: string;
   linkedinResume: string;
@@ -210,7 +212,6 @@ const LinkedInAutomationBot: React.FC = () => {
   const [config, setConfig] = useState<BrowserUseConfig>({
     apiKey: apiKey,
     linkedinEmail: '',
-    linkedinPassword: '',
     contactNumber: '',
     countryCode: '+1-US',
     linkedinResume: '',
@@ -242,6 +243,11 @@ const LinkedInAutomationBot: React.FC = () => {
   const [showVoiceSetup, setShowVoiceSetup] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
   const [accessCheckComplete, setAccessCheckComplete] = useState(false);
+  
+  // Session management state
+  const [browserClient, setBrowserClient] = useState<BrowserUseClient | null>(null);
+  const [hasRecentLogin, setHasRecentLogin] = useState(false);
+  const [daysSinceLogin, setDaysSinceLogin] = useState<number | null>(null);
 
   const isSupabaseConfigured = () => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -259,7 +265,19 @@ const LinkedInAutomationBot: React.FC = () => {
     loadConfiguration();
     fetchUserSubscription();
     checkAccess();
-  }, [user]);
+    
+    // Initialize browser client
+    if (apiKey) {
+      const client = new BrowserUseClient(apiKey);
+      setBrowserClient(client);
+      
+      // Check for recent login
+      const hasRecent = client.hasRecentLogin();
+      const days = client.getDaysSinceLastLogin();
+      setHasRecentLogin(hasRecent);
+      setDaysSinceLogin(days);
+    }
+  }, [user, apiKey, config.linkedinEmail]);
 
   // Check access on component mount
   const checkAccess = async () => {
@@ -291,6 +309,105 @@ const LinkedInAutomationBot: React.FC = () => {
       toast.success(message);
     } else if (type === 'error') {
       toast.error(message);
+    }
+  };
+
+  // Session management functions
+  const refreshSession = async () => {
+    if (browserClient) {
+      try {
+        await browserClient.clearBrowserProfile();
+        setHasRecentLogin(false);
+        setDaysSinceLogin(null);
+        addLog('🔄 Browser session cleared - you will be prompted to login again on next run', 'info');
+      } catch (error) {
+        console.error('Failed to clear browser profile:', error);
+        browserClient.clearLoginRecord();
+        setHasRecentLogin(false);
+        setDaysSinceLogin(null);
+        addLog('🔄 Local session record cleared', 'info');
+      }
+    }
+  };
+
+  const clearSession = async () => {
+    if (browserClient) {
+      try {
+        await browserClient.clearBrowserProfile();
+        setHasRecentLogin(false);
+        setDaysSinceLogin(null);
+        addLog('🗑️ Browser session data cleared', 'info');
+      } catch (error) {
+        console.error('Failed to clear browser profile:', error);
+        browserClient.clearLoginRecord();
+        setHasRecentLogin(false);
+        setDaysSinceLogin(null);
+        addLog('🗑️ Local session record cleared', 'info');
+      }
+    }
+  };
+
+  const updateSessionStatus = () => {
+    if (browserClient) {
+      const hasRecent = browserClient.hasRecentLogin();
+      const days = browserClient.getDaysSinceLastLogin();
+      setHasRecentLogin(hasRecent);
+      setDaysSinceLogin(days);
+    }
+  };
+
+  const fetchUserResumeContent = async (): Promise<string | null> => {
+    try {
+      if (!user) return null;
+
+      // Get user profile with resume URL
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('resume_url, full_name')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error || !profile?.resume_url) {
+        return null;
+      }
+
+      // Get signed URL and fetch the resume content
+      const { data: signedUrlData } = await supabase.storage
+        .from('resumes')
+        .createSignedUrl(profile.resume_url, 60); // 60 seconds should be enough
+
+      if (!signedUrlData?.signedUrl) {
+        return null;
+      }
+
+      // Fetch the file content
+      const response = await fetch(signedUrlData.signedUrl);
+      if (!response.ok) {
+        return null;
+      }
+
+      // Check if it's a PDF file
+      const contentType = response.headers.get('content-type');
+      if (contentType?.includes('application/pdf')) {
+        // For PDF files, try to extract text content
+        try {
+          const arrayBuffer = await response.arrayBuffer();
+          const file = new File([arrayBuffer], 'resume.pdf', { type: 'application/pdf' });
+          const { extractTextFromPDF } = await import('../lib/pdfExtractor');
+          const extractedText = await extractTextFromPDF(file);
+          return extractedText || `[PDF Resume for ${profile.full_name || 'User'} - Text extraction failed, but user has uploaded their resume]`;
+        } catch (error) {
+          console.error('PDF extraction failed:', error);
+          return `[PDF Resume for ${profile.full_name || 'User'} - Text extraction failed, but user has uploaded their resume]`;
+        }
+      }
+
+      // For text files, read as text
+      const content = await response.text();
+      return content;
+    } catch (error) {
+      console.error('Error fetching resume content:', error);
+      return null;
     }
   };
 
@@ -335,8 +452,8 @@ const LinkedInAutomationBot: React.FC = () => {
     }
 
     try {
-      // Don't save credentials in the config
-      const { linkedinEmail, linkedinPassword, ...configToSave } = config;
+      // Don't save email in the config (it's not sensitive but we handle it separately)
+      const { linkedinEmail, ...configToSave } = config;
       
       const { error } = await supabase
         .from('automation_configs')
@@ -438,13 +555,18 @@ const LinkedInAutomationBot: React.FC = () => {
       const startDate = firstDayOfMonth.toISOString();
       const endDate = nextMonth.toISOString();
 
-      
-
+      console.log(`🔍 System date check - Today: ${today.toISOString()}, Month: ${today.getMonth()}, Year: ${today.getFullYear()}`);
       console.log(`🔍 Fetching usage data from ${startDate} to ${endDate}`);
+      
+      // Add warning if system date seems incorrect
+      const currentYear = new Date().getFullYear();
+      if (currentYear > 2024) {
+        console.warn(`⚠️ WARNING: System date appears to be in the future (${currentYear}). This may cause incorrect usage calculations.`);
+      }
       
       const { data: usageData, error: usageError } = await supabase
         .from('browser_use_logs')
-        .select('step_count, cost_usd, created_at')
+        .select('task_id, step_count, cost_usd, created_at')
         .eq('user_id', user.id)
         .eq('task_type', 'linkedin_auto_apply')
         .gte('created_at', startDate)
@@ -452,19 +574,51 @@ const LinkedInAutomationBot: React.FC = () => {
         .order('created_at', { ascending: false });
 
       console.log('🔍 Usage query result:', { usageData, error: usageError });
+      console.log('🔍 Raw data count:', usageData?.length);
+      console.log('🔍 First 3 records:', usageData?.slice(0, 3));
 
       if (usageError) {
         console.error('❌ Error fetching usage data:', usageError);
         // Don't show error toast for usage data loading
       }
 
-      const totalTokens = usageData?.reduce((sum, log) => {
-        return sum + (log.step_count || 0);
-      }, 0) || 0;
+      // Calculate total steps correctly: only count the MAX step_count per task_id (same logic as billing page)
+      console.log('🔍 Auto Apply Page - Raw usage data:', usageData);
       
-      const jobTokens = Math.ceil(totalTokens / 10);
-
-      const totalCost = usageData?.reduce((sum, log) => sum + (log.cost_usd || 0), 0) || 0;
+      let totalSteps = 0;
+      let totalCost = 0;
+      
+      if (usageData && usageData.length > 0) {
+        const taskSteps: Record<string, number> = {};
+        const taskCosts: Record<string, number> = {};
+        
+        // Group by task_id and find the maximum step_count for each task
+        usageData.forEach(log => {
+          const currentSteps = taskSteps[log.task_id] || 0;
+          const currentCost = taskCosts[log.task_id] || 0;
+          
+          // Only keep the highest step count and cost for each task
+          if (log.step_count > currentSteps) {
+            console.log(`🔍 Task ${log.task_id}: Updating max steps from ${currentSteps} to ${log.step_count}`);
+            taskSteps[log.task_id] = log.step_count;
+            taskCosts[log.task_id] = parseFloat(log.cost_usd.toString());
+          }
+        });
+        
+        console.log('🔍 Auto Apply Page - Task steps by ID:', taskSteps);
+        console.log('🔍 Auto Apply Page - Task costs by ID:', taskCosts);
+        
+        // Sum up the final step counts and costs for all tasks
+        totalSteps = Object.values(taskSteps).reduce((sum, steps) => sum + steps, 0);
+        totalCost = Object.values(taskCosts).reduce((sum, cost) => sum + cost, 0);
+      }
+      
+      const jobTokens = totalSteps; // Use actual steps, not divided by 10
+      
+      console.log('🔍 Auto Apply Page - Final totals:', { totalSteps, jobTokens, totalCost });
+      
+      // DEBUG: Check current state before updating
+      console.log('🔍 Current monthlyUsage state before update:', monthlyUsage);
 
       
       
@@ -539,8 +693,8 @@ const LinkedInAutomationBot: React.FC = () => {
 
   const getTokenLimit = () => {
     if (!userSubscription || userSubscription.subscription_status !== 'active') {
-      console.log('❌ No active subscription found, returning 0 applications');
-      return 0; // Free plan gets 0 applications
+      console.log('❌ No active subscription found, returning 0 steps');
+      return 0; // Free plan gets 0 steps
     }
     
     console.log(`🔍 Getting limits for subscription:`, userSubscription);
@@ -550,8 +704,9 @@ const LinkedInAutomationBot: React.FC = () => {
     console.log('🔍 Plan usage limits:', limits);
     
     const applicationLimit = limits.applications || 0;
-    console.log(`✅ Final application limit: ${applicationLimit}`);
-    return applicationLimit;
+    const stepLimit = applicationLimit * 10; // Convert applications to steps (10 steps per application)
+    console.log(`✅ Final step limit: ${stepLimit} (${applicationLimit} applications × 10 steps)`);
+    return stepLimit;
   };
 
   const canStartAutomation = () => {
@@ -632,7 +787,7 @@ const LinkedInAutomationBot: React.FC = () => {
     return `${baseUrl}?${params.toString()}`;
   };
 
-  const trackUsage = async (steps: number, taskId: string) => {
+  const trackUsage = async (totalSteps: number, taskId: string) => {
     if (!user) {
       addLog('❌ User not authenticated - cannot track usage', 'error');
       return;
@@ -641,13 +796,12 @@ const LinkedInAutomationBot: React.FC = () => {
     try {
       const costPerStep = 0.03; // $0.03 per step
       const initializationCost = 0.01; // $0.01 initialization cost
-      const costUsd = (steps * costPerStep) + initializationCost;
+      const costUsd = (totalSteps * costPerStep) + initializationCost;
       
       // 🔧 DIRECT DATABASE RECORDING - Bypass problematic server-side validation
       // Use client-side validation which is working correctly
-      const limits = getPlanUsageLimits();
       const currentUsage = monthlyUsage.tokens_used || 0;
-      const maxSteps = limits.applications * 10;
+      const maxSteps = getTokenLimit(); // This now returns steps, not applications
       
       // Check if user has active subscription (client-side check that works)
       if (!userSubscription || userSubscription.subscription_status !== 'active') {
@@ -657,38 +811,59 @@ const LinkedInAutomationBot: React.FC = () => {
         return;
       }
       
-      // Check usage limits
-      if (maxSteps > 0 && (currentUsage + steps) >= maxSteps) {
-        addLog(`❌ Usage limit would be exceeded: ${currentUsage + steps}/${maxSteps} steps`, 'error');
+      // Check usage limits based on total steps for this task
+      if (maxSteps > 0 && totalSteps > maxSteps) {
+        addLog(`❌ Usage limit would be exceeded: ${totalSteps}/${maxSteps} steps`, 'error');
         toast.error('Monthly usage limit reached. Upgrade your plan or wait until next month to continue automation.');
         addLog('🛑 Stopping automation due to usage limit violation', 'error');
         await stopAutomation();
         return;
       }
       
+      console.log(`🔍 Usage check: ${totalSteps}/${maxSteps} steps used (${currentUsage} current monthly usage)`);
+      
       // Record usage directly to database (bypassing problematic RPC function)
+      // Delete existing record and insert new one to ensure we always have the latest total
       if (isSupabaseConfigured()) {
         try {
-          const { error: logError } = await supabase
+          // First, delete any existing logs for this task to avoid duplicates
+          console.log(`🗑️ Deleting existing logs for task ${taskId}, user ${user.id}`);
+          const { error: deleteError } = await supabase
+            .from('browser_use_logs')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('task_id', taskId);
+
+          if (deleteError) {
+            console.warn('Warning: Error deleting existing logs:', deleteError);
+          }
+
+          // Then insert the current total step count
+          console.log(`💾 Inserting new usage record:`, {
+            user_id: user.id,
+            task_id: taskId,
+            step_count: totalSteps,
+            cost_usd: costUsd
+          });
+
+          const { data: insertData, error: logError } = await supabase
             .from('browser_use_logs')
             .insert({
               user_id: user.id,
               task_id: taskId,
               task_type: 'linkedin_auto_apply',
-              step_count: steps,
-              cost_usd: costUsd,
-              metadata: {
-                target_location: config.location,
-                target_role: config.jobTitle,
-                session_timestamp: new Date().toISOString()
-              }
-            });
+              step_count: totalSteps, // Always store TOTAL steps, not incremental
+              cost_usd: costUsd
+            })
+            .select(); // Return the inserted data
 
           if (logError) {
-            console.warn('Error recording usage log:', logError);
+            console.error('❌ Error recording usage log:', logError);
+            addLog(`❌ Failed to record usage: ${logError.message}`, 'error');
             // Don't stop automation for logging errors, just warn
           } else {
-            addLog(`✅ Usage recorded: ${steps} steps ($${costUsd.toFixed(3)})`);
+            console.log('✅ Successfully inserted usage record:', insertData);
+            addLog(`✅ Usage recorded: ${totalSteps} total steps ($${costUsd.toFixed(3)})`);
           }
         } catch (dbError) {
           console.warn('Database logging failed:', dbError);
@@ -696,11 +871,11 @@ const LinkedInAutomationBot: React.FC = () => {
         }
       }
 
-      // Update local state for immediate UI feedback
+      // Update local state for immediate UI feedback - use total steps for the session
       setMonthlyUsage(prev => ({
         ...prev,
-        tokens_used: prev.tokens_used + steps,
-        cost_usd: prev.cost_usd + costUsd
+        tokens_used: totalSteps, // Store total for this session
+        cost_usd: costUsd
       }));
       
     } catch (error) {
@@ -837,21 +1012,80 @@ const LinkedInAutomationBot: React.FC = () => {
   };
 
   const createLinkedInTask = async () => {
+    if (!browserClient) {
+      throw new Error('Browser client not initialized');
+    }
+
     const linkedinUrl = buildLinkedInJobsURL();
     const fullContactNumber = `${config.countryCode}${config.contactNumber}`;
     
-    const taskData = {
-      task: `You are an AI assistant helping with LinkedIn job applications. Your goal is to apply to jobs using LinkedIn's "Easy Apply" feature.
+    // Fetch user's resume content for context
+    addLog('📄 Fetching resume content for better job matching...', 'info');
+    const resumeContent = await fetchUserResumeContent();
+    if (resumeContent) {
+      addLog('✅ Resume content loaded successfully', 'success');
+    } else {
+      addLog('⚠️ No resume found - upload one in Profile for better results', 'info');
+    }
+    
+    // Check if we have stored session - if yes, skip login
+    const hasStoredSession = browserClient.hasRecentLogin();
+    
+    console.log('🔍 Session check:', {
+      hasRecentLogin: browserClient.hasRecentLogin(),
+      daysSinceLogin: browserClient.getDaysSinceLastLogin(),
+      forcingManualLogin: true
+    });
+    
+    // Create optimized task prompt for session-based automation
+    const taskPrompt = hasStoredSession 
+      ? createSessionBasedTaskPrompt(linkedinUrl, resumeContent)
+      : createInitialLoginTaskPrompt(linkedinUrl, resumeContent);
 
-CRITICAL SCROLLING INSTRUCTIONS:
-- ALWAYS scroll down when you can't find buttons like "Submit", "Next", "Continue", or "Apply"
-- LinkedIn forms often have content below the fold - scroll to reveal hidden elements
-- If you encounter form questions but can't see all of them, scroll down to see more questions
-- When stuck on any form, try scrolling both up and down to find missing elements
-- Easy Apply modals often require scrolling to see the submit button
+    const taskConfig = {
+      task: taskPrompt,
+      save_browser_data: true, // Always save for session persistence
+      use_adblock: true,
+      use_proxy: true,
+      proxy_country_code: 'us' as const,
+      highlight_elements: true,
+      browser_viewport_width: 1280,
+      browser_viewport_height: 960,
+              max_agent_steps: 200, // Max allowed by browser-use API - use max for 2FA waiting time
+      llm_model: 'gpt-4o' as const,
+      allowed_domains: ['linkedin.com', '*.linkedin.com']
+    };
+
+    if (hasStoredSession) {
+      addLog('🔐 Using stored session - skipping login process', 'success');
+    } else {
+      addLog('🔑 No stored session - manual login required', 'info');
+      addLog('📋 IMPORTANT: You will need to manually log into LinkedIn when the browser window opens', 'info');
+      addLog('⏳ The automation will wait patiently while you complete login and 2FA', 'info');
+      toast.success('Manual login required - please be ready to log into LinkedIn when the browser opens', {
+        duration: 6000
+      });
+    }
+
+    const result = await browserClient.createLinkedInTask(taskConfig);
+    
+    return {
+      id: result.id,
+      live_url: undefined, // Will be fetched later
+      status: 'created' as const,
+      steps: [],
+      output: undefined,
+      error: undefined
+    };
+  };
+
+  const createSessionBasedTaskPrompt = (linkedinUrl: string, resumeContent: string | null = null) => {
+    return `You are an AI assistant helping with LinkedIn job applications. Your browser session already has LinkedIn login cookies saved, so you should SKIP the login process entirely.
+
+IMPORTANT: DO NOT ATTEMPT TO LOGIN - Your session is already authenticated!
 
 STEP-BY-STEP PROCESS:
-1. First, go to LinkedIn.com and log in using the provided credentials
+1. Go directly to LinkedIn.com (you should already be logged in)
 2. Navigate to the job search URL: ${linkedinUrl}
 3. Look for jobs with "Easy Apply" buttons
 4. For each job with Easy Apply:
@@ -861,11 +1095,106 @@ STEP-BY-STEP PROCESS:
    d. Click the "Easy Apply" button
    e. Fill out the application form (scroll down if you can't see all fields)
    f. Answer any questions that appear (scroll to see all questions)
-   g. Upload resume if prompted - use the specified LinkedIn resume: "${config.linkedinResume || 'Use the most recent resume available'}"
+   g. Upload resume if prompted - use: "${config.linkedinResume || 'Use the most recent resume available'}"
    h. SCROLL DOWN to find the "Submit" or "Submit application" button
    i. Before clicking submit, repeat: "SUBMITTING APPLICATION TO: [COMPANY NAME] - [JOB TITLE]"
    j. Click submit to complete the application
    k. Close the modal and move to the next job
+
+${getCommonTaskInstructions(resumeContent)}`;
+  };
+
+  const createInitialLoginTaskPrompt = (linkedinUrl: string, resumeContent: string | null = null) => {
+    return `You are an AI assistant helping with LinkedIn job applications. You need to log into LinkedIn using provided credentials.
+
+🔑 AUTOMATED LOGIN PROTOCOL:
+1. Navigate directly to LinkedIn.com/login (the login page URL)
+2. If that doesn't work, go to LinkedIn.com and look for "Sign in" button to click
+3. IMPORTANT: LinkedIn login forms are often below the viewport. SCROLL DOWN multiple times to find the login form
+4. Look for email/password input fields - they should have labels like "Email or phone" and "Password"
+5. IMPORTANT: If you only see "Continue with Google" and "Sign in with Apple" buttons, SCROLL DOWN to find the actual email/password form
+6. The email/password fields are usually BELOW the social login buttons - keep scrolling until you find them
+7. Once you find the email and password input fields:
+   a. Click on the email field and enter: ${config.linkedinEmail}
+   b. Click on the password field and enter: ${config.linkedinPassword || '[PASSWORD_REQUIRED]'}
+   c. Click the "Sign in" button
+8. IF LOGIN FAILS:
+   - If you see any security prompts, captcha, or verification requests
+   - ANNOUNCE: "❌ LOGIN FAILED: Please ensure 2FA is disabled and try again"
+   - This indicates the user needs to disable 2FA first
+   - The task should complete with this error message
+9. MONITOR for successful login signs:
+   - LinkedIn feed/homepage appears
+   - User profile/dashboard visible  
+   - Navigation menu appears
+   - URL changes from /login to main LinkedIn
+10. When login is complete, ANNOUNCE: "✅ LOGIN SUCCESSFUL: Proceeding with job applications"
+11. THEN navigate to job search: ${linkedinUrl}
+
+🖱️ NAVIGATION & SCROLLING HELP:
+- Try going directly to linkedin.com/login first
+- If that doesn't work, go to linkedin.com and look for "Sign in" link/button
+- If you see a homepage instead of login, look for "Sign in" in the top navigation
+- If the login page loads but you can't see login fields, scroll down slowly
+- LinkedIn sometimes loads with the login form below the viewport
+- Try multiple scroll attempts to find the login form
+- Look for input fields labeled "Email or phone" and "Password"
+- Once you find the actual login form, announce the login requirement and wait
+
+⏳ PATIENCE IS KEY DURING LOGIN:
+- Enter credentials automatically as instructed
+- DO NOT proceed until you clearly see the LinkedIn main interface (feed/homepage)
+- Help by scrolling to reveal hidden login forms if needed
+- If you encounter any security verification, announce failure and exit
+
+4. Look for jobs with "Easy Apply" buttons
+5. For each job with Easy Apply:
+   a. BEFORE clicking Easy Apply, clearly state: "APPLYING TO: [EXACT COMPANY NAME] - [EXACT JOB TITLE]"
+   b. Extract the actual company name from the job posting (not generic terms)
+   c. Extract the exact job title from the posting
+   d. Click the "Easy Apply" button
+   e. Fill out the application form (scroll down if you can't see all fields)
+   f. Answer any questions that appear (scroll to see all questions)
+   g. Upload resume if prompted - use: "${config.linkedinResume || 'Use the most recent resume available'}"
+   h. SCROLL DOWN to find the "Submit" or "Submit application" button
+   i. Before clicking submit, repeat: "SUBMITTING APPLICATION TO: [COMPANY NAME] - [JOB TITLE]"
+   j. Click submit to complete the application
+   k. Close the modal and move to the next job
+
+IMPORTANT: Your browser session will be saved after successful login to avoid future 2FA prompts.
+
+${getCommonTaskInstructions(resumeContent)}`;
+  };
+
+  const getCommonTaskInstructions = (resumeContent: string | null = null) => {
+    const resumeSection = resumeContent 
+      ? `APPLICANT RESUME CONTEXT:
+The person you're applying for has provided their resume content below. Use this context to:
+- Better match their skills to job requirements
+- Understand their experience level and background
+- Make more informed decisions about which jobs to apply to
+- Fill out application forms more accurately
+
+RESUME CONTENT:
+${resumeContent}
+
+---
+
+`
+      : `APPLICANT CONTEXT: No resume content available. Apply to jobs based on the search criteria provided.
+
+---
+
+`;
+
+    return `
+${resumeSection}
+CRITICAL SCROLLING INSTRUCTIONS:
+- ALWAYS scroll down when you can't find buttons like "Submit", "Next", "Continue", or "Apply"
+- LinkedIn forms often have content below the fold - scroll to reveal hidden elements
+- If you encounter form questions but can't see all of them, scroll down to see more questions
+- When stuck on any form, try scrolling both up and down to find missing elements
+- Easy Apply modals often require scrolling to see the submit button
 
 COMPANY NAME EXTRACTION REQUIREMENTS:
 - Extract the ACTUAL company name from the LinkedIn job posting
@@ -884,27 +1213,13 @@ FORM HANDLING GUIDELINES:
 - If you can't find a "Submit" button, scroll down - it's usually below the visible area
 - For multi-step forms, look for "Next" or "Continue" buttons (may require scrolling)
 - If forms have multiple questions, scroll to see all questions before proceeding
-- Handle file uploads by using any existing resume/CV files${config.linkedinResume ? ` - specifically look for: "${config.linkedinResume}"` : ''}
+- Handle file uploads by using any existing resume/CV files
 - Skip optional fields if they're complex, but fill required fields
 - If a form seems stuck, try scrolling up and down to find missing elements
 - When filling contact information:
   * If there's a country code dropdown, select: ${config.countryCode.split('-')[0]}
   * For the phone number field, use ONLY the number WITHOUT country code: ${config.contactNumber}
   * Do NOT add the country code to the phone number field if you already selected it in a dropdown
-
-IMPORTANT SCROLLING BEHAVIORS:
-- Scroll slowly and check for new elements after each scroll
-- Pay special attention to modal dialogs - they often have scrollable content
-- If you encounter a form that won't submit, scroll down to find the submit button
-- LinkedIn's Easy Apply forms frequently hide submit buttons below the initial view
-- When in doubt, scroll down - most issues are resolved by scrolling
-
-CREDENTIALS:
-- Email: ${config.linkedinEmail}
-- Password: ${config.linkedinPassword}
-- Country Code: ${config.countryCode.split('-')[0]}
-- Phone Number (without country code): ${config.contactNumber}
-- Resume to Use: ${config.linkedinResume || 'Most recent available'}
 
 ${config.customInstructions ? `
 CUSTOM INSTRUCTIONS:
@@ -914,143 +1229,61 @@ ${config.customInstructions}
 CRITICAL: For every application, you MUST clearly announce both BEFORE clicking Easy Apply and BEFORE submitting:
 "APPLYING TO: [EXACT COMPANY NAME] - [EXACT JOB TITLE]"
 
-This helps track which companies you applied to. Use the exact company names and job titles from the LinkedIn job postings.`
-    };
-
-    // Validate API key before making request
-    if (!apiKey || apiKey.trim() === '') {
-      throw new Error('Browser Use API key is not configured. Please check your environment variables.');
-    }
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-    try {
-      const response = await fetch(`${BROWSER_USE_API_BASE}/run-task`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey.trim()}`
-        },
-        body: JSON.stringify(taskData),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error');
-        throw new Error(`API request failed (${response.status}): ${errorText}`);
-      }
-
-      const result = await response.json();
-      
-      // Ensure we capture the live_url from the response
-      return {
-        id: result.id,
-        live_url: result.live_url,
-        status: result.status || 'created',
-        steps: result.steps || [],
-        output: result.output,
-        error: result.error
-      };
-    } catch (error) {
-      clearTimeout(timeoutId);
-      
-      if (error instanceof Error) {
-        if (error.name === 'AbortError') {
-          throw new Error('Request timed out. Please check your internet connection and try again.');
-        } else if (error.message.includes('Failed to fetch')) {
-          throw new Error(`Unable to connect to Browser Use API at ${BROWSER_USE_API_BASE}. Please check:\n• Internet connection\n• API key configuration\n• Firewall/network settings`);
-        }
-      }
-      
-      throw error;
-    }
+This helps track which companies you applied to. Use the exact company names and job titles from the LinkedIn job postings.`;
   };
 
   const getTaskStatus = async (taskId: string): Promise<TaskStatus> => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    if (!browserClient) {
+      throw new Error('Browser client not initialized');
+    }
 
     try {
-      const response = await fetch(`${BROWSER_USE_API_BASE}/task/${taskId}/status`, {
-        headers: {
-          'Authorization': `Bearer ${apiKey.trim()}`,
-        },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        const status = await response.json();
+      const status = await browserClient.getTaskStatus(taskId);
+      const fullTask = await browserClient.getTask(taskId);
+      
+      // If task is finished, check if it actually completed successfully
+      if (status === 'finished') {
+        // Only mark as successful if we have steps indicating actual job applications
+        const hasJobApplications = fullTask.steps?.some(step => 
+          step.next_goal?.includes('APPLYING TO:') || 
+          step.next_goal?.includes('SUBMITTING APPLICATION') ||
+          step.evaluation_previous_goal?.includes('application submitted') ||
+          step.next_goal?.includes('Submit application')
+        );
         
-        // Get full task details if needed
-        const taskResponse = await fetch(`${BROWSER_USE_API_BASE}/task/${taskId}`, {
-          headers: {
-            'Authorization': `Bearer ${apiKey.trim()}`,
-          },
-        });
-        
-        const data = taskResponse.ok ? await taskResponse.json() : {};
-        
-        return {
-          id: taskId,
-          status: status,
-          steps: data.steps || [],
-          output: data.output,
-          error: data.error,
-          live_url: data.live_url
-        };
+        if (hasJobApplications) {
+          addLog('✅ Automation completed successfully with job applications', 'success');
+          browserClient.markSuccessfulLogin();
+          updateSessionStatus(); // Update UI state
+        } else {
+          addLog('⚠️ Task finished but no job applications were completed. This may indicate a login issue.', 'error');
+          addLog('💡 Try clearing your session and running automation again for manual login.', 'info');
+        }
       }
       
-      throw new Error(`Failed to get task status: ${response.statusText}`);
+      return {
+        id: taskId,
+        status: status,
+        steps: fullTask.steps || [],
+        output: fullTask.output || undefined,
+        error: undefined,
+        live_url: fullTask.live_url || undefined
+      };
     } catch (error) {
-      clearTimeout(timeoutId);
       throw error;
     }
   };
 
   const stopTask = async (taskId: string): Promise<void> => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    if (!browserClient) {
+      throw new Error('Browser client not initialized');
+    }
 
     try {
       addLog(`🛑 Stopping task: ${taskId}`);
-      
-      const response = await fetch(`${BROWSER_USE_API_BASE}/stop-task?task_id=${taskId}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${apiKey.trim()}`,
-        },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        addLog(`✅ Task stopped successfully: ${taskId}`, 'success');
-      } else {
-        const errorText = await response.text().catch(() => 'Unknown error');
-        
-        // Check if task is already stopped - this is not an error
-        if (response.status === 400 && errorText.includes('already stopped')) {
-          addLog(`✅ Task was already stopped: ${taskId}`, 'success');
-          return; // Don't throw error for already stopped tasks
-        }
-        
-        throw new Error(`Failed to stop task (${response.status}): ${errorText}`);
-      }
+      await browserClient.stopTask(taskId);
+      addLog(`✅ Task stopped successfully: ${taskId}`, 'success');
     } catch (error) {
-      clearTimeout(timeoutId);
-      
-      // Handle AbortError separately
-      if (error instanceof Error && error.name === 'AbortError') {
-        addLog(`⚠️ Stop request timed out for task: ${taskId}`, 'error');
-        throw new Error('Stop request timed out - task may still be running');
-      }
-      
       addLog(`❌ Error stopping task: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
       throw error;
     }
@@ -1133,8 +1366,13 @@ This helps track which companies you applied to. Use the exact company names and
       return;
     }
 
-    if (!config.linkedinEmail.trim() || !config.linkedinPassword.trim()) {
-      toast.error('Please enter your LinkedIn email and password to begin automation');
+    if (!config.linkedinEmail.trim()) {
+      toast.error('Please enter your LinkedIn email');
+      return;
+    }
+
+    if (!config.linkedinPassword?.trim()) {
+      toast.error('Please enter your LinkedIn password');
       return;
     }
 
@@ -1197,23 +1435,21 @@ This helps track which companies you applied to. Use the exact company names and
             const newStepCount = updatedTask.steps.length;
             
             if (newStepCount > stepCount) {
-              // Only track the NEW steps since last update
-              const newSteps = newStepCount - stepCount;
-              await trackUsage(newSteps, task.id);
+              // Track the TOTAL steps (not incremental) - this will upsert in the database
+              await trackUsage(newStepCount, task.id);
               
-              // Calculate total steps used including the new steps from this session
-              const totalStepsUsed = monthlyUsage.tokens_used + newSteps;
+              // Calculate total steps used for limit checking
               const limit = getTokenLimit() * 10; // Convert token limit to step limit (1 token = 10 steps originally)
               
-              if (totalStepsUsed >= limit) {
+              if (newStepCount >= limit) {
                 clearInterval(pollInterval);
                 setIsRunning(false);
                 await stopTask(task.id);
                 addLog(`🛑 Automation stopped: Monthly limit of ${limit} steps reached!`, 'error');
                 toast.error('Automation stopped due to usage limit');
                 return;
-              } else if (totalStepsUsed >= limit * 0.9) {
-                addLog(`⚠️ Warning: Approaching monthly limit (${totalStepsUsed}/${limit} steps used)`);
+              } else if (newStepCount >= limit * 0.9) {
+                addLog(`⚠️ Warning: Approaching monthly limit (${newStepCount}/${limit} steps used)`);
               }
             }
             
@@ -1252,47 +1488,138 @@ This helps track which companies you applied to. Use the exact company names and
             clearInterval(pollInterval);
             setIsRunning(false);
             
-            // Mark task as completed in database
-            await markTaskCompleted(task.id, updatedTask.steps?.length || 0, 'finished');
+            addLog('🔄 Fetching final task details...', 'info');
             
-            // Try to extract company names from the final steps
-            if (updatedTask.steps && updatedTask.steps.length > 0) {
-                              const applications = extractCompanyFromSteps(updatedTask.steps);
+            // Wait a moment for browser-use API to finalize the task
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Fetch final task state to ensure we have all steps
+            try {
+              const finalTask = await getTaskStatus(task.id);
+              setCurrentTask(finalTask);
+              
+              const finalStepCount = finalTask.steps?.length || 0;
+              const finalApplicationCount = finalTask.steps ? finalTask.steps.filter(step => {
+                const stepText = (JSON.stringify(step.action || {}) + ' ' + (step.output || '')).toLowerCase();
+                return stepText.includes('submitting application to:') || 
+                       stepText.includes('applying to:') ||
+                       stepText.includes('submit application') ||
+                       (stepText.includes('submit') && stepText.includes('successfully'));
+              }).length : 0;
+              
+              setStepCount(finalStepCount);
+              setAppliedCount(finalApplicationCount);
+              
+              addLog(`📊 Final Summary: ${finalStepCount} total steps, ${finalApplicationCount} applications submitted`);
+              
+              // Track final step count (this will upsert to ensure we have the correct total)
+              await trackUsage(finalStepCount, task.id);
+              addLog(`📈 Final step count recorded: ${finalStepCount} steps`);
+              
+              // Mark task as completed in database with final step count
+              await markTaskCompleted(task.id, finalStepCount, 'finished');
+              
+              // Try to extract company names from the final steps
+              if (finalTask.steps && finalTask.steps.length > 0) {
+                const applications = extractCompanyFromSteps(finalTask.steps);
                 applications.forEach(app => {
                   saveJobApplication(app.company, app.role, task.id);
                 });
+              }
+              
+              addLog('✅ Automation completed successfully!', 'success');
+              
+              if (finalTask.output) {
+                addLog(`📊 Final Results: ${finalTask.output}`);
+              }
+              
+            } catch (error) {
+              console.error('Error fetching final task details:', error);
+              addLog('⚠️ Could not fetch final task details, using last known state', 'error');
+              
+              // Fallback to last known state
+              await markTaskCompleted(task.id, updatedTask.steps?.length || 0, 'finished');
             }
             
-            addLog('✅ Automation completed successfully!', 'success');
-            
-            if (updatedTask.output) {
-              addLog(`📊 Final Results: ${updatedTask.output}`);
-            }
-            
-            // Refresh usage data
+            // Refresh usage data immediately and force billing page refresh
             fetchUserSubscription();
+            
+            // Force billing page to refresh by dispatching a custom event
+            window.dispatchEvent(new CustomEvent('billing-refresh-needed'));
           } else if (updatedTask.status === 'failed') {
             clearInterval(pollInterval);
             setIsRunning(false);
             
-            // Mark task as failed in database
-            await markTaskCompleted(task.id, updatedTask.steps?.length || 0, 'failed', updatedTask.error);
+            addLog('🔄 Fetching final task details for failed task...', 'info');
             
-            addLog(`❌ Automation failed: ${updatedTask.error || 'Unknown error'}`, 'error');
+            // Wait a moment and fetch final state
+            await new Promise(resolve => setTimeout(resolve, 1000));
             
-            // Refresh usage data
+            try {
+              const finalTask = await getTaskStatus(task.id);
+              setCurrentTask(finalTask);
+              
+              const finalStepCount = finalTask.steps?.length || 0;
+              setStepCount(finalStepCount);
+              
+              // Track final step count (this will upsert to ensure we have the correct total)
+              await trackUsage(finalStepCount, task.id);
+              addLog(`📈 Final step count recorded: ${finalStepCount} steps`);
+              
+              // Mark task as failed in database with final step count
+              await markTaskCompleted(task.id, finalStepCount, 'failed', finalTask.error || updatedTask.error);
+              
+              addLog(`❌ Automation failed: ${finalTask.error || updatedTask.error || 'Unknown error'}`, 'error');
+              addLog(`📊 Final step count: ${finalStepCount}`);
+              
+            } catch (error) {
+              console.error('Error fetching final failed task details:', error);
+              await markTaskCompleted(task.id, updatedTask.steps?.length || 0, 'failed', updatedTask.error);
+              addLog(`❌ Automation failed: ${updatedTask.error || 'Unknown error'}`, 'error');
+            }
+            
+            // Refresh usage data immediately and force billing page refresh
             fetchUserSubscription();
+            
+            // Force billing page to refresh by dispatching a custom event
+            window.dispatchEvent(new CustomEvent('billing-refresh-needed'));
           } else if (updatedTask.status === 'stopped') {
             clearInterval(pollInterval);
             setIsRunning(false);
             
-            // Mark task as stopped in database
-            await markTaskCompleted(task.id, updatedTask.steps?.length || 0, 'stopped');
+            addLog('🔄 Fetching final task details for stopped task...', 'info');
             
-            addLog('⏹️ Automation stopped by user');
+            // Wait a moment and fetch final state
+            await new Promise(resolve => setTimeout(resolve, 1000));
             
-            // Refresh usage data
+            try {
+              const finalTask = await getTaskStatus(task.id);
+              setCurrentTask(finalTask);
+              
+              const finalStepCount = finalTask.steps?.length || 0;
+              setStepCount(finalStepCount);
+              
+              // Track final step count (this will upsert to ensure we have the correct total)
+              await trackUsage(finalStepCount, task.id);
+              addLog(`📈 Final step count recorded: ${finalStepCount} steps`);
+              
+              // Mark task as stopped in database with final step count
+              await markTaskCompleted(task.id, finalStepCount, 'stopped');
+              
+              addLog('⏹️ Automation stopped by user');
+              addLog(`📊 Final step count: ${finalStepCount}`);
+              
+            } catch (error) {
+              console.error('Error fetching final stopped task details:', error);
+              await markTaskCompleted(task.id, updatedTask.steps?.length || 0, 'stopped');
+              addLog('⏹️ Automation stopped by user');
+            }
+            
+            // Refresh usage data immediately and force billing page refresh
             fetchUserSubscription();
+            
+            // Force billing page to refresh by dispatching a custom event
+            window.dispatchEvent(new CustomEvent('billing-refresh-needed'));
           }
         } catch (error) {
           if (error instanceof Error && error.name !== 'AbortError') {
@@ -1324,68 +1651,28 @@ This helps track which companies you applied to. Use the exact company names and
   };
 
   const pauseAutomation = async () => {
-    if (!currentTask) return;
+    if (!currentTask || !browserClient) return;
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-      const response = await fetch(`${BROWSER_USE_API_BASE}/pause-task?task_id=${currentTask.id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${apiKey.trim()}`,
-        },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        setIsPaused(true);
-        toast.success('Automation paused');
-      } else {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
+      await browserClient.pauseTask(currentTask.id);
+      setIsPaused(true);
+      toast.success('Automation paused');
     } catch (error) {
       console.error('Error pausing automation:', error);
-      if (error instanceof Error && error.name === 'AbortError') {
-        toast.error('Request timed out while pausing automation');
-      } else {
-        toast.error('Failed to pause automation');
-      }
+      toast.error('Failed to pause automation');
     }
   };
 
   const resumeAutomation = async () => {
-    if (!currentTask) return;
+    if (!currentTask || !browserClient) return;
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-      const response = await fetch(`${BROWSER_USE_API_BASE}/resume-task?task_id=${currentTask.id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${apiKey.trim()}`,
-        },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        setIsPaused(false);
-        toast.success('Automation resumed');
-      } else {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
+      await browserClient.resumeTask(currentTask.id);
+      setIsPaused(false);
+      toast.success('Automation resumed');
     } catch (error) {
       console.error('Error resuming automation:', error);
-      if (error instanceof Error && error.name === 'AbortError') {
-        toast.error('Request timed out while resuming automation');
-      } else {
-        toast.error('Failed to resume automation');
-      }
+      toast.error('Failed to resume automation');
     }
   };
 
@@ -1401,6 +1688,35 @@ This helps track which companies you applied to. Use the exact company names and
 
     try {
       await stopTask(currentTask.id);
+      
+      addLog('🔄 Fetching final task details after manual stop...', 'info');
+      
+      // Wait a moment for the stop to be processed, then fetch final state
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      try {
+        const finalTask = await getTaskStatus(currentTask.id);
+        
+        const finalStepCount = finalTask.steps?.length || 0;
+        setStepCount(finalStepCount);
+        
+        // Track final step count (this will upsert to ensure we have the correct total)
+        await trackUsage(finalStepCount, currentTask.id);
+        addLog(`📈 Final step count recorded: ${finalStepCount} steps`);
+        
+        // Mark task as stopped in database with final step count
+        await markTaskCompleted(currentTask.id, finalStepCount, 'stopped');
+        
+        addLog(`📊 Final step count: ${finalStepCount}`);
+        
+        // Refresh usage data
+        fetchUserSubscription();
+        
+      } catch (error) {
+        console.error('Error fetching final task details after manual stop:', error);
+        addLog('⚠️ Could not fetch final task details after stop', 'error');
+      }
+      
       setIsRunning(false);
       setIsPaused(false);
       setCurrentTask(null);
@@ -1768,7 +2084,7 @@ This helps track which companies you applied to. Use the exact company names and
               
               <div>
                 <label className="block text-sm font-medium text-white/90 dark:text-white/90 mb-2">
-                  Email Address *
+                  LinkedIn Email Address *
                 </label>
                 <input
                   type="email"
@@ -1778,18 +2094,39 @@ This helps track which companies you applied to. Use the exact company names and
                   onChange={(e) => setConfig(prev => ({ ...prev, linkedinEmail: e.target.value }))}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-white/90 dark:text-white/90 mb-2">
-                  Password *
+                  LinkedIn Password *
                 </label>
                 <input
                   type="password"
                   className="w-full px-4 py-3 border border-white/20 dark:border-gray-600/20 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-600 dark:placeholder-white/60 transition-all duration-200"
-                  placeholder="••••••••••••"
-                  value={config.linkedinPassword}
+                  placeholder="Your LinkedIn password"
+                  value={config.linkedinPassword || ''}
                   onChange={(e) => setConfig(prev => ({ ...prev, linkedinPassword: e.target.value }))}
                 />
+                <div className="mt-1 text-xs text-white/60">
+                  Used for automated login - you'll handle 2FA manually if required
+                </div>
+              </div>
+              
+              <div className="bg-red-900/20 border border-red-500/20 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-red-400 mb-2 flex items-center gap-2">
+                  ⚠️ Important: Disable 2FA Before Using Automation
+                </h4>
+                <div className="text-xs text-red-300 space-y-2">
+                  <p><strong>Required steps:</strong></p>
+                  <ol className="list-decimal list-inside space-y-1 ml-2">
+                    <li>Go to LinkedIn Settings & Privacy → Account access</li>
+                    <li>Temporarily disable Two-step verification</li>
+                    <li>Run the automation with just email/password</li>
+                    <li>Re-enable 2FA after automation completes</li>
+                  </ol>
+                  <p className="mt-3 text-emerald-300">
+                    ✨ <strong>This ensures reliable automation</strong> - no manual intervention needed
+                  </p>
+                </div>
               </div>
 
               <div>
@@ -2266,7 +2603,17 @@ This helps track which companies you applied to. Use the exact company names and
       </div>
 
       {/* Extension Error Status */}
-      <ExtensionErrorStatus className="mb-6" />
+              <ExtensionErrorStatus className="mb-6" />
+        
+        {/* Session Status Display */}
+        <SessionStatusDisplay 
+                          hasSession={hasRecentLogin}
+                sessionAge={daysSinceLogin ? daysSinceLogin * 24 : null}
+          linkedinEmail={config.linkedinEmail}
+          onRefreshSession={refreshSession}
+          onClearSession={clearSession}
+          className="mb-6"
+        />
 
       {/* Browser Preview */}
       {currentTask?.live_url && (

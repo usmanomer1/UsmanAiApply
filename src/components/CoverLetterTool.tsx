@@ -192,7 +192,7 @@ export const CoverLetterTool: React.FC = () => {
       if (!accessResult.hasAccess) {
         // Show appropriate error message for paid users vs free users
         if (accessResult.showPaywall) {
-          setShowPaywall(true);
+        setShowPaywall(true);
         } else {
           // Paid user hit usage limit - show error but no paywall
           toast.error('Usage limit reached. Please try again later or contact support.');
