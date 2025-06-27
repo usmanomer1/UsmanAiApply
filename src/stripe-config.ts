@@ -16,11 +16,22 @@ export interface StripeProduct {
 
 // Get price IDs from environment variables with fallbacks for development
 const getStripeConfig = () => ({
-  PRO_PRICE_ID: import.meta.env.VITE_STRIPE_PRO_PRICE_ID || 'price_1RaM5LQGabzJD80B3zGbTHcZ',
-  PRO_PLUS_PRICE_ID: import.meta.env.VITE_STRIPE_PRO_PLUS_PRICE_ID || 'price_1RYvjSQGabzJD80BbbXxTq2S',
-  EXTREME_PRICE_ID: import.meta.env.VITE_STRIPE_EXTREME_PRICE_ID || 'price_1RYvocQGabzJD80BEVgRcdSa',
-  JOB_TOKEN_PRICE_ID: import.meta.env.VITE_STRIPE_JOB_TOKEN_PRICE_ID || 'price_1RaMKDQGabzJD80BKxOyfLX3',
-  AI_TOKEN_PRICE_ID: import.meta.env.VITE_STRIPE_AI_TOKEN_PRICE_ID || 'price_1RaMIgQGabzJD80B2aVeDPYZ'
+  PLUS_PRICE_ID: import.meta.env.VITE_STRIPE_PLUS_PRICE_ID || 'price_1ReWRFGkowQ7Swlf8PrgcgFW',
+  PRO_PRICE_ID: import.meta.env.VITE_STRIPE_PRO_PRICE_ID || 'price_1ReWSQGkowQ7SwlftYAa0rsz',
+  MAX_PRICE_ID: import.meta.env.VITE_STRIPE_MAX_PRICE_ID || 'price_1ReWUBGkowQ7SwlfhyAyjNOl',
+  
+  // Job Application Token Packs
+  QUICK_APPLY_PRICE_ID: import.meta.env.VITE_STRIPE_QUICK_APPLY_PRICE_ID || 'price_1ReWZdGkowQ7SwlfVZescJWA',
+  HUSTLE_BOOST_PRICE_ID: import.meta.env.VITE_STRIPE_HUSTLE_BOOST_PRICE_ID || 'price_1ReWdLGkowQ7SwlfDuLs92WQ',
+  FULL_SEND_PRICE_ID: import.meta.env.VITE_STRIPE_FULL_SEND_PRICE_ID || 'price_1ReWefGkowQ7Swlf023H0L0W',
+  CAREER_STORM_PRICE_ID: import.meta.env.VITE_STRIPE_CAREER_STORM_PRICE_ID || 'price_1ReWfMGkowQ7SwlfTzR1Cf1Q',
+  
+  // AI Token Packs
+  LIGHT_BOOST_PRICE_ID: import.meta.env.VITE_STRIPE_LIGHT_BOOST_PRICE_ID || 'price_1ReWj2GkowQ7SwlfgLEXqpPu',
+  SMART_STACK_PRICE_ID: import.meta.env.VITE_STRIPE_SMART_STACK_PRICE_ID || 'price_1ReWjhGkowQ7SwlfWMmqHJgT',
+  POWER_DRAFT_PRICE_ID: import.meta.env.VITE_STRIPE_POWER_DRAFT_PRICE_ID || 'price_1ReWkPGkowQ7SwlfEaIHuHnm',
+  CREATOR_SURGE_PRICE_ID: import.meta.env.VITE_STRIPE_CREATOR_SURGE_PRICE_ID || 'price_1ReWlhGkowQ7Swlfx31q1Sf0',
+  AI_VAULT_PRICE_ID: import.meta.env.VITE_STRIPE_AI_VAULT_PRICE_ID || 'price_1ReWnQGkowQ7Swlfs8LiY8Bg'
 });
 
 const stripeConfig = getStripeConfig();
@@ -28,10 +39,10 @@ const stripeConfig = getStripeConfig();
 export const STRIPE_PRODUCTS: StripeProduct[] = [
   // Subscription Plans
   {
-    id: 'prod_STtSVTDQXrXzYM',
-    priceId: stripeConfig.PRO_PRICE_ID,
+    id: 'prod_SZfmZazFIlmV2H',
+    priceId: stripeConfig.PLUS_PRICE_ID,
     name: 'Plus',
-    description: 'Unlock up to 37 automated job applications per month with AI-powered job matching. Includes 30,000 AI tokens for resume and cover letter generation, where complex requests count as double token usage. Additional job applications cost $0.80 each; extra AI tokens are billed at $0.10 per 1,000 tokens. Enjoy seamless automation',
+    description: '37 automated job applications/month, 30,000 AI tokens for resume & cover letters. Voice AI features included. Additional applications and AI tokens billed separately.',
     mode: 'subscription',
     price: 25.00,
     currency: 'usd',
@@ -49,10 +60,10 @@ export const STRIPE_PRODUCTS: StripeProduct[] = [
     ]
   },
   {
-    id: 'prod_ALT_PRO_PLUS',
-    priceId: stripeConfig.PRO_PLUS_PRICE_ID,
+    id: 'prod_SZfo61zKWmnX6l',
+    priceId: stripeConfig.PRO_PRICE_ID,
     name: 'Pro',
-    description: 'Legacy price id for Pro Plus – same limits as standard Pro Plus plan.',
+    description: '37 automated job applications per month, 30,000 AI tokens for resume and cover letters, voice AI features included, additional applications and AI tokens billed separately.',
     mode: 'subscription',
     price: 50.00,
     currency: 'usd',
@@ -71,10 +82,10 @@ export const STRIPE_PRODUCTS: StripeProduct[] = [
     ]
   },
   {
-    id: 'prod_STtb6RASMEP4t2',
-    priceId: stripeConfig.EXTREME_PRICE_ID,
+    id: 'prod_SZfpQ9Y78JdsPl',
+    priceId: stripeConfig.MAX_PRICE_ID,
     name: 'Max',
-    description: 'Experience premium access with 158 automated job applications per month plus 30,000 AI tokens for resume and cover letter generation (complex requests charged at 2× tokens). Benefit from priority support and early feature access. Additional job applications are billed at $0.80 each, and extra AI tokens at $0.10 per 1,000 tokens. Ideal for power users demanding maximum productivity.',
+    description: '158 job applications per month, 30,000 AI tokens for resume and cover letters, Voice AI features included, Priority support and early access, Additional applications and AI tokens billed separately',
     mode: 'subscription',
     price: 100.00,
     currency: 'usd',
@@ -93,41 +104,171 @@ export const STRIPE_PRODUCTS: StripeProduct[] = [
       'Dedicated account manager'
     ]
   },
-  // Token Packs
+  
+  // Job Application Token Packs
   {
-    id: 'prod_SVN42LIZP5sFxh',
-    priceId: stripeConfig.JOB_TOKEN_PRICE_ID,
-    name: 'Job Application Token Pack',
-    description: 'Buy individual tokens to automate job applications using AI powered autonomous web agent. Each token covers 10 steps of our AI agent. Scale your applications easily with flexible token quantities.',
+    id: 'prod_SZfvC0SBiq8WCH',
+    priceId: stripeConfig.QUICK_APPLY_PRICE_ID,
+    name: 'Job Application QuickApply',
+    description: 'Just need a few extras? Top off with 10 more AI job submissions.',
     mode: 'payment',
-    price: 0.80,
+    price: 7.00,
     currency: 'usd',
     category: 'tokens',
-    tokenCount: 1,
+    tokenCount: 10,
     features: [
-      '1 token = 10 automation steps',
-      'AI-powered job applications',
-      'Flexible quantity scaling',
-      'Pay-as-you-go pricing',
-      'No monthly commitment'
+      '10 AI job applications',
+      'Instant access',
+      'No expiration',
+      'Use anytime',
+      'Compatible with all plans'
     ]
   },
   {
-    id: 'prod_SVN2ST7bWhXL6K',
-    priceId: stripeConfig.AI_TOKEN_PRICE_ID,
-    name: 'AI ToolSuite Token Pack',
-    description: 'Purchase 1,000 AI tokens for resume, CV, and cover letter generation and analysis. Tokens are used based on request complexity. Perfect for powering all your AI-powered document tools with flexible pay-as-you-go usage.',
+    id: 'prod_SZfzFzOrGwV9rs',
+    priceId: stripeConfig.HUSTLE_BOOST_PRICE_ID,
+    name: 'Job Application Hustle Boost',
+    description: 'A solid 25-job boost to keep your application momentum alive.',
     mode: 'payment',
-    price: 0.10,
+    price: 17.00,
     currency: 'usd',
     category: 'tokens',
-    aiTokenCount: 1000,
+    tokenCount: 25,
     features: [
-      '1,000 AI tokens per pack',
-      'Resume, CV & cover letter generation',
-      'Usage based on complexity',
-      'Flexible pay-as-you-go',
-      'No expiration date'
+      '25 AI job applications',
+      'Instant access',
+      'No expiration',
+      'Use anytime',
+      'Compatible with all plans'
+    ]
+  },
+  {
+    id: 'prod_SZg0BHePDKyfaJ',
+    priceId: stripeConfig.FULL_SEND_PRICE_ID,
+    name: 'Job Application Full Send',
+    description: 'Bulk top-up of 100 AI applications. Efficient and powerful.',
+    mode: 'subscription',
+    price: 60.00,
+    currency: 'usd',
+    category: 'tokens',
+    tokenCount: 100,
+    features: [
+      '100 AI job applications',
+      'Instant access',
+      'No expiration',
+      'Use anytime',
+      'Compatible with all plans'
+    ]
+  },
+  {
+    id: 'prod_SZg1hA5JYa7jUD',
+    priceId: stripeConfig.CAREER_STORM_PRICE_ID,
+    name: 'Job Application Career Storm',
+    description: '250 more jobs. For users executing full-scale job search blitzes.',
+    mode: 'payment',
+    price: 145.00,
+    currency: 'usd',
+    category: 'tokens',
+    tokenCount: 250,
+    features: [
+      '250 AI job applications',
+      'Instant access',
+      'No expiration',
+      'Use anytime',
+      'Compatible with all plans',
+      'Best value for bulk applications'
+    ]
+  },
+  
+  // AI Token Packs
+  {
+    id: 'prod_SZg5NzHO7PdwNC',
+    priceId: stripeConfig.LIGHT_BOOST_PRICE_ID,
+    name: 'AI Tokens - Light Boost',
+    description: 'Extra 10K AI tokens to top up your resume and cover letter tools — fast, cheap, and effective.',
+    mode: 'payment',
+    price: 1.00,
+    currency: 'usd',
+    category: 'tokens',
+    aiTokenCount: 10000,
+    features: [
+      '10,000 AI tokens',
+      'Resume & cover letter generation',
+      'Instant access',
+      'No expiration',
+      'Compatible with all plans'
+    ]
+  },
+  {
+    id: 'prod_SZg52qwFFosoC6',
+    priceId: stripeConfig.SMART_STACK_PRICE_ID,
+    name: 'AI Tokens - Smart Stack',
+    description: '25K tokens for multiple cover letters, custom responses, or rewriting your resume like a pro.',
+    mode: 'payment',
+    price: 2.00,
+    currency: 'usd',
+    category: 'tokens',
+    aiTokenCount: 25000,
+    features: [
+      '25,000 AI tokens',
+      'Multiple cover letters',
+      'Resume rewrites',
+      'Custom responses',
+      'No expiration'
+    ]
+  },
+  {
+    id: 'prod_SZg6oBdB7j50Xb',
+    priceId: stripeConfig.POWER_DRAFT_PRICE_ID,
+    name: 'AI Tokens - Power Draft',
+    description: 'Build full application kits with 50K tokens. Great for interview prep, personalization, and bulk usage.',
+    mode: 'subscription',
+    price: 3.00,
+    currency: 'usd',
+    category: 'tokens',
+    aiTokenCount: 50000,
+    features: [
+      '50,000 AI tokens',
+      'Full application kits',
+      'Interview preparation',
+      'Personalized content',
+      'Bulk usage capability'
+    ]
+  },
+  {
+    id: 'prod_SZg70s45I6BmQg',
+    priceId: stripeConfig.CREATOR_SURGE_PRICE_ID,
+    name: 'AI Tokens - Creator Surge',
+    description: '100K tokens for those running weekly AI content — perfect for heavy resume customization and job prep.',
+    mode: 'subscription',
+    price: 5.00,
+    currency: 'usd',
+    category: 'tokens',
+    aiTokenCount: 100000,
+    features: [
+      '100,000 AI tokens',
+      'Weekly content generation',
+      'Heavy resume customization',
+      'Comprehensive job prep',
+      'Bulk content creation'
+    ]
+  },
+  {
+    id: 'prod_SZg9YA9twVqwnF',
+    priceId: stripeConfig.AI_VAULT_PRICE_ID,
+    name: 'AI Tokens - AI Vault',
+    description: '250K tokens for serious users scaling fast. Bulk pricing, maximum flexibility, and huge value.',
+    mode: 'payment',
+    price: 10.00,
+    currency: 'usd',
+    category: 'tokens',
+    aiTokenCount: 250000,
+    features: [
+      '250,000 AI tokens',
+      'Bulk pricing',
+      'Maximum flexibility',
+      'Huge value',
+      'Ideal for power users'
     ]
   }
 ];
@@ -211,11 +352,18 @@ export const calculateOverageCost = (usage: { steps: number; aiTokens: number },
 // Validate environment configuration
 export const validateStripeConfig = (): { isValid: boolean; missingVars: string[] } => {
   const requiredVars = [
-    'VITE_STRIPE_PRO_PRICE_ID',
-    'VITE_STRIPE_PRO_PLUS_PRICE_ID', 
-    'VITE_STRIPE_EXTREME_PRICE_ID',
-    'VITE_STRIPE_JOB_TOKEN_PRICE_ID',
-    'VITE_STRIPE_AI_TOKEN_PRICE_ID'
+    'VITE_STRIPE_PLUS_PRICE_ID',
+    'VITE_STRIPE_PRO_PRICE_ID', 
+    'VITE_STRIPE_MAX_PRICE_ID',
+    'VITE_STRIPE_QUICK_APPLY_PRICE_ID',
+    'VITE_STRIPE_HUSTLE_BOOST_PRICE_ID',
+    'VITE_STRIPE_FULL_SEND_PRICE_ID',
+    'VITE_STRIPE_CAREER_STORM_PRICE_ID',
+    'VITE_STRIPE_LIGHT_BOOST_PRICE_ID',
+    'VITE_STRIPE_SMART_STACK_PRICE_ID',
+    'VITE_STRIPE_POWER_DRAFT_PRICE_ID',
+    'VITE_STRIPE_CREATOR_SURGE_PRICE_ID',
+    'VITE_STRIPE_AI_VAULT_PRICE_ID'
   ];
   
   const missingVars = requiredVars.filter(varName => !import.meta.env[varName]);
