@@ -10,18 +10,14 @@ import { Badge } from './ui/badge';
 export const SuccessPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get('session_id');
+  const priceId = searchParams.get('price_id');
+  const type = searchParams.get('type');
   const [purchaseDetails, setPurchaseDetails] = useState<any>(null);
 
   useEffect(() => {
-    // You could fetch session details here if needed
-
-    
     // For demo purposes, we'll simulate purchase details based on URL params
     // In a real app, you'd fetch this from your backend using the session_id
-    const mockPurchaseType = searchParams.get('type') || 'subscription';
-    const mockPriceId = searchParams.get('price_id') || 'price_1RaM5LQGabzJD80B3zGbTHcZ';
-    
-    const product = getProductByPriceId(mockPriceId);
+    const product = priceId ? getProductByPriceId(priceId) : null;
     
     if (product) {
       setPurchaseDetails({
@@ -35,7 +31,7 @@ export const SuccessPage: React.FC = () => {
     } else {
       // Fallback for demo
       setPurchaseDetails({
-        type: 'subscription',
+        type: type || 'subscription',
         productName: 'Jobotic Pro',
         amount: '$25.00 USD',
         mode: 'subscription',
@@ -47,7 +43,7 @@ export const SuccessPage: React.FC = () => {
         ]
       });
     }
-  }, [sessionId, searchParams]);
+  }, [sessionId, priceId, type]);
 
   const getSuccessIcon = (type: string) => {
     switch (type) {

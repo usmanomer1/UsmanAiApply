@@ -60,8 +60,6 @@ interface UsageStats {
   ai_tokens_used: number;
 }
 
-
-
 export const BillingPage: React.FC = () => {
   const { user, session } = useAuth();
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
@@ -409,7 +407,7 @@ This will create the default configuration needed for the billing portal to work
 
   return (
     <>
-              <ConditionalBackground className="fixed inset-0 z-0" animate={false} />
+      <ConditionalBackground className="fixed inset-0 z-0" animate={false} />
       <div className="relative min-h-screen py-12 z-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
@@ -422,7 +420,7 @@ This will create the default configuration needed for the billing portal to work
           </p>
           {!isSupabaseConfigured() && (
             <div className="mt-4 text-sm text-amber-600 dark:text-amber-400">
-                              Billing service not configured
+              Billing service not configured
             </div>
           )}
         </div>
@@ -666,7 +664,7 @@ This will create the default configuration needed for the billing portal to work
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {subscriptionProducts.map((product, index) => {
               const isCurrentPlan = subscription?.price_id === product.priceId;
-              const isPopular = product.name.includes('Plus');
+              const isPopular = product.name.includes('Pro');
               
               return (
                 <motion.div
@@ -702,7 +700,7 @@ This will create the default configuration needed for the billing portal to work
                     {/* Plan Header */}
                     <div className="text-center mb-8">
                       <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                        {product.name.replace('Jobotic ', '')}
+                        {product.name}
                       </h3>
                       
                       <div className="mb-4">
@@ -733,13 +731,13 @@ This will create the default configuration needed for the billing portal to work
                           <Check className="w-4 h-4 text-green-500 mr-3 flex-shrink-0" />
                           Resume & cover letter tools
                         </li>
-                        {product.name.includes('Plus') && (
+                        {product.name.includes('Pro') && (
                           <li className="flex items-center text-sm text-gray-600 dark:text-gray-300">
                             <Check className="w-4 h-4 text-green-500 mr-3 flex-shrink-0" />
                             Priority support
                           </li>
                         )}
-                        {product.name.includes('Extreme') && (
+                        {product.name.includes('Max') && (
                           <>
                             <li className="flex items-center text-sm text-gray-600 dark:text-gray-300">
                               <Check className="w-4 h-4 text-green-500 mr-3 flex-shrink-0" />
@@ -818,7 +816,7 @@ This will create the default configuration needed for the billing portal to work
                         ${product.price.toFixed(2)}
                       </span>
                       <span className="text-gray-500 dark:text-gray-400 ml-1">
-                        per {product.name.includes('Job') ? 'token' : '1,000 tokens'}
+                        {product.mode === 'subscription' ? '/month' : 'one-time'}
                       </span>
                     </div>
                   </div>

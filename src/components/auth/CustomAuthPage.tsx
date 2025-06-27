@@ -62,11 +62,12 @@ export const CustomAuthPage: React.FC = () => {
 
     // Redirect to Stripe Checkout for the specified plan
     try {
-      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+      const { data, error } = await supabase.functions.invoke('stripe-checkout', {
         body: {
-          priceId: targetProduct.priceId,
-          successUrl: `${window.location.origin}/success?session_id={CHECKOUT_SESSION_ID}`,
-          cancelUrl: `${window.location.origin}/billing`,
+          price_id: targetProduct.priceId,
+          mode: targetProduct.mode,
+          success_url: `${window.location.origin}/success?session_id={CHECKOUT_SESSION_ID}&price_id=${targetProduct.priceId}&type=${targetProduct.category}`,
+          cancel_url: `${window.location.origin}/billing?canceled=true`,
         }
       });
 
@@ -567,4 +568,4 @@ export const CustomAuthPage: React.FC = () => {
   );
 };
 
-export default CustomAuthPage; 
+export default CustomAuthPage;
