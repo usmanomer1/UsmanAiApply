@@ -38,4 +38,5 @@ export {
   TableCell,
   TableCaption,
 } from './table'
-export { Logo } from './Logo' 
+export { Logo } from './Logo'
+export { default as SessionStatusDisplay } from './SessionStatusDisplay' 

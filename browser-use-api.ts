@@ -406,211 +406,10 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/events/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Post Events
-         * @description Process one or more events.
-         *
-         *     Accepts a list of events, validates each against the appropriate
-         *     event model, and creates the corresponding database records.
-         *
-         *     Processing stops immediately if any event fails.
-         */
-        post: operations["post_events_api_v1_events__post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/oauth/device/authorize": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Oauth2 Device Authorization
-         * @description OAuth2 Device Authorization endpoint.
-         *     Returns device code and user code for device flow.
-         */
-        post: operations["oauth2_device_authorization_api_v1_oauth_device_authorize_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/oauth/device/token": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Oauth2 Device Token
-         * @description OAuth2 Device Token endpoint.
-         *     Client polls this endpoint every 2sec until it resolves with their device auth token.
-         */
-        post: operations["oauth2_device_token_api_v1_oauth_device_token_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/oauth/hotlink/create_api_key": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Hotlink Create Api Key
-         * @description Create API key for CLI session via hotlink (called from web UI after user logs in).
-         */
-        post: operations["hotlink_create_api_key_api_v1_oauth_hotlink_create_api_key_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/oauth/hotlink/preview": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Hotlink Preview
-         * @description Get hotlink authorization status and agent session preview data.
-         *     Public endpoint that doesn't require authentication.
-         *     Returns both auth info and session preview in one call.
-         */
-        get: operations["hotlink_preview_api_v1_oauth_hotlink_preview_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /**
-         * BaseEvent
-         * @description The base model used for all Events that flow through the EventBus system.
-         */
-        BaseEvent: {
-            /**
-             * Event Type
-             * @description Event type name
-             */
-            event_type?: string | null;
-            /**
-             * Event Schema
-             * @description Event schema version in format ClassName@version
-             */
-            event_schema?: string | null;
-            /**
-             * Event Timeout
-             * @description Timeout in seconds for event to complete
-             * @default 60
-             */
-            event_timeout: number | null;
-            /** Event Id */
-            event_id?: string;
-            /**
-             * Event Path
-             * @description Path tracking for event routing
-             */
-            event_path?: string[];
-            /**
-             * Event Parent Id
-             * @description ID of the parent event that triggered this event
-             */
-            event_parent_id?: string | null;
-            /**
-             * Event Created At
-             * Format: date-time
-             * @description Timestamp when event was first dispatched to an EventBus aka marked pending
-             */
-            event_created_at?: string;
-            /** Event Results */
-            event_results?: {
-                [key: string]: components["schemas"]["EventResult"];
-            };
-        } & {
-            [key: string]: unknown;
-        };
-        /** Body_hotlink_create_api_key_api_v1_oauth_hotlink_create_api_key_post */
-        Body_hotlink_create_api_key_api_v1_oauth_hotlink_create_api_key_post: {
-            /** User Code */
-            user_code: string;
-        };
-        /** Body_oauth2_device_authorization_api_v1_oauth_device_authorize_post */
-        Body_oauth2_device_authorization_api_v1_oauth_device_authorize_post: {
-            /** Client Id */
-            client_id: string;
-            /**
-             * Scope
-             * @default read write
-             */
-            scope: string;
-            /**
-             * Agent Session Id
-             * Format: uuid
-             */
-            agent_session_id: string;
-        };
-        /** Body_oauth2_device_token_api_v1_oauth_device_token_post */
-        Body_oauth2_device_token_api_v1_oauth_device_token_post: {
-            /** Grant Type */
-            grant_type: string;
-            /** Device Code */
-            device_code: string;
-            /** Client Id */
-            client_id: string;
-        };
-        /**
-         * ChangeRecord
-         * @description Record of a single change made by an event.
-         */
-        ChangeRecord: {
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "created" | "updated" | "deleted";
-            /** Object Type */
-            object_type: string;
-            /** Id */
-            id: string;
-            /** Created At */
-            created_at: string;
-        };
         /**
          * CheckUserBalanceResponse
          * @description balance: Current number of API credits available, value in cents (0.01 USD = 1 credit)
@@ -618,90 +417,6 @@ export interface components {
         CheckUserBalanceResponse: {
             /** Balance */
             balance: number;
-        };
-        /**
-         * EventResponse
-         * @description Event processing response.
-         */
-        EventResponse: {
-            /** Success */
-            success: boolean;
-            /** Event Id */
-            event_id: string;
-            /** Event Type */
-            event_type: string;
-            /**
-             * Event Status
-             * @enum {string}
-             */
-            event_status: "processed" | "failed" | "partial";
-            /** Event Created At */
-            event_created_at: string;
-            /** Received At */
-            received_at: string;
-            /** Processed At */
-            processed_at: string;
-            /** Event Schema */
-            event_schema: string;
-            /** User Id */
-            user_id: string;
-            /** Changes */
-            changes: components["schemas"]["ChangeRecord"][];
-            /** Error */
-            error?: string | null;
-        };
-        /**
-         * EventResult
-         * @description Individual result from a single handler
-         */
-        EventResult: {
-            /** Id */
-            id?: string;
-            /** Handler Id */
-            handler_id: string;
-            /** Handler Name */
-            handler_name: string;
-            /** Eventbus Id */
-            eventbus_id: string;
-            /** Eventbus Name */
-            eventbus_name: string;
-            /** Timeout */
-            timeout?: number | null;
-            /**
-             * Status
-             * @default pending
-             */
-            status: string;
-            /** Result */
-            result?: unknown;
-            /** Error */
-            error?: string | null;
-            /** Started At */
-            started_at?: string | null;
-            /** Completed At */
-            completed_at?: string | null;
-            /** Event Parent Id */
-            event_parent_id?: string | null;
-        };
-        /**
-         * EventsRequest
-         * @description Events request - can contain one or many events.
-         */
-        EventsRequest: {
-            /** Events */
-            events: components["schemas"]["BaseEvent"][];
-        };
-        /**
-         * EventsResponse
-         * @description Events processing response.
-         */
-        EventsResponse: {
-            /** Processed */
-            processed: number;
-            /** Failed */
-            failed: number;
-            /** Results */
-            results: components["schemas"]["EventResponse"][];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -752,7 +467,7 @@ export interface components {
          * ProxyCountryCode
          * @enum {string}
          */
-        ProxyCountryCode: "us" | "uk" | "fr" | "it" | "jp" | "au" | "de" | "fi" | "ca";
+        ProxyCountryCode: "us" | "uk" | "fr" | "it" | "jp" | "au" | "de" | "fi" | "ca" | "in";
         /**
          * RunTaskRequest
          * @description task: What should the agent do. You can try it out at https://cloud.browser-use.com/
@@ -778,6 +493,8 @@ export interface components {
          *     browser_viewport_width: Width of the browser viewport in pixels. Default is 1280.
          *
          *     browser_viewport_height: Height of the browser viewport in pixels. Default is 960.
+         *
+         *     max_agent_steps: Maximum number of agent steps to take. Default is 75. Maximum is 200.
          */
         RunTaskRequest: {
             /** Task */
@@ -825,6 +542,11 @@ export interface components {
              * @default 960
              */
             browser_viewport_height: number | null;
+            /**
+             * Max Agent Steps
+             * @default 75
+             */
+            max_agent_steps: number | null;
         };
         /**
          * ScheduleType
@@ -887,6 +609,11 @@ export interface components {
              * @default 960
              */
             browser_viewport_height: number | null;
+            /**
+             * Max Agent Steps
+             * @default 75
+             */
+            max_agent_steps: number | null;
             schedule_type: components["schemas"]["ScheduleType"];
             /** Interval Minutes */
             interval_minutes?: number | null;
@@ -1762,177 +1489,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
-                };
-            };
-        };
-    };
-    post_events_api_v1_events__post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EventsRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EventsResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    oauth2_device_authorization_api_v1_oauth_device_authorize_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/x-www-form-urlencoded": components["schemas"]["Body_oauth2_device_authorization_api_v1_oauth_device_authorize_post"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    oauth2_device_token_api_v1_oauth_device_token_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/x-www-form-urlencoded": components["schemas"]["Body_oauth2_device_token_api_v1_oauth_device_token_post"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    hotlink_create_api_key_api_v1_oauth_hotlink_create_api_key_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/x-www-form-urlencoded": components["schemas"]["Body_hotlink_create_api_key_api_v1_oauth_hotlink_create_api_key_post"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    hotlink_preview_api_v1_oauth_hotlink_preview_get: {
-        parameters: {
-            query: {
-                user_code: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
