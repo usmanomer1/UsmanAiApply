@@ -28,24 +28,16 @@ export const usePaywall = () => {
     setIsCheckingAccess(true);
     
     try {
-      // First check if user has any active subscription
-      const hasActiveSub = await subscriptionService.hasActiveSubscription(user.id);
-      
-      // If user has active subscription, never show paywall regardless of feature access
-      if (hasActiveSub) {
-        return {
-          hasAccess: true,
-          showPaywall: false,
-          reason: 'subscribed_user'
-        };
-      }
-      
-      // If user is free, check feature access and show paywall if no access
+      // Always check server-side feature access regardless of subscription status
+      // This ensures usage limits are properly enforced
       const accessCheck = await subscriptionService.checkFeatureAccess(user.id, feature);
+      
+      // Check if user has any active subscription for paywall display logic
+      const hasActiveSub = await subscriptionService.hasActiveSubscription(user.id);
       
       return {
         hasAccess: accessCheck.hasAccess,
-        showPaywall: !accessCheck.hasAccess, // Only show paywall for free users without access
+        showPaywall: !hasActiveSub && !accessCheck.hasAccess, // NEVER show paywall for paid users
         reason: accessCheck.reason,
         requiredPlan: accessCheck.requiredPlan
       };
@@ -77,24 +69,16 @@ export const usePaywall = () => {
     setIsCheckingAccess(true);
     
     try {
-      // First check if user has any active subscription
-      const hasActiveSub = await subscriptionService.hasActiveSubscription(user.id);
-      
-      // If user has active subscription, never show paywall regardless of voice access
-      if (hasActiveSub) {
-        return {
-          hasAccess: true,
-          showPaywall: false,
-          reason: 'subscribed_user'
-        };
-      }
-      
-      // If user is free, check voice access and show paywall if no access
+      // Always check server-side voice access regardless of subscription status
+      // This ensures usage limits are properly enforced
       const voiceCheck = await subscriptionService.canUseVoiceFeatures(user.id, estimatedCharacters);
+      
+      // Check if user has any active subscription for paywall display logic
+      const hasActiveSub = await subscriptionService.hasActiveSubscription(user.id);
       
       return {
         hasAccess: voiceCheck.allowed,
-        showPaywall: !voiceCheck.allowed, // Only show paywall for free users without access
+        showPaywall: !hasActiveSub && !voiceCheck.allowed, // NEVER show paywall for paid users
         reason: voiceCheck.reason,
         requiredPlan: voiceCheck.reason === 'subscription_required' ? 'any' : undefined
       };

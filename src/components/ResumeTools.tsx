@@ -173,9 +173,8 @@ export const ResumeTools: React.FC = () => {
 
       try {
         const accessResult = await checkFeatureAccess('advanced_ai');
-        if (!accessResult.hasAccess) {
-          setShowPaywall(true);
-        }
+        // Use the correct logic that NEVER shows paywall for paid users
+        setShowPaywall(accessResult.showPaywall);
       } catch (error) {
         console.error('Error checking feature access:', error);
         setShowPaywall(true);
@@ -197,7 +196,13 @@ export const ResumeTools: React.FC = () => {
     try {
       const accessResult = await checkFeatureAccess('advanced_ai');
       if (!accessResult.hasAccess) {
-        setShowPaywall(true);
+        // Show appropriate error message for paid users vs free users
+        if (accessResult.showPaywall) {
+          setShowPaywall(true);
+        } else {
+          // Paid user hit usage limit - show error but no paywall
+          toast.error('Usage limit reached. Please try again later or contact support.');
+        }
         return;
       }
     } catch (error) {

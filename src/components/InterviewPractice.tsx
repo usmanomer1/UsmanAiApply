@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Users, Target, Award, RefreshCw, Settings, BookOpen, Briefcase, Crown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { useElevenLabsConversation, ConversationMessage } from '../hooks/useElevenLabsConversation';
 import { ElevenLabsClient } from '../lib/elevenlabs';
 import VoiceControls from './voice/VoiceControls';
@@ -67,9 +68,8 @@ export const InterviewPractice: React.FC<InterviewPracticeProps> = ({ className 
 
       try {
         const accessResult = await checkVoiceAccess(200); // Check for typical conversation length
-        if (!accessResult.hasAccess) {
-          setShowPaywall(true);
-        }
+        // Use the correct logic that NEVER shows paywall for paid users
+        setShowPaywall(accessResult.showPaywall);
       } catch (error) {
         console.error('Error checking voice access:', error);
         setShowPaywall(true);
@@ -91,7 +91,13 @@ export const InterviewPractice: React.FC<InterviewPracticeProps> = ({ className 
     try {
       const accessResult = await checkVoiceAccess(500); // Estimate for full conversation
       if (!accessResult.hasAccess) {
-        setShowPaywall(true);
+        // Show appropriate error message for paid users vs free users
+        if (accessResult.showPaywall) {
+          setShowPaywall(true);
+        } else {
+          // Paid user hit usage limit - show error but no paywall
+          toast.error('Voice usage limit reached. Please try again later or contact support.');
+        }
         return;
       }
 
