@@ -371,7 +371,7 @@ const LinkedInAutomationBot: React.FC = () => {
       if (!isSupabaseConfigured() || !user) {
         setUserSubscription({
           subscription_status: 'active',
-          price_id: 'price_1RYvf7QGabzJD80Bhd4V99CB' // Demo Pro plan
+          price_id: import.meta.env.VITE_STRIPE_PRO_PRICE_ID || null // Demo Pro plan
         });
         setMonthlyUsage({ tokens_used: 15, ai_requests_used: 5, cost_usd: 0.15 });
         return;
@@ -446,14 +446,14 @@ const LinkedInAutomationBot: React.FC = () => {
     // Use the price_id directly from the subscription
     const priceId = userSubscription.price_id;
     
-    if (priceId === 'price_1RYvocQGabzJD80BEVgRcdSa') {
-      return 'Extreme Plan';
+    if (priceId === import.meta.env.VITE_STRIPE_MAX_PRICE_ID) {
+      return 'Max Plan';
     }
-    if (priceId === 'price_1RYvjSQGabzJD80BbbXxTq2S') {
-      return 'Pro Plus Plan';
-    }
-    if (priceId === 'price_1RYvf7QGabzJD80Bhd4V99CB') {
+    if (priceId === import.meta.env.VITE_STRIPE_PRO_PRICE_ID) {
       return 'Pro Plan';
+    }
+    if (priceId === import.meta.env.VITE_STRIPE_PLUS_PRICE_ID) {
+      return 'Plus Plan';
     }
     
     // If subscription exists but price ID doesn't match, default to Pro
@@ -468,18 +468,18 @@ const LinkedInAutomationBot: React.FC = () => {
     // Use the price_id directly from the subscription
     const priceId = userSubscription.price_id;
     
-    if (priceId === 'price_1RYvocQGabzJD80BEVgRcdSa') {
-      return 150; // Extreme Plan
+    if (priceId === import.meta.env.VITE_STRIPE_MAX_PRICE_ID) {
+      return 158; // Max Plan - 158 applications
     }
-    if (priceId === 'price_1RYvjSQGabzJD80BbbXxTq2S') {
-      return 75; // Pro Plus Plan
+    if (priceId === import.meta.env.VITE_STRIPE_PRO_PRICE_ID) {
+      return 77; // Pro Plan - 77 applications
     }
-    if (priceId === 'price_1RYvf7QGabzJD80Bhd4V99CB') {
-      return 50; // Pro Plan
+    if (priceId === import.meta.env.VITE_STRIPE_PLUS_PRICE_ID) {
+      return 37; // Plus Plan - 37 applications
     }
     
     // If subscription exists but price ID doesn't match, give basic tokens
-    return userSubscription.subscription_status === 'active' ? 50 : 0;
+    return userSubscription.subscription_status === 'active' ? 37 : 0;
   };
 
   const canStartAutomation = () => {
@@ -567,8 +567,9 @@ const LinkedInAutomationBot: React.FC = () => {
     }
 
     try {
-      const costPerStep = 0.001; // $0.001 per step
-      const costUsd = steps * costPerStep;
+      const costPerStep = 0.03; // $0.03 per step
+      const initializationCost = 0.01; // $0.01 initialization cost
+      const costUsd = (steps * costPerStep) + initializationCost;
       
       // 🔒 SECURE SERVER-SIDE USAGE RECORDING WITH VALIDATION
       const { subscriptionService } = await import('../lib/subscriptionService');
