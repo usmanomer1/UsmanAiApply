@@ -228,10 +228,11 @@ export const Navbar: React.FC = () => {
         return;
       }
 
-      // Fetch subscription using the view
+      // Fetch subscription using the view - filtered by current user
       const { data: subData, error: subError } = await supabase
         .from('stripe_user_subscriptions')
         .select('*')
+        .eq('user_id', user.id)
         .maybeSingle();
 
       if (subError) {

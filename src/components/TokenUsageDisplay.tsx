@@ -33,9 +33,16 @@ export const TokenUsageDisplay: React.FC<TokenUsageDisplayProps> = ({ className 
 
   const checkSubscriptionStatus = async () => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setHasActiveSubscription(false);
+        return;
+      }
+      
       const { data } = await supabase
         .from('stripe_user_subscriptions')
         .select('subscription_status')
+        .eq('user_id', user.id)
         .single();
       
       setHasActiveSubscription(data?.subscription_status === 'active');

@@ -259,9 +259,8 @@ export const CVGeneration: React.FC = () => {
 
       try {
         const accessResult = await checkFeatureAccess('advanced_ai');
-        if (!accessResult.hasAccess) {
-          setShowPaywall(true);
-        }
+        // Use the correct logic that NEVER shows paywall for paid users
+        setShowPaywall(accessResult.showPaywall);
       } catch (error) {
         console.error('Error checking feature access:', error);
         setShowPaywall(true);
@@ -283,7 +282,13 @@ export const CVGeneration: React.FC = () => {
     try {
       const accessResult = await checkFeatureAccess('advanced_ai');
       if (!accessResult.hasAccess) {
-        setShowPaywall(true);
+        // Show appropriate error message for paid users vs free users
+        if (accessResult.showPaywall) {
+          setShowPaywall(true);
+        } else {
+          // Paid user hit usage limit - show error but no paywall
+          toast.error('Usage limit reached. Please try again later or contact support.');
+        }
         return;
       }
     } catch (error) {
@@ -335,6 +340,20 @@ ${cvData.certifications.filter(cert => cert.name).length > 0 ? 'CERTIFICATIONS\n
 ${cvData.projects.filter(proj => proj.name).length > 0 ? 'PROJECTS\n' + cvData.projects.filter(proj => proj.name).map(proj => `• ${proj.name}: ${proj.description}\nTechnologies: ${proj.technologies.join(', ')}`).join('\n') : ''}
       `;
 
+      console.log('🔍 Generating CV with data:', {
+        personalInfo: cvData.personalInfo,
+        experiencesCount: cvData.experiences.length,
+        educationCount: cvData.education.length,
+        skillsCount: cvData.skills.length,
+        languagesCount: cvData.languages.length,
+        certificationsCount: cvData.certifications.filter(cert => cert.name).length,
+        projectsCount: cvData.projects.filter(proj => proj.name).length,
+        targetRole: cvData.targetRole,
+        industry: cvData.industry,
+        selectedTemplate: selectedTemplate,
+        resumeTextLength: resumeText.length
+      });
+
       const result = await openAIService.rewriteResume({
         resumeText,
         industry: cvData.industry,
@@ -354,14 +373,95 @@ ${cvData.projects.filter(proj => proj.name).length > 0 ? 'PROJECTS\n' + cvData.p
   };
 
   const downloadCV = () => {
-    const element = document.createElement('a');
-    const file = new Blob([generatedCV], { type: 'text/plain' });
-    element.href = URL.createObjectURL(file);
-    element.download = `${cvData.personalInfo.fullName}_CV.txt`;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-    toast.success('CV downloaded successfully!');
+    if (!generatedCV) return;
+    
+    // Dynamic import to reduce bundle size
+    import('jspdf').then(({ default: jsPDF }) => {
+      try {
+        const pdf = new jsPDF();
+        
+        // Set up the PDF formatting
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const margin = 20;
+        const lineHeight = 5;
+        const maxWidth = pageWidth - (margin * 2);
+        
+        let yPosition = margin;
+        
+        // Add header with applicant name
+        if (cvData.personalInfo.fullName) {
+          pdf.setFontSize(18);
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(cvData.personalInfo.fullName, margin, yPosition);
+          yPosition += lineHeight + 8;
+        }
+        
+        // Add contact info on one line
+        const contactInfo = [
+          cvData.personalInfo.email,
+          cvData.personalInfo.phone,
+          cvData.personalInfo.location
+        ].filter(Boolean).join(' | ');
+        
+        if (contactInfo) {
+          pdf.setFontSize(10);
+          pdf.setFont('helvetica', 'normal');
+          pdf.text(contactInfo, margin, yPosition);
+          yPosition += lineHeight + 5;
+        }
+        
+        // Add website/LinkedIn if provided
+        const webInfo = [
+          cvData.personalInfo.website,
+          cvData.personalInfo.linkedIn
+        ].filter(Boolean).join(' | ');
+        
+        if (webInfo) {
+          pdf.setFontSize(10);
+          pdf.text(webInfo, margin, yPosition);
+          yPosition += lineHeight + 10;
+        }
+        
+        // Add horizontal line
+        pdf.setLineWidth(0.5);
+        pdf.line(margin, yPosition, pageWidth - margin, yPosition);
+        yPosition += 10;
+        
+        // Add CV content
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        
+        // Split the CV content into lines that fit the page width
+        const lines = pdf.splitTextToSize(generatedCV, maxWidth);
+        
+        for (let i = 0; i < lines.length; i++) {
+          // Check if we need a new page
+          if (yPosition + lineHeight > pageHeight - margin) {
+            pdf.addPage();
+            yPosition = margin;
+          }
+          
+          pdf.text(lines[i], margin, yPosition);
+          yPosition += lineHeight;
+        }
+        
+        // Generate filename
+        const fullName = cvData.personalInfo.fullName.replace(/[^a-zA-Z0-9]/g, '_') || 'CV';
+        const filename = `${fullName}_CV.pdf`;
+        
+        // Save the PDF
+        pdf.save(filename);
+        toast.success('CV PDF downloaded successfully!');
+        
+      } catch (error) {
+        console.error('Error generating CV PDF:', error);
+        toast.error('Failed to generate CV PDF. Please try again.');
+      }
+    }).catch((error) => {
+      console.error('Error loading PDF library:', error);
+      toast.error('Failed to load PDF generator. Please try again.');
+    });
   };
 
   const nextStep = () => {
@@ -762,7 +862,583 @@ ${cvData.projects.filter(proj => proj.name).length > 0 ? 'PROJECTS\n' + cvData.p
           </motion.div>
         )}
 
-        {/* Other steps would be implemented similarly... */}
+        {/* Experience Step */}
+        {currentStep === 'experience' && (
+          <motion.div
+            key="experience"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+          >
+            <Card className="glass-card hover-lift">
+              <CardHeader>
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <Briefcase className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-3xl text-gray-900 dark:text-white">Work Experience</CardTitle>
+                    <CardDescription className="text-gray-600 dark:text-gray-300">
+                      Add your professional experience and achievements
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {cvData.experiences.map((experience, index) => (
+                  <div key={experience.id} className="glass-card p-6 space-y-4 border border-white/20 dark:border-white/10">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        Experience {index + 1}
+                      </h4>
+                      {cvData.experiences.length > 1 && (
+                        <Button
+                          onClick={() => removeExperience(experience.id)}
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          Company Name
+                        </label>
+                        <Input
+                          type="text"
+                          value={experience.company}
+                          onChange={(e) => {
+                            const updatedExperiences = [...cvData.experiences];
+                            updatedExperiences[index] = { ...experience, company: e.target.value };
+                            setCvData(prev => ({ ...prev, experiences: updatedExperiences }));
+                          }}
+                          placeholder="TechCorp Inc."
+                          className="premium-input"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          Position Title
+                        </label>
+                        <Input
+                          type="text"
+                          value={experience.position}
+                          onChange={(e) => {
+                            const updatedExperiences = [...cvData.experiences];
+                            updatedExperiences[index] = { ...experience, position: e.target.value };
+                            setCvData(prev => ({ ...prev, experiences: updatedExperiences }));
+                          }}
+                          placeholder="Senior Software Engineer"
+                          className="premium-input"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          Start Date
+                        </label>
+                        <Input
+                          type="text"
+                          value={experience.startDate}
+                          onChange={(e) => {
+                            const updatedExperiences = [...cvData.experiences];
+                            updatedExperiences[index] = { ...experience, startDate: e.target.value };
+                            setCvData(prev => ({ ...prev, experiences: updatedExperiences }));
+                          }}
+                          placeholder="Jan 2022"
+                          className="premium-input"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          End Date
+                        </label>
+                        <div className="space-y-2">
+                          <Input
+                            type="text"
+                            value={experience.endDate}
+                            onChange={(e) => {
+                              const updatedExperiences = [...cvData.experiences];
+                              updatedExperiences[index] = { ...experience, endDate: e.target.value };
+                              setCvData(prev => ({ ...prev, experiences: updatedExperiences }));
+                            }}
+                            placeholder="Present"
+                            disabled={experience.isCurrentRole}
+                            className="premium-input"
+                          />
+                          <label className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
+                            <input
+                              type="checkbox"
+                              checked={experience.isCurrentRole}
+                              onChange={(e) => {
+                                const updatedExperiences = [...cvData.experiences];
+                                updatedExperiences[index] = { 
+                                  ...experience, 
+                                  isCurrentRole: e.target.checked,
+                                  endDate: e.target.checked ? 'Present' : ''
+                                };
+                                setCvData(prev => ({ ...prev, experiences: updatedExperiences }));
+                              }}
+                              className="rounded"
+                            />
+                            <span>Current Role</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        Job Description
+                      </label>
+                      <textarea
+                        value={experience.description}
+                        onChange={(e) => {
+                          const updatedExperiences = [...cvData.experiences];
+                          updatedExperiences[index] = { ...experience, description: e.target.value };
+                          setCvData(prev => ({ ...prev, experiences: updatedExperiences }));
+                        }}
+                        placeholder="Describe your responsibilities and key contributions..."
+                        className="premium-input h-24 resize-none"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        Key Achievements
+                      </label>
+                      {experience.achievements.map((achievement, achievementIndex) => (
+                        <div key={achievementIndex} className="flex items-center space-x-2">
+                          <Input
+                            type="text"
+                            value={achievement}
+                            onChange={(e) => {
+                              const updatedExperiences = [...cvData.experiences];
+                              const updatedAchievements = [...experience.achievements];
+                              updatedAchievements[achievementIndex] = e.target.value;
+                              updatedExperiences[index] = { ...experience, achievements: updatedAchievements };
+                              setCvData(prev => ({ ...prev, experiences: updatedExperiences }));
+                            }}
+                            placeholder="Increased team productivity by 30%"
+                            className="premium-input flex-1"
+                          />
+                          <Button
+                            onClick={() => {
+                              const updatedExperiences = [...cvData.experiences];
+                              const updatedAchievements = experience.achievements.filter((_, i) => i !== achievementIndex);
+                              updatedExperiences[index] = { ...experience, achievements: updatedAchievements };
+                              setCvData(prev => ({ ...prev, experiences: updatedExperiences }));
+                            }}
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <Minus className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        onClick={() => {
+                          const updatedExperiences = [...cvData.experiences];
+                          updatedExperiences[index] = { 
+                            ...experience, 
+                            achievements: [...experience.achievements, ''] 
+                          };
+                          setCvData(prev => ({ ...prev, experiences: updatedExperiences }));
+                        }}
+                        variant="outline"
+                        size="sm"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Achievement
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                
+                <Button
+                  onClick={addExperience}
+                  variant="outline"
+                  className="w-full"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Another Experience
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Education Step */}
+        {currentStep === 'education' && (
+          <motion.div
+            key="education"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+          >
+            <Card className="glass-card hover-lift">
+              <CardHeader>
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <GraduationCap className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-3xl text-gray-900 dark:text-white">Education</CardTitle>
+                    <CardDescription className="text-gray-600 dark:text-gray-300">
+                      Add your educational background and qualifications
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {cvData.education.map((edu, index) => (
+                  <div key={edu.id} className="glass-card p-6 space-y-4 border border-white/20 dark:border-white/10">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        Education {index + 1}
+                      </h4>
+                      {cvData.education.length > 1 && (
+                        <Button
+                          onClick={() => {
+                            setCvData(prev => ({
+                              ...prev,
+                              education: prev.education.filter(e => e.id !== edu.id)
+                            }));
+                          }}
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          Institution
+                        </label>
+                        <Input
+                          type="text"
+                          value={edu.institution}
+                          onChange={(e) => {
+                            const updatedEducation = [...cvData.education];
+                            updatedEducation[index] = { ...edu, institution: e.target.value };
+                            setCvData(prev => ({ ...prev, education: updatedEducation }));
+                          }}
+                          placeholder="University of Technology"
+                          className="premium-input"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          Degree
+                        </label>
+                        <Input
+                          type="text"
+                          value={edu.degree}
+                          onChange={(e) => {
+                            const updatedEducation = [...cvData.education];
+                            updatedEducation[index] = { ...edu, degree: e.target.value };
+                            setCvData(prev => ({ ...prev, education: updatedEducation }));
+                          }}
+                          placeholder="Bachelor's Degree"
+                          className="premium-input"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          Field of Study
+                        </label>
+                        <Input
+                          type="text"
+                          value={edu.field}
+                          onChange={(e) => {
+                            const updatedEducation = [...cvData.education];
+                            updatedEducation[index] = { ...edu, field: e.target.value };
+                            setCvData(prev => ({ ...prev, education: updatedEducation }));
+                          }}
+                          placeholder="Computer Science"
+                          className="premium-input"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          Graduation Date
+                        </label>
+                        <Input
+                          type="text"
+                          value={edu.graduationDate}
+                          onChange={(e) => {
+                            const updatedEducation = [...cvData.education];
+                            updatedEducation[index] = { ...edu, graduationDate: e.target.value };
+                            setCvData(prev => ({ ...prev, education: updatedEducation }));
+                          }}
+                          placeholder="May 2020"
+                          className="premium-input"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          GPA (Optional)
+                        </label>
+                        <Input
+                          type="text"
+                          value={edu.gpa || ''}
+                          onChange={(e) => {
+                            const updatedEducation = [...cvData.education];
+                            updatedEducation[index] = { ...edu, gpa: e.target.value };
+                            setCvData(prev => ({ ...prev, education: updatedEducation }));
+                          }}
+                          placeholder="3.8/4.0"
+                          className="premium-input"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          Honors (Optional)
+                        </label>
+                        <Input
+                          type="text"
+                          value={edu.honors || ''}
+                          onChange={(e) => {
+                            const updatedEducation = [...cvData.education];
+                            updatedEducation[index] = { ...edu, honors: e.target.value };
+                            setCvData(prev => ({ ...prev, education: updatedEducation }));
+                          }}
+                          placeholder="Magna Cum Laude"
+                          className="premium-input"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                <Button
+                  onClick={addEducation}
+                  variant="outline"
+                  className="w-full"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Another Education
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Skills Step */}
+        {currentStep === 'skills' && (
+          <motion.div
+            key="skills"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+          >
+            <Card className="glass-card hover-lift">
+              <CardHeader>
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <Award className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-3xl text-gray-900 dark:text-white">Skills & Additional Info</CardTitle>
+                    <CardDescription className="text-gray-600 dark:text-gray-300">
+                      Add your skills, languages, certifications, and projects
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-8">
+                {/* Skills Section */}
+                <div className="space-y-4">
+                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Technical Skills</h4>
+                  {cvData.skills.map((skill, index) => (
+                    <div key={skill.id} className="flex items-center space-x-4">
+                      <Input
+                        type="text"
+                        value={skill.name}
+                        onChange={(e) => {
+                          const updatedSkills = [...cvData.skills];
+                          updatedSkills[index] = { ...skill, name: e.target.value };
+                          setCvData(prev => ({ ...prev, skills: updatedSkills }));
+                        }}
+                        placeholder="JavaScript"
+                        className="premium-input flex-1"
+                      />
+                      <Select 
+                        value={skill.level} 
+                        onValueChange={(value: 'Beginner' | 'Intermediate' | 'Advanced' | 'Expert') => {
+                          const updatedSkills = [...cvData.skills];
+                          updatedSkills[index] = { ...skill, level: value };
+                          setCvData(prev => ({ ...prev, skills: updatedSkills }));
+                        }}
+                      >
+                        <SelectTrigger className="w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Beginner">Beginner</SelectItem>
+                          <SelectItem value="Intermediate">Intermediate</SelectItem>
+                          <SelectItem value="Advanced">Advanced</SelectItem>
+                          <SelectItem value="Expert">Expert</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        onClick={() => {
+                          setCvData(prev => ({
+                            ...prev,
+                            skills: prev.skills.filter(s => s.id !== skill.id)
+                          }));
+                        }}
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    onClick={addSkill}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Skill
+                  </Button>
+                </div>
+
+                {/* Languages Section */}
+                <div className="space-y-4">
+                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Languages</h4>
+                  {cvData.languages.map((language, index) => (
+                    <div key={index} className="flex items-center space-x-4">
+                      <Input
+                        type="text"
+                        value={language.name}
+                        onChange={(e) => {
+                          const updatedLanguages = [...cvData.languages];
+                          updatedLanguages[index] = { ...language, name: e.target.value };
+                          setCvData(prev => ({ ...prev, languages: updatedLanguages }));
+                        }}
+                        placeholder="English"
+                        className="premium-input flex-1"
+                      />
+                      <Select 
+                        value={language.proficiency} 
+                        onValueChange={(value) => {
+                          const updatedLanguages = [...cvData.languages];
+                          updatedLanguages[index] = { ...language, proficiency: value };
+                          setCvData(prev => ({ ...prev, languages: updatedLanguages }));
+                        }}
+                      >
+                        <SelectTrigger className="w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Native">Native</SelectItem>
+                          <SelectItem value="Fluent">Fluent</SelectItem>
+                          <SelectItem value="Advanced">Advanced</SelectItem>
+                          <SelectItem value="Intermediate">Intermediate</SelectItem>
+                          <SelectItem value="Beginner">Beginner</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        onClick={() => {
+                          setCvData(prev => ({
+                            ...prev,
+                            languages: prev.languages.filter((_, i) => i !== index)
+                          }));
+                        }}
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    onClick={() => {
+                      setCvData(prev => ({
+                        ...prev,
+                        languages: [...prev.languages, { name: '', proficiency: 'Native' }]
+                      }));
+                    }}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Language
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Template Step */}
+        {currentStep === 'template' && (
+          <motion.div
+            key="template"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+          >
+            <Card className="glass-card hover-lift">
+              <CardHeader>
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <Palette className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-3xl text-gray-900 dark:text-white">Choose Template</CardTitle>
+                    <CardDescription className="text-gray-600 dark:text-gray-300">
+                      Select a professional template for your CV
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {Object.entries(templates).map(([key, template]) => (
+                    <motion.div
+                      key={key}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setSelectedTemplate(key as Template)}
+                      className={`cursor-pointer glass-card p-6 transition-all duration-200 ${
+                        selectedTemplate === key 
+                          ? 'ring-2 ring-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 shadow-xl' 
+                          : 'hover:shadow-lg'
+                      }`}
+                    >
+                      <div className={`w-16 h-16 rounded-xl bg-gradient-to-br ${template.color} mb-4 mx-auto shadow-lg flex items-center justify-center text-2xl`}>
+                        {template.preview}
+                      </div>
+                      <h4 className="font-semibold text-gray-900 dark:text-white text-center mb-2">{template.name}</h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-300 text-center">{template.description}</p>
+                    </motion.div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {/* Navigation Card */}

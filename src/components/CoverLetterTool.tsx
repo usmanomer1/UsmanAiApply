@@ -76,8 +76,8 @@ export const CoverLetterTool: React.FC = () => {
     applicantEmail: '',
     tone: 'professional',
     experience: '',
-    keySkills: [],
-    achievements: []
+    keySkills: [''], // Start with one empty skill field
+    achievements: [''] // Start with one empty achievement field
   });
   
   const [isGenerating, setIsGenerating] = useState(false);
@@ -140,9 +140,8 @@ export const CoverLetterTool: React.FC = () => {
 
       try {
         const accessResult = await checkFeatureAccess('advanced_ai');
-        if (!accessResult.hasAccess) {
-          setShowPaywall(true);
-        }
+        // Use the correct logic that NEVER shows paywall for paid users
+        setShowPaywall(accessResult.showPaywall);
       } catch (error) {
         console.error('Error checking feature access:', error);
         setShowPaywall(true);
@@ -191,7 +190,13 @@ export const CoverLetterTool: React.FC = () => {
     try {
       const accessResult = await checkFeatureAccess('advanced_ai');
       if (!accessResult.hasAccess) {
-        setShowPaywall(true);
+        // Show appropriate error message for paid users vs free users
+        if (accessResult.showPaywall) {
+          setShowPaywall(true);
+        } else {
+          // Paid user hit usage limit - show error but no paywall
+          toast.error('Usage limit reached. Please try again later or contact support.');
+        }
         return;
       }
     } catch (error) {
@@ -219,10 +224,21 @@ Key Achievements:
 ${formData.achievements.filter(ach => ach.trim()).map(ach => `• ${ach}`).join('\n')}
       `.trim();
 
+      console.log('🔍 Generating cover letter with data:', {
+        applicantName: formData.applicantName,
+        company: formData.companyName,
+        tone: formData.tone,
+        skillsCount: formData.keySkills.filter(s => s.trim()).length,
+        achievementsCount: formData.achievements.filter(a => a.trim()).length,
+        hasJobDescription: !!formData.jobDescription,
+        experience: formData.experience
+      });
+
       const coverLetter = await openAIService.generateCoverLetter(
         resumeText,
         formData.jobDescription,
-        formData.companyName
+        formData.companyName,
+        formData.tone
       );
 
       setGeneratedLetter({
@@ -260,14 +276,90 @@ ${formData.achievements.filter(ach => ach.trim()).map(ach => `• ${ach}`).join(
   const downloadLetter = () => {
     if (!generatedLetter) return;
     
-    const element = document.createElement('a');
-    const file = new Blob([generatedLetter.coverLetter], { type: 'text/plain' });
-    element.href = URL.createObjectURL(file);
-    element.download = `${formData.applicantName}_CoverLetter_${formData.companyName}.txt`;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-    toast.success('Cover letter downloaded!');
+    // Dynamic import to reduce bundle size
+    import('jspdf').then(({ default: jsPDF }) => {
+      try {
+        const pdf = new jsPDF();
+        
+        // Set up the PDF formatting
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const margin = 20;
+        const lineHeight = 6;
+        const maxWidth = pageWidth - (margin * 2);
+        
+        let yPosition = margin;
+        
+                 // Add header with applicant name
+         if (formData.applicantName) {
+           pdf.setFontSize(16);
+           pdf.setFont('helvetica', 'bold');
+           pdf.text(formData.applicantName, margin, yPosition);
+           yPosition += lineHeight + 5;
+         }
+         
+         // Add email if provided
+         if (formData.applicantEmail) {
+           pdf.setFontSize(12);
+           pdf.setFont('helvetica', 'normal');
+           pdf.text(formData.applicantEmail, margin, yPosition);
+           yPosition += lineHeight + 10;
+         }
+         
+         // Add date
+         const today = new Date().toLocaleDateString('en-US', { 
+           year: 'numeric', 
+           month: 'long', 
+           day: 'numeric' 
+         });
+         pdf.setFontSize(11);
+         pdf.text(today, margin, yPosition);
+         yPosition += lineHeight + 10;
+         
+         // Add company name if provided
+         if (formData.companyName) {
+           pdf.setFont('helvetica', 'bold');
+           pdf.text(formData.companyName, margin, yPosition);
+           yPosition += lineHeight;
+           pdf.setFont('helvetica', 'normal');
+           yPosition += 10;
+         }
+         
+         // Add cover letter content
+         pdf.setFontSize(11);
+         pdf.setFont('helvetica', 'normal');
+        
+        // Split the cover letter into lines that fit the page width
+        const lines = pdf.splitTextToSize(generatedLetter.coverLetter, maxWidth);
+        
+        for (let i = 0; i < lines.length; i++) {
+          // Check if we need a new page
+          if (yPosition + lineHeight > pageHeight - margin) {
+            pdf.addPage();
+            yPosition = margin;
+          }
+          
+          pdf.text(lines[i], margin, yPosition);
+          yPosition += lineHeight;
+        }
+        
+        // Generate filename
+        const applicantName = formData.applicantName.replace(/[^a-zA-Z0-9]/g, '_') || 'Applicant';
+        const companyName = formData.companyName.replace(/[^a-zA-Z0-9]/g, '_') || 'Company';
+        const filename = `${applicantName}_CoverLetter_${companyName}.pdf`;
+        
+        // Save the PDF
+        pdf.save(filename);
+        toast.success('Cover letter PDF downloaded!');
+        
+      } catch (error) {
+        console.error('Error generating PDF:', error);
+        toast.error('Failed to generate PDF. Please try again.');
+      }
+    }).catch((error) => {
+      console.error('Error loading PDF library:', error);
+      toast.error('Failed to load PDF generator. Please try again.');
+    });
   };
 
   const handleUpgrade = () => {

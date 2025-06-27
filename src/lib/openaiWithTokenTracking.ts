@@ -93,9 +93,11 @@ class OpenAIServiceWithTokenTracking {
 
   private async getUserSubscriptionStatus(): Promise<{ hasActiveSubscription: boolean; status?: string }> {
     try {
+      const user = await this.getCurrentUser();
       const { data, error } = await supabase
         .from('stripe_user_subscriptions')
         .select('subscription_status')
+        .eq('user_id', user.id)
         .single();
       
       if (error || !data) {
@@ -441,16 +443,25 @@ Focus on:
     return JSON.parse(response.content);
   }
 
-  async generateCoverLetter(resumeText: string, jobDescription: string, company: string): Promise<string> {
+  async generateCoverLetter(resumeText: string, jobDescription: string, company: string, tone: string = 'professional'): Promise<string> {
+    const toneInstructions = {
+      professional: 'formal, business-focused, and respectful',
+      confident: 'bold, assertive, and self-assured while remaining professional',
+      friendly: 'warm, approachable, and personable while maintaining professionalism',
+      innovative: 'creative, forward-thinking, and emphasizing innovation and problem-solving'
+    };
+
+    const toneStyle = toneInstructions[tone as keyof typeof toneInstructions] || toneInstructions.professional;
+
     const messages = [
       {
         role: 'system',
-        content: 'You are an expert cover letter writer. Create compelling, personalized cover letters that highlight relevant experience and show genuine interest in the role.'
+        content: `You are an expert cover letter writer. Create compelling, personalized cover letters that highlight relevant experience and show genuine interest in the role. Write in a ${toneStyle} tone throughout the letter.`
       },
       {
         role: 'user',
         content: `
-Create a professional cover letter based on:
+Create a cover letter with a ${tone} tone based on:
 
 Resume:
 ${resumeText}
@@ -464,8 +475,9 @@ Write a compelling cover letter that:
 - Highlights relevant experience
 - Shows knowledge of the company
 - Demonstrates value proposition
-- Maintains professional tone
+- Maintains a ${toneStyle} tone
 - Is concise yet impactful (3-4 paragraphs)
+- Uses appropriate language for the ${tone} style
 
 Return only the cover letter text, properly formatted.`
       }
@@ -475,7 +487,7 @@ Return only the cover letter text, properly formatted.`
       messages, 
       OPERATION_TOKEN_LIMITS.cover_letter, 
       'cover_letter',
-      { company, hasJobDescription: !!jobDescription }
+      { company, hasJobDescription: !!jobDescription, tone }
     );
     
     return response.content;
