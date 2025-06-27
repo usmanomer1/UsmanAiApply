@@ -14,33 +14,91 @@ export interface StripeProduct {
   aiTokenCount?: number; // For AI tokens
 }
 
-// Get price IDs from environment variables with fallbacks for development
-const getStripeConfig = () => ({
-  PLUS_PRICE_ID: import.meta.env.VITE_STRIPE_PLUS_PRICE_ID || 'price_1ReWRFGkowQ7Swlf8PrgcgFW',
-  PRO_PRICE_ID: import.meta.env.VITE_STRIPE_PRO_PRICE_ID || 'price_1ReWSQGkowQ7SwlftYAa0rsz',
-  MAX_PRICE_ID: import.meta.env.VITE_STRIPE_MAX_PRICE_ID || 'price_1ReWUBGkowQ7SwlfhyAyjNOl',
-  
-  // Job Application Token Packs
-  QUICK_APPLY_PRICE_ID: import.meta.env.VITE_STRIPE_QUICK_APPLY_PRICE_ID || 'price_1ReWZdGkowQ7SwlfVZescJWA',
-  HUSTLE_BOOST_PRICE_ID: import.meta.env.VITE_STRIPE_HUSTLE_BOOST_PRICE_ID || 'price_1ReWdLGkowQ7SwlfDuLs92WQ',
-  FULL_SEND_PRICE_ID: import.meta.env.VITE_STRIPE_FULL_SEND_PRICE_ID || 'price_1ReWefGkowQ7Swlf023H0L0W',
-  CAREER_STORM_PRICE_ID: import.meta.env.VITE_STRIPE_CAREER_STORM_PRICE_ID || 'price_1ReWfMGkowQ7SwlfTzR1Cf1Q',
-  
-  // AI Token Packs
-  LIGHT_BOOST_PRICE_ID: import.meta.env.VITE_STRIPE_LIGHT_BOOST_PRICE_ID || 'price_1ReWj2GkowQ7SwlfgLEXqpPu',
-  SMART_STACK_PRICE_ID: import.meta.env.VITE_STRIPE_SMART_STACK_PRICE_ID || 'price_1ReWjhGkowQ7SwlfWMmqHJgT',
-  POWER_DRAFT_PRICE_ID: import.meta.env.VITE_STRIPE_POWER_DRAFT_PRICE_ID || 'price_1ReWkPGkowQ7SwlfEaIHuHnm',
-  CREATOR_SURGE_PRICE_ID: import.meta.env.VITE_STRIPE_CREATOR_SURGE_PRICE_ID || 'price_1ReWlhGkowQ7Swlfx31q1Sf0',
-  AI_VAULT_PRICE_ID: import.meta.env.VITE_STRIPE_AI_VAULT_PRICE_ID || 'price_1ReWnQGkowQ7Swlfs8LiY8Bg'
-});
+// Get price IDs from environment variables with better error handling
+const getStripeConfig = () => {
+  const config = {
+    PLUS_PRICE_ID: import.meta.env.VITE_STRIPE_PLUS_PRICE_ID,
+    PRO_PRICE_ID: import.meta.env.VITE_STRIPE_PRO_PRICE_ID,
+    MAX_PRICE_ID: import.meta.env.VITE_STRIPE_MAX_PRICE_ID,
+    
+    // Job Application Token Packs
+    QUICK_APPLY_PRICE_ID: import.meta.env.VITE_STRIPE_QUICK_APPLY_PRICE_ID,
+    HUSTLE_BOOST_PRICE_ID: import.meta.env.VITE_STRIPE_HUSTLE_BOOST_PRICE_ID,
+    FULL_SEND_PRICE_ID: import.meta.env.VITE_STRIPE_FULL_SEND_PRICE_ID,
+    CAREER_STORM_PRICE_ID: import.meta.env.VITE_STRIPE_CAREER_STORM_PRICE_ID,
+    
+    // AI Token Packs
+    LIGHT_BOOST_PRICE_ID: import.meta.env.VITE_STRIPE_LIGHT_BOOST_PRICE_ID,
+    SMART_STACK_PRICE_ID: import.meta.env.VITE_STRIPE_SMART_STACK_PRICE_ID,
+    POWER_DRAFT_PRICE_ID: import.meta.env.VITE_STRIPE_POWER_DRAFT_PRICE_ID,
+    CREATOR_SURGE_PRICE_ID: import.meta.env.VITE_STRIPE_CREATOR_SURGE_PRICE_ID,
+    AI_VAULT_PRICE_ID: import.meta.env.VITE_STRIPE_AI_VAULT_PRICE_ID
+  };
 
-const stripeConfig = getStripeConfig();
+  // Check for invalid price IDs (product IDs starting with 'prod_')
+  const invalidPriceIds = Object.entries(config)
+    .filter(([key, value]) => value && value.startsWith('prod_'))
+    .map(([key]) => key);
+
+  if (invalidPriceIds.length > 0) {
+    console.error('❌ STRIPE CONFIGURATION ERROR:');
+    console.error(`Found product IDs instead of price IDs for: ${invalidPriceIds.join(', ')}`);
+    console.error('❗ You must use PRICE IDs (price_xxxxx) not PRODUCT IDs (prod_xxxxx)');
+    console.error('🔧 Go to your Stripe Dashboard > Product catalog > Select product > Copy the PRICE ID');
+    
+    // Don't throw error in development to allow testing
+    if (import.meta.env.MODE === 'production') {
+      throw new Error(`Invalid Stripe configuration: Product IDs found instead of Price IDs for: ${invalidPriceIds.join(', ')}`);
+    }
+  }
+
+  // Validate that all required price IDs are present
+  const missingPriceIds = Object.entries(config)
+    .filter(([key, value]) => !value)
+    .map(([key]) => key);
+
+  if (missingPriceIds.length > 0) {
+    console.warn('⚠️ Missing Stripe price IDs:', missingPriceIds);
+    
+    if (import.meta.env.MODE === 'production') {
+      throw new Error(`Missing required environment variables: ${missingPriceIds.map(id => `VITE_STRIPE_${id}`).join(', ')}`);
+    }
+  }
+
+  return config;
+};
+
+// Safe version that doesn't throw errors
+const getStripeConfigSafe = () => {
+  try {
+    return getStripeConfig();
+  } catch (error) {
+    console.error('Stripe configuration error:', error);
+    // Return empty config for development
+    return {
+      PLUS_PRICE_ID: '',
+      PRO_PRICE_ID: '',
+      MAX_PRICE_ID: '',
+      QUICK_APPLY_PRICE_ID: '',
+      HUSTLE_BOOST_PRICE_ID: '',
+      FULL_SEND_PRICE_ID: '',
+      CAREER_STORM_PRICE_ID: '',
+      LIGHT_BOOST_PRICE_ID: '',
+      SMART_STACK_PRICE_ID: '',
+      POWER_DRAFT_PRICE_ID: '',
+      CREATOR_SURGE_PRICE_ID: '',
+      AI_VAULT_PRICE_ID: ''
+    };
+  }
+};
+
+const stripeConfig = getStripeConfigSafe();
 
 export const STRIPE_PRODUCTS: StripeProduct[] = [
   // Subscription Plans
   {
     id: 'prod_SZfmZazFIlmV2H',
-    priceId: stripeConfig.PLUS_PRICE_ID,
+    priceId: stripeConfig.PLUS_PRICE_ID || 'price_missing_plus',
     name: 'Plus',
     description: '37 automated job applications/month, 30,000 AI tokens for resume & cover letters. Voice AI features included. Additional applications and AI tokens billed separately.',
     mode: 'subscription',
@@ -61,9 +119,9 @@ export const STRIPE_PRODUCTS: StripeProduct[] = [
   },
   {
     id: 'prod_SZfo61zKWmnX6l',
-    priceId: stripeConfig.PRO_PRICE_ID,
+    priceId: stripeConfig.PRO_PRICE_ID || 'price_missing_pro',
     name: 'Pro',
-    description: '37 automated job applications per month, 30,000 AI tokens for resume and cover letters, voice AI features included, additional applications and AI tokens billed separately.',
+    description: '77 automated job applications per month, 30,000 AI tokens for resume and cover letters, voice AI features included, additional applications and AI tokens billed separately.',
     mode: 'subscription',
     price: 50.00,
     currency: 'usd',
@@ -83,7 +141,7 @@ export const STRIPE_PRODUCTS: StripeProduct[] = [
   },
   {
     id: 'prod_SZfpQ9Y78JdsPl',
-    priceId: stripeConfig.MAX_PRICE_ID,
+    priceId: stripeConfig.MAX_PRICE_ID || 'price_missing_max',
     name: 'Max',
     description: '158 job applications per month, 30,000 AI tokens for resume and cover letters, Voice AI features included, Priority support and early access, Additional applications and AI tokens billed separately',
     mode: 'subscription',
@@ -108,7 +166,7 @@ export const STRIPE_PRODUCTS: StripeProduct[] = [
   // Job Application Token Packs
   {
     id: 'prod_SZfvC0SBiq8WCH',
-    priceId: stripeConfig.QUICK_APPLY_PRICE_ID,
+    priceId: stripeConfig.QUICK_APPLY_PRICE_ID || 'price_missing_quick_apply',
     name: 'Job Application QuickApply',
     description: 'Just need a few extras? Top off with 10 more AI job submissions.',
     mode: 'payment',
@@ -126,7 +184,7 @@ export const STRIPE_PRODUCTS: StripeProduct[] = [
   },
   {
     id: 'prod_SZfzFzOrGwV9rs',
-    priceId: stripeConfig.HUSTLE_BOOST_PRICE_ID,
+    priceId: stripeConfig.HUSTLE_BOOST_PRICE_ID || 'price_missing_hustle_boost',
     name: 'Job Application Hustle Boost',
     description: 'A solid 25-job boost to keep your application momentum alive.',
     mode: 'payment',
@@ -144,10 +202,10 @@ export const STRIPE_PRODUCTS: StripeProduct[] = [
   },
   {
     id: 'prod_SZg0BHePDKyfaJ',
-    priceId: stripeConfig.FULL_SEND_PRICE_ID,
+    priceId: stripeConfig.FULL_SEND_PRICE_ID || 'price_missing_full_send',
     name: 'Job Application Full Send',
     description: 'Bulk top-up of 100 AI applications. Efficient and powerful.',
-    mode: 'subscription',
+    mode: 'payment',
     price: 60.00,
     currency: 'usd',
     category: 'tokens',
@@ -162,7 +220,7 @@ export const STRIPE_PRODUCTS: StripeProduct[] = [
   },
   {
     id: 'prod_SZg1hA5JYa7jUD',
-    priceId: stripeConfig.CAREER_STORM_PRICE_ID,
+    priceId: stripeConfig.CAREER_STORM_PRICE_ID || 'price_missing_career_storm',
     name: 'Job Application Career Storm',
     description: '250 more jobs. For users executing full-scale job search blitzes.',
     mode: 'payment',
@@ -183,95 +241,106 @@ export const STRIPE_PRODUCTS: StripeProduct[] = [
   // AI Token Packs
   {
     id: 'prod_SZg5NzHO7PdwNC',
-    priceId: stripeConfig.LIGHT_BOOST_PRICE_ID,
-    name: 'AI Tokens - Light Boost',
-    description: 'Extra 10K AI tokens to top up your resume and cover letter tools — fast, cheap, and effective.',
+    priceId: stripeConfig.LIGHT_BOOST_PRICE_ID || 'price_missing_light_boost',
+    name: 'AI Token Light Boost',
+    description: 'Quick boost of 10,000 AI tokens for resume and cover letter generation.',
     mode: 'payment',
     price: 1.00,
     currency: 'usd',
     category: 'tokens',
-    aiTokenCount: 10000,
+    tokenCount: 10000,
     features: [
       '10,000 AI tokens',
-      'Resume & cover letter generation',
+      'Resume generation',
+      'Cover letter creation',
       'Instant access',
-      'No expiration',
-      'Compatible with all plans'
+      'No expiration'
     ]
   },
   {
     id: 'prod_SZg52qwFFosoC6',
-    priceId: stripeConfig.SMART_STACK_PRICE_ID,
-    name: 'AI Tokens - Smart Stack',
-    description: '25K tokens for multiple cover letters, custom responses, or rewriting your resume like a pro.',
+    priceId: stripeConfig.SMART_STACK_PRICE_ID || 'price_missing_smart_stack',
+    name: 'AI Token Smart Stack',
+    description: '25,000 AI tokens for extended resume and cover letter work.',
     mode: 'payment',
     price: 2.00,
     currency: 'usd',
     category: 'tokens',
-    aiTokenCount: 25000,
+    tokenCount: 25000,
     features: [
       '25,000 AI tokens',
-      'Multiple cover letters',
-      'Resume rewrites',
-      'Custom responses',
+      'Multiple resume versions',
+      'Custom cover letters',
+      'Instant access',
       'No expiration'
     ]
   },
   {
     id: 'prod_SZg6oBdB7j50Xb',
-    priceId: stripeConfig.POWER_DRAFT_PRICE_ID,
-    name: 'AI Tokens - Power Draft',
-    description: 'Build full application kits with 50K tokens. Great for interview prep, personalization, and bulk usage.',
-    mode: 'subscription',
+    priceId: stripeConfig.POWER_DRAFT_PRICE_ID || 'price_missing_power_draft',
+    name: 'AI Token Power Draft',
+    description: '50,000 AI tokens for comprehensive job application materials.',
+    mode: 'payment',
     price: 3.00,
     currency: 'usd',
     category: 'tokens',
-    aiTokenCount: 50000,
+    tokenCount: 50000,
     features: [
       '50,000 AI tokens',
-      'Full application kits',
-      'Interview preparation',
-      'Personalized content',
-      'Bulk usage capability'
+      'Professional resume optimization',
+      'Industry-specific cover letters',
+      'Instant access',
+      'No expiration'
     ]
   },
   {
     id: 'prod_SZg70s45I6BmQg',
-    priceId: stripeConfig.CREATOR_SURGE_PRICE_ID,
-    name: 'AI Tokens - Creator Surge',
-    description: '100K tokens for those running weekly AI content — perfect for heavy resume customization and job prep.',
-    mode: 'subscription',
+    priceId: stripeConfig.CREATOR_SURGE_PRICE_ID || 'price_missing_creator_surge',
+    name: 'AI Token Creator Surge',
+    description: '100,000 AI tokens for power users and frequent job seekers.',
+    mode: 'payment',
     price: 5.00,
     currency: 'usd',
     category: 'tokens',
-    aiTokenCount: 100000,
+    tokenCount: 100000,
     features: [
       '100,000 AI tokens',
-      'Weekly content generation',
-      'Heavy resume customization',
-      'Comprehensive job prep',
-      'Bulk content creation'
+      'Unlimited resume variations',
+      'Custom cover letter templates',
+      'Priority processing',
+      'No expiration'
     ]
   },
   {
     id: 'prod_SZg9YA9twVqwnF',
-    priceId: stripeConfig.AI_VAULT_PRICE_ID,
-    name: 'AI Tokens - AI Vault',
-    description: '250K tokens for serious users scaling fast. Bulk pricing, maximum flexibility, and huge value.',
+    priceId: stripeConfig.AI_VAULT_PRICE_ID || 'price_missing_ai_vault',
+    name: 'AI Token Vault',
+    description: '250,000 AI tokens - the ultimate package for serious job searchers.',
     mode: 'payment',
     price: 10.00,
     currency: 'usd',
     category: 'tokens',
-    aiTokenCount: 250000,
+    tokenCount: 250000,
     features: [
       '250,000 AI tokens',
-      'Bulk pricing',
-      'Maximum flexibility',
-      'Huge value',
-      'Ideal for power users'
+      'Enterprise-level resume optimization',
+      'Unlimited cover letter variations',
+      'Priority support',
+      'No expiration',
+      'Best value for heavy users'
     ]
   }
 ];
+
+// Helper function to check if Stripe is properly configured
+export const isStripeConfigured = (): boolean => {
+  try {
+    const config = getStripeConfig();
+    return Object.values(config).every(value => value && !value.startsWith('price_missing'));
+  } catch {
+    return false;
+  }
+};
 
 export const getProductByPriceId = (priceId: string): StripeProduct | undefined => {
   return STRIPE_PRODUCTS.find(product => product.priceId === priceId);
@@ -290,22 +359,20 @@ export const getTokenProducts = (): StripeProduct[] => {
 };
 
 export const formatPrice = (price: number, currency: string): string => {
-  const formatter = new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency.toUpperCase(),
-    minimumFractionDigits: 2,
-  });
-  return formatter.format(price);
+    minimumFractionDigits: price % 1 === 0 ? 0 : 2,
+  }).format(price);
 };
 
 export const getCurrencySymbol = (currency: string): string => {
   const symbols: Record<string, string> = {
-    'usd': '$',
-    'cad': 'C$',
-    'eur': '€',
-    'gbp': '£'
+    usd: '$',
+    eur: '€',
+    gbp: '£',
   };
-  return symbols[currency.toLowerCase()] || '$';
+  return symbols[currency.toLowerCase()] || currency.toUpperCase();
 };
 
 // Helper function to get plan limits
@@ -320,25 +387,41 @@ export const getPlanLimits = (priceId: string) => {
   };
 };
 
-// Helper function to get plan name from price ID
+// Helper function to get plan name by price ID with better fallbacks
 export const getPlanNameByPriceId = (priceId: string): string => {
+  // Try to get product by price ID first
   const product = getProductByPriceId(priceId);
-  return product?.name || 'Unknown Plan';
+  if (product && product.category === 'subscription') {
+    return product.name;
+  }
+
+  // Fallback: try to match against environment variables
+  if (priceId === stripeConfig.PLUS_PRICE_ID) return 'Plus';
+  if (priceId === stripeConfig.PRO_PRICE_ID) return 'Pro';
+  if (priceId === stripeConfig.MAX_PRICE_ID) return 'Max';
+
+  // If price ID looks like a product ID, return default
+  if (priceId && priceId.startsWith('prod_')) {
+    console.warn('⚠️ Product ID detected instead of Price ID:', priceId);
+    return 'Pro'; // Default fallback
+  }
+
+  return 'Unknown Plan';
 };
 
-// Helper function to check if plan includes voice features
 export const planIncludesVoiceFeatures = (priceId: string): boolean => {
+  // All paid plans include voice features
   const product = getProductByPriceId(priceId);
-  return product?.category === 'subscription'; // All subscription plans include voice
+  return product?.category === 'subscription' || false;
 };
 
-// Helper function to calculate overage costs (now step-based instead of application-based)
 export const calculateOverageCost = (usage: { steps: number; aiTokens: number }, limits: { steps: number; aiTokens: number }) => {
   const stepOverage = Math.max(0, usage.steps - limits.steps);
   const aiTokenOverage = Math.max(0, usage.aiTokens - limits.aiTokens);
   
-  const stepCost = stepOverage * 0.001; // $0.001 per step
-  const aiTokenCost = Math.ceil(aiTokenOverage / 1000) * 0.10; // $0.10 per 1,000 tokens
+  // Updated browser use cost: $0.03 per step + $0.01 initialization
+  const stepCost = stepOverage * 0.03;
+  const aiTokenCost = (aiTokenOverage / 1000) * 0.10; // $0.10 per 1,000 tokens
   
   return {
     stepOverage,
@@ -349,27 +432,24 @@ export const calculateOverageCost = (usage: { steps: number; aiTokens: number },
   };
 };
 
-// Validate environment configuration
 export const validateStripeConfig = (): { isValid: boolean; missingVars: string[] } => {
-  const requiredVars = [
-    'VITE_STRIPE_PLUS_PRICE_ID',
-    'VITE_STRIPE_PRO_PRICE_ID', 
-    'VITE_STRIPE_MAX_PRICE_ID',
-    'VITE_STRIPE_QUICK_APPLY_PRICE_ID',
-    'VITE_STRIPE_HUSTLE_BOOST_PRICE_ID',
-    'VITE_STRIPE_FULL_SEND_PRICE_ID',
-    'VITE_STRIPE_CAREER_STORM_PRICE_ID',
-    'VITE_STRIPE_LIGHT_BOOST_PRICE_ID',
-    'VITE_STRIPE_SMART_STACK_PRICE_ID',
-    'VITE_STRIPE_POWER_DRAFT_PRICE_ID',
-    'VITE_STRIPE_CREATOR_SURGE_PRICE_ID',
-    'VITE_STRIPE_AI_VAULT_PRICE_ID'
-  ];
-  
-  const missingVars = requiredVars.filter(varName => !import.meta.env[varName]);
-  
-  return {
-    isValid: missingVars.length === 0,
-    missingVars
-  };
+  try {
+    const config = getStripeConfig();
+    const missingVars = Object.entries(config)
+      .filter(([key, value]) => !value || value.startsWith('price_missing'))
+      .map(([key]) => `VITE_STRIPE_${key}`);
+    
+    return {
+      isValid: missingVars.length === 0,
+      missingVars
+    };
+  } catch (error) {
+    return {
+      isValid: false,
+      missingVars: ['Configuration Error']
+    };
+  }
 };
+
+// Export the safe config for use elsewhere
+export { stripeConfig };

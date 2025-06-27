@@ -35,8 +35,11 @@ import {
   getTokenProducts, 
   formatPrice, 
   getCurrencySymbol,
-  getPlanLimits
+  getPlanLimits,
+  isStripeConfigured,
+  validateStripeConfig
 } from '../../stripe-config';
+import { PricingFAQ } from '../PricingFAQ';
 import toast from 'react-hot-toast';
 
 interface UserSubscription {
@@ -68,8 +71,15 @@ export const BillingPage: React.FC = () => {
   const [purchasing, setPurchasing] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'subscriptions' | 'tokens'>('subscriptions');
   const [refreshing, setRefreshing] = useState(false);
+  const [stripeConfigError, setStripeConfigError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Check Stripe configuration on mount
+    const configValidation = validateStripeConfig();
+    if (!configValidation.isValid) {
+      setStripeConfigError(`Missing Stripe configuration: ${configValidation.missingVars.join(', ')}`);
+    }
+    
     fetchBillingData();
   }, [user]);
 
@@ -216,8 +226,21 @@ export const BillingPage: React.FC = () => {
   };
 
   const handlePurchase = async (priceId: string) => {
+    // Check if price ID is valid
+    if (!priceId || priceId.startsWith('price_missing')) {
+      toast.error('This product is not yet available. Please check back later or contact support.');
+      return;
+    }
+
     if (!isSupabaseConfigured() || !user || !session) {
       toast.error('Billing service not available. Please check your configuration.');
+      return;
+    }
+
+    // Check if it's a product ID instead of price ID
+    if (priceId.startsWith('prod_')) {
+      toast.error('Configuration error: Invalid price ID. Please contact support.');
+      console.error('Product ID used instead of Price ID:', priceId);
       return;
     }
 
@@ -423,6 +446,15 @@ This will create the default configuration needed for the billing portal to work
               Billing service not configured
             </div>
           )}
+          {stripeConfigError && (
+            <div className="mt-4 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 max-w-2xl mx-auto">
+              <h3 className="font-semibold mb-2">Stripe Configuration Error</h3>
+              <p>{stripeConfigError}</p>
+              <p className="mt-2 text-xs">
+                Developers: Check your environment variables and ensure you're using Price IDs (price_xxxxx) not Product IDs (prod_xxxxx)
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Current Plan Status & Usage */}
@@ -518,7 +550,7 @@ This will create the default configuration needed for the billing portal to work
                       {limits.applications === 0 ? 
                         'Subscribe to get automation steps' :
                         applicationProgress >= 100 ? 
-                          'Additional: $0.001 per step' :
+                          'Additional: $0.03 per step' :
                           `${Math.max(0, (limits.applications * 10) - (usage?.job_tokens || 0))} remaining`
                       }
                     </span>
@@ -665,6 +697,7 @@ This will create the default configuration needed for the billing portal to work
             {subscriptionProducts.map((product, index) => {
               const isCurrentPlan = subscription?.price_id === product.priceId;
               const isPopular = product.name.includes('Pro');
+              const isPriceValid = !product.priceId.startsWith('price_missing');
               
               return (
                 <motion.div
@@ -678,7 +711,7 @@ This will create the default configuration needed for the billing portal to work
                       : isPopular
                       ? 'border-purple-500 ring-2 ring-purple-500 ring-opacity-20'
                       : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                  }`}
+                  } ${!isPriceValid ? 'opacity-60' : ''}`}
                 >
                   {isPopular && (
                     <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
@@ -755,10 +788,12 @@ This will create the default configuration needed for the billing portal to work
                     {/* CTA Button */}
                     <button
                       onClick={() => handlePurchase(product.priceId)}
-                      disabled={isCurrentPlan || purchasing === product.priceId}
+                      disabled={isCurrentPlan || purchasing === product.priceId || !isPriceValid}
                       className={`w-full py-3 px-4 rounded-xl font-semibold transition-all ${
                         isCurrentPlan
                           ? 'bg-white/10 dark:bg-white/10 text-gray-500 dark:text-gray-400 cursor-not-allowed backdrop-blur-sm'
+                          : !isPriceValid
+                          ? 'bg-gray-400 text-white cursor-not-allowed'
                           : isPopular
                           ? 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl'
                           : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl'
@@ -771,6 +806,8 @@ This will create the default configuration needed for the billing portal to work
                         </div>
                       ) : isCurrentPlan ? (
                         'Current Plan'
+                      ) : !isPriceValid ? (
+                        'Coming Soon'
                       ) : (
                         'Get Started'
                       )}
@@ -784,88 +821,100 @@ This will create the default configuration needed for the billing portal to work
 
         {/* Token Packs */}
         {activeTab === 'tokens' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {tokenProducts.map((product, index) => (
-              <motion.div
-                key={product.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="glass-card rounded-2xl transition-all duration-300 hover:shadow-xl"
-              >
-                <div className="p-8">
-                  {/* Token Pack Header */}
-                  <div className="text-center mb-8">
-                    <div className={`w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center ${
-                      product.name.includes('Job') ? 'bg-gradient-to-br from-emerald-500 to-emerald-600' :
-                      'bg-gradient-to-br from-amber-500 to-amber-600'
-                    }`}>
-                      {product.name.includes('Job') ? (
-                        <Bot className="w-8 h-8 text-white" />
-                      ) : (
-                        <Brain className="w-8 h-8 text-white" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+            {tokenProducts.map((product, index) => {
+              const isPriceValid = !product.priceId.startsWith('price_missing');
+              
+              return (
+                <motion.div
+                  key={product.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  className={`glass-card rounded-2xl transition-all duration-300 hover:shadow-lg border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 ${
+                    !isPriceValid ? 'opacity-60' : ''
+                  }`}
+                >
+                  <div className="p-8">
+                    {/* Token Pack Header */}
+                    <div className="text-center mb-8">
+                      <div className={`w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center ${
+                        product.name.includes('Job') ? 'bg-gradient-to-br from-emerald-500 to-emerald-600' :
+                        'bg-gradient-to-br from-amber-500 to-amber-600'
+                      }`}>
+                        {product.name.includes('Job') ? (
+                          <Bot className="w-8 h-8 text-white" />
+                        ) : (
+                          <Brain className="w-8 h-8 text-white" />
+                        )}
+                      </div>
+                      
+                      <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                        {product.name}
+                      </h3>
+                      
+                      <div className="mb-4">
+                        <span className="text-4xl font-bold text-gray-900 dark:text-white">
+                          ${product.price.toFixed(2)}
+                        </span>
+                        <span className="text-gray-500 dark:text-gray-400 ml-1">
+                          {product.mode === 'subscription' ? '/month' : 'one-time'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    <div className="mb-8">
+                      <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+                        {product.description}
+                      </p>
+                    </div>
+
+                    {/* Features */}
+                    <div className="mb-8">
+                      <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
+                        Includes
+                      </h4>
+                      {product.features && (
+                        <ul className="space-y-3">
+                          {product.features.slice(0, 3).map((feature, idx) => (
+                            <li key={idx} className="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                              <Check className="w-4 h-4 text-green-500 mr-3 flex-shrink-0" />
+                              {feature}
+                            </li>
+                          ))}
+                        </ul>
                       )}
                     </div>
-                    
-                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                      {product.name}
-                    </h3>
-                    
-                    <div className="mb-4">
-                      <span className="text-4xl font-bold text-gray-900 dark:text-white">
-                        ${product.price.toFixed(2)}
-                      </span>
-                      <span className="text-gray-500 dark:text-gray-400 ml-1">
-                        {product.mode === 'subscription' ? '/month' : 'one-time'}
-                      </span>
-                    </div>
-                  </div>
 
-                  {/* Description */}
-                  <div className="mb-8">
-                    <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-                      {product.description}
-                    </p>
+                    {/* CTA Button */}
+                    <button
+                      onClick={() => handlePurchase(product.priceId)}
+                      disabled={purchasing === product.priceId || !isPriceValid}
+                      className={`w-full py-3 px-4 rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl ${
+                        !isPriceValid
+                          ? 'bg-gray-400 text-white cursor-not-allowed'
+                          : 'bg-blue-600 hover:bg-blue-700 text-white'
+                      }`}
+                    >
+                      {purchasing === product.priceId ? (
+                        <div className="flex items-center justify-center">
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Loading...
+                        </div>
+                      ) : !isPriceValid ? (
+                        'Coming Soon'
+                      ) : (
+                        <div className="flex items-center justify-center">
+                          <ShoppingCart className="w-4 h-4 mr-2" />
+                          Buy Now
+                        </div>
+                      )}
+                    </button>
                   </div>
-
-                  {/* Features */}
-                  <div className="mb-8">
-                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
-                      Includes
-                    </h4>
-                    {product.features && (
-                      <ul className="space-y-3">
-                        {product.features.slice(0, 3).map((feature, idx) => (
-                          <li key={idx} className="flex items-center text-sm text-gray-600 dark:text-gray-300">
-                            <Check className="w-4 h-4 text-green-500 mr-3 flex-shrink-0" />
-                            {feature}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-
-                  {/* CTA Button */}
-                  <button
-                    onClick={() => handlePurchase(product.priceId)}
-                    disabled={purchasing === product.priceId}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl"
-                  >
-                    {purchasing === product.priceId ? (
-                      <div className="flex items-center justify-center">
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Loading...
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center">
-                        <ShoppingCart className="w-4 h-4 mr-2" />
-                        Buy Now
-                      </div>
-                    )}
-                  </button>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              );
+            })}
           </div>
         )}
 
@@ -885,9 +934,12 @@ This will create the default configuration needed for the billing portal to work
             <HelpCircle className="w-4 h-4 mr-2" />
             View Pricing FAQ
           </button>
-        </div>
+                </div>
+
+        {/* Pricing FAQ */}
+        <PricingFAQ />
       </div>
       </div>
-    </>
-  );
-};
+      </>
+    );
+  };

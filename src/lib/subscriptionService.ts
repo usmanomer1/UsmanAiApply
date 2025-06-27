@@ -234,14 +234,20 @@ class SubscriptionService {
   }
 
   private getPlanNameFromPriceId(priceId: string): string {
-    // Map price IDs to plan names - these should match your Stripe config
-    const priceToName: Record<string, string> = {
-      [import.meta.env.VITE_STRIPE_PRO_PRICE_ID || 'price_1RaM5LQGabzJD80B3zGbTHcZ']: 'Jobotic Pro',
-      [import.meta.env.VITE_STRIPE_PRO_PLUS_PRICE_ID || 'price_1RYvjSQGabzJD80BbbXxTq2S']: 'Jobotic Pro Plus',
-      [import.meta.env.VITE_STRIPE_EXTREME_PRICE_ID || 'price_1RYvocQGabzJD80BEVgRcdSa']: 'Jobotic Extreme'
-    };
+    // Map price IDs to plan names using environment variables only
+    const envVars: Record<string, string> = {};
     
-    return priceToName[priceId] || 'Pro';
+    if (import.meta.env.VITE_STRIPE_PLUS_PRICE_ID) {
+      envVars[import.meta.env.VITE_STRIPE_PLUS_PRICE_ID] = 'Plus';
+    }
+    if (import.meta.env.VITE_STRIPE_PRO_PRICE_ID) {
+      envVars[import.meta.env.VITE_STRIPE_PRO_PRICE_ID] = 'Pro';
+    }
+    if (import.meta.env.VITE_STRIPE_MAX_PRICE_ID) {
+      envVars[import.meta.env.VITE_STRIPE_MAX_PRICE_ID] = 'Max';
+    }
+    
+    return envVars[priceId] || 'Pro';
   }
 
   // Helper method to clear cache for a user (useful for testing or subscription changes)
