@@ -12,6 +12,7 @@ import Silk from '../ui/Silk';
 import { supabase } from '../../lib/supabase';
 import { getSubscriptionProducts } from '../../stripe-config';
 import toast from 'react-hot-toast';
+import { useTheme } from '../../contexts/ThemeContext';
 
 type AuthMode = 'login' | 'signup' | 'forgot-password';
 
@@ -27,6 +28,7 @@ export const CustomAuthPage: React.FC = () => {
   });
 
   const { signIn, signUp, user } = useAuth();
+  const { isDark } = useTheme();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
@@ -302,36 +304,36 @@ export const CustomAuthPage: React.FC = () => {
       </div>
 
       {/* Right Side - Auth Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gradient-to-br from-gray-50 to-white">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
           className="w-full max-w-md"
         >
-          <Card className="bg-white/95 backdrop-blur-xl border-gray-200/50 shadow-2xl">
+          <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-2xl transition-colors duration-200">
             {/* Mobile Logo */}
             <div className="lg:hidden text-center mb-8 pt-8">
               <div className="inline-flex items-center justify-center mb-4">
-                <div className="p-3 bg-indigo-100 rounded-2xl">
+                <div className="p-3 bg-indigo-100 dark:bg-indigo-900 rounded-2xl transition-colors duration-200">
                   <Logo width={64} height={64} />
                 </div>
               </div>
-              <h1 className="text-2xl font-bold text-gray-900">Jobotic</h1>
-              <p className="text-gray-600 mt-1">Premium Job Search Platform</p>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white transition-colors duration-200">Jobotic</h1>
+              <p className="text-gray-600 dark:text-gray-300 mt-1 transition-colors duration-200">Premium Job Search Platform</p>
               {planParam && (
-                <div className="mt-4 inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-100 to-pink-100 rounded-full">
-                  <Crown className="w-4 h-4 text-purple-600 mr-2" />
-                  <span className="text-purple-800 font-semibold text-sm">Upgrading to {planParam}</span>
+                <div className="mt-4 inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-900 dark:to-pink-900 rounded-full transition-colors duration-200">
+                  <Crown className="w-4 h-4 text-purple-600 dark:text-purple-400 mr-2 transition-colors duration-200" />
+                  <span className="text-purple-800 dark:text-purple-200 font-semibold text-sm transition-colors duration-200">Upgrading to {planParam}</span>
                 </div>
               )}
             </div>
 
             <CardHeader className="text-center pb-4">
-              <CardTitle className="text-3xl font-bold text-gray-900 mb-2">
+              <CardTitle className="text-3xl font-bold text-gray-900 dark:text-white mb-2 transition-colors duration-200">
                 {getFormTitle()}
               </CardTitle>
-              <CardDescription className="text-gray-600 text-base">
+              <CardDescription className="text-gray-600 dark:text-gray-300 text-base transition-colors duration-200">
                 {getFormDescription()}
               </CardDescription>
             </CardHeader>
@@ -342,16 +344,16 @@ export const CustomAuthPage: React.FC = () => {
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl"
+                  className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl transition-colors duration-200"
                 >
                   <div className="flex items-center space-x-2">
-                    <Shield className="w-5 h-5 text-amber-600" />
-                    <span className="text-amber-800 font-medium">Maintenance Mode</span>
+                    <Shield className="w-5 h-5 text-amber-600 dark:text-amber-400 transition-colors duration-200" />
+                    <span className="text-amber-800 dark:text-amber-200 font-medium transition-colors duration-200">Maintenance Mode</span>
                   </div>
-                  <p className="text-amber-700 text-sm mt-1">
+                  <p className="text-amber-700 dark:text-amber-300 text-sm mt-1 transition-colors duration-200">
                     {maintenanceMessage}
                   </p>
-                  <p className="text-amber-600 text-xs mt-2">
+                  <p className="text-amber-600 dark:text-amber-400 text-xs mt-2 transition-colors duration-200">
                     Admin access only during this period.
                   </p>
                 </motion.div>
@@ -362,13 +364,13 @@ export const CustomAuthPage: React.FC = () => {
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl"
+                  className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-700 rounded-xl transition-colors duration-200"
                 >
                   <div className="flex items-center space-x-3">
-                    <Crown className="w-5 h-5 text-purple-600" />
+                    <Crown className="w-5 h-5 text-purple-600 dark:text-purple-400 transition-colors duration-200" />
                     <div>
-                      <p className="text-purple-800 font-semibold">Upgrading to {selectedPlan.name}</p>
-                      <p className="text-purple-600 text-sm">${selectedPlan.price}/month • {selectedPlan.applicationCount} applications/month</p>
+                      <p className="text-purple-800 dark:text-purple-200 font-semibold transition-colors duration-200">Upgrading to {selectedPlan.name}</p>
+                      <p className="text-purple-600 dark:text-purple-300 text-sm transition-colors duration-200">${selectedPlan.price}/month • {selectedPlan.applicationCount} applications/month</p>
                     </div>
                   </div>
                 </motion.div>
@@ -381,17 +383,17 @@ export const CustomAuthPage: React.FC = () => {
                     initial={{ opacity: 0, y: -10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                    className={`mb-6 p-4 rounded-xl border ${
+                    className={`mb-6 p-4 rounded-xl border transition-colors duration-200 ${
                       message.type === 'success'
-                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                        : 'bg-red-50 border-red-200 text-red-800'
+                        ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200'
+                        : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700 text-red-800 dark:text-red-200'
                     }`}
                   >
                     <div className="flex items-start space-x-2">
                       {message.type === 'success' ? (
-                        <CheckCircle className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
+                        <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0 transition-colors duration-200" />
                       ) : (
-                        <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                        <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0 transition-colors duration-200" />
                       )}
                       <p className="text-sm leading-relaxed">{message.text}</p>
                     </div>
@@ -409,17 +411,17 @@ export const CustomAuthPage: React.FC = () => {
                       exit={{ opacity: 0, height: 0 }}
                       transition={{ duration: 0.3 }}
                     >
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2 transition-colors duration-200">
                         Full Name
                       </label>
                       <div className="relative">
-                        <User className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
+                        <User className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5 z-10 transition-colors duration-200" />
                         <Input
                           type="text"
                           required
                           value={formData.fullName}
                           onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                          className="pl-12 h-12 text-base border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                          className="pl-12 h-12 text-base border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-colors duration-200"
                           placeholder="Enter your full name"
                         />
                       </div>
@@ -428,17 +430,17 @@ export const CustomAuthPage: React.FC = () => {
                 </AnimatePresence>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2 transition-colors duration-200">
                     Email Address
                   </label>
                   <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
+                    <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5 z-10 transition-colors duration-200" />
                     <Input
                       type="email"
                       required
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="pl-12 h-12 text-base border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                      className="pl-12 h-12 text-base border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-colors duration-200"
                       placeholder="Enter your email"
                     />
                   </div>
@@ -446,23 +448,23 @@ export const CustomAuthPage: React.FC = () => {
 
                 {authMode !== 'forgot-password' && (
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2 transition-colors duration-200">
                       Password
                     </label>
                     <div className="relative">
-                      <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 z-10" />
+                      <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5 z-10 transition-colors duration-200" />
                       <Input
                         type={showPassword ? 'text' : 'password'}
                         required
                         value={formData.password}
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        className="pl-12 pr-12 h-12 text-base border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                        className="pl-12 pr-12 h-12 text-base border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-colors duration-200"
                         placeholder="Enter your password"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors z-10"
+                        className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors z-10"
                       >
                         {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                       </button>
@@ -476,7 +478,7 @@ export const CustomAuthPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setAuthMode('forgot-password')}
-                      className="text-sm text-indigo-600 hover:text-indigo-700 font-medium transition-colors"
+                      className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium transition-colors"
                     >
                       Forgot your password?
                     </button>
@@ -491,10 +493,10 @@ export const CustomAuthPage: React.FC = () => {
                     type="submit"
                     disabled={loading}
                     size="lg"
-                    className={`w-full text-lg font-bold shadow-xl h-12 ${
+                    className={`w-full text-lg font-bold shadow-xl h-12 transition-colors duration-200 ${
                       planParam 
-                        ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700' 
-                        : 'bg-indigo-600 hover:bg-indigo-700'
+                        ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white' 
+                        : 'bg-indigo-600 hover:bg-indigo-700 text-white'
                     }`}
                   >
                     {loading ? (
@@ -520,7 +522,7 @@ export const CustomAuthPage: React.FC = () => {
                   <div className="text-center">
                     <button
                       onClick={() => setAuthMode('login')}
-                      className="text-indigo-600 hover:text-indigo-700 font-semibold transition-colors flex items-center justify-center"
+                      className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-semibold transition-colors flex items-center justify-center"
                     >
                       <ArrowLeft className="w-4 h-4 mr-2" />
                       Back to Sign In
@@ -532,7 +534,7 @@ export const CustomAuthPage: React.FC = () => {
                   <div className="text-center">
                     <button
                       onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
-                      className="text-indigo-600 hover:text-indigo-700 font-semibold transition-colors"
+                      className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-semibold transition-colors"
                     >
                       {authMode === 'login'
                         ? "Don't have an account? Sign up"
@@ -544,8 +546,8 @@ export const CustomAuthPage: React.FC = () => {
               </div>
 
               {/* Trust Indicators */}
-              <div className="mt-8 pt-6 border-t border-gray-200">
-                <div className="flex items-center justify-center space-x-6 text-xs text-gray-500">
+              <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700 transition-colors duration-200">
+                <div className="flex items-center justify-center space-x-6 text-xs text-gray-500 dark:text-gray-400 transition-colors duration-200">
                   <div className="flex items-center">
                     <Shield className="w-4 h-4 mr-1" />
                     <span>256-bit SSL</span>
