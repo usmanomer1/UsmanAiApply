@@ -3,21 +3,30 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-// Enhanced Supabase configuration detection for production
-const isSupabaseConfigured = () => {
+// Centralized Supabase configuration detection
+export const isSupabaseConfigured = (): boolean => {
   return !!(
     supabaseUrl && 
     supabaseAnonKey && 
     supabaseUrl.startsWith('https://') &&
     supabaseUrl.includes('.supabase.co') &&
-    supabaseAnonKey.length > 50 && // Supabase keys are typically longer
-    supabaseUrl !== 'your_supabase_url_here' &&
-    supabaseAnonKey !== 'your_supabase_anon_key_here'
+    supabaseAnonKey.length > 50 // Supabase keys are typically longer
   );
 };
 
-// Create Supabase client
+// Create Supabase client - only if configured
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Environment validation helper for debugging
+export const getSupabaseConfig = () => {
+  return {
+    hasUrl: !!supabaseUrl,
+    hasKey: !!supabaseAnonKey,
+    urlFormat: supabaseUrl.startsWith('https://') && supabaseUrl.includes('.supabase.co'),
+    keyLength: supabaseAnonKey.length,
+    isConfigured: isSupabaseConfigured()
+  };
+};
 
 export type Database = {
   public: {
@@ -294,6 +303,3 @@ export const getSignedResumeUrl = async (path: string): Promise<string | null> =
     return null;
   }
 };
-
-// Export configuration check
-export { isSupabaseConfigured };
