@@ -273,6 +273,44 @@ const LinkedInAutomationBot: React.FC = () => {
     targetCount: '10'
   });
   
+  // AI Model selection state
+  const [selectedModel, setSelectedModel] = useState<'gemini-2.0-flash' | 'gpt-4.1' | 'claude-3-7-sonnet-20250219'>('gemini-2.0-flash');
+  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+
+  // Model definitions with properties
+  const AI_MODELS = {
+    'gemini-2.0-flash': {
+      name: 'Gemini 2.0 Flash',
+      provider: 'Google',
+      stepMultiplier: 1,
+      requestLabel: '1x steps',
+      speed: 'Fastest',
+      description: 'Best efficiency and performance ratio',
+      icon: '🚀',
+      color: 'from-blue-500 to-indigo-600'
+    },
+    'gpt-4.1': {
+      name: 'GPT-4.1',
+      provider: 'OpenAI',
+      stepMultiplier: 3,
+      requestLabel: '3x steps',
+      speed: 'Fast',
+      description: 'Highest accuracy and reliability',
+      icon: '🎯',
+      color: 'from-emerald-500 to-teal-600'
+    },
+    'claude-3-7-sonnet-20250219': {
+      name: 'Claude 3.7 Sonnet',
+      provider: 'Anthropic',
+      stepMultiplier: 3,
+      requestLabel: '3x steps',
+      speed: 'Fast',
+      description: 'Advanced reasoning and analysis',
+      icon: '🧠',
+      color: 'from-purple-500 to-indigo-600'
+    }
+  } as const;
+  
   const [currentTask, setCurrentTask] = useState<TaskStatus | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -511,6 +549,11 @@ const LinkedInAutomationBot: React.FC = () => {
           }
         });
         setConfig(prev => ({ ...prev, ...loadedConfig }));
+        
+        // Load selected model if saved
+        if (loadedConfig.selectedModel && AI_MODELS[loadedConfig.selectedModel as keyof typeof AI_MODELS]) {
+          setSelectedModel(loadedConfig.selectedModel as keyof typeof AI_MODELS);
+        }
       }
     } catch (error) {
       // Silently fail for configuration loading
@@ -529,11 +572,17 @@ const LinkedInAutomationBot: React.FC = () => {
       // Don't save email in the config (it's not sensitive but we handle it separately)
       const { linkedinEmail, ...configToSave } = config;
       
+      // Include selected model in the config
+      const configWithModel = {
+        ...configToSave,
+        selectedModel
+      };
+      
       const { error } = await supabase
         .from('automation_configs')
         .upsert({
           user_id: user.id,
-          config: configToSave
+          config: configWithModel
         }, {
           onConflict: 'user_id'
         });
@@ -554,6 +603,11 @@ const LinkedInAutomationBot: React.FC = () => {
       ...prev,
       ...voiceConfig
     }));
+    
+    // If voice config includes model selection, update it
+    if (voiceConfig.selectedModel && AI_MODELS[voiceConfig.selectedModel as keyof typeof AI_MODELS]) {
+      setSelectedModel(voiceConfig.selectedModel as keyof typeof AI_MODELS);
+    }
     
     // Save the configuration
     saveConfiguration();
@@ -612,7 +666,7 @@ const LinkedInAutomationBot: React.FC = () => {
 
       const startDate = firstDayOfMonth.toISOString();
       const endDate = nextMonth.toISOString();
-
+      
       // Add warning if system date seems incorrect
       const currentYear = new Date().getFullYear();
       if (currentYear > 2024) {
@@ -1022,7 +1076,7 @@ const LinkedInAutomationBot: React.FC = () => {
     // Use comprehensive single prompt approach (proven to work better)
     const comprehensivePrompt = createComprehensivePrompt(linkedinUrl);
 
-        const taskConfig = {
+    const taskConfig = {
       task: comprehensivePrompt,
       save_browser_data: false,
       use_adblock: false,
@@ -1031,12 +1085,12 @@ const LinkedInAutomationBot: React.FC = () => {
       highlight_elements: true,
     
       max_agent_steps: Math.max(100, parseInt(config.targetCount) * 10), // 10 steps per application to stay within billing constraints
-      llm_model: 'gemini-2.0-flash' as const,
+      llm_model: selectedModel,
       allowed_domains: ['linkedin.com', '*.linkedin.com'],
       
     };
 
-    addLog('🚀 Starting LinkedIn automation with comprehensive AI agent', 'success');
+    addLog(`🚀 Starting LinkedIn automation with ${AI_MODELS[selectedModel].name} (${AI_MODELS[selectedModel].provider})`, 'success');
 
     const result = await browserClient.createLinkedInTask(taskConfig);
     
@@ -1444,224 +1498,224 @@ This tracking is essential for saving your applications correctly.`;
     const interval = setInterval(async () => {
       try {
         const updatedTask = await getTaskStatus(taskId);
-        setCurrentTask(updatedTask);
+          setCurrentTask(updatedTask);
 
-        if (updatedTask.steps) {
-          const newStepCount = updatedTask.steps.length;
-          
-          if (newStepCount > stepCount) {
-            // Track the TOTAL steps (not incremental) - this will upsert in the database
-            await trackUsage(newStepCount, taskId);
+          if (updatedTask.steps) {
+            const newStepCount = updatedTask.steps.length;
             
-            // Calculate total steps used for limit checking
+            if (newStepCount > stepCount) {
+              // Track the TOTAL steps (not incremental) - this will upsert in the database
+            await trackUsage(newStepCount, taskId);
+              
+              // Calculate total steps used for limit checking
             const limit = getTokenLimit(); // getTokenLimit() already returns step limit (applications * 10)
             
             // Only check limit if we have a meaningful limit (not 0)
             if (limit > 0 && newStepCount >= limit) {
               clearInterval(interval);
               setPollInterval(null);
-              setIsRunning(false);
+                setIsRunning(false);
               await stopTask(taskId);
-              addLog(`🛑 Automation stopped: Monthly limit of ${limit} steps reached!`, 'error');
-              toast.error('Automation stopped due to usage limit');
+                addLog(`🛑 Automation stopped: Monthly limit of ${limit} steps reached!`, 'error');
+                toast.error('Automation stopped due to usage limit');
               clearAutomationState();
-              return;
+                return;
             }
             
             // Also check if we've reached the target application count
             const targetApplications = parseInt(config.targetCount) || 10;
             if (appliedCount >= targetApplications) {
               addLog(`🎯 Target reached: Applied to ${appliedCount}/${targetApplications} jobs!`, 'success');
+              }
             }
-          }
-          
-          setStepCount(newStepCount);
-          
+            
+            setStepCount(newStepCount);
+            
           // Look for successful application submissions only
-          const applicationSteps = updatedTask.steps.filter(step => {
+            const applicationSteps = updatedTask.steps.filter(step => {
             const stepText = step.next_goal || step.evaluation_previous_goal || '';
             // Only count steps with our specific announcement format
             return /SUBMITTING APPLICATION TO:/i.test(stepText);
           });
           
           // Process new applications with deduplication
-          if (applicationSteps.length > appliedCount) {
+            if (applicationSteps.length > appliedCount) {
             const processedApplications = new Set();
             
             for (const appStep of applicationSteps) {
               const stepText = appStep.next_goal || appStep.evaluation_previous_goal || '';
-              const companyRole = extractCompanyRoleFromStep(stepText);
-              
-              if (companyRole.company && companyRole.role) {
+                const companyRole = extractCompanyRoleFromStep(stepText);
+                
+                if (companyRole.company && companyRole.role) {
                 const appKey = `${companyRole.company.toLowerCase()}-${companyRole.role.toLowerCase()}`;
                 
                 // Only save if we haven't processed this exact application
                 if (!processedApplications.has(appKey)) {
                   processedApplications.add(appKey);
                   await saveJobApplication(companyRole.company, companyRole.role, taskId);
+                  }
                 }
               }
             }
+            
+            setAppliedCount(applicationSteps.length);
           }
-          
-          setAppliedCount(applicationSteps.length);
-        }
 
         // Save current state
         saveAutomationState(updatedTask);
 
-        if (updatedTask.status === 'finished') {
+          if (updatedTask.status === 'finished') {
           clearInterval(interval);
           setPollInterval(null);
-          setIsRunning(false);
-          
-          addLog('🔄 Fetching final task details...', 'info');
-          
-          // Wait a moment for browser-use API to finalize the task
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
-          // Fetch final task state to ensure we have all steps
-          try {
+            setIsRunning(false);
+            
+            addLog('🔄 Fetching final task details...', 'info');
+            
+            // Wait a moment for browser-use API to finalize the task
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Fetch final task state to ensure we have all steps
+            try {
             const finalTask = await getTaskStatus(taskId);
-            setCurrentTask(finalTask);
-            
-            const finalStepCount = finalTask.steps?.length || 0;
-            const finalApplicationCount = finalTask.steps ? finalTask.steps.filter(step => {
-              const stepText = (JSON.stringify(step.action || {}) + ' ' + (step.output || '')).toLowerCase();
-              return stepText.includes('submitting application to:') || 
-                     stepText.includes('applying to:') ||
-                     stepText.includes('submit application') ||
-                     (stepText.includes('submit') && stepText.includes('successfully'));
-            }).length : 0;
-            
-            setStepCount(finalStepCount);
-            setAppliedCount(finalApplicationCount);
-            
-            addLog(`📊 Final Summary: ${finalStepCount} total steps, ${finalApplicationCount} applications submitted`);
-            
-            // Track final step count (this will upsert to ensure we have the correct total)
+              setCurrentTask(finalTask);
+              
+              const finalStepCount = finalTask.steps?.length || 0;
+              const finalApplicationCount = finalTask.steps ? finalTask.steps.filter(step => {
+                const stepText = (JSON.stringify(step.action || {}) + ' ' + (step.output || '')).toLowerCase();
+                return stepText.includes('submitting application to:') || 
+                       stepText.includes('applying to:') ||
+                       stepText.includes('submit application') ||
+                       (stepText.includes('submit') && stepText.includes('successfully'));
+              }).length : 0;
+              
+              setStepCount(finalStepCount);
+              setAppliedCount(finalApplicationCount);
+              
+              addLog(`📊 Final Summary: ${finalStepCount} total steps, ${finalApplicationCount} applications submitted`);
+              
+              // Track final step count (this will upsert to ensure we have the correct total)
             await trackUsage(finalStepCount, taskId);
-            addLog(`📈 Final step count recorded: ${finalStepCount} steps`);
-            
-            // Mark task as completed in database with final step count
+              addLog(`📈 Final step count recorded: ${finalStepCount} steps`);
+              
+              // Mark task as completed in database with final step count
             await markTaskCompleted(taskId, finalStepCount, 'finished');
             
             // Final application extraction already handled above
-            
-            addLog('✅ Automation completed successfully!', 'success');
-            
-            if (finalTask.output) {
-              addLog(`📊 Final Results: ${finalTask.output}`);
+              
+              addLog('✅ Automation completed successfully!', 'success');
+              
+              if (finalTask.output) {
+                addLog(`📊 Final Results: ${finalTask.output}`);
+              }
+              
+            } catch (error) {
+              addLog('⚠️ Could not fetch final task details, using last known state', 'error');
+              
+              // Fallback to last known state
+            await markTaskCompleted(taskId, updatedTask.steps?.length || 0, 'finished');
             }
             
-          } catch (error) {
-            addLog('⚠️ Could not fetch final task details, using last known state', 'error');
-            
-            // Fallback to last known state
-            await markTaskCompleted(taskId, updatedTask.steps?.length || 0, 'finished');
-          }
-        
           // Clear automation state and refresh usage data
           clearAutomationState();
-          fetchUserSubscription();
-          
-          // Force billing page to refresh by dispatching a custom event
-          window.dispatchEvent(new CustomEvent('billing-refresh-needed'));
-        } else if (updatedTask.status === 'failed') {
+            fetchUserSubscription();
+            
+            // Force billing page to refresh by dispatching a custom event
+            window.dispatchEvent(new CustomEvent('billing-refresh-needed'));
+          } else if (updatedTask.status === 'failed') {
           clearInterval(interval);
           setPollInterval(null);
-          setIsRunning(false);
-          
-          addLog('🔄 Fetching final task details for failed task...', 'info');
-          
-          // Wait a moment and fetch final state
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          try {
+            setIsRunning(false);
+            
+            addLog('🔄 Fetching final task details for failed task...', 'info');
+            
+            // Wait a moment and fetch final state
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            try {
             const finalTask = await getTaskStatus(taskId);
-            setCurrentTask(finalTask);
-            
-            const finalStepCount = finalTask.steps?.length || 0;
-            setStepCount(finalStepCount);
-            
-            // Track final step count (this will upsert to ensure we have the correct total)
+              setCurrentTask(finalTask);
+              
+              const finalStepCount = finalTask.steps?.length || 0;
+              setStepCount(finalStepCount);
+              
+              // Track final step count (this will upsert to ensure we have the correct total)
             await trackUsage(finalStepCount, taskId);
-            addLog(`📈 Final step count recorded: ${finalStepCount} steps`);
-            
-            // Mark task as failed in database with final step count
+              addLog(`📈 Final step count recorded: ${finalStepCount} steps`);
+              
+              // Mark task as failed in database with final step count
             await markTaskCompleted(taskId, finalStepCount, 'failed', finalTask.error || updatedTask.error);
-            
-            addLog(`❌ Automation failed: ${finalTask.error || updatedTask.error || 'Unknown error'}`, 'error');
-            addLog(`📊 Final step count: ${finalStepCount}`);
-            
-          } catch (error) {
+              
+              addLog(`❌ Automation failed: ${finalTask.error || updatedTask.error || 'Unknown error'}`, 'error');
+              addLog(`📊 Final step count: ${finalStepCount}`);
+              
+            } catch (error) {
             await markTaskCompleted(taskId, updatedTask.steps?.length || 0, 'failed', updatedTask.error);
-            addLog(`❌ Automation failed: ${updatedTask.error || 'Unknown error'}`, 'error');
-          }
-        
+              addLog(`❌ Automation failed: ${updatedTask.error || 'Unknown error'}`, 'error');
+            }
+            
           // Clear automation state and refresh usage data
           clearAutomationState();
-          fetchUserSubscription();
-          
-          // Force billing page to refresh by dispatching a custom event
-          window.dispatchEvent(new CustomEvent('billing-refresh-needed'));
-        } else if (updatedTask.status === 'stopped') {
+            fetchUserSubscription();
+            
+            // Force billing page to refresh by dispatching a custom event
+            window.dispatchEvent(new CustomEvent('billing-refresh-needed'));
+          } else if (updatedTask.status === 'stopped') {
           clearInterval(interval);
           setPollInterval(null);
-          setIsRunning(false);
-          
-          addLog('🔄 Fetching final task details for stopped task...', 'info');
-          
-          // Wait a moment and fetch final state
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          try {
+            setIsRunning(false);
+            
+            addLog('🔄 Fetching final task details for stopped task...', 'info');
+            
+            // Wait a moment and fetch final state
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            try {
             const finalTask = await getTaskStatus(taskId);
-            setCurrentTask(finalTask);
-            
-            const finalStepCount = finalTask.steps?.length || 0;
-            setStepCount(finalStepCount);
-            
-            // Track final step count (this will upsert to ensure we have the correct total)
+              setCurrentTask(finalTask);
+              
+              const finalStepCount = finalTask.steps?.length || 0;
+              setStepCount(finalStepCount);
+              
+              // Track final step count (this will upsert to ensure we have the correct total)
             await trackUsage(finalStepCount, taskId);
-            addLog(`📈 Final step count recorded: ${finalStepCount} steps`);
-            
-            // Mark task as stopped in database with final step count
+              addLog(`📈 Final step count recorded: ${finalStepCount} steps`);
+              
+              // Mark task as stopped in database with final step count
             await markTaskCompleted(taskId, finalStepCount, 'stopped');
-            
-            addLog('⏹️ Automation stopped by user');
-            addLog(`📊 Final step count: ${finalStepCount}`);
-            
-          } catch (error) {
+              
+              addLog('⏹️ Automation stopped by user');
+              addLog(`📊 Final step count: ${finalStepCount}`);
+              
+            } catch (error) {
             await markTaskCompleted(taskId, updatedTask.steps?.length || 0, 'stopped');
-            addLog('⏹️ Automation stopped by user');
-          }
-        
+              addLog('⏹️ Automation stopped by user');
+            }
+            
           // Clear automation state and refresh usage data
           clearAutomationState();
-          fetchUserSubscription();
-          
-          // Force billing page to refresh by dispatching a custom event
-          window.dispatchEvent(new CustomEvent('billing-refresh-needed'));
-        }
-      } catch (error) {
-        if (error instanceof Error && error.name !== 'AbortError') {
+            fetchUserSubscription();
+            
+            // Force billing page to refresh by dispatching a custom event
+            window.dispatchEvent(new CustomEvent('billing-refresh-needed'));
+          }
+        } catch (error) {
+          if (error instanceof Error && error.name !== 'AbortError') {
           // Error checking task status
+          }
         }
-      }
-    }, 3000);
+      }, 3000);
 
     setPollInterval(interval);
 
     // Auto-cleanup after 30 minutes
-    setTimeout(() => {
+      setTimeout(() => {
       clearInterval(interval);
-      if (isRunning) {
-        addLog('⏰ Automation timed out after 30 minutes');
-        setIsRunning(false);
+        if (isRunning) {
+          addLog('⏰ Automation timed out after 30 minutes');
+          setIsRunning(false);
         clearAutomationState();
-      }
-    }, 30 * 60 * 1000);
+        }
+      }, 30 * 60 * 1000);
   };
 
   const markTaskCompleted = async (taskId: string, finalSteps: number, status: 'finished' | 'failed' | 'stopped', error?: string) => {
@@ -1706,7 +1760,7 @@ This tracking is essential for saving your applications correctly.`;
     let company = match[1]?.trim();
     let role = match[2]?.trim();
     
-    if (!company || !role) {
+          if (!company || !role) {
       return { company: null, role: null };
     }
     
@@ -1868,6 +1922,141 @@ This tracking is essential for saving your applications correctly.`;
           Voice-Guided Setup
           <Sparkles className="w-4 h-4 ml-2" />
         </button>
+      </div>
+
+            {/* AI Model Selection - Minimalistic Dropdown */}
+      <div className="glass-card rounded-xl p-6">
+        {/* Dropdown Header */}
+        <div 
+          className="flex items-center justify-between cursor-pointer group hover:bg-white/5 dark:hover:bg-gray-800/10 rounded-lg p-2 -m-2 transition-all duration-200"
+          onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
+        >
+          <div className="flex items-center space-x-4">
+            <div className={`w-10 h-10 bg-gradient-to-br ${AI_MODELS[selectedModel].color} rounded-xl flex items-center justify-center shadow-lg`}>
+              <span className="text-xl">{AI_MODELS[selectedModel].icon}</span>
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {AI_MODELS[selectedModel].name}
+                </h3>
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  ({AI_MODELS[selectedModel].requestLabel})
+                </span>
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {AI_MODELS[selectedModel].provider} • {AI_MODELS[selectedModel].description}
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-3">
+            <div className="text-right">
+                             <p className="text-xs text-gray-500 dark:text-gray-400">
+                 {(() => {
+                   const stepsPerApp = 10;
+                   const totalSteps = parseInt(config.targetCount) * stepsPerApp;
+                   const stepMultiplier = AI_MODELS[selectedModel].stepMultiplier;
+                   const totalSteps_calculated = totalSteps * stepMultiplier;
+                   return `${totalSteps_calculated.toLocaleString()} steps`;
+                 })()}
+               </p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">for {config.targetCount} applications</p>
+            </div>
+            
+            <div className={`p-2 rounded-lg bg-white/10 dark:bg-gray-800/20 transition-all duration-300 group-hover:bg-white/20 dark:group-hover:bg-gray-700/30 ${
+              isModelDropdownOpen ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''
+            }`}>
+              <svg 
+                className={`w-5 h-5 text-gray-600 dark:text-gray-400 transition-transform duration-300 ${
+                  isModelDropdownOpen ? 'rotate-180' : ''
+                }`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        {/* Dropdown Content */}
+        <AnimatePresence>
+          {isModelDropdownOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.3, ease: 'easeInOut' }}
+              className="overflow-hidden"
+            >
+              <div className="mt-6 pt-6 border-t border-white/10 dark:border-gray-700/20">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Choose AI model:</p>
+                
+                <div className="space-y-3">
+                  {Object.entries(AI_MODELS).map(([modelKey, modelInfo]) => {
+                    const isSelected = selectedModel === modelKey;
+                    return (
+                      <div
+                        key={modelKey}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedModel(modelKey as keyof typeof AI_MODELS);
+                          setIsModelDropdownOpen(false);
+                          saveConfiguration();
+                        }}
+                        className={`relative p-4 rounded-lg border cursor-pointer transition-all duration-200 hover:scale-[1.02] ${
+                          isSelected 
+                            ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 shadow-md' 
+                            : 'border-white/20 dark:border-gray-600/20 bg-white/10 dark:bg-gray-800/10 hover:border-white/40 dark:hover:border-gray-500/40 hover:bg-white/20 dark:hover:bg-gray-700/20'
+                        }`}
+                      >
+                        {/* Selection indicator */}
+                        {isSelected && (
+                          <div className="absolute top-3 right-3 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                            <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                        )}
+
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-10 h-10 bg-gradient-to-br ${modelInfo.color} rounded-lg flex items-center justify-center shadow-md`}>
+                            <span className="text-lg">{modelInfo.icon}</span>
+                          </div>
+                          
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2 mb-1">
+                              <h4 className="font-semibold text-gray-900 dark:text-white">{modelInfo.name}</h4>
+                              <span className="text-xs text-gray-500 dark:text-gray-400">{modelInfo.provider}</span>
+                              {modelInfo.stepMultiplier === 1 && (
+                                <div className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium rounded-full">
+                                  Most Efficient
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm text-gray-600 dark:text-gray-400">{modelInfo.description}</p>
+                              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{modelInfo.requestLabel}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-4 p-3 bg-gray-50/50 dark:bg-gray-800/20 rounded-lg">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 text-center">
+                    Each job application uses approximately 10 automation steps
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Configuration Panel */}
