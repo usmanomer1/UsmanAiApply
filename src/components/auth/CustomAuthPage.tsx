@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Logo } from '../ui/Logo';
 import { getMaintenanceConfig, canAccessDuringMaintenance } from '../../lib/maintenance';
 import Silk from '../ui/Silk';
-import { supabase } from '../../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { getSubscriptionProducts } from '../../stripe-config';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -35,13 +35,6 @@ export const CustomAuthPage: React.FC = () => {
   const planParam = searchParams.get('plan');
   const { isMaintenanceMode, maintenanceMessage } = getMaintenanceConfig();
 
-  // Check if Supabase is configured
-  const isSupabaseConfigured = () => {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    return !!(supabaseUrl && supabaseKey && supabaseUrl !== 'your_supabase_url_here' && supabaseKey !== 'your_supabase_anon_key_here');
-  };
-
   // Redirect logic after successful authentication
   const handleAuthSuccess = async () => {
     if (!planParam) {
@@ -58,6 +51,13 @@ export const CustomAuthPage: React.FC = () => {
 
     if (!targetProduct) {
       toast.error(`Plan "${planParam}" not found. Redirecting to dashboard.`);
+      navigate('/dashboard');
+      return;
+    }
+
+    // Only proceed with Stripe checkout if Supabase is configured
+    if (!isSupabaseConfigured()) {
+      toast.error('Service configuration error. Please contact support.');
       navigate('/dashboard');
       return;
     }
@@ -112,6 +112,12 @@ export const CustomAuthPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage(null);
+    
+    // Check if Supabase is configured
+    if (!isSupabaseConfigured()) {
+      setMessage({ type: 'error', text: 'Authentication service is not configured. Please contact support.' });
+      return;
+    }
     
     // Check maintenance mode for non-admin users
     if (!canAccessDuringMaintenance(formData.email)) {

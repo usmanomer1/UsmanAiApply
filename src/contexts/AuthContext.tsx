@@ -1,12 +1,11 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { User } from '@supabase/supabase-js';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { getMaintenanceConfig, isAdminEmail } from '../lib/maintenance';
 import toast from 'react-hot-toast';
 
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
@@ -25,22 +24,7 @@ export const useAuth = () => {
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const isSupabaseConfigured = () => {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    return !!(
-      supabaseUrl && 
-      supabaseKey && 
-      supabaseUrl.startsWith('https://') &&
-      supabaseUrl.includes('.supabase.co') &&
-      supabaseKey.length > 50 &&
-      supabaseUrl !== 'your_supabase_url_here' && 
-      supabaseKey !== 'your_supabase_anon_key_here'
-    );
-  };
 
   useEffect(() => {
     let mounted = true;
@@ -66,17 +50,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         
         if (mounted) {
-          setSession(session);
           setUser(session?.user ?? null);
           setLoading(false);
         }
 
         // Listen for auth changes
-        const {
-          data: { subscription },
-        } = supabase.auth.onAuthStateChange(async (event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
           if (mounted) {
-            setSession(session);
             setUser(session?.user ?? null);
             setLoading(false);
           }
@@ -191,13 +171,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       setUser(null);
-      setSession(null);
       toast.success('Signed out successfully');
     } catch (error) {
       console.error('Error signing out:', error);
       // Force sign out even if there's an error
       setUser(null);
-      setSession(null);
       toast.success('Signed out successfully');
     }
   };
@@ -205,7 +183,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   return (
     <AuthContext.Provider value={{
       user,
-      session,
       loading,
       signIn,
       signUp,
