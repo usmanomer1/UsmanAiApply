@@ -224,15 +224,7 @@ Key Achievements:
 ${formData.achievements.filter(ach => ach.trim()).map(ach => `• ${ach}`).join('\n')}
       `.trim();
 
-      console.log('🔍 Generating cover letter with data:', {
-        applicantName: formData.applicantName,
-        company: formData.companyName,
-        tone: formData.tone,
-        skillsCount: formData.keySkills.filter(s => s.trim()).length,
-        achievementsCount: formData.achievements.filter(a => a.trim()).length,
-        hasJobDescription: !!formData.jobDescription,
-        experience: formData.experience
-      });
+
 
       const coverLetter = await openAIService.generateCoverLetter(
         resumeText,

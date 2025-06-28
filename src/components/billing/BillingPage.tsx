@@ -64,7 +64,7 @@ interface UsageStats {
 }
 
 export const BillingPage: React.FC = () => {
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [usage, setUsage] = useState<UsageStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -84,7 +84,6 @@ export const BillingPage: React.FC = () => {
 
     // Listen for billing refresh events from automation completion
     const handleBillingRefresh = () => {
-      console.log('🔄 Billing refresh event received from automation');
       fetchBillingData(true);
     };
 
@@ -180,12 +179,6 @@ export const BillingPage: React.FC = () => {
         }
 
         // Get browser use logs for step count - only count the FINAL step count per task
-        console.log('🔍 Billing Page - Date range:', {
-          start: currentMonthStart.toISOString(),
-          end: nextMonthStart.toISOString(),
-          userId: user.id
-        });
-
         const { data: usageData, error: usageError } = await supabase
           .from('browser_use_logs')
           .select('task_id, step_count, cost_usd, created_at, user_id')
@@ -194,15 +187,11 @@ export const BillingPage: React.FC = () => {
           .lt('created_at', nextMonthStart.toISOString())
           .order('created_at', { ascending: false });
 
-        console.log('🔍 Billing Page - Database query result:', { usageData, usageError });
-
         // Calculate total steps correctly: only count the MAX step_count per task_id
         let totalSteps = 0;
         let totalCost = 0;
         
         if (usageData && !usageError) {
-          console.log('🔍 Billing Page - Raw usage data:', usageData);
-          
           const taskSteps: Record<string, number> = {};
           const taskCosts: Record<string, number> = {};
           
@@ -218,14 +207,9 @@ export const BillingPage: React.FC = () => {
             }
           });
           
-          console.log('🔍 Billing Page - Task steps by ID:', taskSteps);
-          console.log('🔍 Billing Page - Task costs by ID:', taskCosts);
-          
           // Sum up the final step counts and costs for all tasks
           totalSteps = Object.values(taskSteps).reduce((sum, steps) => sum + steps, 0);
           totalCost = Object.values(taskCosts).reduce((sum, cost) => sum + cost, 0);
-          
-          console.log('🔍 Billing Page - Final totals:', { totalSteps, totalCost });
         }
 
         const currentUsage = {
@@ -256,27 +240,30 @@ export const BillingPage: React.FC = () => {
   };
 
   const handlePurchase = async (priceId: string) => {
-    // Check if price ID is valid
-    if (!priceId || priceId.startsWith('price_missing')) {
-      toast.error('This product is not yet available. Please check back later or contact support.');
-      return;
-    }
-
-    if (!isSupabaseConfigured() || !user || !session) {
-      toast.error('Billing service not available. Please check your configuration.');
-      return;
-    }
-
-    // Check if it's a product ID instead of price ID
-    if (priceId.startsWith('prod_')) {
-      toast.error('Configuration error: Invalid price ID. Please contact support.');
-      console.error('Product ID used instead of Price ID:', priceId);
-      return;
-    }
-
-    setPurchasing(priceId);
-    
     try {
+      // Get current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      // Check if price ID is valid
+      if (!priceId || priceId.startsWith('price_missing')) {
+        toast.error('This product is not yet available. Please check back later or contact support.');
+        return;
+      }
+
+      if (sessionError || !isSupabaseConfigured() || !user || !session) {
+        toast.error('Billing service not available. Please check your configuration.');
+        return;
+      }
+
+      // Check if it's a product ID instead of price ID
+      if (priceId.startsWith('prod_')) {
+        toast.error('Configuration error: Invalid price ID. Please contact support.');
+        console.error('Product ID used instead of Price ID:', priceId);
+        return;
+      }
+
+      setPurchasing(priceId);
+      
       const product = getProductByPriceId(priceId);
       if (!product) {
         throw new Error('Product not found');
@@ -328,10 +315,18 @@ export const BillingPage: React.FC = () => {
     }
 
     try {
+      // Get current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        toast.error('Authentication required. Please sign in again.');
+        return;
+      }
+
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create_stripe_portal_link`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
+          'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({

@@ -237,10 +237,13 @@ export const CustomAuthPage: React.FC = () => {
             {selectedPlan ? (
               <div className="mb-8">
                 <div className="flex items-center space-x-3 mb-4">
-                  <Crown className="w-8 h-8 text-yellow-400" />
+                  <Crown className="w-8 h-8 text-amber-400" />
                   <div>
                     <h2 className="text-3xl font-bold text-white">{selectedPlan.name} Plan</h2>
-                    <p className="text-xl text-gray-100">${selectedPlan.price}/month</p>
+                    <div>
+                      <p className="text-xl text-gray-100">${selectedPlan.price}/month</p>
+                      <p className="text-xs text-gray-300 mt-1">Terms and Conditions Apply</p>
+                    </div>
                   </div>
                 </div>
                 <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 mb-6">
@@ -328,9 +331,12 @@ export const CustomAuthPage: React.FC = () => {
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white transition-colors duration-200">Jobotic</h1>
               <p className="text-gray-600 dark:text-gray-300 mt-1 transition-colors duration-200">Premium Job Search Platform</p>
               {planParam && (
-                <div className="mt-4 inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-900 dark:to-pink-900 rounded-full transition-colors duration-200">
-                  <Crown className="w-4 h-4 text-purple-600 dark:text-purple-400 mr-2 transition-colors duration-200" />
-                  <span className="text-purple-800 dark:text-purple-200 font-semibold text-sm transition-colors duration-200">Upgrading to {planParam}</span>
+                <div className="mt-4 inline-flex items-center flex-col space-y-1">
+                  <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-slate-100 to-stone-100 dark:from-slate-800 dark:to-stone-800 rounded-full border border-slate-200 dark:border-slate-700 transition-colors duration-200">
+                    <Crown className="w-4 h-4 text-slate-600 dark:text-slate-400 mr-2 transition-colors duration-200" />
+                    <span className="text-slate-800 dark:text-slate-200 font-semibold text-sm transition-colors duration-200">Upgrading to {planParam}</span>
+                  </div>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">Terms and Conditions Apply</span>
                 </div>
               )}
             </div>
@@ -370,13 +376,16 @@ export const CustomAuthPage: React.FC = () => {
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-700 rounded-xl transition-colors duration-200"
+                  className="mb-6 p-4 bg-gradient-to-r from-slate-50 to-stone-50 dark:from-slate-800/20 dark:to-stone-800/20 border border-slate-200 dark:border-slate-700 rounded-xl transition-colors duration-200"
                 >
                   <div className="flex items-center space-x-3">
-                    <Crown className="w-5 h-5 text-purple-600 dark:text-purple-400 transition-colors duration-200" />
-                    <div>
-                      <p className="text-purple-800 dark:text-purple-200 font-semibold transition-colors duration-200">Upgrading to {selectedPlan.name}</p>
-                      <p className="text-purple-600 dark:text-purple-300 text-sm transition-colors duration-200">${selectedPlan.price}/month • {selectedPlan.applicationCount} applications/month</p>
+                    <Crown className="w-5 h-5 text-slate-600 dark:text-slate-400 transition-colors duration-200" />
+                    <div className="flex-1">
+                      <p className="text-slate-800 dark:text-slate-200 font-semibold transition-colors duration-200">Upgrading to {selectedPlan.name}</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-slate-600 dark:text-slate-300 text-sm transition-colors duration-200">${selectedPlan.price}/month • {selectedPlan.applicationCount} applications/month</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Terms and Conditions Apply</p>
+                      </div>
                     </div>
                   </div>
                 </motion.div>
@@ -427,7 +436,7 @@ export const CustomAuthPage: React.FC = () => {
                           required
                           value={formData.fullName}
                           onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                          className="pl-12 h-12 text-base border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-colors duration-200"
+                          className="pl-12 h-12 text-base border-gray-300 dark:border-gray-600 focus:border-slate-500 focus:ring-slate-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-colors duration-200"
                           placeholder="Enter your full name"
                         />
                       </div>
@@ -446,7 +455,7 @@ export const CustomAuthPage: React.FC = () => {
                       required
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="pl-12 h-12 text-base border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-colors duration-200"
+                      className="pl-12 h-12 text-base border-gray-300 dark:border-gray-600 focus:border-slate-500 focus:ring-slate-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-colors duration-200"
                       placeholder="Enter your email"
                     />
                   </div>
@@ -464,7 +473,7 @@ export const CustomAuthPage: React.FC = () => {
                         required
                         value={formData.password}
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        className="pl-12 pr-12 h-12 text-base border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-colors duration-200"
+                        className="pl-12 pr-12 h-12 text-base border-gray-300 dark:border-gray-600 focus:border-slate-500 focus:ring-slate-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-colors duration-200"
                         placeholder="Enter your password"
                       />
                       <button
@@ -484,7 +493,7 @@ export const CustomAuthPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setAuthMode('forgot-password')}
-                      className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium transition-colors"
+                      className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 font-medium transition-colors"
                     >
                       Forgot your password?
                     </button>
@@ -501,8 +510,8 @@ export const CustomAuthPage: React.FC = () => {
                     size="lg"
                     className={`w-full text-lg font-bold shadow-xl h-12 transition-colors duration-200 ${
                       planParam 
-                        ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white' 
-                        : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                        ? 'bg-gradient-to-r from-slate-700 to-stone-700 hover:from-slate-800 hover:to-stone-800 text-white border border-slate-600 shadow-slate-500/25' 
+                        : 'bg-slate-800 hover:bg-slate-900 text-white border border-slate-700 shadow-slate-500/25'
                     }`}
                   >
                     {loading ? (
@@ -528,7 +537,7 @@ export const CustomAuthPage: React.FC = () => {
                   <div className="text-center">
                     <button
                       onClick={() => setAuthMode('login')}
-                      className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-semibold transition-colors flex items-center justify-center"
+                      className="text-slate-600 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 font-semibold transition-colors flex items-center justify-center"
                     >
                       <ArrowLeft className="w-4 h-4 mr-2" />
                       Back to Sign In
@@ -540,7 +549,7 @@ export const CustomAuthPage: React.FC = () => {
                   <div className="text-center">
                     <button
                       onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
-                      className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-semibold transition-colors"
+                      className="text-slate-600 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 font-semibold transition-colors"
                     >
                       {authMode === 'login'
                         ? "Don't have an account? Sign up"

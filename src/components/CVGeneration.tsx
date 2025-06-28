@@ -340,19 +340,7 @@ ${cvData.certifications.filter(cert => cert.name).length > 0 ? 'CERTIFICATIONS\n
 ${cvData.projects.filter(proj => proj.name).length > 0 ? 'PROJECTS\n' + cvData.projects.filter(proj => proj.name).map(proj => `• ${proj.name}: ${proj.description}\nTechnologies: ${proj.technologies.join(', ')}`).join('\n') : ''}
       `;
 
-      console.log('🔍 Generating CV with data:', {
-        personalInfo: cvData.personalInfo,
-        experiencesCount: cvData.experiences.length,
-        educationCount: cvData.education.length,
-        skillsCount: cvData.skills.length,
-        languagesCount: cvData.languages.length,
-        certificationsCount: cvData.certifications.filter(cert => cert.name).length,
-        projectsCount: cvData.projects.filter(proj => proj.name).length,
-        targetRole: cvData.targetRole,
-        industry: cvData.industry,
-        selectedTemplate: selectedTemplate,
-        resumeTextLength: resumeText.length
-      });
+
 
       const result = await openAIService.rewriteResume({
         resumeText,
