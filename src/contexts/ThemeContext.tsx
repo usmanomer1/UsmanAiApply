@@ -15,6 +15,22 @@ export const useTheme = () => {
   return context;
 };
 
+// Favicon update utility function
+const updateFavicon = (isDark: boolean) => {
+  const favicon = document.getElementById('favicon') as HTMLLinkElement;
+  const appleTouchIcon = document.getElementById('apple-touch-icon') as HTMLLinkElement;
+  const shortcutIcon = document.getElementById('shortcut-icon') as HTMLLinkElement;
+  
+  const lightFavicon = '/images/logos/light_theme_favicon.png';
+  const darkFavicon = '/images/logos/dark_theme_favicon.png';
+  
+  const selectedFavicon = isDark ? darkFavicon : lightFavicon;
+  
+  if (favicon) favicon.href = selectedFavicon;
+  if (appleTouchIcon) appleTouchIcon.href = selectedFavicon;
+  if (shortcutIcon) shortcutIcon.href = selectedFavicon;
+};
+
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isDark, setIsDark] = useState(false);
 
@@ -34,6 +50,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } else {
       document.documentElement.classList.remove('dark');
     }
+    
+    // Update favicon when theme changes
+    updateFavicon(isDark);
   }, [isDark]);
 
   const toggleTheme = () => setIsDark(!isDark);

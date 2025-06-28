@@ -2,9 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/favicon.png" />
-    <link rel="apple-touch-icon" href="/favicon.png" />
-    <link rel="shortcut icon" href="/favicon.png" />
+    <link rel="icon" type="image/png" href="/images/logos/light_theme_favicon.png" id="favicon" />
+    <link rel="apple-touch-icon" href="/images/logos/light_theme_favicon.png" id="apple-touch-icon" />
+    <link rel="shortcut icon" href="/images/logos/light_theme_favicon.png" id="shortcut-icon" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Jobotic - AI-Powered Job Application Platform</title>
     <meta name="description" content="Automate your job applications with AI. Upload your resume, set preferences, and let our AI apply to jobs on LinkedIn for you." />
@@ -22,6 +22,34 @@
     <meta name="twitter:title" content="Jobotic - AI-Powered Job Application Platform" />
     <meta name="twitter:description" content="Automate your job applications with AI. Upload your resume, set preferences, and let our AI apply to jobs on LinkedIn for you." />
     <meta name="twitter:image" content="/images/logos/light.png" />
+    
+    <!-- Initial Favicon Script (for before React loads) -->
+    <script>
+      (function() {
+        // Set initial favicon based on system preference before React loads
+        function setInitialFavicon() {
+          const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          const savedTheme = localStorage.getItem('theme');
+          
+          // Use saved theme preference if available, otherwise use system preference
+          const useDarkMode = savedTheme === 'dark' || (savedTheme !== 'light' && isDarkMode);
+          
+          const favicon = document.getElementById('favicon');
+          const appleTouchIcon = document.getElementById('apple-touch-icon');
+          const shortcutIcon = document.getElementById('shortcut-icon');
+          
+          const selectedFavicon = useDarkMode 
+            ? '/images/logos/dark_theme_favicon.png' 
+            : '/images/logos/light_theme_favicon.png';
+          
+          if (favicon) favicon.href = selectedFavicon;
+          if (appleTouchIcon) appleTouchIcon.href = selectedFavicon;
+          if (shortcutIcon) shortcutIcon.href = selectedFavicon;
+        }
+        
+        setInitialFavicon();
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

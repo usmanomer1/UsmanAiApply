@@ -14,11 +14,12 @@ const faqData: FAQItem[] = [
       <div className="space-y-2">
         <p>Each plan includes automated job applications per month:</p>
         <ul className="list-disc list-inside space-y-1 text-sm opacity-90">
-          <li><strong>Plus:</strong> 37 applications/month</li>
-          <li><strong>Pro:</strong> 77 applications/month</li>
-          <li><strong>Max:</strong> 158 applications/month</li>
+          <li><strong>Plus ($10/month):</strong> 40 applications/month</li>
+          <li><strong>Pro ($25/month):</strong> 110 applications/month</li>
+          <li><strong>Max ($50/month):</strong> 230 applications/month</li>
         </ul>
-        <p className="text-sm pt-2">Need more? Additional applications are just $0.80 each - no commitment required.</p>
+        <p className="text-sm pt-2"><strong>Important:</strong> Each job application uses exactly 10 automation steps for consistent, reliable results.</p>
+        <p className="text-sm">Need more? Additional applications are just $0.80 each - no commitment required.</p>
       </div>
     ),
     icon: Bot
@@ -32,7 +33,7 @@ const faqData: FAQItem[] = [
           <li>All plans include <strong>30,000 AI tokens/month</strong></li>
           <li>Basic requests: ~500-1,000 tokens</li>
           <li>Complex requests: 2x token cost</li>
-          <li>Overage: $0.10 per 1,000 tokens</li>
+          <li>Additional tokens: $0.10 per 1,000 tokens</li>
         </ul>
         <p className="text-sm pt-2">Most users never exceed their monthly allowance.</p>
       </div>
@@ -61,37 +62,28 @@ const faqData: FAQItem[] = [
           <li>Voice AI features for interview prep</li>
           <li>LinkedIn automation tools</li>
           <li>Real-time application tracking</li>
-          <li>Browser automation ($0.03/step + $0.01 init)</li>
+          <li>Browser automation included</li>
         </ul>
       </div>
     ),
     icon: Zap
   },
   {
-    question: "How does browser automation pricing work?",
+    question: "How does the automation work?",
     answer: (
       <div className="space-y-2">
-        <p>Our browser automation runs on a simple, transparent model:</p>
+        <p>Our AI-powered automation simplifies your job search:</p>
         <ul className="list-disc list-inside space-y-1 text-sm opacity-90">
-          <li><strong>$0.01</strong> initialization fee per session</li>
-          <li><strong>$0.03</strong> per automation step</li>
-          <li>Average job application: ~10-15 steps ($0.31-$0.46 total)</li>
+          <li>Automatically finds relevant job postings</li>
+          <li>Fills out applications with your information</li>
+          <li>Customizes responses based on job requirements</li>
+          <li>Tracks all applications in your dashboard</li>
+          <li><strong>Each application uses exactly 10 automation steps</strong></li>
         </ul>
-        <p className="text-sm pt-2">Only pay for what you use. No minimum usage requirements.</p>
+        <p className="text-sm pt-2">Focus on interview prep while we handle the applications. Every job application follows the same efficient 10-step process.</p>
       </div>
     ),
     icon: Bot
-  },
-  {
-    question: "Do you offer refunds?",
-    answer: (
-      <div className="space-y-2">
-        <p>We offer a <strong>7-day money-back guarantee</strong> for all new subscriptions.</p>
-        <p>Not satisfied? Contact us within 7 days for a full refund, no questions asked.</p>
-        <p className="text-sm pt-2">Usage-based charges (browser automation, token overages) are non-refundable but very affordable.</p>
-      </div>
-    ),
-    icon: Shield
   },
   {
     question: "Can I buy token packs instead of subscribing?",
@@ -104,7 +96,7 @@ const faqData: FAQItem[] = [
             <ul className="list-disc list-inside space-y-1 text-xs opacity-90">
               <li>QuickApply: $7 (10 apps)</li>
               <li>Hustle Boost: $17 (25 apps)</li>
-              <li>Full Send: $60 (100 apps)</li>
+              <li>Full Send: $60/month (100 apps)</li>
               <li>Career Storm: $145 (250 apps)</li>
             </ul>
           </div>
@@ -113,13 +105,13 @@ const faqData: FAQItem[] = [
             <ul className="list-disc list-inside space-y-1 text-xs opacity-90">
               <li>Light Boost: $1 (10K tokens)</li>
               <li>Smart Stack: $2 (25K tokens)</li>
-              <li>Power Draft: $3 (50K tokens)</li>
-              <li>Creator Surge: $5 (100K tokens)</li>
+              <li>Power Draft: $3/month (50K tokens)</li>
+              <li>Creator Surge: $5/month (100K tokens)</li>
               <li>AI Vault: $10 (250K tokens)</li>
             </ul>
           </div>
         </div>
-        <p className="text-sm pt-2">Perfect for testing or occasional use. Tokens never expire.</p>
+        <p className="text-sm pt-2">Perfect for testing or occasional use. One-time tokens never expire.</p>
       </div>
     ),
     icon: CreditCard
