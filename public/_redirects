@@ -1,0 +1,9 @@
+# SPA Redirect Rules for Netlify
+# Handle client-side routing - serve index.html for all routes
+/*    /index.html   200
+
+# API routes and assets should not be redirected
+/api/*  /api/:splat  200
+/assets/*  /assets/:splat  200
+/images/*  /images/:splat  200
+/_netlify/*  /_netlify/:splat  200 
