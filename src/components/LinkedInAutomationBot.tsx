@@ -279,6 +279,7 @@ const LinkedInAutomationBot: React.FC = () => {
   const [logs, setLogs] = useState<string[]>([]);
   const [stepCount, setStepCount] = useState(0);
   const [appliedCount, setAppliedCount] = useState(0);
+  const [pollInterval, setPollInterval] = useState<number | null>(null);
   const [userSubscription, setUserSubscription] = useState<any>(null);
   const [monthlyUsage, setMonthlyUsage] = useState({ tokens_used: 0, ai_requests_used: 0, cost_usd: 0 });
   const [loading, setLoading] = useState(true);
@@ -312,7 +313,92 @@ const LinkedInAutomationBot: React.FC = () => {
       const client = new BrowserUseClient(apiKey);
       setBrowserClient(client);
     }
+    
+    // Restore automation state on page load
+    restoreAutomationState();
+    
+    return () => {
+      // Cleanup polling interval on unmount
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+    };
   }, [user, apiKey]);
+
+  // Persist automation state to survive page refreshes
+  const saveAutomationState = (task: TaskStatus) => {
+    if (!user) return;
+    
+    const automationState = {
+      taskId: task.id,
+      status: task.status,
+      live_url: task.live_url,
+      stepCount,
+      appliedCount,
+      isRunning,
+      isPaused,
+      timestamp: Date.now()
+    };
+    
+    localStorage.setItem(`automation_state_${user.id}`, JSON.stringify(automationState));
+  };
+
+  const clearAutomationState = () => {
+    if (!user) return;
+    localStorage.removeItem(`automation_state_${user.id}`);
+  };
+
+  const restoreAutomationState = async () => {
+    if (!user || !browserClient) return;
+    
+    try {
+      const savedState = localStorage.getItem(`automation_state_${user.id}`);
+      if (!savedState) return;
+      
+      const state = JSON.parse(savedState);
+      
+      // Check if state is recent (within last hour) and task is still active
+      const isRecent = (Date.now() - state.timestamp) < 60 * 60 * 1000; // 1 hour
+      
+      if (!isRecent) {
+        clearAutomationState();
+        return;
+      }
+      
+      // Restore the task and check its current status
+      if (state.taskId && (state.status === 'running' || state.status === 'paused')) {
+        try {
+          const currentTaskStatus = await getTaskStatus(state.taskId);
+          
+          // If task is still active, restore the UI state
+          if (currentTaskStatus.status === 'running' || currentTaskStatus.status === 'paused') {
+            setCurrentTask(currentTaskStatus);
+            setIsRunning(currentTaskStatus.status === 'running');
+            setIsPaused(currentTaskStatus.status === 'paused');
+            setStepCount(state.stepCount || 0);
+            setAppliedCount(state.appliedCount || 0);
+            
+            addLog(`🔄 Restored automation state - Task ${state.taskId} is ${currentTaskStatus.status}`);
+            
+            // Resume polling if task is running
+            if (currentTaskStatus.status === 'running') {
+              startPolling(state.taskId);
+            }
+          } else {
+            // Task is finished/failed, clear saved state
+            clearAutomationState();
+            addLog(`✅ Previous automation task completed`);
+          }
+        } catch (error) {
+          // Task no longer exists, clear saved state
+          clearAutomationState();
+        }
+      }
+    } catch (error) {
+      // Invalid saved state, clear it
+      clearAutomationState();
+    }
+  };
 
   // Check access on component mount
   const checkAccess = async () => {
@@ -947,6 +1033,7 @@ const LinkedInAutomationBot: React.FC = () => {
       max_agent_steps: Math.max(100, parseInt(config.targetCount) * 10), // 10 steps per application to stay within billing constraints
       llm_model: 'gemini-2.0-flash' as const,
       allowed_domains: ['linkedin.com', '*.linkedin.com'],
+      
     };
 
     addLog('🚀 Starting LinkedIn automation with comprehensive AI agent', 'success');
@@ -1231,218 +1318,12 @@ This tracking is essential for saving your applications correctly.`;
       setCurrentTask(task);
       
       addLog(`✅ Task created: ${task.id}`);
-
-      // Poll for task status
-      const pollInterval = setInterval(async () => {
-        try {
-          const updatedTask = await getTaskStatus(task.id);
-          setCurrentTask(updatedTask);
-
-          if (updatedTask.steps) {
-            const newStepCount = updatedTask.steps.length;
-            
-            if (newStepCount > stepCount) {
-              // Track the TOTAL steps (not incremental) - this will upsert in the database
-              await trackUsage(newStepCount, task.id);
-              
-              // Calculate total steps used for limit checking
-              const limit = getTokenLimit(); // getTokenLimit() already returns step limit (applications * 10)
-              
-              // Only check limit if we have a meaningful limit (not 0)
-              if (limit > 0 && newStepCount >= limit) {
-                clearInterval(pollInterval);
-                setIsRunning(false);
-                await stopTask(task.id);
-                addLog(`🛑 Automation stopped: Monthly limit of ${limit} steps reached!`, 'error');
-                toast.error('Automation stopped due to usage limit');
-                return;
-              } else if (limit > 0 && newStepCount >= limit * 0.9) {
-                addLog(`⚠️ Warning: Approaching monthly limit (${newStepCount}/${limit} steps used)`);
-              }
-              
-              // Also check if we've reached the target application count
-              const targetApplications = parseInt(config.targetCount) || 10;
-              if (appliedCount >= targetApplications) {
-                addLog(`🎯 Target reached: Applied to ${appliedCount}/${targetApplications} jobs!`, 'success');
-                // Don't stop automatically - let the AI agent decide when to finish
-                // This allows it to complete any in-progress applications
-              }
-            }
-            
-            setStepCount(newStepCount);
-            
-            // Look for successful application submissions only
-            const applicationSteps = updatedTask.steps.filter(step => {
-              const stepText = step.next_goal || step.evaluation_previous_goal || '';
-              // Only count steps with our specific announcement format
-              return /SUBMITTING APPLICATION TO:/i.test(stepText);
-            });
-            
-            // Process new applications with deduplication
-            if (applicationSteps.length > appliedCount) {
-              const processedApplications = new Set();
-              
-              for (const appStep of applicationSteps) {
-                const stepText = appStep.next_goal || appStep.evaluation_previous_goal || '';
-                const companyRole = extractCompanyRoleFromStep(stepText);
-                
-                if (companyRole.company && companyRole.role) {
-                  const appKey = `${companyRole.company.toLowerCase()}-${companyRole.role.toLowerCase()}`;
-                  
-                  // Only save if we haven't processed this exact application
-                  if (!processedApplications.has(appKey)) {
-                    processedApplications.add(appKey);
-                    await saveJobApplication(companyRole.company, companyRole.role, task.id);
-                  }
-                }
-              }
-            }
-            
-            setAppliedCount(applicationSteps.length);
-          }
-
-          if (updatedTask.status === 'finished') {
-            clearInterval(pollInterval);
-            setIsRunning(false);
-            
-            addLog('🔄 Fetching final task details...', 'info');
-            
-            // Wait a moment for browser-use API to finalize the task
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            
-            // Fetch final task state to ensure we have all steps
-            try {
-              const finalTask = await getTaskStatus(task.id);
-              setCurrentTask(finalTask);
-              
-              const finalStepCount = finalTask.steps?.length || 0;
-              const finalApplicationCount = finalTask.steps ? finalTask.steps.filter(step => {
-                const stepText = (JSON.stringify(step.action || {}) + ' ' + (step.output || '')).toLowerCase();
-                return stepText.includes('submitting application to:') || 
-                       stepText.includes('applying to:') ||
-                       stepText.includes('submit application') ||
-                       (stepText.includes('submit') && stepText.includes('successfully'));
-              }).length : 0;
-              
-              setStepCount(finalStepCount);
-              setAppliedCount(finalApplicationCount);
-              
-              addLog(`📊 Final Summary: ${finalStepCount} total steps, ${finalApplicationCount} applications submitted`);
-              
-              // Track final step count (this will upsert to ensure we have the correct total)
-              await trackUsage(finalStepCount, task.id);
-              addLog(`📈 Final step count recorded: ${finalStepCount} steps`);
-              
-              // Mark task as completed in database with final step count
-              await markTaskCompleted(task.id, finalStepCount, 'finished');
-              
-              // Final application extraction already handled above
-              
-              addLog('✅ Automation completed successfully!', 'success');
-              
-              if (finalTask.output) {
-                addLog(`📊 Final Results: ${finalTask.output}`);
-              }
-              
-                          } catch (error) {
-                addLog('⚠️ Could not fetch final task details, using last known state', 'error');
-                
-                // Fallback to last known state
-                await markTaskCompleted(task.id, updatedTask.steps?.length || 0, 'finished');
-              }
-            
-            // Refresh usage data immediately and force billing page refresh
-            fetchUserSubscription();
-            
-            // Force billing page to refresh by dispatching a custom event
-            window.dispatchEvent(new CustomEvent('billing-refresh-needed'));
-          } else if (updatedTask.status === 'failed') {
-            clearInterval(pollInterval);
-            setIsRunning(false);
-            
-            addLog('🔄 Fetching final task details for failed task...', 'info');
-            
-            // Wait a moment and fetch final state
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            try {
-              const finalTask = await getTaskStatus(task.id);
-              setCurrentTask(finalTask);
-              
-              const finalStepCount = finalTask.steps?.length || 0;
-              setStepCount(finalStepCount);
-              
-              // Track final step count (this will upsert to ensure we have the correct total)
-              await trackUsage(finalStepCount, task.id);
-              addLog(`📈 Final step count recorded: ${finalStepCount} steps`);
-              
-              // Mark task as failed in database with final step count
-              await markTaskCompleted(task.id, finalStepCount, 'failed', finalTask.error || updatedTask.error);
-              
-              addLog(`❌ Automation failed: ${finalTask.error || updatedTask.error || 'Unknown error'}`, 'error');
-              addLog(`📊 Final step count: ${finalStepCount}`);
-              
-                          } catch (error) {
-                await markTaskCompleted(task.id, updatedTask.steps?.length || 0, 'failed', updatedTask.error);
-                addLog(`❌ Automation failed: ${updatedTask.error || 'Unknown error'}`, 'error');
-              }
-            
-            // Refresh usage data immediately and force billing page refresh
-            fetchUserSubscription();
-            
-            // Force billing page to refresh by dispatching a custom event
-            window.dispatchEvent(new CustomEvent('billing-refresh-needed'));
-          } else if (updatedTask.status === 'stopped') {
-            clearInterval(pollInterval);
-            setIsRunning(false);
-            
-            addLog('🔄 Fetching final task details for stopped task...', 'info');
-            
-            // Wait a moment and fetch final state
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            try {
-              const finalTask = await getTaskStatus(task.id);
-              setCurrentTask(finalTask);
-              
-              const finalStepCount = finalTask.steps?.length || 0;
-              setStepCount(finalStepCount);
-              
-              // Track final step count (this will upsert to ensure we have the correct total)
-              await trackUsage(finalStepCount, task.id);
-              addLog(`📈 Final step count recorded: ${finalStepCount} steps`);
-              
-              // Mark task as stopped in database with final step count
-              await markTaskCompleted(task.id, finalStepCount, 'stopped');
-              
-              addLog('⏹️ Automation stopped by user');
-              addLog(`📊 Final step count: ${finalStepCount}`);
-              
-                          } catch (error) {
-                await markTaskCompleted(task.id, updatedTask.steps?.length || 0, 'stopped');
-                addLog('⏹️ Automation stopped by user');
-              }
-            
-            // Refresh usage data immediately and force billing page refresh
-            fetchUserSubscription();
-            
-            // Force billing page to refresh by dispatching a custom event
-            window.dispatchEvent(new CustomEvent('billing-refresh-needed'));
-          }
-        } catch (error) {
-          if (error instanceof Error && error.name !== 'AbortError') {
-            // Error checking task status
-          }
-        }
-      }, 3000);
-
-      setTimeout(() => {
-        clearInterval(pollInterval);
-        if (isRunning) {
-          addLog('⏰ Automation timed out after 30 minutes');
-          setIsRunning(false);
-        }
-      }, 30 * 60 * 1000);
+      
+      // Save initial automation state
+      saveAutomationState(task);
+      
+      // Start polling for status updates
+      startPolling(task.id);
 
     } catch (error) {
       setIsRunning(false);
@@ -1482,10 +1363,17 @@ This tracking is essential for saving your applications correctly.`;
   };
 
   const stopAutomation = async () => {
+    // Clear polling interval first
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      setPollInterval(null);
+    }
+
     if (!currentTask) {
       // No task to stop, just reset UI state
       setIsRunning(false);
       setIsPaused(false);
+      clearAutomationState();
       addLog('⏹️ Automation stopped by user');
       toast.success('Automation stopped');
       return;
@@ -1524,6 +1412,7 @@ This tracking is essential for saving your applications correctly.`;
       setIsRunning(false);
       setIsPaused(false);
       setCurrentTask(null);
+      clearAutomationState();
       addLog('⏹️ Automation stopped by user');
       toast.success('Automation stopped');
     } catch (error) {
@@ -1531,6 +1420,7 @@ This tracking is essential for saving your applications correctly.`;
       setIsRunning(false);
       setIsPaused(false);
       setCurrentTask(null);
+      clearAutomationState();
       
       // Check if it's a network/timeout error vs already stopped
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -1542,6 +1432,236 @@ This tracking is essential for saving your applications correctly.`;
         toast.error('Automation stopped locally (server may still be running)');
       }
     }
+  };
+
+  const startPolling = (taskId: string) => {
+    // Clear any existing polling interval
+    if (pollInterval) {
+      clearInterval(pollInterval);
+    }
+
+    // Start polling for task status
+    const interval = setInterval(async () => {
+      try {
+        const updatedTask = await getTaskStatus(taskId);
+        setCurrentTask(updatedTask);
+
+        if (updatedTask.steps) {
+          const newStepCount = updatedTask.steps.length;
+          
+          if (newStepCount > stepCount) {
+            // Track the TOTAL steps (not incremental) - this will upsert in the database
+            await trackUsage(newStepCount, taskId);
+            
+            // Calculate total steps used for limit checking
+            const limit = getTokenLimit(); // getTokenLimit() already returns step limit (applications * 10)
+            
+            // Only check limit if we have a meaningful limit (not 0)
+            if (limit > 0 && newStepCount >= limit) {
+              clearInterval(interval);
+              setPollInterval(null);
+              setIsRunning(false);
+              await stopTask(taskId);
+              addLog(`🛑 Automation stopped: Monthly limit of ${limit} steps reached!`, 'error');
+              toast.error('Automation stopped due to usage limit');
+              clearAutomationState();
+              return;
+            }
+            
+            // Also check if we've reached the target application count
+            const targetApplications = parseInt(config.targetCount) || 10;
+            if (appliedCount >= targetApplications) {
+              addLog(`🎯 Target reached: Applied to ${appliedCount}/${targetApplications} jobs!`, 'success');
+            }
+          }
+          
+          setStepCount(newStepCount);
+          
+          // Look for successful application submissions only
+          const applicationSteps = updatedTask.steps.filter(step => {
+            const stepText = step.next_goal || step.evaluation_previous_goal || '';
+            // Only count steps with our specific announcement format
+            return /SUBMITTING APPLICATION TO:/i.test(stepText);
+          });
+          
+          // Process new applications with deduplication
+          if (applicationSteps.length > appliedCount) {
+            const processedApplications = new Set();
+            
+            for (const appStep of applicationSteps) {
+              const stepText = appStep.next_goal || appStep.evaluation_previous_goal || '';
+              const companyRole = extractCompanyRoleFromStep(stepText);
+              
+              if (companyRole.company && companyRole.role) {
+                const appKey = `${companyRole.company.toLowerCase()}-${companyRole.role.toLowerCase()}`;
+                
+                // Only save if we haven't processed this exact application
+                if (!processedApplications.has(appKey)) {
+                  processedApplications.add(appKey);
+                  await saveJobApplication(companyRole.company, companyRole.role, taskId);
+                }
+              }
+            }
+          }
+          
+          setAppliedCount(applicationSteps.length);
+        }
+
+        // Save current state
+        saveAutomationState(updatedTask);
+
+        if (updatedTask.status === 'finished') {
+          clearInterval(interval);
+          setPollInterval(null);
+          setIsRunning(false);
+          
+          addLog('🔄 Fetching final task details...', 'info');
+          
+          // Wait a moment for browser-use API to finalize the task
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          // Fetch final task state to ensure we have all steps
+          try {
+            const finalTask = await getTaskStatus(taskId);
+            setCurrentTask(finalTask);
+            
+            const finalStepCount = finalTask.steps?.length || 0;
+            const finalApplicationCount = finalTask.steps ? finalTask.steps.filter(step => {
+              const stepText = (JSON.stringify(step.action || {}) + ' ' + (step.output || '')).toLowerCase();
+              return stepText.includes('submitting application to:') || 
+                     stepText.includes('applying to:') ||
+                     stepText.includes('submit application') ||
+                     (stepText.includes('submit') && stepText.includes('successfully'));
+            }).length : 0;
+            
+            setStepCount(finalStepCount);
+            setAppliedCount(finalApplicationCount);
+            
+            addLog(`📊 Final Summary: ${finalStepCount} total steps, ${finalApplicationCount} applications submitted`);
+            
+            // Track final step count (this will upsert to ensure we have the correct total)
+            await trackUsage(finalStepCount, taskId);
+            addLog(`📈 Final step count recorded: ${finalStepCount} steps`);
+            
+            // Mark task as completed in database with final step count
+            await markTaskCompleted(taskId, finalStepCount, 'finished');
+            
+            // Final application extraction already handled above
+            
+            addLog('✅ Automation completed successfully!', 'success');
+            
+            if (finalTask.output) {
+              addLog(`📊 Final Results: ${finalTask.output}`);
+            }
+            
+          } catch (error) {
+            addLog('⚠️ Could not fetch final task details, using last known state', 'error');
+            
+            // Fallback to last known state
+            await markTaskCompleted(taskId, updatedTask.steps?.length || 0, 'finished');
+          }
+        
+          // Clear automation state and refresh usage data
+          clearAutomationState();
+          fetchUserSubscription();
+          
+          // Force billing page to refresh by dispatching a custom event
+          window.dispatchEvent(new CustomEvent('billing-refresh-needed'));
+        } else if (updatedTask.status === 'failed') {
+          clearInterval(interval);
+          setPollInterval(null);
+          setIsRunning(false);
+          
+          addLog('🔄 Fetching final task details for failed task...', 'info');
+          
+          // Wait a moment and fetch final state
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          try {
+            const finalTask = await getTaskStatus(taskId);
+            setCurrentTask(finalTask);
+            
+            const finalStepCount = finalTask.steps?.length || 0;
+            setStepCount(finalStepCount);
+            
+            // Track final step count (this will upsert to ensure we have the correct total)
+            await trackUsage(finalStepCount, taskId);
+            addLog(`📈 Final step count recorded: ${finalStepCount} steps`);
+            
+            // Mark task as failed in database with final step count
+            await markTaskCompleted(taskId, finalStepCount, 'failed', finalTask.error || updatedTask.error);
+            
+            addLog(`❌ Automation failed: ${finalTask.error || updatedTask.error || 'Unknown error'}`, 'error');
+            addLog(`📊 Final step count: ${finalStepCount}`);
+            
+          } catch (error) {
+            await markTaskCompleted(taskId, updatedTask.steps?.length || 0, 'failed', updatedTask.error);
+            addLog(`❌ Automation failed: ${updatedTask.error || 'Unknown error'}`, 'error');
+          }
+        
+          // Clear automation state and refresh usage data
+          clearAutomationState();
+          fetchUserSubscription();
+          
+          // Force billing page to refresh by dispatching a custom event
+          window.dispatchEvent(new CustomEvent('billing-refresh-needed'));
+        } else if (updatedTask.status === 'stopped') {
+          clearInterval(interval);
+          setPollInterval(null);
+          setIsRunning(false);
+          
+          addLog('🔄 Fetching final task details for stopped task...', 'info');
+          
+          // Wait a moment and fetch final state
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          try {
+            const finalTask = await getTaskStatus(taskId);
+            setCurrentTask(finalTask);
+            
+            const finalStepCount = finalTask.steps?.length || 0;
+            setStepCount(finalStepCount);
+            
+            // Track final step count (this will upsert to ensure we have the correct total)
+            await trackUsage(finalStepCount, taskId);
+            addLog(`📈 Final step count recorded: ${finalStepCount} steps`);
+            
+            // Mark task as stopped in database with final step count
+            await markTaskCompleted(taskId, finalStepCount, 'stopped');
+            
+            addLog('⏹️ Automation stopped by user');
+            addLog(`📊 Final step count: ${finalStepCount}`);
+            
+          } catch (error) {
+            await markTaskCompleted(taskId, updatedTask.steps?.length || 0, 'stopped');
+            addLog('⏹️ Automation stopped by user');
+          }
+        
+          // Clear automation state and refresh usage data
+          clearAutomationState();
+          fetchUserSubscription();
+          
+          // Force billing page to refresh by dispatching a custom event
+          window.dispatchEvent(new CustomEvent('billing-refresh-needed'));
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name !== 'AbortError') {
+          // Error checking task status
+        }
+      }
+    }, 3000);
+
+    setPollInterval(interval);
+
+    // Auto-cleanup after 30 minutes
+    setTimeout(() => {
+      clearInterval(interval);
+      if (isRunning) {
+        addLog('⏰ Automation timed out after 30 minutes');
+        setIsRunning(false);
+        clearAutomationState();
+      }
+    }, 30 * 60 * 1000);
   };
 
   const markTaskCompleted = async (taskId: string, finalSteps: number, status: 'finished' | 'failed' | 'stopped', error?: string) => {
