@@ -165,6 +165,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const { error } = await supabase.auth.signOut();
         
         if (error) {
+          // Check if it's just a session missing error (normal when session expired)
+          if (error.message.includes('Auth session missing')) {
+            // This is normal - session was already cleared/expired
+            setUser(null);
+            toast.success('Signed out successfully');
+            return;
+          }
+          
           toast.error(error.message);
           throw error;
         }
