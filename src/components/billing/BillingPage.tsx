@@ -943,24 +943,6 @@ This will create the default configuration needed for the billing portal to work
           </div>
         )}
 
-        {/* FAQ Link */}
-        <div className="text-center mt-12">
-          <p className="text-gray-600 dark:text-gray-300 mb-4">
-            Have questions about our pricing?
-          </p>
-          <button 
-            type="button"
-            onClick={() => {
-              // You can replace this with your actual FAQ page URL or modal
-              window.open('https://docs.jobotic.ai/pricing-faq', '_blank');
-            }}
-            className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium inline-flex items-center transition-colors cursor-pointer"
-          >
-            <HelpCircle className="w-4 h-4 mr-2" />
-            View Pricing FAQ
-          </button>
-                </div>
-
         {/* Pricing FAQ */}
         <PricingFAQ />
       </div>
