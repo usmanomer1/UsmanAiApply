@@ -37,6 +37,9 @@
     "@radix-ui/react-toggle-group": "^1.1.10",
     "@radix-ui/react-tooltip": "^1.2.7",
     "@react-three/fiber": "^8.15.19",
+    "@sentry/react": "^9.33.0",
+    "@sentry/replay": "^7.116.0",
+    "@sentry/tracing": "^7.120.3",
     "@supabase/supabase-js": "^2.39.0",
     "@types/three": "^0.177.0",
     "class-variance-authority": "^0.7.1",
@@ -56,6 +59,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
+    "@sentry/vite-plugin": "^3.5.0",
+    "@types/node": "^24.0.7",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",

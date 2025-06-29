@@ -352,9 +352,6 @@ const LinkedInAutomationBot: React.FC = () => {
       setBrowserClient(client);
     }
     
-    // Restore automation state on page load
-    restoreAutomationState();
-    
     return () => {
       // Cleanup polling interval on unmount
       if (pollInterval) {
@@ -362,6 +359,81 @@ const LinkedInAutomationBot: React.FC = () => {
       }
     };
   }, [user, apiKey]);
+
+  // Separate useEffect for state restoration after browser client is ready
+  useEffect(() => {
+    if (browserClient && user) {
+      restoreAutomationState();
+    }
+  }, [browserClient, user]);
+
+  // Handle page close to automatically stop tasks and prevent backend charges
+  useEffect(() => {
+          const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+        if (isRunning && currentTask && browserClient && apiKey) {
+          // Immediately attempt to stop the task to prevent backend charges
+          try {
+            // Multiple stop attempts for reliability (browsers limit time for beforeunload)
+            
+            // Method 1: Use browser client (most compatible)
+            browserClient.stopTask(currentTask.id).catch(() => {});
+            
+            // Method 2: Direct API call with keepalive for reliability
+            fetch(`https://api.browseruse.com/tasks/${currentTask.id}/stop`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({}),
+              keepalive: true // Continues even as page unloads
+            }).catch(() => {});
+            
+            // Method 3: Fallback with sendBeacon (most reliable for page unload)
+            const stopData = JSON.stringify({
+              taskId: currentTask.id,
+              authorization: `Bearer ${apiKey}`,
+              timestamp: Date.now()
+            });
+            
+            if (navigator.sendBeacon) {
+              navigator.sendBeacon(
+                `https://api.browseruse.com/tasks/${currentTask.id}/stop`,
+                stopData
+              );
+            }
+            
+            // Clear local state immediately
+            clearAutomationState();
+            
+          } catch (error) {
+            // Even if stop fails, clear local state
+            clearAutomationState();
+          }
+          
+          // Show brief message (no confirmation dialog needed)
+          const message = 'Stopping automation to prevent charges...';
+          event.returnValue = message;
+          return message;
+        }
+      };
+
+    // Also handle visibility change (tab switching, minimizing)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden' && isRunning && currentTask) {
+        // Just save state when tab becomes hidden (don't stop)
+        saveAutomationState(currentTask);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isRunning, currentTask, user, browserClient, apiKey]);
 
   // Persist automation state to survive page refreshes
   const saveAutomationState = (task: TaskStatus) => {
@@ -371,14 +443,22 @@ const LinkedInAutomationBot: React.FC = () => {
       taskId: task.id,
       status: task.status,
       live_url: task.live_url,
+      steps: task.steps || [],
+      output: task.output || '',
+      error: task.error || '',
       stepCount,
       appliedCount,
       isRunning,
       isPaused,
+      logs: logs.slice(-50), // Save last 50 log entries to avoid storage issues
       timestamp: Date.now()
     };
     
+    try {
     localStorage.setItem(`automation_state_${user.id}`, JSON.stringify(automationState));
+    } catch (error) {
+      console.warn('Failed to save automation state:', error);
+    }
   };
 
   const clearAutomationState = () => {
@@ -395,11 +475,12 @@ const LinkedInAutomationBot: React.FC = () => {
       
       const state = JSON.parse(savedState);
       
-      // Check if state is recent (within last hour) and task is still active
-      const isRecent = (Date.now() - state.timestamp) < 60 * 60 * 1000; // 1 hour
+      // Check if state is recent (within last 30 minutes since tasks auto-stop on tab close)
+      const isRecent = (Date.now() - state.timestamp) < 30 * 60 * 1000; // 30 minutes
       
       if (!isRecent) {
         clearAutomationState();
+        addLog(`⏰ Previous automation session expired (tasks auto-stop when tab is closed)`);
         return;
       }
       
@@ -408,33 +489,60 @@ const LinkedInAutomationBot: React.FC = () => {
         try {
           const currentTaskStatus = await getTaskStatus(state.taskId);
           
-          // If task is still active, restore the UI state
+          // If task is still active, restore the UI state comprehensively
           if (currentTaskStatus.status === 'running' || currentTaskStatus.status === 'paused') {
+            // Restore task details
             setCurrentTask(currentTaskStatus);
             setIsRunning(currentTaskStatus.status === 'running');
             setIsPaused(currentTaskStatus.status === 'paused');
             setStepCount(state.stepCount || 0);
             setAppliedCount(state.appliedCount || 0);
             
-            addLog(`🔄 Restored automation state - Task ${state.taskId} is ${currentTaskStatus.status}`);
+            // Restore logs if available
+            if (state.logs && Array.isArray(state.logs)) {
+              setLogs(state.logs);
+            }
+            
+            addLog(`🔄 Restored automation session - Task ${state.taskId} is ${currentTaskStatus.status}`);
+            addLog(`📊 Restored state: ${state.stepCount || 0} steps, ${state.appliedCount || 0} applications`);
+            
+            // Show live preview URL if available
+            if (currentTaskStatus.live_url) {
+              addLog(`🌐 Live preview available: ${currentTaskStatus.live_url}`);
+            }
             
             // Resume polling if task is running
             if (currentTaskStatus.status === 'running') {
               startPolling(state.taskId);
+              addLog(`▶️ Resumed monitoring task progress`);
+            } else if (currentTaskStatus.status === 'paused') {
+              addLog(`⏸️ Task is paused - you can resume it anytime`);
             }
           } else {
-            // Task is finished/failed, clear saved state
+            // Task is finished/failed, clear saved state but show completion info
             clearAutomationState();
-            addLog(`✅ Previous automation task completed`);
+            if (state.stepCount || state.appliedCount) {
+              addLog(`✅ Previous automation completed: ${state.stepCount || 0} steps, ${state.appliedCount || 0} applications`);
+            } else {
+              addLog(`✅ Previous automation task finished`);
+            }
           }
         } catch (error) {
-          // Task no longer exists, clear saved state
+          // Task no longer exists (likely auto-stopped), clear saved state
           clearAutomationState();
+          addLog(`💰 Previous automation was auto-stopped when tab was closed (cost protection)`);
         }
+      } else if (state.taskId && ['finished', 'failed', 'stopped'].includes(state.status)) {
+        // Show info about completed task and clear state
+        if (state.stepCount || state.appliedCount) {
+          addLog(`✅ Last session: ${state.stepCount || 0} steps, ${state.appliedCount || 0} applications (${state.status})`);
+        }
+        clearAutomationState();
       }
     } catch (error) {
       // Invalid saved state, clear it
       clearAutomationState();
+      console.warn('Failed to restore automation state:', error);
     }
   };
 
@@ -536,7 +644,7 @@ const LinkedInAutomationBot: React.FC = () => {
         .from('automation_configs')
         .select('config')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (error && error.code !== 'PGRST116') {
         // Don't show error toast for configuration loading
@@ -1398,6 +1506,13 @@ This tracking is essential for saving your applications correctly.`;
     try {
       await browserClient.pauseTask(currentTask.id);
       setIsPaused(true);
+      
+      // Update and save the current task state
+      const updatedTask = { ...currentTask, status: 'paused' as const };
+      setCurrentTask(updatedTask);
+      saveAutomationState(updatedTask);
+      
+      addLog('⏸️ Automation paused - you can refresh the page and resume later');
       toast.success('Automation paused');
     } catch (error) {
       toast.error('Failed to pause automation');
@@ -1410,6 +1525,17 @@ This tracking is essential for saving your applications correctly.`;
     try {
       await browserClient.resumeTask(currentTask.id);
       setIsPaused(false);
+      setIsRunning(true);
+      
+      // Update and save the current task state
+      const updatedTask = { ...currentTask, status: 'running' as const };
+      setCurrentTask(updatedTask);
+      saveAutomationState(updatedTask);
+      
+      // Resume polling
+      startPolling(currentTask.id);
+      
+      addLog('▶️ Automation resumed - task is now running');
       toast.success('Automation resumed');
     } catch (error) {
       toast.error('Failed to resume automation');
@@ -1705,7 +1831,7 @@ This tracking is essential for saving your applications correctly.`;
         }
       }, 3000);
 
-    setPollInterval(interval);
+    setPollInterval(interval as unknown as number);
 
     // Auto-cleanup after 30 minutes
       setTimeout(() => {
@@ -2513,6 +2639,26 @@ This tracking is essential for saving your applications correctly.`;
             <div className="text-sm text-orange-600 dark:text-orange-400">Progress</div>
           </div>
         </div>
+
+        {/* Auto-Stop Warning */}
+        {(isRunning || isPaused) && (
+          <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
+            <div className="flex items-start space-x-3">
+              <div className="p-2 bg-amber-100 dark:bg-amber-800 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-amber-800 dark:text-amber-200 mb-1">
+                  💰 Cost Protection Active
+                </p>
+                <p className="text-xs text-amber-600 dark:text-amber-300">
+                  Your automation will automatically stop if you close this tab or navigate away to prevent unnecessary backend charges. 
+                  Keep this tab open to monitor progress.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Control Buttons */}
         <div className="flex flex-col sm:flex-row gap-4">

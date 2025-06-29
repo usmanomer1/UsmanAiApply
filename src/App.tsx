@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -18,12 +18,40 @@ import { SuccessPage } from './components/SuccessPage';
 import { ApplicationsPage } from './pages/ApplicationsPage';
 import InterviewPractice from './components/InterviewPractice';
 
+function BoltBadge() {
+  const [isDark, setIsDark] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    setIsDark(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsDark(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+  return (
+    <a
+      href="https://bolt.new"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="fixed top-2 right-4 z-[100]"
+      aria-label="Bolt - Build apps and sites in chat"
+      style={{ textDecoration: 'none' }}
+    >
+      <img
+        src={isDark ? '/images/logos/white_circle_360x360.png' : '/images/logos/black_circle_360x360.png'}
+        alt="Bolt Badge"
+        className="w-16 h-16 rounded-full shadow-lg border border-gray-200 dark:border-gray-700 transition-all hover:scale-105 hover:shadow-xl"
+      />
+    </a>
+  );
+}
+
 function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
         <Router>
           <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors relative overflow-hidden">
+            <BoltBadge />
             <Routes>
               <Route path="/auth" element={<CustomAuthPage />} />
               <Route path="/legacy-auth" element={<AuthPage />} />
