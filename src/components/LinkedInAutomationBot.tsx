@@ -1174,6 +1174,9 @@ const LinkedInAutomationBot: React.FC = () => {
       throw new Error('Browser client not initialized');
     }
 
+    // Always clear the browser profile before starting a new task for a new user
+    await browserClient.clearBrowserProfile();
+
     const linkedinUrl = buildLinkedInJobsURL();
     const fullContactNumber = `${config.countryCode}${config.contactNumber}`;
     
@@ -1182,20 +1185,21 @@ const LinkedInAutomationBot: React.FC = () => {
     addLog('📋 IMPORTANT: Make sure 2FA is disabled on your LinkedIn account', 'info');
     
     // Use comprehensive single prompt approach (proven to work better)
+    // INSTRUCTION: Use the LinkedIn password from the secret variable ln_password
     const comprehensivePrompt = createComprehensivePrompt(linkedinUrl);
 
+    // Pass the password via secrets, not in the prompt/config
     const taskConfig = {
       task: comprehensivePrompt,
+      secrets: config.linkedinPassword ? { ln_password: config.linkedinPassword } : undefined,
       save_browser_data: false,
       use_adblock: false,
       use_proxy: true,
       proxy_country_code: 'us' as const,
       highlight_elements: true,
-    
       max_agent_steps: Math.max(100, parseInt(config.targetCount) * 10), // 10 steps per application to stay within billing constraints
       llm_model: selectedModel,
       allowed_domains: ['linkedin.com', '*.linkedin.com'],
-      
     };
 
     addLog(`🚀 Starting LinkedIn automation with ${AI_MODELS[selectedModel].name} (${AI_MODELS[selectedModel].provider})`, 'success');
@@ -1219,7 +1223,7 @@ const LinkedInAutomationBot: React.FC = () => {
 
 STEP-BY-STEP PROCESS:
 1. Navigate directly to the job search URL: ${linkedinUrl}
-2. If you need to login, use the provided credentials (email: ${config.linkedinEmail}, password: ${config.linkedinPassword})
+2. If you need to login, use the provided credentials (email: ${config.linkedinEmail}, password: (use the value from the secret variable ln_password))
 3. After page loads, look for the left sidebar with job listings - if it's collapsed or missing, try clicking any "expand" or "menu" buttons
 4. Look for jobs with "Easy Apply" buttons in the job listings
 5. For each job with Easy Apply (continue until you reach ${config.targetCount} applications):
@@ -1299,13 +1303,13 @@ FORM HANDLING GUIDELINES:
 - For text fields asking "Why are you interested?", provide a brief, professional response based on the company/role
 
 LOGIN GUIDANCE:
-- If prompted to login, enter email: ${config.linkedinEmail} and password: ${config.linkedinPassword}
+- If prompted to login, enter email: ${config.linkedinEmail} and password: (use the value from the secret variable ln_password)
 - If already logged in, proceed directly to job applications
 - Don't get stuck on login verification - focus on the job application task
 
 CREDENTIALS:
 - Email: ${config.linkedinEmail}
-- Password: ${config.linkedinPassword}
+- Password: (use the value from the secret variable ln_password)
 - Country Code: ${config.countryCode.split('-')[0]}
 - Phone Number (without country code): ${config.contactNumber}
 - Resume to Use: ${config.linkedinResume || 'Most recent available'}
