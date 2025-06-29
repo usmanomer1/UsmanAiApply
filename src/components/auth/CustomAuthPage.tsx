@@ -226,7 +226,18 @@ export const CustomAuthPage: React.FC = () => {
           >
             <div className="flex items-center space-x-3 mb-8">
               <div className="p-3 bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg">
-                <Logo width={48} height={48} />
+                {/* Custom logo logic for auth page: use light.png in dark mode */}
+                {isDark ? (
+                  <img
+                    src="/images/logos/light.png"
+                    alt="Jobotic Logo"
+                    width={48}
+                    height={48}
+                    style={{ objectFit: 'contain', maxWidth: '100%', height: 'auto' }}
+                  />
+                ) : (
+                  <Logo width={48} height={48} />
+                )}
               </div>
               <div>
                 <h1 className="text-3xl font-bold text-white">Jobotic</h1>

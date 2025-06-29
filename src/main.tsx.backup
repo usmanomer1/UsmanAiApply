@@ -1,48 +1,43 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import * as Sentry from '@sentry/react'
-import { browserTracingIntegration } from '@sentry/react'
-import { replayIntegration } from '@sentry/replay'
 import App from './App.tsx'
 import './index.css'
 import { supabase } from './lib/supabase.ts'
 
-// Initialize Sentry in both development and production
-Sentry.init({
-  dsn: "https://a999c9b7652cf69f708de66b5f3acd54@o4509578673258496.ingest.us.sentry.io/4509580186157056",
-  integrations: [
-    browserTracingIntegration(),
-    replayIntegration({
-      maskAllText: false,
-      blockAllMedia: false,
-    }),
-  ],
-  tracesSampleRate: 0.2,
-  // Setting this option to true will send default PII data to Sentry.
-  sendDefaultPii: true,
-  // Enable debug mode in development
-  debug: import.meta.env.DEV,
-  // Set environment
-  environment: import.meta.env.DEV ? 'development' : 'production',
-  release: '2.0',
-});
+// Initialize Sentry only in production
+if (import.meta.env.PROD) {
+  Sentry.init({
+    dsn: import.meta.env.VITE_SENTRY_DSN,
+    integrations: [
+      Sentry.browserTracingIntegration(),
+    ],
+    // Set tracesSampleRate to 0.1 to capture 10% of the transactions for performance monitoring
+    tracesSampleRate: 0.1,
+    // Send default PII (personally identifiable information)
+    sendDefaultPii: true,
+    // Use release version from environment variable
+    release: import.meta.env.VITE_SENTRY_RELEASE,
+    environment: 'production',
+  })
 
-// Set user context from Supabase authentication
-const initializeUserContext = async () => {
-  try {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      Sentry.setUser({
-        id: user.id,
-        email: user.email,
-      })
+  // Set user context from Supabase authentication
+  const initializeUserContext = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        Sentry.setUser({
+          id: user.id,
+          email: user.email,
+        })
+      }
+    } catch (error) {
+      console.debug('Failed to set Sentry user context:', error)
     }
-  } catch (error) {
-    console.debug('Failed to set Sentry user context:', error)
   }
-}
 
-initializeUserContext()
+  initializeUserContext()
+}
 
 // Suppress common browser extension errors to reduce console noise
 const originalConsoleError = console.error;
@@ -143,24 +138,14 @@ const SentryFallback = ({ error, resetError }: { error: unknown; componentStack:
   </div>
 );
 
-// Wrap App component with Sentry Error Boundary
-const AppWithSentry = (
+// Wrap App component with Sentry Error Boundary only in production
+const AppWithSentry = import.meta.env.PROD ? (
   <Sentry.ErrorBoundary fallback={SentryFallback} showDialog>
     <App />
   </Sentry.ErrorBoundary>
+) : (
+  <App />
 );
-
-// Add Sentry to window type for TypeScript
-declare global {
-  interface Window {
-    Sentry: typeof Sentry;
-  }
-}
-
-// Expose Sentry globally for browser console testing
-if (typeof window !== "undefined") {
-  window.Sentry = Sentry;
-}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
