@@ -45,9 +45,12 @@ const CONFIGURATION_STEPS: VoiceGuideStep[] = [
     field: 'contactNumber',
     type: 'phone',
     validation: (value) => {
-      // Accept various phone number formats
-      const phoneRegex = /^[\+]?[\d\s\-\(\)]{7,20}$/;
-      return phoneRegex.test(value.trim());
+      // Accept various phone number formats - be very flexible
+      const cleaned = value.trim();
+      // Must contain at least 7 digits and only valid phone characters
+      const hasEnoughDigits = (cleaned.match(/\d/g) || []).length >= 7;
+      const onlyValidChars = /^[\+\d\s\-\(\)]+$/.test(cleaned);
+      return hasEnoughDigits && onlyValidChars && cleaned.length >= 7;
     }
   },
   {
@@ -115,6 +118,68 @@ const CONFIGURATION_STEPS: VoiceGuideStep[] = [
     type: 'text'
   }
 ];
+
+// Helper function to clean up speech recognition artifacts
+const cleanupSpeechInput = (input: string, stepType: string): string => {
+  let cleaned = input.trim();
+  
+  if (stepType === 'phone') {
+    // Convert spoken words to symbols and numbers for phone numbers
+    cleaned = cleaned
+      .replace(/\bplus\b/gi, '+')
+      .replace(/\bminus\b/gi, '-')
+      .replace(/\bdash\b/gi, '-')
+      .replace(/\bhyphen\b/gi, '-')
+      .replace(/\bopen paren\b/gi, '(')
+      .replace(/\bopen parenthesis\b/gi, '(')
+      .replace(/\bclose paren\b/gi, ')')
+      .replace(/\bclose parenthesis\b/gi, ')')
+      .replace(/\bleft paren\b/gi, '(')
+      .replace(/\bright paren\b/gi, ')')
+      .replace(/\bspace\b/gi, ' ')
+      .replace(/\bzero\b/gi, '0')
+      .replace(/\bone\b/gi, '1')
+      .replace(/\btwo\b/gi, '2')
+      .replace(/\bthree\b/gi, '3')
+      .replace(/\bfour\b/gi, '4')
+      .replace(/\bfive\b/gi, '5')
+      .replace(/\bsix\b/gi, '6')
+      .replace(/\bseven\b/gi, '7')
+      .replace(/\beight\b/gi, '8')
+      .replace(/\bnine\b/gi, '9');
+    
+    // Remove extra spaces between digits
+    cleaned = cleaned.replace(/(\d)\s+(\d)/g, '$1$2');
+    
+    // Clean up common phone number patterns
+    cleaned = cleaned
+      .replace(/\s*\+\s*/g, '+') // Clean up spaces around +
+      .replace(/\s*\(\s*/g, '(') // Clean up spaces around (
+      .replace(/\s*\)\s*/g, ')') // Clean up spaces around )
+      .replace(/\s*-\s*/g, '-')  // Clean up spaces around -
+      .replace(/\s{2,}/g, ' ')   // Replace multiple spaces with single space
+      .trim();
+  } else if (stepType === 'email') {
+    // Clean up email-related speech artifacts
+    cleaned = cleaned
+      .replace(/\bat symbol\b/gi, '@')
+      .replace(/\bat sign\b/gi, '@')
+      .replace(/\bat\b/gi, '@')
+      .replace(/\bdot\b/gi, '.')
+      .replace(/\bperiod\b/gi, '.')
+      .replace(/\bcom\b/gi, 'com')
+      .replace(/\borg\b/gi, 'org')
+      .replace(/\bnet\b/gi, 'net')
+      .replace(/\bedu\b/gi, 'edu')
+      .replace(/\s+/g, '') // Remove all spaces from email
+      .toLowerCase();
+  } else if (stepType === 'text' || stepType === 'textarea') {
+    // For text fields, just clean up extra spaces
+    cleaned = cleaned.replace(/\s{2,}/g, ' ').trim();
+  }
+  
+  return cleaned;
+};
 
 export const useLinkedInVoiceGuide = () => {
   const [isActive, setIsActive] = useState(false);
@@ -291,7 +356,10 @@ export const useLinkedInVoiceGuide = () => {
     const step = CONFIGURATION_STEPS[currentStepIndex];
     console.log(`DEBUG: Processing step ${currentStepIndex} (${step.id}), type: ${step.type}, field: ${step.field}, response: "${response}"`);
     
-    let processedResponse = response.trim();
+    // Clean up speech recognition artifacts based on step type
+    let processedResponse = cleanupSpeechInput(response.trim(), step.type);
+    console.log(`DEBUG: Cleaned response: "${processedResponse}"`);
+    
     let isValid = true;
     let validationMessage = '';
 
@@ -313,7 +381,7 @@ export const useLinkedInVoiceGuide = () => {
     // Apply validation if provided
     if (step.validation && !step.validation(processedResponse)) {
       isValid = false;
-      console.log(`DEBUG: Validation failed for step ${step.id} (${step.type})`);
+      console.log(`DEBUG: Validation failed for step ${step.id} (${step.type}) with processed response: "${processedResponse}"`);
       if (step.type === 'email') {
         validationMessage = 'Please provide a valid email address.';
       } else if (step.type === 'phone') {
@@ -323,6 +391,9 @@ export const useLinkedInVoiceGuide = () => {
       } else {
         validationMessage = 'Please provide a valid response.';
       }
+      console.log(`DEBUG: Validation message: ${validationMessage}`);
+    } else {
+      console.log(`DEBUG: Validation passed for step ${step.id} (${step.type}) with processed response: "${processedResponse}"`);
     }
 
     if (!isValid) {
@@ -357,11 +428,12 @@ export const useLinkedInVoiceGuide = () => {
     if (nextIndex < CONFIGURATION_STEPS.length) {
       setCurrentStepIndex(nextIndex);
       const nextStep = CONFIGURATION_STEPS[nextIndex];
-      console.log(`DEBUG: Moving to step ${nextIndex} (${nextStep.id})`);
+      console.log(`DEBUG: Moving to step ${nextIndex} (${nextStep.id}) - ${nextStep.type}`);
       const audioUrl = await speakMessage(nextStep.prompt);
       addMessage('assistant', nextStep.prompt, audioUrl || undefined);
     } else {
       // Configuration complete
+      console.log(`DEBUG: Voice guide completed successfully`);
       const completionMessage = "Perfect! Your LinkedIn automation setup is now complete. You can review your settings and start the automation whenever you're ready.";
       const audioUrl = await speakMessage(completionMessage);
       addMessage('assistant', completionMessage, audioUrl || undefined);
@@ -414,6 +486,7 @@ export const useLinkedInVoiceGuide = () => {
     setConfigData({});
     
     const welcomeStep = CONFIGURATION_STEPS[0];
+    console.log(`DEBUG: Starting voice guide with step 0 (${welcomeStep.id}) - ${welcomeStep.type}`);
     const audioUrl = await speakMessage(welcomeStep.prompt);
     addMessage('assistant', welcomeStep.prompt, audioUrl || undefined);
   }, [speakMessage, addMessage]);
