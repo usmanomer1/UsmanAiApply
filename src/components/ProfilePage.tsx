@@ -132,34 +132,62 @@ export const ProfilePage: React.FC = () => {
   };
 
   const handleSaveProfile = async () => {
-    if (!profile) return;
+    if (!formData.full_name.trim()) {
+      toast.error('Full name is required');
+      return;
+    }
 
     setSaving(true);
     try {
       if (isSupabaseConfigured() && user) {
-        const { error } = await supabase
-          .from('profiles')
-          .update({
+        let currentProfile = profile;
+        
+        if (!currentProfile) {
+          // Create new profile
+          console.log('No profile found, creating one...');
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert({
+              user_id: user.id,
+              full_name: formData.full_name,
+              phone: formData.phone || null,
+            })
+            .select()
+            .single();
+
+          if (createError) {
+            throw new Error(`Failed to create profile: ${createError.message}`);
+          }
+
+          currentProfile = newProfile;
+          setProfile(newProfile);
+          console.log('Profile created successfully:', newProfile.id);
+        } else {
+          // Update existing profile
+          const { error } = await supabase
+            .from('profiles')
+            .update({
+              full_name: formData.full_name,
+              phone: formData.phone || null,
+            })
+            .eq('id', currentProfile.id);
+
+          if (error) {
+            throw error;
+          }
+
+          setProfile(prev => prev ? {
+            ...prev,
             full_name: formData.full_name,
             phone: formData.phone || null,
-          })
-          .eq('id', profile.id);
-
-        if (error) {
-          throw error;
+          } : null);
         }
       }
 
-      setProfile(prev => prev ? {
-        ...prev,
-        full_name: formData.full_name,
-        phone: formData.phone || null,
-      } : null);
-
-      toast.success('Profile updated successfully');
+      toast.success('Profile saved successfully');
     } catch (error) {
-      console.error('Error updating profile:', error);
-      toast.error('Failed to update profile');
+      console.error('Error saving profile:', error);
+      toast.error('Failed to save profile');
     } finally {
       setSaving(false);
     }
@@ -167,11 +195,18 @@ export const ProfilePage: React.FC = () => {
 
   const handleResumeUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !profile) return;
+    if (!file) return;
 
-    // Validate file type
-    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-    if (!allowedTypes.includes(file.type)) {
+    // Enhanced file type validation
+    const allowedTypes = [
+      'application/pdf', 
+      'application/msword', 
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ];
+    const allowedExtensions = ['.pdf', '.doc', '.docx'];
+    const fileExtension = '.' + (file.name.split('.').pop() || '').toLowerCase();
+    
+    if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
       toast.error('Please upload a PDF or Word document');
       return;
     }
@@ -183,30 +218,71 @@ export const ProfilePage: React.FC = () => {
     }
 
     setUploading(true);
+    let uploadedPath: string | null = null;
+    
     try {
       if (isSupabaseConfigured() && user) {
-        const resumePath = await uploadResume(file, user.id);
-        if (!resumePath) {
-          throw new Error('Failed to upload resume');
+        // Create profile if it doesn't exist
+        let currentProfile = profile;
+        if (!currentProfile) {
+          console.log('No profile found, creating one...');
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert({
+              user_id: user.id,
+              full_name: user.user_metadata?.full_name || formData.full_name || 'User',
+              phone: formData.phone || null,
+            })
+            .select()
+            .single();
+
+          if (createError) {
+            throw new Error(`Failed to create profile: ${createError.message}`);
+          }
+
+          currentProfile = newProfile;
+          setProfile(newProfile);
+          console.log('Profile created successfully:', newProfile.id);
+        }
+
+        // Upload the file
+        uploadedPath = await uploadResume(file, user.id);
+        if (!uploadedPath) {
+          throw new Error('Failed to upload resume - no path returned');
         }
 
         // Update profile with resume URL
+        if (!currentProfile) {
+          throw new Error('Profile is required but not available');
+        }
+        
         const { error } = await supabase
           .from('profiles')
-          .update({ resume_url: resumePath })
-          .eq('id', profile.id);
+          .update({ resume_url: uploadedPath })
+          .eq('id', currentProfile.id);
 
         if (error) {
-          throw error;
+          // Rollback: delete the uploaded file since profile update failed
+          try {
+            await supabase.storage.from('resumes').remove([uploadedPath]);
+          } catch (rollbackError) {
+            console.error('Failed to rollback file upload:', rollbackError);
+          }
+          throw new Error(`Failed to update profile: ${error.message}`);
         }
 
         // Get signed URL for the uploaded resume
-        const signedUrl = await getSignedResumeUrl(resumePath);
-        setResumeUrl(signedUrl);
+        try {
+          const signedUrl = await getSignedResumeUrl(uploadedPath);
+          setResumeUrl(signedUrl);
+        } catch (urlError) {
+          console.warn('Failed to generate signed URL:', urlError);
+          // Don't fail the entire upload for this
+        }
 
         setProfile(prev => prev ? {
           ...prev,
-          resume_url: resumePath,
+          resume_url: uploadedPath,
         } : null);
       } else {
         toast.error('Resume upload not available - database not configured');
@@ -217,7 +293,9 @@ export const ProfilePage: React.FC = () => {
       toast.success('Resume uploaded successfully');
     } catch (error) {
       console.error('Error uploading resume:', error);
-      toast.error('Failed to upload resume');
+      // Show the actual error message for better debugging
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      toast.error(`Failed to upload resume: ${errorMessage}`);
     } finally {
       setUploading(false);
     }
