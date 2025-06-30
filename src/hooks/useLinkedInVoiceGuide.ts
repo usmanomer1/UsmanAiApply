@@ -43,7 +43,12 @@ const CONFIGURATION_STEPS: VoiceGuideStep[] = [
     title: 'Phone Number',
     prompt: "Perfect! Now let's add your phone number for job applications. This helps employers contact you directly. Please tell me your phone number, including the country code.",
     field: 'contactNumber',
-    type: 'phone'
+    type: 'phone',
+    validation: (value) => {
+      // Accept various phone number formats
+      const phoneRegex = /^[\+]?[\d\s\-\(\)]{7,20}$/;
+      return phoneRegex.test(value.trim());
+    }
   },
   {
     id: 'resume',
@@ -284,6 +289,8 @@ export const useLinkedInVoiceGuide = () => {
     
     // Validate and process response
     const step = CONFIGURATION_STEPS[currentStepIndex];
+    console.log(`DEBUG: Processing step ${currentStepIndex} (${step.id}), type: ${step.type}, field: ${step.field}, response: "${response}"`);
+    
     let processedResponse = response.trim();
     let isValid = true;
     let validationMessage = '';
@@ -306,8 +313,11 @@ export const useLinkedInVoiceGuide = () => {
     // Apply validation if provided
     if (step.validation && !step.validation(processedResponse)) {
       isValid = false;
+      console.log(`DEBUG: Validation failed for step ${step.id} (${step.type})`);
       if (step.type === 'email') {
         validationMessage = 'Please provide a valid email address.';
+      } else if (step.type === 'phone') {
+        validationMessage = 'Please provide a valid phone number with country code (e.g., +1 555-123-4567).';
       } else if (step.field === 'targetCount') {
         validationMessage = 'Please provide a valid number greater than 0.';
       } else {
@@ -320,6 +330,8 @@ export const useLinkedInVoiceGuide = () => {
       
       if (step.type === 'email') {
         retryMessage = `I need a valid email address. Please provide your LinkedIn email in the format like john@company.com`;
+      } else if (step.type === 'phone') {
+        retryMessage = `I need a valid phone number. Please provide your phone number with country code, like +1 555-123-4567 or +44 20 7946 0958`;
       } else if (step.field === 'targetCount') {
         retryMessage = `Please provide a valid number of applications, like 10 or 20.`;
       } else if (step.type === 'select' && step.options) {
@@ -328,6 +340,7 @@ export const useLinkedInVoiceGuide = () => {
         retryMessage = `${validationMessage} Could you please provide that information again?`;
       }
       
+      console.log(`DEBUG: Sending retry message: "${retryMessage}"`);
       const audioUrl = await speakMessage(retryMessage);
       addMessage('assistant', retryMessage, audioUrl || undefined);
       return; // Stay on the same step, don't advance
@@ -336,6 +349,7 @@ export const useLinkedInVoiceGuide = () => {
     // Save valid response
     if (step.field) {
       setConfigData(prev => ({ ...prev, [step.field]: processedResponse }));
+      console.log(`DEBUG: Saved ${step.field} = "${processedResponse}"`);
     }
 
     // Move to next step or complete
@@ -343,6 +357,7 @@ export const useLinkedInVoiceGuide = () => {
     if (nextIndex < CONFIGURATION_STEPS.length) {
       setCurrentStepIndex(nextIndex);
       const nextStep = CONFIGURATION_STEPS[nextIndex];
+      console.log(`DEBUG: Moving to step ${nextIndex} (${nextStep.id})`);
       const audioUrl = await speakMessage(nextStep.prompt);
       addMessage('assistant', nextStep.prompt, audioUrl || undefined);
     } else {
