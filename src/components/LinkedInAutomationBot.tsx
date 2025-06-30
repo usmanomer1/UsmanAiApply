@@ -38,7 +38,7 @@ import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import ConditionalBackground from './ui/ConditionalBackground';
-import LinkedInVoiceSetup from './voice/LinkedInVoiceSetup';
+
 import { extensionSuppressor } from '../lib/extensionSuppressor';
 import ExtensionErrorStatus from './ui/ExtensionErrorStatus';
 import UsageStatusDisplay from './ui/UsageStatusDisplay';
@@ -322,7 +322,7 @@ const LinkedInAutomationBot: React.FC = () => {
   const [monthlyUsage, setMonthlyUsage] = useState({ tokens_used: 0, ai_requests_used: 0, cost_usd: 0 });
   const [loading, setLoading] = useState(true);
   const [showConfigPanel, setShowConfigPanel] = useState(false);
-  const [showVoiceSetup, setShowVoiceSetup] = useState(false);
+
   const [showPaywall, setShowPaywall] = useState(false);
   const [accessCheckComplete, setAccessCheckComplete] = useState(false);
   
@@ -705,23 +705,7 @@ const LinkedInAutomationBot: React.FC = () => {
     }
   };
 
-  const handleVoiceConfigurationComplete = (voiceConfig: Record<string, string>) => {
-    // Update the main config with voice-configured data
-    setConfig(prev => ({
-      ...prev,
-      ...voiceConfig
-    }));
-    
-    // If voice config includes model selection, update it
-    if (voiceConfig.selectedModel && AI_MODELS[voiceConfig.selectedModel as keyof typeof AI_MODELS]) {
-      setSelectedModel(voiceConfig.selectedModel as keyof typeof AI_MODELS);
-    }
-    
-    // Save the configuration
-    saveConfiguration();
-    
-    toast.success('Voice configuration completed! Your settings have been saved.');
-  };
+
 
   const fetchUserSubscription = async () => {
     try {
@@ -1201,10 +1185,12 @@ const LinkedInAutomationBot: React.FC = () => {
     // Pass the password via secrets, not in the prompt/config
     const taskConfig = {
       task: comprehensivePrompt,
+      
       secrets: config.linkedinPassword ? { ln_password: config.linkedinPassword } : undefined,
       save_browser_data: false,
       use_adblock: false,
       use_proxy: true,
+      
       proxy_country_code: 'us' as const,
       highlight_elements: true,
       max_agent_steps: Math.max(100, parseInt(config.targetCount) * 10), // 10 steps per application to stay within billing constraints
@@ -2036,7 +2022,7 @@ This tracking is essential for saving your applications correctly.`;
       )}
 
       {/* Configuration Panel Toggle */}
-      <div className="flex justify-center gap-4 mb-8">
+      <div className="flex justify-center mb-8">
         <button
           onClick={() => setShowConfigPanel(!showConfigPanel)}
           className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
@@ -2052,15 +2038,6 @@ This tracking is essential for saving your applications correctly.`;
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           )}
-        </button>
-        
-        <button
-          onClick={() => setShowVoiceSetup(true)}
-          className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
-        >
-          <Mic className="w-5 h-5 mr-2" />
-          Voice-Guided Setup
-          <Sparkles className="w-4 h-4 ml-2" />
         </button>
       </div>
 
@@ -2226,16 +2203,6 @@ This tracking is essential for saving your applications correctly.`;
                 </div>
               </div>
               <div className="flex items-center space-x-3">
-                <button
-                  onClick={() => {
-                    setShowConfigPanel(false);
-                    setShowVoiceSetup(true);
-                  }}
-                  className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
-                >
-                  <Mic className="w-5 h-5 mr-2" />
-                  Voice Setup
-                </button>
                 <button
                   onClick={saveConfiguration}
                   className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
@@ -2909,14 +2876,7 @@ This tracking is essential for saving your applications correctly.`;
         </div>
       )}
 
-      {/* Voice Setup Modal */}
-      {showVoiceSetup && (
-        <LinkedInVoiceSetup
-          onConfigurationComplete={handleVoiceConfigurationComplete}
-          onClose={() => setShowVoiceSetup(false)}
-          initialConfig={config}
-        />
-      )}
+
       </div>
     </>
   );
