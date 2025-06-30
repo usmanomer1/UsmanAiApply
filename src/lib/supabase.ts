@@ -263,8 +263,16 @@ export const uploadResume = async (file: File, userId: string): Promise<string |
       throw new Error('Supabase not configured for file uploads');
     }
 
-    const fileExt = file.name.split('.').pop();
+    // Get file extension with fallback
+    const fileExt = file.name.split('.').pop() || 'pdf';
     const fileName = `${userId}/resume.${fileExt}`;
+
+    // Delete existing file first (if any) to ensure clean upload
+    const { error: deleteError } = await supabase.storage
+      .from('resumes')
+      .remove([fileName]);
+    
+    // Ignore delete errors (file might not exist)
 
     const { error: uploadError } = await supabase.storage
       .from('resumes')
@@ -273,13 +281,15 @@ export const uploadResume = async (file: File, userId: string): Promise<string |
       });
 
     if (uploadError) {
-      throw uploadError;
+      console.error('Supabase upload error:', uploadError);
+      throw new Error(`Upload failed: ${uploadError.message}`);
     }
 
     return fileName;
   } catch (error) {
     console.error('Error uploading resume:', error);
-    return null;
+    // Return the actual error message for better debugging
+    throw error;
   }
 };
 
