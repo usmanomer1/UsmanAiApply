@@ -16,7 +16,6 @@ import { CoverLetterTool } from './components/CoverLetterTool';
 import LinkedInAutomationBot from './components/LinkedInAutomationBot';
 import { SuccessPage } from './components/SuccessPage';
 import { ApplicationsPage } from './pages/ApplicationsPage';
-import InterviewPractice from './components/InterviewPractice';
 
 function BoltBadge() {
   const [isDark, setIsDark] = useState(false);
@@ -66,7 +65,6 @@ function App() {
                         <Route path="/dashboard" element={<DashboardHome />} />
                         <Route path="/auto-apply" element={<LinkedInAutomationBot />} />
                         <Route path="/applications" element={<ApplicationsPage />} />
-                        <Route path="/interview-practice" element={<InterviewPractice />} />
                         <Route path="/billing" element={<BillingPage />} />
                         <Route path="/profile" element={<ProfilePage />} />
                         <Route path="/resume" element={<ResumeTools />} />

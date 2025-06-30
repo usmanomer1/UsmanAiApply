@@ -855,31 +855,6 @@ export const DashboardHome: React.FC = () => {
           </Card>
         </Link>
 
-        <Link to="/interview-practice">
-          <Card className="premium-card hover-lift cursor-pointer group transition-all duration-300 hover:shadow-2xl hover:scale-105">
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Users className="w-6 h-6 text-white" />
-                </div>
-                                 <div className="flex-1">
-                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">CS Interview Practice</h3>
-                   <p className="text-sm text-gray-600 dark:text-gray-400">AI voice coaching for coding interviews</p>
-                   <div className="flex space-x-1 mt-1">
-                     <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
-                       Voice AI
-                     </Badge>
-                     <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                       Beta
-                     </Badge>
-                   </div>
-                 </div>
-                <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-purple-600 group-hover:translate-x-1 transition-all" />
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-
         <Link to="/resume">
           <Card className="premium-card hover-lift cursor-pointer group transition-all duration-300 hover:shadow-2xl hover:scale-105">
             <CardContent className="p-6">
