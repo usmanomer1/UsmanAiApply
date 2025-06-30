@@ -13,6 +13,7 @@ import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { getSubscriptionProducts } from '../../stripe-config';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../contexts/ThemeContext';
+import Turnstile from 'react-turnstile';
 
 type AuthMode = 'login' | 'signup' | 'forgot-password';
 
@@ -26,6 +27,7 @@ export const CustomAuthPage: React.FC = () => {
     password: '',
     fullName: '',
   });
+  const [captchaToken, setCaptchaToken] = useState("");
 
   const { signIn, signUp, user } = useAuth();
   const { isDark } = useTheme();
@@ -112,6 +114,10 @@ export const CustomAuthPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage(null);
+    if (!captchaToken) {
+      setMessage({ type: 'error', text: 'Please complete the CAPTCHA.' });
+      return;
+    }
     
     // Check if Supabase is configured
     if (!isSupabaseConfigured()) {
@@ -129,7 +135,7 @@ export const CustomAuthPage: React.FC = () => {
 
     try {
       if (authMode === 'login') {
-        await signIn(formData.email, formData.password);
+        await signIn(formData.email, formData.password, captchaToken);
         // handleAuthSuccess will be called by useEffect when user state updates
       } else if (authMode === 'signup') {
         // Disable signup during maintenance mode
@@ -137,11 +143,12 @@ export const CustomAuthPage: React.FC = () => {
           setMessage({ type: 'error', text: 'New registrations are temporarily disabled during maintenance.' });
           return;
         }
-        await signUp(formData.email, formData.password, formData.fullName);
+        await signUp(formData.email, formData.password, formData.fullName, captchaToken);
         // handleAuthSuccess will be called by useEffect when user state updates
       } else if (authMode === 'forgot-password') {
         const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
           redirectTo: `${window.location.origin}/auth${planParam ? `?plan=${planParam}` : ''}`,
+          captchaToken,
         });
         
         if (error) {
@@ -510,6 +517,12 @@ export const CustomAuthPage: React.FC = () => {
                     </button>
                   </div>
                 )}
+
+                <Turnstile
+                  sitekey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+                  onSuccess={setCaptchaToken}
+                  className="my-4"
+                />
 
                 <motion.div
                   whileHover={{ scale: 1.02 }}

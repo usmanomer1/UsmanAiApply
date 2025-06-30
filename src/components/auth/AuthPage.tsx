@@ -10,6 +10,7 @@ import { Logo } from '../ui/Logo';
 import { getMaintenanceConfig, canAccessDuringMaintenance } from '../../lib/maintenance';
 import Silk from '../ui/Silk';
 import { supabase } from '../../lib/supabase';
+import Turnstile from 'react-turnstile';
 
 type AuthMode = 'login' | 'signup' | 'forgot-password' | 'reset-password';
 
@@ -23,6 +24,7 @@ export const AuthPage: React.FC = () => {
     password: '',
     fullName: '',
   });
+  const [captchaToken, setCaptchaToken] = useState("");
 
   const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
@@ -55,6 +57,10 @@ export const AuthPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage(null);
+    if (!captchaToken) {
+      setMessage({ type: 'error', text: 'Please complete the CAPTCHA.' });
+      return;
+    }
     
     // Check maintenance mode for non-admin users
     if (!canAccessDuringMaintenance(formData.email)) {
@@ -66,17 +72,18 @@ export const AuthPage: React.FC = () => {
 
     try {
       if (authMode === 'login') {
-        await signIn(formData.email, formData.password);
+        await signIn(formData.email, formData.password, captchaToken);
       } else if (authMode === 'signup') {
         // Disable signup during maintenance mode
         if (isMaintenanceMode) {
           setMessage({ type: 'error', text: 'New registrations are temporarily disabled during maintenance.' });
           return;
         }
-        await signUp(formData.email, formData.password, formData.fullName);
+        await signUp(formData.email, formData.password, formData.fullName, captchaToken);
       } else if (authMode === 'forgot-password') {
         const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
           redirectTo: `${window.location.origin}/auth?mode=reset-password`,
+          captchaToken,
         });
         
         if (error) {
@@ -377,6 +384,12 @@ export const AuthPage: React.FC = () => {
                     </button>
                   </div>
                 )}
+
+                <Turnstile
+                  sitekey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+                  onSuccess={setCaptchaToken}
+                  className="my-4"
+                />
 
                 <motion.div
                   whileHover={{ scale: 1.02 }}
