@@ -352,6 +352,29 @@ export const useLinkedInVoiceGuide = () => {
       return;
     }
     
+    // Handle step navigation commands
+    if (lowerResponse.includes('go to phone') || lowerResponse.includes('phone step') || lowerResponse.includes('phone number step')) {
+      const phoneStepIndex = CONFIGURATION_STEPS.findIndex(step => step.id === 'phone');
+      if (phoneStepIndex !== -1) {
+        setCurrentStepIndex(phoneStepIndex);
+        const phoneStep = CONFIGURATION_STEPS[phoneStepIndex];
+        const jumpMessage = `Sure! Let's go to the phone number step. ${phoneStep.prompt}`;
+        const audioUrl = await speakMessage(jumpMessage);
+        addMessage('assistant', jumpMessage, audioUrl || undefined);
+        return;
+      }
+    }
+    
+    if (lowerResponse.includes('restart') || lowerResponse.includes('start over') || lowerResponse.includes('begin again')) {
+      setCurrentStepIndex(0);
+      setConfigData({});
+      const welcomeStep = CONFIGURATION_STEPS[0];
+      const restartMessage = `Okay, let's start over. ${welcomeStep.prompt}`;
+      const audioUrl = await speakMessage(restartMessage);
+      addMessage('assistant', restartMessage, audioUrl || undefined);
+      return;
+    }
+    
     // Validate and process response
     const step = CONFIGURATION_STEPS[currentStepIndex];
     console.log(`DEBUG: Processing step ${currentStepIndex} (${step.id}), type: ${step.type}, field: ${step.field}, response: "${response}"`);
