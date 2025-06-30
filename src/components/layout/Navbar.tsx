@@ -597,7 +597,7 @@ export const Navbar: React.FC = () => {
                     <Icon className="w-4 h-4" />
                     <span>{item.name}</span>
                     {item.badge && (
-                      <span className="absolute -top-0.5 -right-0.5 px-1.5 py-0.5 bg-gradient-to-r from-emerald-400 to-emerald-500 text-white text-xs font-bold rounded-full">
+                      <span className="ml-2 px-1.5 py-0.5 bg-gradient-to-r from-emerald-400 to-emerald-500 text-white text-xs font-bold rounded-full">
                         {item.badge}
                       </span>
                     )}
@@ -624,12 +624,12 @@ export const Navbar: React.FC = () => {
                 >
                   <Briefcase className="w-4 h-4" />
                   <span>Career Tools</span>
-                  <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isCareerToolsOpen ? 'rotate-180' : ''}`} />
                   {careerTools.some(tool => tool.badge) && (
-                    <span className="absolute -top-0.5 -right-0.5 px-1.5 py-0.5 bg-gradient-to-r from-emerald-400 to-emerald-500 text-white text-xs font-bold rounded-full">
+                    <span className="ml-2 px-1.5 py-0.5 bg-gradient-to-r from-emerald-400 to-emerald-500 text-white text-xs font-bold rounded-full">
                       AI
                     </span>
                   )}
+                  <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isCareerToolsOpen ? 'rotate-180' : ''}`} />
                   {careerTools.some(tool => location.pathname === tool.href) && (
                     <motion.div
                       layoutId="activeTab"
