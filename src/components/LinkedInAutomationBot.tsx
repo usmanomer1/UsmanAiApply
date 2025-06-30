@@ -1174,6 +1174,16 @@ const LinkedInAutomationBot: React.FC = () => {
       throw new Error('Browser client not initialized');
     }
 
+    // Stop previous task if running or paused
+    if (currentTask && (currentTask.status === 'running' || currentTask.status === 'paused')) {
+      try {
+        await browserClient.stopTask(currentTask.id);
+        addLog('⏹️ Stopped previous automation task before starting a new one', 'info');
+      } catch (err) {
+        addLog('⚠️ Failed to stop previous task (it may already be stopped)', 'info');
+      }
+    }
+
     // Always clear the browser profile before starting a new task for a new user
     await browserClient.clearBrowserProfile();
 

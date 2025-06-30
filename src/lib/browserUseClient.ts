@@ -12,6 +12,7 @@ export interface BrowserUseTaskConfig {
   max_agent_steps?: number;
   llm_model?: components['schemas']['LLMModel'];
   allowed_domains?: string[];
+  secrets?: { [key: string]: string } | null;
 }
 
 export interface TaskWithSession {
@@ -58,7 +59,7 @@ export class BrowserUseClient {
       max_agent_steps: config.max_agent_steps ?? 150,
       llm_model: config.llm_model ?? 'gpt-4o',
       allowed_domains: config.allowed_domains ?? ['linkedin.com', '*.linkedin.com'],
-      secrets: null,
+      secrets: config.secrets ?? null,
       structured_output_json: null,
       included_file_names: null
     };
