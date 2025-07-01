@@ -578,27 +578,29 @@ export const DashboardHome: React.FC = () => {
           )}
         </div>
         
-        <div className="flex flex-wrap items-center gap-3">
-          <Button 
-            onClick={fetchDashboardData} 
-            variant="outline" 
-            size="sm"
-            className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
-          <Button 
-            onClick={exportData} 
-            variant="outline" 
-            size="sm"
-            className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Export
-          </Button>
-          <Link to="/auto-apply">
-            <Button size="sm" className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="flex items-center gap-3">
+            <Button 
+              onClick={fetchDashboardData} 
+              variant="outline" 
+              size="sm"
+              className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all duration-200"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
+            </Button>
+            <Button 
+              onClick={exportData} 
+              variant="outline" 
+              size="sm"
+              className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all duration-200"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export
+            </Button>
+          </div>
+          <Link to="/auto-apply" className="w-full sm:w-auto">
+            <Button size="sm" className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200">
               <Zap className="w-4 h-4 mr-2" />
               Start Auto Apply
             </Button>
@@ -620,7 +622,7 @@ export const DashboardHome: React.FC = () => {
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Applications</p>
                 <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.totalApplications}</p>
               </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
                 <Target className="w-6 h-6 text-white" />
               </div>
             </div>
@@ -638,7 +640,7 @@ export const DashboardHome: React.FC = () => {
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Success Rate</p>
                 <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.successRate}%</p>
               </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
                 <BarChart3 className="w-6 h-6 text-white" />
               </div>
             </div>
@@ -656,7 +658,7 @@ export const DashboardHome: React.FC = () => {
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Jobs</p>
                 <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.activeJobs}</p>
               </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
                 <Users className="w-6 h-6 text-white" />
               </div>
             </div>
@@ -674,7 +676,7 @@ export const DashboardHome: React.FC = () => {
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Tokens Remaining</p>
                 <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.tokensRemaining}</p>
               </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center shadow-lg">
                 <Bot className="w-6 h-6 text-white" />
               </div>
             </div>
@@ -842,52 +844,52 @@ export const DashboardHome: React.FC = () => {
         transition={{ delay: 0.3 }}
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
       >
-        <Link to="/auto-apply">
-          <Card className="premium-card hover-lift cursor-pointer group transition-all duration-300 hover:shadow-2xl hover:scale-105">
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+        <Link to="/auto-apply" className="block h-full">
+          <Card className="premium-card hover-lift cursor-pointer group transition-all duration-300 hover:shadow-2xl hover:scale-105 h-full">
+            <CardContent className="p-6 h-full flex items-center">
+              <div className="flex items-center space-x-4 w-full">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
                   <Bot className="w-6 h-6 text-white" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Start Auto Apply</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">Start Auto Apply</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Begin automated job applications</p>
                 </div>
-                <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
+                <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all duration-300" />
               </div>
             </CardContent>
           </Card>
         </Link>
 
-        <Link to="/resume">
-          <Card className="premium-card hover-lift cursor-pointer group transition-all duration-300 hover:shadow-2xl hover:scale-105">
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-emerald-600 to-teal-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+        <Link to="/resume" className="block h-full">
+          <Card className="premium-card hover-lift cursor-pointer group transition-all duration-300 hover:shadow-2xl hover:scale-105 h-full">
+            <CardContent className="p-6 h-full flex items-center">
+              <div className="flex items-center space-x-4 w-full">
+                <div className="w-12 h-12 bg-gradient-to-br from-emerald-600 to-teal-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
                   <FileText className="w-6 h-6 text-white" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Optimize Resume</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">Optimize Resume</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">AI-powered resume analysis</p>
                 </div>
-                <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all" />
+                <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-emerald-600 group-hover:translate-x-1 transition-all duration-300" />
               </div>
             </CardContent>
           </Card>
         </Link>
 
-        <Link to="/cover-letter">
-          <Card className="premium-card hover-lift cursor-pointer group transition-all duration-300 hover:shadow-2xl hover:scale-105">
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-orange-600 to-pink-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+        <Link to="/cover-letter" className="block h-full">
+          <Card className="premium-card hover-lift cursor-pointer group transition-all duration-300 hover:shadow-2xl hover:scale-105 h-full">
+            <CardContent className="p-6 h-full flex items-center">
+              <div className="flex items-center space-x-4 w-full">
+                <div className="w-12 h-12 bg-gradient-to-br from-orange-600 to-pink-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
                   <FileText className="w-6 h-6 text-white" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Generate Cover Letter</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">Generate Cover Letter</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Create personalized letters</p>
                 </div>
-                <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-orange-600 group-hover:translate-x-1 transition-all" />
+                <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-orange-600 group-hover:translate-x-1 transition-all duration-300" />
               </div>
             </CardContent>
           </Card>
@@ -909,20 +911,20 @@ export const DashboardHome: React.FC = () => {
                   Recent job applications and their status
                 </CardDescription>
               </div>
-              <div className="flex items-center space-x-3">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                 <Button 
                   onClick={() => setIsAddModalOpen(true)}
                   size="sm"
-                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Add Application
                 </Button>
-                <Link to="/applications">
+                <Link to="/applications" className="w-full sm:w-auto">
                   <Button 
                     variant="outline" 
                     size="sm"
-                    className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"
+                    className="w-full sm:w-auto border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all duration-200"
                   >
                     <Eye className="w-4 h-4 mr-2" />
                     View All
@@ -988,10 +990,10 @@ export const DashboardHome: React.FC = () => {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.1 }}
-                    className="flex items-center justify-between p-4 glass-card rounded-xl hover:shadow-lg transition-all duration-200"
+                    className="flex items-center justify-between p-5 glass-card rounded-xl hover:shadow-lg transition-all duration-200 border border-gray-200/50 dark:border-gray-700/50"
                   >
                     <div className="flex items-center space-x-4">
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-800 dark:to-blue-700 rounded-xl flex items-center justify-center">
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-800 dark:to-blue-700 rounded-xl flex items-center justify-center shadow-sm">
                         <Building className="w-6 h-6 text-blue-600 dark:text-blue-300" />
                       </div>
                       <div>
@@ -1024,11 +1026,11 @@ export const DashboardHome: React.FC = () => {
                 ))}
                 
                 {filteredApplications.length > 0 && (
-                  <div className="text-center pt-4">
+                  <div className="text-center pt-6">
                     <Link to="/applications">
                       <Button 
                         variant="outline"
-                        className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"
+                        className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white shadow-sm hover:shadow-md transition-all duration-200"
                       >
                         View All Applications
                         <ArrowRight className="w-4 h-4 ml-2" />
