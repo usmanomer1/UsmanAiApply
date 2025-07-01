@@ -120,15 +120,17 @@ export const Navbar: React.FC = () => {
     fetchUserSubscription();
     checkSupabaseConnection();
     
-    // Load notifications from Supabase immediately
-    if (user && isSupabaseConfigured()) {
-      loadNotificationsFromSupabase().then(setNotifications);
+    // Load notifications - prioritize Supabase if configured
+    if (user) {
+      loadAndMergeNotifications();
     }
     
-    fetchNotifications();
-    
     // Set up real-time notifications
-    const interval = setInterval(fetchNotifications, 30000); // Check every 30 seconds
+    const interval = setInterval(() => {
+      if (user) {
+        loadAndMergeNotifications();
+      }
+    }, 30000); // Check every 30 seconds
     
     return () => clearInterval(interval);
   }, [user]);
@@ -290,10 +292,14 @@ export const Navbar: React.FC = () => {
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
-        .limit(20);
+        .limit(50); // Increased limit to show more notifications
 
       if (error) {
         console.error('Error loading notifications:', error);
+        return [];
+      }
+
+      if (!data) {
         return [];
       }
 
@@ -303,9 +309,9 @@ export const Navbar: React.FC = () => {
         message: notification.message,
         type: notification.type as 'success' | 'info' | 'warning' | 'error',
         time: getTimeAgo(new Date(notification.created_at)),
-        read: notification.read,
+        read: notification.read, // This preserves the read status from Supabase
         icon: getIconComponent(notification.icon_name),
-        data: notification.data
+        data: notification.data || {}
       }));
     } catch (error) {
       console.error('Error loading notifications:', error);
@@ -361,7 +367,8 @@ export const Navbar: React.FC = () => {
     }
   };
 
-  const fetchNotifications = async () => {
+  // New unified function to load and merge notifications
+  const loadAndMergeNotifications = async () => {
     try {
       if (!isSupabaseConfigured() || !user) {
         // Use demo notifications if not configured
@@ -379,58 +386,58 @@ export const Navbar: React.FC = () => {
         return;
       }
 
-      const realNotifications: Notification[] = [];
+      // First, load existing notifications from Supabase
+      const existingNotifications = await loadNotificationsFromSupabase();
+      
+      // For real-time updates, we'll only check for new activities
+      // and add them if they don't already exist
+      const newActivities: Notification[] = [];
 
-      // Fetch recent automation tasks
+      // Fetch recent automation tasks (only check last hour to avoid duplicates)
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
       const { data: automationTasks } = await supabase
         .from('automation_tasks')
         .select('*')
         .eq('user_id', user.id)
+        .gte('created_at', oneHourAgo)
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(3);
 
       if (automationTasks) {
         automationTasks.forEach(task => {
-          const timeAgo = getTimeAgo(new Date(task.created_at));
-          
-          if (task.status === 'completed') {
-            realNotifications.push({
-              id: `task-${task.id}`,
-              title: 'Automation Completed',
-              message: `${task.task_type} task finished successfully`,
-              type: 'success',
-              time: timeAgo,
-              read: false,
-              icon: CheckCircle,
-              data: { taskId: task.task_id, type: task.task_type }
-            });
-          } else if (task.status === 'failed') {
-            realNotifications.push({
-              id: `task-${task.id}`,
-              title: 'Automation Failed',
-              message: task.error_message || 'Task encountered an error',
-              type: 'error',
-              time: timeAgo,
-              read: false,
-              icon: AlertCircle,
-              data: { taskId: task.task_id, error: task.error_message }
-            });
-          } else if (task.status === 'running') {
-            realNotifications.push({
-              id: `task-${task.id}`,
-              title: 'Automation Running',
-              message: `${task.task_type} task is in progress`,
-              type: 'info',
-              time: timeAgo,
-              read: false,
-              icon: Clock,
-              data: { taskId: task.task_id, type: task.task_type }
-            });
+          const activityId = `task-${task.id}`;
+          // Only add if not already in existing notifications
+          if (!existingNotifications.find(n => n.id === activityId)) {
+            const timeAgo = getTimeAgo(new Date(task.created_at));
+            
+            if (task.status === 'completed') {
+              newActivities.push({
+                id: activityId,
+                title: 'Automation Completed',
+                message: `${task.task_type} task finished successfully`,
+                type: 'success',
+                time: timeAgo,
+                read: false,
+                icon: CheckCircle,
+                data: { taskId: task.task_id, type: task.task_type }
+              });
+            } else if (task.status === 'failed') {
+              newActivities.push({
+                id: activityId,
+                title: 'Automation Failed',
+                message: task.error_message || 'Task encountered an error',
+                type: 'error',
+                time: timeAgo,
+                read: false,
+                icon: AlertCircle,
+                data: { taskId: task.task_id, error: task.error_message }
+              });
+            }
           }
         });
       }
 
-      // Fetch recent applications
+      // Fetch recent applications (only check last hour)
       const { data: recentApplications } = await supabase
         .from('applications')
         .select(`
@@ -440,135 +447,42 @@ export const Navbar: React.FC = () => {
           )
         `)
         .eq('job_campaigns.profiles.user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(3);
-
-      if (recentApplications) {
-        recentApplications.forEach(app => {
-          const timeAgo = getTimeAgo(new Date(app.created_at));
-          
-          realNotifications.push({
-            id: `app-${app.id}`,
-            title: 'Job Application Submitted',
-            message: `Applied to ${app.role || 'position'} at ${app.company || 'company'}`,
-            type: 'success',
-            time: timeAgo,
-            read: false,
-            icon: Send,
-            data: { applicationId: app.id, company: app.company, role: app.role }
-          });
-        });
-      }
-
-      // Check token usage and add warnings if needed
-      const { data: tokenUsage } = await supabase.rpc('get_user_monthly_ai_tokens', {
-        user_uuid: user.id,
-        target_date: new Date().toISOString().split('T')[0]
-      });
-
-      if (tokenUsage) {
-        const result = Array.isArray(tokenUsage) ? tokenUsage[0] : tokenUsage;
-        const totalTokens = Number(result?.total_tokens) || 0;
-        const usagePercentage = (totalTokens / 150000) * 100; // 150k monthly limit
-
-        if (usagePercentage >= 90) {
-          realNotifications.unshift({
-            id: 'token-warning-critical',
-            title: 'Token Limit Critical',
-            message: 'You\'ve used 90% of your monthly AI tokens',
-            type: 'error',
-            time: 'Now',
-            read: false,
-            icon: AlertTriangle
-          });
-        } else if (usagePercentage >= 75) {
-          realNotifications.unshift({
-            id: 'token-warning',
-            title: 'Token Usage High',
-            message: 'You\'ve used 75% of your monthly AI tokens',
-            type: 'warning',
-            time: 'Now',
-            read: false,
-            icon: AlertCircle
-          });
-        }
-      }
-
-      // Check browser use logs for recent activity
-      const { data: browserLogs } = await supabase
-        .from('browser_use_logs')
-        .select('*')
-        .eq('user_id', user.id)
+        .gte('created_at', oneHourAgo)
         .order('created_at', { ascending: false })
         .limit(2);
 
-      if (browserLogs) {
-        browserLogs.forEach(log => {
-          const timeAgo = getTimeAgo(new Date(log.created_at));
-          
-          realNotifications.push({
-            id: `browser-${log.id}`,
-            title: 'Automation Activity',
-            message: `${log.step_count} automation steps completed`,
-            type: 'info',
-            time: timeAgo,
-            read: false,
-            icon: Bot,
-            data: { stepCount: log.step_count, cost: log.cost_usd }
-          });
+      if (recentApplications) {
+        recentApplications.forEach(app => {
+          const activityId = `app-${app.id}`;
+          // Only add if not already in existing notifications
+          if (!existingNotifications.find(n => n.id === activityId)) {
+            const timeAgo = getTimeAgo(new Date(app.created_at));
+            
+            newActivities.push({
+              id: activityId,
+              title: 'Job Application Submitted',
+              message: `Applied to ${app.role || 'position'} at ${app.company || 'company'}`,
+              type: 'success',
+              time: timeAgo,
+              read: false,
+              icon: Send,
+              data: { applicationId: app.id, company: app.company, role: app.role }
+            });
+          }
         });
       }
 
-      // Sort by time and limit to 10 most recent
-      realNotifications.sort((a, b) => {
-        const timeA = parseTimeAgo(a.time);
-        const timeB = parseTimeAgo(b.time);
-        return timeA - timeB;
-      });
-
-      // Save new notifications to Supabase and merge with existing ones
-      if (isSupabaseConfigured() && user) {
-        // Load existing notifications from Supabase
-        const existingNotifications = await loadNotificationsFromSupabase();
-        const existingIds = new Set(existingNotifications.map(n => n.id));
-        
-        // Save only new notifications to Supabase
-        const newNotifications: Notification[] = [];
-        for (const notification of realNotifications) {
-          // Check if this is a new notification (not already in Supabase)
-          const existingMatch = existingNotifications.find(existing => 
-            existing.title === notification.title && 
-            existing.message === notification.message &&
-            Math.abs(parseTimeAgo(existing.time) - parseTimeAgo(notification.time)) < 300 // Within 5 minutes
-          );
-          
-          if (!existingMatch) {
-            const savedNotification = await saveNotificationToSupabase(notification);
-            if (savedNotification) {
-              newNotifications.push({
-                id: savedNotification.id,
-                title: savedNotification.title,
-                message: savedNotification.message,
-                type: savedNotification.type as 'success' | 'info' | 'warning' | 'error',
-                time: getTimeAgo(new Date(savedNotification.created_at)),
-                read: savedNotification.read,
-                icon: getIconComponent(savedNotification.icon_name),
-                data: savedNotification.data
-              });
-            }
-          }
-        }
-        
-        // Reload all notifications from Supabase to get the complete list
-        const allNotifications = await loadNotificationsFromSupabase();
-        setNotifications(allNotifications);
-      } else {
-        // Fallback for when Supabase is not configured
-        setNotifications(realNotifications.slice(0, 15));
+      // Save new activities to Supabase
+      for (const activity of newActivities) {
+        await saveNotificationToSupabase(activity);
       }
 
+      // Reload all notifications from Supabase to get the complete, up-to-date list
+      const allNotifications = await loadNotificationsFromSupabase();
+      setNotifications(allNotifications);
+
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      console.error('Error loading notifications:', error);
       // Fallback to demo notification
       setNotifications([
         {
@@ -629,75 +543,75 @@ export const Navbar: React.FC = () => {
   };
 
   const markNotificationAsRead = async (id: string) => {
-    // Update UI immediately
-    setNotifications(prev => 
-      prev.map(notification => 
-        notification.id === id 
-          ? { ...notification, read: true }
-          : notification
-      )
-    );
-
-    // Update in Supabase
+    // Update in Supabase first
     if (isSupabaseConfigured() && user) {
       try {
         const { error } = await supabase
           .from('notifications')
-          .update({ read: true })
+          .update({ read: true, updated_at: new Date().toISOString() })
           .eq('id', id)
           .eq('user_id', user.id);
 
         if (error) {
           console.error('Error marking notification as read:', error);
-          // Revert UI change if Supabase update failed
-          setNotifications(prev => 
-            prev.map(notification => 
-              notification.id === id 
-                ? { ...notification, read: false }
-                : notification
-            )
-          );
+          return;
         }
+        
+        // Update UI after successful Supabase update
+        setNotifications(prev => 
+          prev.map(notification => 
+            notification.id === id 
+              ? { ...notification, read: true }
+              : notification
+          )
+        );
       } catch (error) {
         console.error('Error marking notification as read:', error);
       }
+    } else {
+      // Fallback for demo mode - update UI only
+      setNotifications(prev => 
+        prev.map(notification => 
+          notification.id === id 
+            ? { ...notification, read: true }
+            : notification
+        )
+      );
     }
   };
 
   const markAllNotificationsAsRead = async () => {
-    // Update UI immediately
-    setNotifications(prev => 
-      prev.map(notification => ({ ...notification, read: true }))
-    );
-
-    // Update in Supabase
+    // Update in Supabase first
     if (isSupabaseConfigured() && user) {
       try {
         const { error } = await supabase
           .from('notifications')
-          .update({ read: true })
+          .update({ read: true, updated_at: new Date().toISOString() })
           .eq('user_id', user.id)
           .eq('read', false);
 
         if (error) {
           console.error('Error marking all notifications as read:', error);
-          // Reload notifications from Supabase if bulk update failed
-          const freshNotifications = await loadNotificationsFromSupabase();
-          setNotifications(freshNotifications);
+          return;
         }
+        
+        // Update UI after successful Supabase update
+        setNotifications(prev => 
+          prev.map(notification => ({ ...notification, read: true }))
+        );
       } catch (error) {
         console.error('Error marking all notifications as read:', error);
       }
+    } else {
+      // Fallback for demo mode - update UI only
+      setNotifications(prev => 
+        prev.map(notification => ({ ...notification, read: true }))
+      );
     }
   };
 
   const clearNotification = async (id: string) => {
-    // Update UI immediately
-    setNotifications(prev => 
-      prev.filter(notification => notification.id !== id)
-    );
-
-    // Delete from Supabase
+    // Delete from Supabase first
     if (isSupabaseConfigured() && user) {
       try {
         const { error } = await supabase
@@ -708,13 +622,21 @@ export const Navbar: React.FC = () => {
 
         if (error) {
           console.error('Error deleting notification:', error);
-          // Reload notifications from Supabase if delete failed
-          const freshNotifications = await loadNotificationsFromSupabase();
-          setNotifications(freshNotifications);
+          return;
         }
+        
+        // Update UI after successful Supabase deletion
+        setNotifications(prev => 
+          prev.filter(notification => notification.id !== id)
+        );
       } catch (error) {
         console.error('Error deleting notification:', error);
       }
+    } else {
+      // Fallback for demo mode - update UI only
+      setNotifications(prev => 
+        prev.filter(notification => notification.id !== id)
+      );
     }
   };
 
@@ -1012,7 +934,7 @@ export const Navbar: React.FC = () => {
                       {notifications.length > 0 && (
                         <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700">
                           <button 
-                            onClick={fetchNotifications}
+                            onClick={loadAndMergeNotifications}
                             className="w-full text-center text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
                           >
                             Refresh notifications
