@@ -142,6 +142,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password,
         options: {
           data: {
+            name: fullName,
             full_name: fullName,
           },
           ...(captchaToken ? { captchaToken } : {}),

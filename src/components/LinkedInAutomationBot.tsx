@@ -329,6 +329,9 @@ const LinkedInAutomationBot: React.FC = () => {
   // Browser client state (no session management)
   const [browserClient, setBrowserClient] = useState<BrowserUseClient | null>(null);
 
+  // Add state for dropdown
+  const [showImportantInstructions, setShowImportantInstructions] = useState(false);
+
   const isSupabaseConfigured = () => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -2041,6 +2044,43 @@ This tracking is essential for saving your applications correctly.`;
         </button>
       </div>
 
+      {/* Important Instructions Dropdown */}
+      <div className="flex justify-center mb-8">
+        <button
+          onClick={() => setShowImportantInstructions((prev) => !prev)}
+          className={`inline-flex items-center px-8 py-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 border-2 border-amber-600 ${showImportantInstructions ? 'ring-4 ring-amber-300/40' : ''}`}
+        >
+          <AlertCircle className="w-6 h-6 mr-3 text-white animate-pulse" />
+          IMPORTANT: You MUST read these instructions before using the AI Agent
+          <svg className={`w-5 h-5 ml-3 transition-transform duration-200 ${showImportantInstructions ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      </div>
+      {showImportantInstructions && (
+        <div className="mb-8 mx-auto max-w-2xl p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl shadow flex items-start space-x-4">
+          <div className="p-2 bg-blue-100 dark:bg-blue-800 rounded-lg">
+            <AlertCircle className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div>
+            <p className="text-base font-semibold text-blue-800 dark:text-blue-200 mb-2">
+              Important Instructions for LinkedIn Automation
+            </p>
+            <ul className="list-disc pl-5 text-sm text-blue-700 dark:text-blue-100 space-y-2">
+              <li>
+                <strong>After entering your email and password, stay on the browser preview.</strong> If you see any verification, CAPTCHA, or 2FA prompt, <span className="font-bold text-blue-900 dark:text-white">immediately press the <span className='underline'>Pause</span> button</span> in our UI. <br/>
+                <span className="text-blue-900 dark:text-blue-200">If you do not press Pause, the AI agent will automatically shut down to save your credits, as it cannot bypass these security checks.</span> <br/>
+                Once you complete the verification manually in the browser preview, press <span className='underline'>Resume</span> to continue automation.
+              </li>
+              <li>
+                <strong>Resume Upload:</strong> To save your credits, our AI agent <span className="font-bold">does NOT upload your resume for you</span>. <br/>
+                <span className="text-blue-900 dark:text-blue-200">You must upload your resume to LinkedIn yourself. When prompted for the resume name in the AI Agent configuration panel, enter the <span className='underline'>exact name</span> of your resume as it appears on LinkedIn. The agent will use the resume with that exact name for job applications.</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      )}
+
             {/* AI Model Selection - Minimalistic Dropdown */}
       <div className="glass-card rounded-xl p-6">
         {/* Dropdown Header */}
@@ -2875,7 +2915,6 @@ This tracking is essential for saving your applications correctly.`;
           </div>
         </div>
       )}
-
 
       </div>
     </>
