@@ -76,6 +76,7 @@ interface NewApplicationData {
   role: string;
   status: string;
   location: string;
+  url: string;
 }
 
 export const DashboardHome: React.FC = () => {
@@ -101,7 +102,8 @@ export const DashboardHome: React.FC = () => {
     company: '',
     role: '',
     status: 'SENT',
-    location: ''
+    location: '',
+    url: ''
   });
 
   const isSupabaseConfigured = () => {
@@ -464,7 +466,8 @@ export const DashboardHome: React.FC = () => {
           applied_at: new Date().toISOString(),
           details: {
             location: newApplication.location.trim() || null,
-            source: 'manual'
+            source: 'manual',
+            url: newApplication.url.trim() || null
           }
         });
 
@@ -477,7 +480,8 @@ export const DashboardHome: React.FC = () => {
         company: '',
         role: '',
         status: 'SENT',
-        location: ''
+        location: '',
+        url: ''
       });
       setIsAddModalOpen(false);
       
@@ -1113,6 +1117,18 @@ export const DashboardHome: React.FC = () => {
                   className="premium-input"
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Job URL (Optional)
+              </label>
+              <Input
+                placeholder="https://linkedin.com/jobs/view/..."
+                value={newApplication.url}
+                onChange={(e) => setNewApplication(prev => ({ ...prev, url: e.target.value }))}
+                className="premium-input"
+              />
             </div>
 
 

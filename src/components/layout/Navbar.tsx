@@ -119,6 +119,12 @@ export const Navbar: React.FC = () => {
   useEffect(() => {
     fetchUserSubscription();
     checkSupabaseConnection();
+    
+    // Load notifications from Supabase immediately
+    if (user && isSupabaseConfigured()) {
+      loadNotificationsFromSupabase().then(setNotifications);
+    }
+    
     fetchNotifications();
     
     // Set up real-time notifications
@@ -207,6 +213,104 @@ export const Navbar: React.FC = () => {
       supabaseUrl.includes('.supabase.co') &&
       supabaseKey.length > 50
     );
+  };
+
+  // Helper function to get icon component from name
+  const getIconComponent = (iconName: string) => {
+    const iconMap: { [key: string]: React.ComponentType<{ className?: string }> } = {
+      CheckCircle,
+      AlertCircle,
+      Clock,
+      Send,
+      AlertTriangle,
+      Bot,
+      Info,
+      Building,
+      Briefcase,
+      TrendingUp
+    };
+    
+    return iconMap[iconName] || CheckCircle;
+  };
+
+  // Helper function to get icon name from component
+  const getIconName = (IconComponent: React.ComponentType<any>): string => {
+    const iconNameMap = new Map([
+      [CheckCircle, 'CheckCircle'],
+      [AlertCircle, 'AlertCircle'],
+      [Clock, 'Clock'],
+      [Send, 'Send'],
+      [AlertTriangle, 'AlertTriangle'],
+      [Bot, 'Bot'],
+      [Info, 'Info'],
+      [Building, 'Building'],
+      [Briefcase, 'Briefcase'],
+      [TrendingUp, 'TrendingUp']
+    ]);
+    
+    return iconNameMap.get(IconComponent) || 'CheckCircle';
+  };
+
+  // Supabase notification functions
+  const saveNotificationToSupabase = async (notification: Omit<Notification, 'id' | 'read'>) => {
+    if (!isSupabaseConfigured() || !user) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: user.id,
+          title: notification.title,
+          message: notification.message,
+          type: notification.type,
+          icon_name: getIconName(notification.icon),
+          data: notification.data || {}
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error saving notification:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error saving notification:', error);
+      return null;
+    }
+  };
+
+  const loadNotificationsFromSupabase = async (): Promise<Notification[]> => {
+    if (!isSupabaseConfigured() || !user) return [];
+
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (error) {
+        console.error('Error loading notifications:', error);
+        return [];
+      }
+
+      return data.map(notification => ({
+        id: notification.id,
+        title: notification.title,
+        message: notification.message,
+        type: notification.type as 'success' | 'info' | 'warning' | 'error',
+        time: getTimeAgo(new Date(notification.created_at)),
+        read: notification.read,
+        icon: getIconComponent(notification.icon_name),
+        data: notification.data
+      }));
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+      return [];
+    }
   };
 
   const checkSupabaseConnection = () => {
@@ -422,7 +526,46 @@ export const Navbar: React.FC = () => {
         return timeA - timeB;
       });
 
-      setNotifications(realNotifications.slice(0, 10));
+      // Save new notifications to Supabase and merge with existing ones
+      if (isSupabaseConfigured() && user) {
+        // Load existing notifications from Supabase
+        const existingNotifications = await loadNotificationsFromSupabase();
+        const existingIds = new Set(existingNotifications.map(n => n.id));
+        
+        // Save only new notifications to Supabase
+        const newNotifications: Notification[] = [];
+        for (const notification of realNotifications) {
+          // Check if this is a new notification (not already in Supabase)
+          const existingMatch = existingNotifications.find(existing => 
+            existing.title === notification.title && 
+            existing.message === notification.message &&
+            Math.abs(parseTimeAgo(existing.time) - parseTimeAgo(notification.time)) < 300 // Within 5 minutes
+          );
+          
+          if (!existingMatch) {
+            const savedNotification = await saveNotificationToSupabase(notification);
+            if (savedNotification) {
+              newNotifications.push({
+                id: savedNotification.id,
+                title: savedNotification.title,
+                message: savedNotification.message,
+                type: savedNotification.type as 'success' | 'info' | 'warning' | 'error',
+                time: getTimeAgo(new Date(savedNotification.created_at)),
+                read: savedNotification.read,
+                icon: getIconComponent(savedNotification.icon_name),
+                data: savedNotification.data
+              });
+            }
+          }
+        }
+        
+        // Reload all notifications from Supabase to get the complete list
+        const allNotifications = await loadNotificationsFromSupabase();
+        setNotifications(allNotifications);
+      } else {
+        // Fallback for when Supabase is not configured
+        setNotifications(realNotifications.slice(0, 15));
+      }
 
     } catch (error) {
       console.error('Error fetching notifications:', error);
@@ -485,7 +628,8 @@ export const Navbar: React.FC = () => {
     }
   };
 
-  const markNotificationAsRead = (id: string) => {
+  const markNotificationAsRead = async (id: string) => {
+    // Update UI immediately
     setNotifications(prev => 
       prev.map(notification => 
         notification.id === id 
@@ -493,18 +637,85 @@ export const Navbar: React.FC = () => {
           : notification
       )
     );
+
+    // Update in Supabase
+    if (isSupabaseConfigured() && user) {
+      try {
+        const { error } = await supabase
+          .from('notifications')
+          .update({ read: true })
+          .eq('id', id)
+          .eq('user_id', user.id);
+
+        if (error) {
+          console.error('Error marking notification as read:', error);
+          // Revert UI change if Supabase update failed
+          setNotifications(prev => 
+            prev.map(notification => 
+              notification.id === id 
+                ? { ...notification, read: false }
+                : notification
+            )
+          );
+        }
+      } catch (error) {
+        console.error('Error marking notification as read:', error);
+      }
+    }
   };
 
-  const markAllNotificationsAsRead = () => {
+  const markAllNotificationsAsRead = async () => {
+    // Update UI immediately
     setNotifications(prev => 
       prev.map(notification => ({ ...notification, read: true }))
     );
+
+    // Update in Supabase
+    if (isSupabaseConfigured() && user) {
+      try {
+        const { error } = await supabase
+          .from('notifications')
+          .update({ read: true })
+          .eq('user_id', user.id)
+          .eq('read', false);
+
+        if (error) {
+          console.error('Error marking all notifications as read:', error);
+          // Reload notifications from Supabase if bulk update failed
+          const freshNotifications = await loadNotificationsFromSupabase();
+          setNotifications(freshNotifications);
+        }
+      } catch (error) {
+        console.error('Error marking all notifications as read:', error);
+      }
+    }
   };
 
-  const clearNotification = (id: string) => {
+  const clearNotification = async (id: string) => {
+    // Update UI immediately
     setNotifications(prev => 
       prev.filter(notification => notification.id !== id)
     );
+
+    // Delete from Supabase
+    if (isSupabaseConfigured() && user) {
+      try {
+        const { error } = await supabase
+          .from('notifications')
+          .delete()
+          .eq('id', id)
+          .eq('user_id', user.id);
+
+        if (error) {
+          console.error('Error deleting notification:', error);
+          // Reload notifications from Supabase if delete failed
+          const freshNotifications = await loadNotificationsFromSupabase();
+          setNotifications(freshNotifications);
+        }
+      } catch (error) {
+        console.error('Error deleting notification:', error);
+      }
+    }
   };
 
   const getNotificationIcon = (type: string) => {
