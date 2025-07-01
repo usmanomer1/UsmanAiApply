@@ -1050,7 +1050,7 @@ const LinkedInAutomationBot: React.FC = () => {
     }
   };
 
-  const saveJobApplication = async (company: string, role: string, taskId: string) => {
+  const saveJobApplication = async (company: string, role: string, taskId: string, jobUrl?: string | null) => {
     try {
       if (!isSupabaseConfigured() || !user) {
         return false;
@@ -1132,7 +1132,8 @@ const LinkedInAutomationBot: React.FC = () => {
               resume_used: config.linkedinResume || 'Default',
               custom_instructions: config.customInstructions || '',
               extraction_method: 'browser_use_api_v2',
-              timestamp: new Date().toISOString()
+              timestamp: new Date().toISOString(),
+              url: jobUrl || null
             }
           };
 
@@ -1143,7 +1144,24 @@ const LinkedInAutomationBot: React.FC = () => {
             .single();
 
           if (!appError && newApp) {
-            // Only show notification for successful saves
+            // Create notification for successful application
+            await supabase
+              .from('notifications')
+              .insert({
+                user_id: user.id,
+                title: 'Job Application Submitted',
+                message: `Applied to ${cleanRole} at ${cleanCompany}`,
+                type: 'success',
+                icon_name: 'Send',
+                data: {
+                  applicationId: newApp.id,
+                  company: cleanCompany,
+                  role: cleanRole,
+                  url: jobUrl
+                }
+              });
+
+            // Only show toast notification for successful saves
             toast.success(`Applied to ${cleanCompany} - ${cleanRole}`);
             return true;
           }
@@ -1324,16 +1342,27 @@ PROGRESS TRACKING:
 - Continue until you reach exactly ${config.targetCount} applications
 
 CRITICAL APPLICATION TRACKING - YOU MUST DO THIS FOR EVERY APPLICATION:
-1. BEFORE clicking Easy Apply: Announce "APPLYING TO: [COMPANY NAME] - [JOB TITLE]"
-2. BEFORE clicking Submit: Announce "SUBMITTING APPLICATION TO: [COMPANY NAME] - [JOB TITLE]"
+1. BEFORE clicking Easy Apply: 
+   - Extract the job URL from the browser address bar or the job posting
+   - Announce "APPLYING TO: [COMPANY NAME] - [JOB TITLE]"
+   - Also note the job URL for tracking
+2. BEFORE clicking Submit: 
+   - Announce "SUBMITTING APPLICATION TO: [COMPANY NAME] - [JOB TITLE]"
+   - Include the job URL if available
 
 IMPORTANT FORMAT RULES:
 - Use EXACT format: "APPLYING TO: Company - Job Title" (no quotes, dash separator)
 - Extract the REAL company name from the job posting (not "LinkedIn Company" or generic terms)
 - Extract the EXACT job title from the posting header
 - Company comes FIRST, then dash, then job title
+- Capture the job URL from the address bar when on the job details page
 - Example: "APPLYING TO: Google - Senior Software Engineer"
 - Example: "SUBMITTING APPLICATION TO: Microsoft - Product Manager"
+
+URL EXTRACTION:
+- When viewing a job posting, note the URL from the browser address bar
+- LinkedIn job URLs typically look like: https://www.linkedin.com/jobs/view/[job-id]/
+- Include this URL in your tracking for later reference
 
 This tracking is essential for saving your applications correctly.`;
   };
@@ -1668,26 +1697,53 @@ This tracking is essential for saving your applications correctly.`;
           });
           
           // Process new applications with deduplication
-            if (applicationSteps.length > appliedCount) {
-            const processedApplications = new Set();
+            if (applicationSteps.length > 0) {
+            // Track which applications we've already processed in this session
+            const sessionProcessedApps = new Set<string>();
+            
+            // Get all previously saved applications for this task to avoid duplicates
+            const { data: existingApps } = await supabase
+              .from('applications')
+              .select('company, role')
+              .eq('details->>task_id', taskId);
+            
+            if (existingApps) {
+              existingApps.forEach(app => {
+                if (app.company && app.role) {
+                  sessionProcessedApps.add(`${app.company.toLowerCase()}-${app.role.toLowerCase()}`);
+                }
+              });
+            }
+            
+            let newApplicationsCount = 0;
             
             for (const appStep of applicationSteps) {
               const stepText = appStep.next_goal || appStep.evaluation_previous_goal || '';
-                const companyRole = extractCompanyRoleFromStep(stepText);
+              // Also check the output field for URL extraction
+              const fullStepText = `${stepText} ${appStep.output || ''}`;
+              const companyRole = extractCompanyRoleFromStep(fullStepText);
                 
-                if (companyRole.company && companyRole.role) {
+              if (companyRole.company && companyRole.role) {
                 const appKey = `${companyRole.company.toLowerCase()}-${companyRole.role.toLowerCase()}`;
                 
-                // Only save if we haven't processed this exact application
-                if (!processedApplications.has(appKey)) {
-                  processedApplications.add(appKey);
-                  await saveJobApplication(companyRole.company, companyRole.role, taskId);
+                // Only save if we haven't processed this exact application in this session
+                if (!sessionProcessedApps.has(appKey)) {
+                  sessionProcessedApps.add(appKey);
+                  const saved = await saveJobApplication(companyRole.company, companyRole.role, taskId, companyRole.url);
+                  if (saved) {
+                    newApplicationsCount++;
                   }
                 }
               }
             }
             
-            setAppliedCount(applicationSteps.length);
+            // Update the applied count based on what's actually saved in the database
+            setAppliedCount(sessionProcessedApps.size);
+            
+            if (newApplicationsCount > 0) {
+              addLog(`💼 Saved ${newApplicationsCount} new application(s) to database`);
+            }
+          }
           }
 
         // Save current state
@@ -1869,6 +1925,50 @@ This tracking is essential for saving your applications correctly.`;
         addLog(`⚠️ Failed to mark task as completed: ${updateError.message}`, 'error');
       } else {
         addLog(`✅ Task ${taskId} marked as ${status}`);
+        
+        // Create notification for task completion
+        let notificationTitle = '';
+        let notificationMessage = '';
+        let notificationType: 'success' | 'error' | 'info' = 'info';
+        let iconName = 'Clock';
+
+        switch (status) {
+          case 'finished':
+            notificationTitle = 'Automation Completed';
+            notificationMessage = `LinkedIn automation finished successfully. ${finalSteps} steps completed.`;
+            notificationType = 'success';
+            iconName = 'CheckCircle';
+            break;
+          case 'failed':
+            notificationTitle = 'Automation Failed';
+            notificationMessage = error || 'Automation task encountered an error and stopped.';
+            notificationType = 'error';
+            iconName = 'AlertCircle';
+            break;
+          case 'stopped':
+            notificationTitle = 'Automation Stopped';
+            notificationMessage = `Automation was stopped by user. ${finalSteps} steps completed.`;
+            notificationType = 'info';
+            iconName = 'Clock';
+            break;
+        }
+
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: user.id,
+            title: notificationTitle,
+            message: notificationMessage,
+            type: notificationType,
+            icon_name: iconName,
+            data: {
+              taskId: taskId,
+              finalSteps: finalSteps,
+              finalCost: finalCost,
+              status: status,
+              error: error || null
+            }
+          });
       }
     } catch (error) {
       // Error marking task completed
@@ -1877,20 +1977,20 @@ This tracking is essential for saving your applications correctly.`;
 
 
 
-    const extractCompanyRoleFromStep = (stepText: string): { company: string | null; role: string | null } => {
+    const extractCompanyRoleFromStep = (stepText: string): { company: string | null; role: string | null; url: string | null } => {
     // Only use our specific format: "SUBMITTING APPLICATION TO: Company - Job Title"
     const pattern = /SUBMITTING APPLICATION TO:\s*([^-\n]+?)\s*-\s*([^\n]+)/i;
     const match = stepText.match(pattern);
     
     if (!match) {
-      return { company: null, role: null };
+      return { company: null, role: null, url: null };
     }
     
     let company = match[1]?.trim();
     let role = match[2]?.trim();
     
-          if (!company || !role) {
-      return { company: null, role: null };
+    if (!company || !role) {
+      return { company: null, role: null, url: null };
     }
     
     // Clean extracted text
@@ -1904,12 +2004,22 @@ This tracking is essential for saving your applications correctly.`;
     // Extract only the core job title (before any instruction text)
     role = role.split(/\s+(to|for|at|in|on|with|by|the|a|an)\s+/i)[0].trim();
     
-    // Final validation - must be real company and clean job title
-    if (isValidCompanyName(company) && isValidJobTitle(role) && role.length >= 3 && role.length <= 50) {
-      return { company, role };
+    // Extract URL if present in the step text
+    let url: string | null = null;
+    const urlPattern = /https?:\/\/[^\s\]}"']+/g;
+    const urlMatches = stepText.match(urlPattern);
+    if (urlMatches) {
+      // Look for LinkedIn job URLs specifically
+      const jobUrl = urlMatches.find(u => u.includes('linkedin.com/jobs/view/') || u.includes('linkedin.com/jobs/collections/'));
+      url = jobUrl || null;
     }
     
-    return { company: null, role: null };
+    // Final validation - must be real company and clean job title
+    if (isValidCompanyName(company) && isValidJobTitle(role) && role.length >= 3 && role.length <= 50) {
+      return { company, role, url };
+    }
+    
+    return { company: null, role: null, url: null };
   };
 
   // Helper function to validate company names
@@ -2907,7 +3017,7 @@ This tracking is essential for saving your applications correctly.`;
                     }
                   }
                 }}
-                onError={(e) => {
+                onError={() => {
                   // Browser preview iframe error (this may be due to browser extensions)
                 }}
               />

@@ -411,6 +411,16 @@ export const ApplicationsPage: React.FC = () => {
                     </TableCell>
                     <TableCell className="text-right py-5">
                       <div className="flex items-center justify-end space-x-2">
+                        {app.details?.url && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => window.open(app.details.url, '_blank')}
+                            className="hover:bg-purple-50 dark:hover:bg-purple-900/20 text-gray-600 dark:text-gray-300 hover:text-purple-700 dark:hover:text-purple-300"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </Button>
+                        )}
                         <Button 
                           variant="ghost" 
                           size="icon"
@@ -498,6 +508,20 @@ export const ApplicationsPage: React.FC = () => {
                   <p className="text-lg font-semibold text-gray-900 dark:text-white">{selectedApplication.campaign.job_title}</p>
                 </div>
               </div>
+              {selectedApplication.details?.url && (
+                <div className="space-y-2 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <label className="text-base font-bold text-gray-800 dark:text-gray-200">Job Posting URL</label>
+                  <a 
+                    href={selectedApplication.details.url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    View Job Posting
+                  </a>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
