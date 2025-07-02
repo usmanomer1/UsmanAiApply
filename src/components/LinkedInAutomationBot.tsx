@@ -24,7 +24,9 @@ import {
   Sparkles,
   Shield,
   Mic,
-  MessageSquare
+  MessageSquare,
+  Target,
+  AlertTriangle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -75,6 +77,22 @@ interface BrowserUseConfig {
   companySize?: string;
   datePosted?: string;
   targetCount: string;
+  // New options for external applications
+  applicationMode?: 'easy_apply_only' | 'all_jobs';
+  externalApplications?: {
+    firstName: string;
+    lastName: string;
+    personalEmail: string;
+    personalPhone: string;
+    address: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    country: string;
+    linkedinProfile?: string;
+    portfolioWebsite?: string;
+    githubProfile?: string;
+  };
 }
 
 
@@ -904,7 +922,10 @@ const LinkedInAutomationBot: React.FC = () => {
     const params = new URLSearchParams();
     
     // Essential LinkedIn parameters
-    params.append('f_AL', 'true'); // Easy Apply filter
+    // Only add Easy Apply filter if in easy_apply_only mode
+    if (config.applicationMode !== 'all_jobs') {
+      params.append('f_AL', 'true'); // Easy Apply filter
+    }
     params.append('distance', '25'); // Search radius
     params.append('origin', 'JOB_SEARCH_PAGE_KEYWORD_HISTORY'); // LinkedIn tracking
     params.append('refresh', 'true'); // Fresh results
@@ -1236,14 +1257,20 @@ const LinkedInAutomationBot: React.FC = () => {
   // Session-based prompts removed - using direct credential login only
 
   const createComprehensivePrompt = (linkedinUrl: string) => {
-    return `You are an AI assistant helping with LinkedIn job applications. Your goal is to apply to ${config.targetCount} jobs using LinkedIn's "Easy Apply" feature.
+    const isAllJobsMode = config.applicationMode === 'all_jobs';
+    const externalData = config.externalApplications;
+    
+    return `You are an AI assistant helping with LinkedIn job applications. Your goal is to apply to ${config.targetCount} jobs ${isAllJobsMode ? 'using both Easy Apply and external company websites' : 'using LinkedIn\'s "Easy Apply" feature'}.
 
 STEP-BY-STEP PROCESS:
 1. Navigate directly to the job search URL: ${linkedinUrl}
 2. If you need to login, use the provided credentials (email: ${config.linkedinEmail}, password: (use the value from the secret variable ln_password))
 3. After page loads, look for the left sidebar with job listings - if it's collapsed or missing, try clicking any "expand" or "menu" buttons
-4. Look for jobs with "Easy Apply" buttons in the job listings
-5. For each job with Easy Apply (continue until you reach ${config.targetCount} applications):
+4. Look for jobs ${isAllJobsMode ? 'with either "Easy Apply" buttons OR "Apply" buttons that lead to external websites' : 'with "Easy Apply" buttons'} in the job listings
+5. For each suitable job (continue until you reach ${config.targetCount} applications):
+
+${isAllJobsMode ? `
+   FOR EASY APPLY JOBS:
    a. BEFORE clicking Easy Apply, clearly state: "APPLYING TO: [EXACT COMPANY NAME] - [EXACT JOB TITLE]"
    b. Extract the actual company name from the job posting (not generic terms)
    c. Extract the exact job title from the posting
@@ -1255,8 +1282,48 @@ STEP-BY-STEP PROCESS:
    i. Before clicking submit, repeat: "SUBMITTING APPLICATION TO: [COMPANY NAME] - [JOB TITLE]"
    j. Click submit to complete the application
    k. Close the modal and move to the next job
+
+   FOR EXTERNAL APPLY JOBS:
+   a. BEFORE clicking Apply, clearly state: "APPLYING TO: [EXACT COMPANY NAME] - [EXACT JOB TITLE] (EXTERNAL)"
+   b. Click the "Apply" or "Apply on company website" button
+   c. You will be redirected to the company's careers page
+   d. Navigate through the external application process:
+      - If registration is required, create an account using: ${externalData?.personalEmail || 'your email'}
+      - Fill application forms with the following information:
+        * Name: ${externalData?.firstName || 'John'} ${externalData?.lastName || 'Doe'}
+        * Email: ${externalData?.personalEmail || 'john.doe@email.com'}
+        * Phone: ${externalData?.personalPhone || '+1 (555) 123-4567'}
+        * Address: ${externalData?.address || '123 Main Street'}
+        * City: ${externalData?.city || 'San Francisco'}
+        * State: ${externalData?.state || 'CA'}
+        * ZIP: ${externalData?.zipCode || '94101'}
+        * Country: ${externalData?.country || 'United States'}
+        * LinkedIn: ${externalData?.linkedinProfile || 'https://linkedin.com/in/profile'}
+        * Portfolio: ${externalData?.portfolioWebsite || ''}
+        * GitHub: ${externalData?.githubProfile || ''}
+      - Upload resume if required (use browser file upload)
+      - Answer application questions intelligently based on the job requirements
+      - Complete all required fields
+   e. Before submitting, repeat: "SUBMITTING APPLICATION TO: [COMPANY NAME] - [JOB TITLE] (EXTERNAL)"
+   f. Submit the external application
+   g. Return to LinkedIn (navigate back or open new tab to LinkedIn)
+   h. Continue to the next job
+` : `
+   a. BEFORE clicking Easy Apply, clearly state: "APPLYING TO: [EXACT COMPANY NAME] - [EXACT JOB TITLE]"
+   b. Extract the actual company name from the job posting (not generic terms)
+   c. Extract the exact job title from the posting
+   d. Click the "Easy Apply" button
+   e. Fill out the application form (scroll down if you can't see all fields)
+   f. Answer any questions that appear (scroll to see all questions)
+   g. Upload resume if prompted - use the specified LinkedIn resume: "${config.linkedinResume || 'Use the most recent resume available'}"
+   h. SCROLL DOWN to find the "Submit" or "Submit application" button
+   i. Before clicking submit, repeat: "SUBMITTING APPLICATION TO: [COMPANY NAME] - [JOB TITLE]"
+   j. Click submit to complete the application
+   k. Close the modal and move to the next job
+`}
+
 6. Continue applying to jobs until you've completed ${config.targetCount} applications
-7. If you run out of Easy Apply jobs on the current page:
+7. If you run out of ${isAllJobsMode ? 'suitable jobs' : 'Easy Apply jobs'} on the current page:
    - Scroll down to load more jobs or click "See more jobs" if available
    - Try adjusting filters or broadening search criteria
    - Only stop when you've reached the target or no more suitable jobs are available
@@ -1482,6 +1549,27 @@ This tracking is essential for saving your applications correctly.`;
     if (!config.contactNumber.trim()) {
       toast.error('Please enter your contact number for job applications');
       return;
+    }
+
+    // Additional validation for external applications mode
+    if (config.applicationMode === 'all_jobs') {
+      const external = config.externalApplications;
+      if (!external?.firstName?.trim()) {
+        toast.error('Please enter your first name for external applications');
+        return;
+      }
+      if (!external?.lastName?.trim()) {
+        toast.error('Please enter your last name for external applications');
+        return;
+      }
+      if (!external?.personalEmail?.trim()) {
+        toast.error('Please enter your personal email for external applications');
+        return;
+      }
+      if (!external?.personalPhone?.trim()) {
+        toast.error('Please enter your phone number for external applications');
+        return;
+      }
     }
 
     if (!apiKey || apiKey.trim() === '') {
@@ -1978,8 +2066,11 @@ This tracking is essential for saving your applications correctly.`;
 
 
     const extractCompanyRoleFromStep = (stepText: string): { company: string | null; role: string | null; url: string | null } => {
-    // Only use our specific format: "SUBMITTING APPLICATION TO: Company - Job Title"
-    const pattern = /SUBMITTING APPLICATION TO:\s*([^-\n]+?)\s*-\s*([^\n]+)/i;
+    // Handle both Easy Apply and External applications
+    // Patterns: 
+    // "SUBMITTING APPLICATION TO: Company - Job Title"
+    // "SUBMITTING APPLICATION TO: Company - Job Title (EXTERNAL)"
+    const pattern = /SUBMITTING APPLICATION TO:\s*([^-\n]+?)\s*-\s*([^\n(]+?)(?:\s*\(EXTERNAL\))?/i;
     const match = stepText.match(pattern);
     
     if (!match) {
@@ -2570,6 +2661,421 @@ This tracking is essential for saving your applications correctly.`;
                 />
               </div>
 
+            </div>
+
+            {/* Application Mode Selection */}
+            <div className="space-y-6">
+              <div className="flex items-center space-x-3 pb-4 border-b border-white/20 dark:border-gray-700/20">
+                <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <Target className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white dark:text-white">Application Mode</h3>
+                  <p className="text-sm text-white/70 dark:text-white/70">Choose which types of jobs to apply to</p>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-white/90 dark:text-white/90 mb-3">
+                  Job Application Type
+                </label>
+                <div className="space-y-3">
+                  <label className="flex items-start space-x-3 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="applicationMode"
+                      value="easy_apply_only"
+                      checked={config.applicationMode === 'easy_apply_only' || !config.applicationMode}
+                      onChange={(e) => setConfig(prev => ({ ...prev, applicationMode: e.target.value as 'easy_apply_only' | 'all_jobs' }))}
+                      className="mt-1 w-4 h-4 text-emerald-600 border-white/30 focus:ring-emerald-500"
+                    />
+                    <div>
+                      <div className="text-white font-medium">Easy Apply Only (Recommended)</div>
+                      <div className="text-white/70 text-sm">Apply only to jobs with LinkedIn's Easy Apply feature. Faster and more reliable.</div>
+                    </div>
+                  </label>
+                  
+                  <label className="flex items-start space-x-3 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="applicationMode"
+                      value="all_jobs"
+                      checked={config.applicationMode === 'all_jobs'}
+                      onChange={(e) => setConfig(prev => ({ ...prev, applicationMode: e.target.value as 'easy_apply_only' | 'all_jobs' }))}
+                      className="mt-1 w-4 h-4 text-emerald-600 border-white/30 focus:ring-emerald-500"
+                    />
+                    <div>
+                      <div className="text-white font-medium">All Jobs (Advanced)</div>
+                      <div className="text-white/70 text-sm">Apply to all jobs including external company websites. AI will create accounts and fill forms automatically.</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* External Applications Details */}
+              {config.applicationMode === 'all_jobs' && (
+                <div className="mt-6 p-6 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm rounded-xl border border-white/20 dark:border-gray-600/20">
+                  <h4 className="text-lg font-semibold text-white mb-4">External Application Details</h4>
+                  <p className="text-white/70 text-sm mb-6">
+                    This information will be used to automatically fill application forms on external company websites.
+                  </p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-white/90 mb-2">First Name *</label>
+                      <input
+                        type="text"
+                        className="w-full px-3 py-2 border border-white/20 rounded-lg bg-white/10 text-white placeholder-white/60"
+                        placeholder="John"
+                        value={config.externalApplications?.firstName || ''}
+                        onChange={(e) => setConfig(prev => ({
+                          ...prev,
+                          externalApplications: {
+                            ...prev.externalApplications,
+                            firstName: e.target.value,
+                            lastName: prev.externalApplications?.lastName || '',
+                            personalEmail: prev.externalApplications?.personalEmail || '',
+                            personalPhone: prev.externalApplications?.personalPhone || '',
+                            address: prev.externalApplications?.address || '',
+                            city: prev.externalApplications?.city || '',
+                            state: prev.externalApplications?.state || '',
+                            zipCode: prev.externalApplications?.zipCode || '',
+                            country: prev.externalApplications?.country || '',
+                            linkedinProfile: prev.externalApplications?.linkedinProfile || '',
+                            portfolioWebsite: prev.externalApplications?.portfolioWebsite || '',
+                            githubProfile: prev.externalApplications?.githubProfile || '',
+                          }
+                        }))}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-white/90 mb-2">Last Name *</label>
+                      <input
+                        type="text"
+                        className="w-full px-3 py-2 border border-white/20 rounded-lg bg-white/10 text-white placeholder-white/60"
+                        placeholder="Doe"
+                        value={config.externalApplications?.lastName || ''}
+                        onChange={(e) => setConfig(prev => ({
+                          ...prev,
+                          externalApplications: {
+                            ...prev.externalApplications,
+                            firstName: prev.externalApplications?.firstName || '',
+                            lastName: e.target.value,
+                            personalEmail: prev.externalApplications?.personalEmail || '',
+                            personalPhone: prev.externalApplications?.personalPhone || '',
+                            address: prev.externalApplications?.address || '',
+                            city: prev.externalApplications?.city || '',
+                            state: prev.externalApplications?.state || '',
+                            zipCode: prev.externalApplications?.zipCode || '',
+                            country: prev.externalApplications?.country || '',
+                            linkedinProfile: prev.externalApplications?.linkedinProfile || '',
+                            portfolioWebsite: prev.externalApplications?.portfolioWebsite || '',
+                            githubProfile: prev.externalApplications?.githubProfile || '',
+                          }
+                        }))}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-white/90 mb-2">Personal Email *</label>
+                      <input
+                        type="email"
+                        className="w-full px-3 py-2 border border-white/20 rounded-lg bg-white/10 text-white placeholder-white/60"
+                        placeholder="john.doe@email.com"
+                        value={config.externalApplications?.personalEmail || ''}
+                        onChange={(e) => setConfig(prev => ({
+                          ...prev,
+                          externalApplications: {
+                            ...prev.externalApplications,
+                            firstName: prev.externalApplications?.firstName || '',
+                            lastName: prev.externalApplications?.lastName || '',
+                            personalEmail: e.target.value,
+                            personalPhone: prev.externalApplications?.personalPhone || '',
+                            address: prev.externalApplications?.address || '',
+                            city: prev.externalApplications?.city || '',
+                            state: prev.externalApplications?.state || '',
+                            zipCode: prev.externalApplications?.zipCode || '',
+                            country: prev.externalApplications?.country || '',
+                            linkedinProfile: prev.externalApplications?.linkedinProfile || '',
+                            portfolioWebsite: prev.externalApplications?.portfolioWebsite || '',
+                            githubProfile: prev.externalApplications?.githubProfile || '',
+                          }
+                        }))}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-white/90 mb-2">Phone Number *</label>
+                      <input
+                        type="tel"
+                        className="w-full px-3 py-2 border border-white/20 rounded-lg bg-white/10 text-white placeholder-white/60"
+                        placeholder="+1 (555) 123-4567"
+                        value={config.externalApplications?.personalPhone || ''}
+                        onChange={(e) => setConfig(prev => ({
+                          ...prev,
+                          externalApplications: {
+                            ...prev.externalApplications,
+                            firstName: prev.externalApplications?.firstName || '',
+                            lastName: prev.externalApplications?.lastName || '',
+                            personalEmail: prev.externalApplications?.personalEmail || '',
+                            personalPhone: e.target.value,
+                            address: prev.externalApplications?.address || '',
+                            city: prev.externalApplications?.city || '',
+                            state: prev.externalApplications?.state || '',
+                            zipCode: prev.externalApplications?.zipCode || '',
+                            country: prev.externalApplications?.country || '',
+                            linkedinProfile: prev.externalApplications?.linkedinProfile || '',
+                            portfolioWebsite: prev.externalApplications?.portfolioWebsite || '',
+                            githubProfile: prev.externalApplications?.githubProfile || '',
+                          }
+                        }))}
+                      />
+                    </div>
+                    
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-white/90 mb-2">Address</label>
+                      <input
+                        type="text"
+                        className="w-full px-3 py-2 border border-white/20 rounded-lg bg-white/10 text-white placeholder-white/60"
+                        placeholder="123 Main Street"
+                        value={config.externalApplications?.address || ''}
+                        onChange={(e) => setConfig(prev => ({
+                          ...prev,
+                          externalApplications: {
+                            ...prev.externalApplications,
+                            firstName: prev.externalApplications?.firstName || '',
+                            lastName: prev.externalApplications?.lastName || '',
+                            personalEmail: prev.externalApplications?.personalEmail || '',
+                            personalPhone: prev.externalApplications?.personalPhone || '',
+                            address: e.target.value,
+                            city: prev.externalApplications?.city || '',
+                            state: prev.externalApplications?.state || '',
+                            zipCode: prev.externalApplications?.zipCode || '',
+                            country: prev.externalApplications?.country || '',
+                            linkedinProfile: prev.externalApplications?.linkedinProfile || '',
+                            portfolioWebsite: prev.externalApplications?.portfolioWebsite || '',
+                            githubProfile: prev.externalApplications?.githubProfile || '',
+                          }
+                        }))}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-white/90 mb-2">City</label>
+                      <input
+                        type="text"
+                        className="w-full px-3 py-2 border border-white/20 rounded-lg bg-white/10 text-white placeholder-white/60"
+                        placeholder="San Francisco"
+                        value={config.externalApplications?.city || ''}
+                        onChange={(e) => setConfig(prev => ({
+                          ...prev,
+                          externalApplications: {
+                            ...prev.externalApplications,
+                            firstName: prev.externalApplications?.firstName || '',
+                            lastName: prev.externalApplications?.lastName || '',
+                            personalEmail: prev.externalApplications?.personalEmail || '',
+                            personalPhone: prev.externalApplications?.personalPhone || '',
+                            address: prev.externalApplications?.address || '',
+                            city: e.target.value,
+                            state: prev.externalApplications?.state || '',
+                            zipCode: prev.externalApplications?.zipCode || '',
+                            country: prev.externalApplications?.country || '',
+                            linkedinProfile: prev.externalApplications?.linkedinProfile || '',
+                            portfolioWebsite: prev.externalApplications?.portfolioWebsite || '',
+                            githubProfile: prev.externalApplications?.githubProfile || '',
+                          }
+                        }))}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-white/90 mb-2">State/Province</label>
+                      <input
+                        type="text"
+                        className="w-full px-3 py-2 border border-white/20 rounded-lg bg-white/10 text-white placeholder-white/60"
+                        placeholder="CA"
+                        value={config.externalApplications?.state || ''}
+                        onChange={(e) => setConfig(prev => ({
+                          ...prev,
+                          externalApplications: {
+                            ...prev.externalApplications,
+                            firstName: prev.externalApplications?.firstName || '',
+                            lastName: prev.externalApplications?.lastName || '',
+                            personalEmail: prev.externalApplications?.personalEmail || '',
+                            personalPhone: prev.externalApplications?.personalPhone || '',
+                            address: prev.externalApplications?.address || '',
+                            city: prev.externalApplications?.city || '',
+                            state: e.target.value,
+                            zipCode: prev.externalApplications?.zipCode || '',
+                            country: prev.externalApplications?.country || '',
+                            linkedinProfile: prev.externalApplications?.linkedinProfile || '',
+                            portfolioWebsite: prev.externalApplications?.portfolioWebsite || '',
+                            githubProfile: prev.externalApplications?.githubProfile || '',
+                          }
+                        }))}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-white/90 mb-2">ZIP/Postal Code</label>
+                      <input
+                        type="text"
+                        className="w-full px-3 py-2 border border-white/20 rounded-lg bg-white/10 text-white placeholder-white/60"
+                        placeholder="94101"
+                        value={config.externalApplications?.zipCode || ''}
+                        onChange={(e) => setConfig(prev => ({
+                          ...prev,
+                          externalApplications: {
+                            ...prev.externalApplications,
+                            firstName: prev.externalApplications?.firstName || '',
+                            lastName: prev.externalApplications?.lastName || '',
+                            personalEmail: prev.externalApplications?.personalEmail || '',
+                            personalPhone: prev.externalApplications?.personalPhone || '',
+                            address: prev.externalApplications?.address || '',
+                            city: prev.externalApplications?.city || '',
+                            state: prev.externalApplications?.state || '',
+                            zipCode: e.target.value,
+                            country: prev.externalApplications?.country || '',
+                            linkedinProfile: prev.externalApplications?.linkedinProfile || '',
+                            portfolioWebsite: prev.externalApplications?.portfolioWebsite || '',
+                            githubProfile: prev.externalApplications?.githubProfile || '',
+                          }
+                        }))}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-white/90 mb-2">Country</label>
+                      <input
+                        type="text"
+                        className="w-full px-3 py-2 border border-white/20 rounded-lg bg-white/10 text-white placeholder-white/60"
+                        placeholder="United States"
+                        value={config.externalApplications?.country || ''}
+                        onChange={(e) => setConfig(prev => ({
+                          ...prev,
+                          externalApplications: {
+                            ...prev.externalApplications,
+                            firstName: prev.externalApplications?.firstName || '',
+                            lastName: prev.externalApplications?.lastName || '',
+                            personalEmail: prev.externalApplications?.personalEmail || '',
+                            personalPhone: prev.externalApplications?.personalPhone || '',
+                            address: prev.externalApplications?.address || '',
+                            city: prev.externalApplications?.city || '',
+                            state: prev.externalApplications?.state || '',
+                            zipCode: prev.externalApplications?.zipCode || '',
+                            country: e.target.value,
+                            linkedinProfile: prev.externalApplications?.linkedinProfile || '',
+                            portfolioWebsite: prev.externalApplications?.portfolioWebsite || '',
+                            githubProfile: prev.externalApplications?.githubProfile || '',
+                          }
+                        }))}
+                      />
+                    </div>
+                    
+                    <div className="md:col-span-2">
+                      <h5 className="text-md font-medium text-white mb-3 mt-4">Optional Professional Links</h5>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-white/90 mb-2">LinkedIn Profile</label>
+                      <input
+                        type="url"
+                        className="w-full px-3 py-2 border border-white/20 rounded-lg bg-white/10 text-white placeholder-white/60"
+                        placeholder="https://linkedin.com/in/johndoe"
+                        value={config.externalApplications?.linkedinProfile || ''}
+                        onChange={(e) => setConfig(prev => ({
+                          ...prev,
+                          externalApplications: {
+                            ...prev.externalApplications,
+                            firstName: prev.externalApplications?.firstName || '',
+                            lastName: prev.externalApplications?.lastName || '',
+                            personalEmail: prev.externalApplications?.personalEmail || '',
+                            personalPhone: prev.externalApplications?.personalPhone || '',
+                            address: prev.externalApplications?.address || '',
+                            city: prev.externalApplications?.city || '',
+                            state: prev.externalApplications?.state || '',
+                            zipCode: prev.externalApplications?.zipCode || '',
+                            country: prev.externalApplications?.country || '',
+                            linkedinProfile: e.target.value,
+                            portfolioWebsite: prev.externalApplications?.portfolioWebsite || '',
+                            githubProfile: prev.externalApplications?.githubProfile || '',
+                          }
+                        }))}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-white/90 mb-2">Portfolio/Website</label>
+                      <input
+                        type="url"
+                        className="w-full px-3 py-2 border border-white/20 rounded-lg bg-white/10 text-white placeholder-white/60"
+                        placeholder="https://johndoe.com"
+                        value={config.externalApplications?.portfolioWebsite || ''}
+                        onChange={(e) => setConfig(prev => ({
+                          ...prev,
+                          externalApplications: {
+                            ...prev.externalApplications,
+                            firstName: prev.externalApplications?.firstName || '',
+                            lastName: prev.externalApplications?.lastName || '',
+                            personalEmail: prev.externalApplications?.personalEmail || '',
+                            personalPhone: prev.externalApplications?.personalPhone || '',
+                            address: prev.externalApplications?.address || '',
+                            city: prev.externalApplications?.city || '',
+                            state: prev.externalApplications?.state || '',
+                            zipCode: prev.externalApplications?.zipCode || '',
+                            country: prev.externalApplications?.country || '',
+                            linkedinProfile: prev.externalApplications?.linkedinProfile || '',
+                            portfolioWebsite: e.target.value,
+                            githubProfile: prev.externalApplications?.githubProfile || '',
+                          }
+                        }))}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-white/90 mb-2">GitHub Profile</label>
+                      <input
+                        type="url"
+                        className="w-full px-3 py-2 border border-white/20 rounded-lg bg-white/10 text-white placeholder-white/60"
+                        placeholder="https://github.com/johndoe"
+                        value={config.externalApplications?.githubProfile || ''}
+                        onChange={(e) => setConfig(prev => ({
+                          ...prev,
+                          externalApplications: {
+                            ...prev.externalApplications,
+                            firstName: prev.externalApplications?.firstName || '',
+                            lastName: prev.externalApplications?.lastName || '',
+                            personalEmail: prev.externalApplications?.personalEmail || '',
+                            personalPhone: prev.externalApplications?.personalPhone || '',
+                            address: prev.externalApplications?.address || '',
+                            city: prev.externalApplications?.city || '',
+                            state: prev.externalApplications?.state || '',
+                            zipCode: prev.externalApplications?.zipCode || '',
+                            country: prev.externalApplications?.country || '',
+                            linkedinProfile: prev.externalApplications?.linkedinProfile || '',
+                            portfolioWebsite: prev.externalApplications?.portfolioWebsite || '',
+                            githubProfile: e.target.value,
+                          }
+                        }))}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 p-4 bg-amber-500/20 border border-amber-500/30 rounded-lg">
+                    <div className="flex items-start space-x-2">
+                      <AlertTriangle className="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-amber-200 text-sm font-medium">Advanced Feature Warning</p>
+                        <p className="text-amber-200/80 text-xs mt-1">
+                          External applications require more AI steps and may take longer. The AI will navigate to company websites, 
+                          create accounts if needed, and fill application forms automatically. Monitor the process carefully.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Optional Filters */}
