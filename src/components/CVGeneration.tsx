@@ -1409,10 +1409,10 @@ ${cvData.projects.filter(proj => proj.name).length > 0 ? 'PROJECTS\n' + cvData.p
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={() => setSelectedTemplate(key as Template)}
-                      className={`cursor-pointer glass-card p-6 transition-all duration-200 ${
+                      className={`relative cursor-pointer glass-card p-6 transition-all duration-200 ${
                         selectedTemplate === key 
-                          ? 'ring-2 ring-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 shadow-xl' 
-                          : 'hover:shadow-lg'
+                          ? 'ring-2 ring-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 shadow-xl transform scale-[1.02]' 
+                          : 'hover:shadow-lg hover:ring-1 hover:ring-blue-300'
                       }`}
                     >
                       <div className={`w-16 h-16 rounded-xl bg-gradient-to-br ${template.color} mb-4 mx-auto shadow-lg flex items-center justify-center text-2xl`}>
@@ -1420,6 +1420,11 @@ ${cvData.projects.filter(proj => proj.name).length > 0 ? 'PROJECTS\n' + cvData.p
                       </div>
                       <h4 className="font-semibold text-gray-900 dark:text-white text-center mb-2">{template.name}</h4>
                       <p className="text-sm text-gray-600 dark:text-gray-300 text-center">{template.description}</p>
+                      {selectedTemplate === key && (
+                        <div className="absolute -top-2 -right-2 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center shadow-lg">
+                          <CheckCircle className="w-5 h-5 text-white" />
+                        </div>
+                      )}
                     </motion.div>
                   ))}
                 </div>

@@ -591,7 +591,11 @@ ${formData.achievements.filter(ach => ach.trim()).map(ach => `• ${ach}`).join(
               </label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {tones.map((tone) => (
-                  <label key={tone.value} className="relative cursor-pointer">
+                  <div 
+                    key={tone.value} 
+                    className="relative cursor-pointer"
+                    onClick={() => setFormData(prev => ({ ...prev, tone: tone.value }))}
+                  >
                     <input
                       type="radio"
                       name="tone"
@@ -600,16 +604,25 @@ ${formData.achievements.filter(ach => ach.trim()).map(ach => `• ${ach}`).join(
                       onChange={(e) => setFormData(prev => ({ ...prev, tone: e.target.value }))}
                       className="sr-only"
                     />
-                    <div className={`glass-card p-6 transition-all duration-200 ${
+                    <div className={`glass-card p-6 transition-all duration-200 hover:scale-[1.02] ${
                       formData.tone === tone.value 
-                        ? 'ring-2 ring-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 shadow-xl' 
-                        : 'hover:shadow-lg'
+                        ? 'ring-2 ring-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 shadow-xl transform scale-[1.02]' 
+                        : 'hover:shadow-lg hover:ring-1 hover:ring-purple-300'
                     }`}>
-                      <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${tone.color} mb-4 mx-auto shadow-lg`}></div>
+                      <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${tone.color} mb-4 mx-auto shadow-lg flex items-center justify-center`}>
+                        {formData.tone === tone.value && (
+                          <CheckCircle className="w-6 h-6 text-white" />
+                        )}
+                      </div>
                       <h4 className="font-semibold text-gray-900 dark:text-white text-center mb-2">{tone.label}</h4>
                       <p className="text-sm text-gray-600 dark:text-gray-300 text-center">{tone.desc}</p>
+                      {formData.tone === tone.value && (
+                        <div className="absolute -top-2 -right-2 w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center">
+                          <CheckCircle className="w-4 h-4 text-white" />
+                        </div>
+                      )}
                     </div>
-                  </label>
+                  </div>
                 ))}
               </div>
             </div>
@@ -659,9 +672,10 @@ ${formData.achievements.filter(ach => ach.trim()).map(ach => `• ${ach}`).join(
                     onClick={() => removeSkill(index)}
                     variant="ghost"
                     size="icon"
-                    className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 shrink-0"
+                    disabled={formData.keySkills.length === 1}
                   >
-                    ×
+                    <X className="w-4 h-4" />
                   </Button>
                 </div>
               ))}
@@ -696,9 +710,10 @@ ${formData.achievements.filter(ach => ach.trim()).map(ach => `• ${ach}`).join(
                     onClick={() => removeAchievement(index)}
                     variant="ghost"
                     size="icon"
-                    className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 shrink-0"
+                    disabled={formData.achievements.length === 1}
                   >
-                    ×
+                    <X className="w-4 h-4" />
                   </Button>
                 </div>
               ))}

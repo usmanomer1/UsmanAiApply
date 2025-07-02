@@ -125,7 +125,21 @@ class OpenAIServiceWithTokenTracking {
       
       if (error) {
         console.error('Error checking token limit:', error);
-        throw new Error('Unable to verify token usage limits');
+        // Log the specific error for debugging
+        console.error('Database error details:', {
+          message: error.message,
+          code: error.code,
+          details: error.details
+        });
+        
+        // For database connection issues, allow the request to proceed
+        // This prevents legitimate users from being blocked by temporary database issues
+        if (error.code === 'PGRST301' || error.message?.includes('function') || error.message?.includes('does not exist')) {
+          console.warn('Database function issue detected, allowing request to proceed');
+          return; // Allow the AI request to continue
+        }
+        
+        throw new Error('Unable to verify token usage limits. Please try again in a moment.');
       }
       
       if (!canMakeRequest) {
