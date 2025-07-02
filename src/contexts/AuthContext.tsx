@@ -11,6 +11,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, fullName: string, captchaToken?: string) => Promise<void>;
   signOut: () => Promise<void>;
   resendEmailVerification: (email: string) => Promise<void>;
+  changePassword: (newPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -224,6 +225,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const changePassword = async (newPassword: string) => {
+    try {
+      if (!isSupabaseConfigured()) {
+        toast.error('Authentication service not configured. Please check your environment variables.');
+        throw new Error('Supabase not configured');
+      }
+
+      if (!user) {
+        toast.error('You must be logged in to change your password.');
+        throw new Error('User not authenticated');
+      }
+
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+
+      toast.success('Password updated successfully!');
+    } catch (error) {
+      throw error;
+    }
+  };
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -232,6 +260,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       signUp,
       signOut,
       resendEmailVerification,
+      changePassword,
     }}>
       {children}
     </AuthContext.Provider>

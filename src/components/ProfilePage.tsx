@@ -22,6 +22,7 @@ import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import ConditionalBackground from './ui/ConditionalBackground';
 import VoiceAdminPanel from './voice/VoiceAdminPanel';
+import { ChangePasswordSection } from './ui/ChangePasswordSection';
 
 interface Profile {
   id: string;
@@ -405,7 +406,7 @@ export const ProfilePage: React.FC = () => {
         </motion.div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 xl:grid-cols-3 lg:grid-cols-2 gap-8">
         {/* Personal Information */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -578,6 +579,9 @@ export const ProfilePage: React.FC = () => {
             )}
           </div>
         </motion.div>
+
+        {/* Change Password Section */}
+        <ChangePasswordSection />
       </div>
       </div>
     </>
