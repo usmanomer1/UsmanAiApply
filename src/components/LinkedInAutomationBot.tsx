@@ -14,12 +14,8 @@ import {
   Activity, 
   Eye, 
   ExternalLink, 
-  RefreshCw, 
-  Clock, 
   TrendingUp, 
   Zap, 
-  Crown, 
-  Building, 
   Loader2, 
   Sparkles,
   Shield,
@@ -75,11 +71,20 @@ interface BrowserUseConfig {
   companySize?: string;
   datePosted?: string;
   targetCount: string;
+  // External job application settings
+  applyToExternalJobs?: boolean;
+  externalJobEmail?: string;
+  externalJobPassword?: string;
+  firstName?: string;
+  lastName?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  linkedInProfileUrl?: string;
+  portfolioUrl?: string;
+  githubUrl?: string;
 }
-
-
-
-const BROWSER_USE_API_BASE = import.meta.env.VITE_BROWSER_USE_API_URL ;
 
 // LinkedIn location ID mapping - expanded with more locations
 const LINKEDIN_LOCATIONS = {
@@ -270,7 +275,19 @@ const LinkedInAutomationBot: React.FC = () => {
     salaryRange: undefined,
     companySize: undefined,
     datePosted: undefined,
-    targetCount: '10'
+    targetCount: '10',
+    applyToExternalJobs: false,
+    externalJobEmail: '',
+    externalJobPassword: '',
+    firstName: '',
+    lastName: '',
+    address: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    linkedInProfileUrl: '',
+    portfolioUrl: '',
+    githubUrl: ''
   });
   
   // AI Model selection state
@@ -318,6 +335,7 @@ const LinkedInAutomationBot: React.FC = () => {
   const [stepCount, setStepCount] = useState(0);
   const [appliedCount, setAppliedCount] = useState(0);
   const [pollInterval, setPollInterval] = useState<number | null>(null);
+  const [userStoppedTask, setUserStoppedTask] = useState(false);
   const [userSubscription, setUserSubscription] = useState<any>(null);
   const [monthlyUsage, setMonthlyUsage] = useState({ tokens_used: 0, ai_requests_used: 0, cost_usd: 0 });
   const [loading, setLoading] = useState(true);
@@ -904,7 +922,9 @@ const LinkedInAutomationBot: React.FC = () => {
     const params = new URLSearchParams();
     
     // Essential LinkedIn parameters
-    params.append('f_AL', 'true'); // Easy Apply filter
+    if (!config.applyToExternalJobs) {
+      params.append('f_AL', 'true'); // Easy Apply filter only when not applying to external jobs
+    }
     params.append('distance', '25'); // Search radius
     params.append('origin', 'JOB_SEARCH_PAGE_KEYWORD_HISTORY'); // LinkedIn tracking
     params.append('refresh', 'true'); // Fresh results
@@ -1193,7 +1213,58 @@ const LinkedInAutomationBot: React.FC = () => {
     await browserClient.clearBrowserProfile();
 
     const linkedinUrl = buildLinkedInJobsURL();
-    const fullContactNumber = `${config.countryCode}${config.contactNumber}`;
+    
+    // Handle resume for external job applications
+    let resumeContent: string | null = null;
+    let uploadedFileNames: string[] = [];
+    
+    if (config.applyToExternalJobs) {
+      addLog('📄 Preparing your resume for external job applications...');
+      
+      try {
+        // First try to get the user's resume file
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('resume_url')
+            .eq('user_id', user.id)
+            .maybeSingle();
+          
+          if (profile?.resume_url) {
+            // Get signed URL for the resume
+            const { data: signedUrlData } = await supabase.storage
+              .from('resumes')
+              .createSignedUrl(profile.resume_url, 60);
+            
+            if (signedUrlData?.signedUrl) {
+              // Fetch the resume file
+              const response = await fetch(signedUrlData.signedUrl);
+              if (response.ok) {
+                const blob = await response.blob();
+                const fileName = profile.resume_url.split('/').pop() || 'resume.pdf';
+                const file = new File([blob], fileName, { type: blob.type });
+                
+                // Upload to browser-use
+                addLog('📤 Uploading resume to browser automation service...');
+                const uploadedFileName = await browserClient.uploadFile(file);
+                uploadedFileNames.push(uploadedFileName);
+                addLog('✅ Resume uploaded successfully for external applications');
+                
+                // Also get text content for context
+                resumeContent = await fetchUserResumeContent();
+              }
+            }
+          }
+        }
+        
+        if (uploadedFileNames.length === 0) {
+          addLog('⚠️ Warning: Could not upload resume. External job applications may be limited.', 'error');
+        }
+      } catch (error) {
+        console.error('Error preparing resume:', error);
+        addLog('⚠️ Warning: Failed to prepare resume for upload. External applications may be limited.', 'error');
+      }
+    }
     
     // Always use direct credential login (no session management)
     addLog('🔑 Using direct credential login with provided credentials', 'info');
@@ -1201,22 +1272,28 @@ const LinkedInAutomationBot: React.FC = () => {
     
     // Use comprehensive single prompt approach (proven to work better)
     // INSTRUCTION: Use the LinkedIn password from the secret variable ln_password
-    const comprehensivePrompt = createComprehensivePrompt(linkedinUrl);
+    const comprehensivePrompt = createComprehensivePrompt(linkedinUrl, resumeContent, uploadedFileNames);
 
     // Pass the password via secrets, not in the prompt/config
+    const secrets: Record<string, string> = { ln_password: config.linkedinPassword || '' };
+    if (config.applyToExternalJobs && config.externalJobPassword) {
+      secrets.ext_password = config.externalJobPassword;
+    }
+    
     const taskConfig = {
       task: comprehensivePrompt,
       
-      secrets: config.linkedinPassword ? { ln_password: config.linkedinPassword } : undefined,
+      secrets: config.linkedinPassword ? secrets : undefined,
       save_browser_data: false,
       use_adblock: false,
       use_proxy: true,
       
       proxy_country_code: 'us' as const,
       highlight_elements: true,
-      max_agent_steps: Math.max(100, parseInt(config.targetCount) * 10), // 10 steps per application to stay within billing constraints
+      max_agent_steps: Math.max(100, parseInt(config.targetCount) * 15), // 15 steps per application for external jobs
       llm_model: selectedModel,
-      allowed_domains: ['linkedin.com', '*.linkedin.com'],
+      allowed_domains: config.applyToExternalJobs ? undefined : ['linkedin.com', '*.linkedin.com'],
+      included_file_names: uploadedFileNames.length > 0 ? uploadedFileNames : undefined,
     };
 
     addLog(`🚀 Starting LinkedIn automation with ${AI_MODELS[selectedModel].name} (${AI_MODELS[selectedModel].provider})`, 'success');
@@ -1235,19 +1312,25 @@ const LinkedInAutomationBot: React.FC = () => {
 
   // Session-based prompts removed - using direct credential login only
 
-  const createComprehensivePrompt = (linkedinUrl: string) => {
-    return `You are an AI assistant helping with LinkedIn job applications. Your goal is to apply to ${config.targetCount} jobs using LinkedIn's "Easy Apply" feature.
+  const createComprehensivePrompt = (linkedinUrl: string, resumeContent: string | null = null, uploadedFileNames: string[] = []) => {
+    const applyToExternalJobs = config.applyToExternalJobs;
+    
+    return `You are an AI assistant helping with LinkedIn job applications. Your goal is to apply to ${config.targetCount} jobs ${applyToExternalJobs ? '(including both Easy Apply and external job postings)' : 'using LinkedIn\'s "Easy Apply" feature'}.
 
 STEP-BY-STEP PROCESS:
 1. Navigate directly to the job search URL: ${linkedinUrl}
 2. If you need to login, use the provided credentials (email: ${config.linkedinEmail}, password: (use the value from the secret variable ln_password))
 3. After page loads, look for the left sidebar with job listings - if it's collapsed or missing, try clicking any "expand" or "menu" buttons
-4. Look for jobs with "Easy Apply" buttons in the job listings
-5. For each job with Easy Apply (continue until you reach ${config.targetCount} applications):
-   a. BEFORE clicking Easy Apply, clearly state: "APPLYING TO: [EXACT COMPANY NAME] - [EXACT JOB TITLE]"
+4. Look for jobs with ${applyToExternalJobs ? '"Easy Apply" buttons OR external application links' : '"Easy Apply" buttons'} in the job listings
+5. For each job (continue until you reach ${config.targetCount} applications):
+   a. BEFORE clicking any apply button, clearly state: "APPLYING TO: [EXACT COMPANY NAME] - [EXACT JOB TITLE]"
    b. Extract the actual company name from the job posting (not generic terms)
    c. Extract the exact job title from the posting
-   d. Click the "Easy Apply" button
+   ${applyToExternalJobs ? `
+   d. Check if it's an Easy Apply job or external application:
+      - If Easy Apply: Click the "Easy Apply" button and follow steps e-k below
+      - If External: Click the external apply button and follow the EXTERNAL JOB APPLICATION INSTRUCTIONS
+   ` : 'd. Click the "Easy Apply" button'}
    e. Fill out the application form (scroll down if you can't see all fields)
    f. Answer any questions that appear (scroll to see all questions)
    g. Upload resume if prompted - use the specified LinkedIn resume: "${config.linkedinResume || 'Use the most recent resume available'}"
@@ -1256,8 +1339,9 @@ STEP-BY-STEP PROCESS:
    j. Click submit to complete the application
    k. Close the modal and move to the next job
 6. Continue applying to jobs until you've completed ${config.targetCount} applications
-7. If you run out of Easy Apply jobs on the current page:
+7. If you run out of ${applyToExternalJobs ? 'applicable jobs (Easy Apply or external)' : 'Easy Apply jobs'} on the current page:
    - Scroll down to load more jobs or click "See more jobs" if available
+   ${applyToExternalJobs ? '- Look for jobs with external application links if Easy Apply jobs are exhausted' : ''}
    - Try adjusting filters or broadening search criteria
    - Only stop when you've reached the target or no more suitable jobs are available
 
@@ -1331,9 +1415,112 @@ CREDENTIALS:
 - Phone Number (without country code): ${config.contactNumber}
 - Resume to Use: ${config.linkedinResume || 'Most recent available'}
 
+${applyToExternalJobs ? `
+🌐 EXTERNAL JOB APPLICATION INSTRUCTIONS:
+When you encounter job postings that don't have "Easy Apply" but have external application links:
+
+1. IDENTIFY EXTERNAL JOBS:
+   - Look for jobs with "Apply on company website" or similar buttons
+   - These typically open new tabs/windows to external career sites
+   
+2. CLICK THE EXTERNAL LINK:
+   - Click the external application button/link
+   - Switch to the new tab that opens
+   - Note the domain/website you're now on
+   
+3. ACCOUNT CREATION (if needed):
+   - Look for "Sign up", "Create account", "Register" options
+   - Use these credentials for new accounts:
+     * Email: ${config.externalJobEmail || config.linkedinEmail}
+     * Password: ${config.externalJobPassword || '(use the value from the secret variable ext_password)'}
+     * First Name: ${config.firstName}
+     * Last Name: ${config.lastName}
+     * Phone: ${config.countryCode} ${config.contactNumber}
+     * Address: ${config.address}
+     * City: ${config.city}
+     * State: ${config.state}
+     * Zip: ${config.zipCode}
+   - If the site requires email verification, skip and move to next job
+   
+4. LOGIN (if account exists):
+   - Try logging in with the external job email/password first
+   - If that fails, create a new account as described above
+   
+5. FILL APPLICATION FORM:
+   - Use the provided personal information above
+   - For LinkedIn profile: ${config.linkedInProfileUrl || 'Use your LinkedIn URL'}
+   - For portfolio: ${config.portfolioUrl || 'Skip if optional'}
+   - For GitHub: ${config.githubUrl || 'Skip if optional'}
+   
+6. RESUME UPLOAD:
+   ${uploadedFileNames.length > 0 ? `
+   - When asked to upload a resume, you have access to the following file(s): ${uploadedFileNames.join(', ')}
+   - These files are already available to you - just select them when prompted
+   - When you see a file upload field, look for and select: "${uploadedFileNames[0]}"
+   - The file is already uploaded and ready to use - you don't need to upload it again
+   - If the site has a "Choose File" or "Upload Resume" button, click it and select the available file
+   ${resumeContent ? `
+   - Additionally, here's the resume content for reference when filling forms:
+     [Resume content provided below in context]
+   ` : ''}
+   ` : `
+   - If resume upload is required but you can't proceed, skip this job
+   - Note: User hasn't uploaded a resume to their profile
+   `}
+   
+7. ANSWER QUESTIONS:
+   - Use the resume content and job context to answer questions
+   - For salary expectations, research typical ranges for the role/location
+   - For availability, default to "2 weeks notice" or "Immediately"
+   - Make educated guesses based on the job requirements
+   
+8. SUBMIT & TRACK:
+   - Before submitting: "SUBMITTING EXTERNAL APPLICATION TO: [COMPANY] - [JOB TITLE]"
+   - After successful submission, close the tab and return to LinkedIn
+   - Continue with the next job
+
+9. HANDLING FAILURES:
+   - If email verification is required: Skip and move to next job
+   - If technical errors occur: Try once more, then skip if it fails
+   - If the form is too complex or requires documents you don't have: Skip
+   - Always return to LinkedIn tab to continue searching
+
+IMPORTANT EXTERNAL JOB NOTES:
+- You can navigate to any domain when applying to external jobs (not just linkedin.com)
+- Prioritize Easy Apply jobs first, then move to external applications
+- Keep track of successful applications regardless of type
+- If you run out of Easy Apply jobs, actively look for external application opportunities
+
+FILE UPLOAD INSTRUCTIONS:
+${uploadedFileNames.length > 0 ? `
+- You have access to these pre-uploaded files: ${uploadedFileNames.join(', ')}
+- When you encounter a file upload field:
+  1. Click the "Choose File" or "Upload" button
+  2. The file "${uploadedFileNames[0]}" should be available for selection
+  3. Select it from the file picker dialog
+  4. The file will be automatically uploaded
+- These files are already prepared and ready - you don't need to upload anything new
+- If a site shows a file input, the files are accessible through the browser's file system
+` : `
+- No resume file is available for upload
+- If file upload is mandatory, you may need to skip this application
+`}
+` : ''}
+
 ${config.customInstructions ? `
 CUSTOM INSTRUCTIONS:
 ${config.customInstructions}
+` : ''}
+
+${resumeContent && applyToExternalJobs ? `
+USER'S RESUME CONTENT FOR REFERENCE:
+${resumeContent}
+
+Use this resume information to:
+- Answer questions about experience, skills, and qualifications
+- Fill in work history and education sections
+- Provide accurate information about the candidate's background
+- Make informed decisions when answering screening questions
 ` : ''}
 
 PROGRESS TRACKING:
@@ -1425,6 +1612,9 @@ This tracking is essential for saving your applications correctly.`;
   };
 
   const startAutomation = async () => {
+    // Reset user stopped flag when starting new task
+    setUserStoppedTask(false);
+    
     // 🔒 BULLETPROOF SECURITY CHECK - Server-side validation first
     if (!user) {
       setShowPaywall(true);
@@ -1575,6 +1765,9 @@ This tracking is essential for saving your applications correctly.`;
   };
 
   const stopAutomation = async () => {
+    // Set flag to indicate user manually stopped the task
+    setUserStoppedTask(true);
+    
     // Clear polling interval first
     if (pollInterval) {
       clearInterval(pollInterval);
@@ -1588,6 +1781,7 @@ This tracking is essential for saving your applications correctly.`;
       clearAutomationState();
       addLog('⏹️ Automation stopped by user');
       toast.success('Automation stopped');
+      setUserStoppedTask(false);
       return;
     }
 
@@ -1627,6 +1821,7 @@ This tracking is essential for saving your applications correctly.`;
       clearAutomationState();
       addLog('⏹️ Automation stopped by user');
       toast.success('Automation stopped');
+      setUserStoppedTask(false);
     } catch (error) {
       // Even if API call fails, reset UI state so user isn't stuck
       setIsRunning(false);
@@ -1638,11 +1833,15 @@ This tracking is essential for saving your applications correctly.`;
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       if (errorMessage.includes('already stopped') || errorMessage.includes('session')) {
         addLog('⏹️ Automation was already stopped');
-        toast.success('Automation stopped');
+        // Only show toast if not already handled by polling
+        if (!userStoppedTask) {
+          toast.success('Automation stopped');
+        }
       } else {
         addLog(`⚠️ Stop command failed but UI reset: ${errorMessage}`, 'error');
         toast.error('Automation stopped locally (server may still be running)');
       }
+      setUserStoppedTask(false);
     }
   };
 
@@ -1849,39 +2048,42 @@ This tracking is essential for saving your applications correctly.`;
           setPollInterval(null);
             setIsRunning(false);
             
-            addLog('🔄 Fetching final task details for stopped task...', 'info');
-            
-            // Wait a moment and fetch final state
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            try {
-            const finalTask = await getTaskStatus(taskId);
-              setCurrentTask(finalTask);
+            // Only process if this wasn't a manual user stop (to avoid duplicate processing)
+            if (!userStoppedTask) {
+              addLog('🔄 Fetching final task details for stopped task...', 'info');
               
-              const finalStepCount = finalTask.steps?.length || 0;
-              setStepCount(finalStepCount);
+              // Wait a moment and fetch final state
+              await new Promise(resolve => setTimeout(resolve, 1000));
               
-              // Track final step count (this will upsert to ensure we have the correct total)
-            await trackUsage(finalStepCount, taskId);
-              addLog(`📈 Final step count recorded: ${finalStepCount} steps`);
+              try {
+              const finalTask = await getTaskStatus(taskId);
+                setCurrentTask(finalTask);
+                
+                const finalStepCount = finalTask.steps?.length || 0;
+                setStepCount(finalStepCount);
+                
+                // Track final step count (this will upsert to ensure we have the correct total)
+              await trackUsage(finalStepCount, taskId);
+                addLog(`📈 Final step count recorded: ${finalStepCount} steps`);
+                
+                // Mark task as stopped in database with final step count
+              await markTaskCompleted(taskId, finalStepCount, 'stopped');
+                
+                addLog('⏹️ Automation stopped');
+                addLog(`📊 Final step count: ${finalStepCount}`);
+                
+              } catch (error) {
+              await markTaskCompleted(taskId, updatedTask.steps?.length || 0, 'stopped');
+                addLog('⏹️ Automation stopped');
+              }
               
-              // Mark task as stopped in database with final step count
-            await markTaskCompleted(taskId, finalStepCount, 'stopped');
+            // Clear automation state and refresh usage data
+            clearAutomationState();
+              fetchUserSubscription();
               
-              addLog('⏹️ Automation stopped by user');
-              addLog(`📊 Final step count: ${finalStepCount}`);
-              
-            } catch (error) {
-            await markTaskCompleted(taskId, updatedTask.steps?.length || 0, 'stopped');
-              addLog('⏹️ Automation stopped by user');
+              // Force billing page to refresh by dispatching a custom event
+              window.dispatchEvent(new CustomEvent('billing-refresh-needed'));
             }
-            
-          // Clear automation state and refresh usage data
-          clearAutomationState();
-            fetchUserSubscription();
-            
-            // Force billing page to refresh by dispatching a custom event
-            window.dispatchEvent(new CustomEvent('billing-refresh-needed'));
           }
         } catch (error) {
           if (error instanceof Error && error.name !== 'AbortError') {
@@ -2713,6 +2915,198 @@ This tracking is essential for saving your applications correctly.`;
               value={config.customInstructions}
               onChange={(e) => setConfig(prev => ({ ...prev, customInstructions: e.target.value }))}
             />
+          </div>
+
+          {/* External Job Application Settings */}
+          <div className="space-y-6">
+            <div className="flex items-center space-x-3 pb-4 border-b border-gray-300/50 dark:border-gray-700/50">
+              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
+                <ExternalLink className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white">External Job Applications</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Configure settings for non-Easy Apply jobs</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="w-5 h-5 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 dark:focus:ring-purple-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                  checked={config.applyToExternalJobs || false}
+                  onChange={(e) => setConfig(prev => ({ ...prev, applyToExternalJobs: e.target.checked }))}
+                />
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  Apply to jobs that open external links
+                </span>
+              </label>
+
+              {config.applyToExternalJobs && (
+                <div className="space-y-4 pl-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Email for External Jobs
+                      </label>
+                      <input
+                        type="email"
+                        className="w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200"
+                        placeholder="email@example.com"
+                        value={config.externalJobEmail || ''}
+                        onChange={(e) => setConfig(prev => ({ ...prev, externalJobEmail: e.target.value }))}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Password for External Jobs
+                      </label>
+                      <input
+                        type="password"
+                        className="w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200"
+                        placeholder="••••••••"
+                        value={config.externalJobPassword || ''}
+                        onChange={(e) => setConfig(prev => ({ ...prev, externalJobPassword: e.target.value }))}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        First Name
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200"
+                        placeholder="John"
+                        value={config.firstName || ''}
+                        onChange={(e) => setConfig(prev => ({ ...prev, firstName: e.target.value }))}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Last Name
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200"
+                        placeholder="Doe"
+                        value={config.lastName || ''}
+                        onChange={(e) => setConfig(prev => ({ ...prev, lastName: e.target.value }))}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Address
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200"
+                        placeholder="123 Main St"
+                        value={config.address || ''}
+                        onChange={(e) => setConfig(prev => ({ ...prev, address: e.target.value }))}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        City
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200"
+                        placeholder="San Francisco"
+                        value={config.city || ''}
+                        onChange={(e) => setConfig(prev => ({ ...prev, city: e.target.value }))}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        State
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200"
+                        placeholder="CA"
+                        value={config.state || ''}
+                        onChange={(e) => setConfig(prev => ({ ...prev, state: e.target.value }))}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Zip Code
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200"
+                        placeholder="94105"
+                        value={config.zipCode || ''}
+                        onChange={(e) => setConfig(prev => ({ ...prev, zipCode: e.target.value }))}
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        LinkedIn Profile URL
+                      </label>
+                      <input
+                        type="url"
+                        className="w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200"
+                        placeholder="https://linkedin.com/in/yourprofile"
+                        value={config.linkedInProfileUrl || ''}
+                        onChange={(e) => setConfig(prev => ({ ...prev, linkedInProfileUrl: e.target.value }))}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Portfolio URL (Optional)
+                      </label>
+                      <input
+                        type="url"
+                        className="w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200"
+                        placeholder="https://yourportfolio.com"
+                        value={config.portfolioUrl || ''}
+                        onChange={(e) => setConfig(prev => ({ ...prev, portfolioUrl: e.target.value }))}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        GitHub URL (Optional)
+                      </label>
+                      <input
+                        type="url"
+                        className="w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200"
+                        placeholder="https://github.com/yourusername"
+                        value={config.githubUrl || ''}
+                        onChange={(e) => setConfig(prev => ({ ...prev, githubUrl: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
+                    <div className="flex items-start space-x-3">
+                      <div className="p-2 bg-purple-100 dark:bg-purple-800 rounded-lg">
+                        <Shield className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-purple-800 dark:text-purple-200 mb-1">
+                          Account Creation & Security
+                        </p>
+                        <p className="text-xs text-purple-600 dark:text-purple-300">
+                          The AI agent will use this information to create accounts on external job platforms and fill application forms. Your resume from the profile section will be automatically uploaded when needed.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
         </div>
