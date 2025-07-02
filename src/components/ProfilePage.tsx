@@ -143,27 +143,7 @@ export const ProfilePage: React.FC = () => {
       if (isSupabaseConfigured() && user) {
         let currentProfile = profile;
         
-        if (!currentProfile) {
-          // Create new profile
-          console.log('No profile found, creating one...');
-          const { data: newProfile, error: createError } = await supabase
-            .from('profiles')
-            .insert({
-              user_id: user.id,
-              full_name: formData.full_name,
-              phone: formData.phone || null,
-            })
-            .select()
-            .single();
-
-          if (createError) {
-            throw new Error(`Failed to create profile: ${createError.message}`);
-          }
-
-          currentProfile = newProfile;
-          setProfile(newProfile);
-          console.log('Profile created successfully:', newProfile.id);
-        } else {
+        if (currentProfile) {
           // Update existing profile
           const { error } = await supabase
             .from('profiles')
@@ -182,6 +162,11 @@ export const ProfilePage: React.FC = () => {
             full_name: formData.full_name,
             phone: formData.phone || null,
           } : null);
+        } else {
+          // Profile doesn't exist yet, which means the database trigger hasn't created it
+          // This should not happen if the trigger is properly configured
+          toast.error('Profile not found. Please try refreshing the page or contact support.');
+          return;
         }
       }
 
@@ -223,27 +208,11 @@ export const ProfilePage: React.FC = () => {
     
     try {
       if (isSupabaseConfigured() && user) {
-        // Create profile if it doesn't exist
+        // Check if profile exists
         let currentProfile = profile;
         if (!currentProfile) {
-          console.log('No profile found, creating one...');
-          const { data: newProfile, error: createError } = await supabase
-            .from('profiles')
-            .insert({
-              user_id: user.id,
-              full_name: user.user_metadata?.full_name || formData.full_name || 'User',
-              phone: formData.phone || null,
-            })
-            .select()
-            .single();
-
-          if (createError) {
-            throw new Error(`Failed to create profile: ${createError.message}`);
-          }
-
-          currentProfile = newProfile;
-          setProfile(newProfile);
-          console.log('Profile created successfully:', newProfile.id);
+          toast.error('Profile not found. Please save your profile information first.');
+          return;
         }
 
         // Upload the file
