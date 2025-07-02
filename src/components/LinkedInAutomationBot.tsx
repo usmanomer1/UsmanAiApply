@@ -1328,16 +1328,21 @@ STEP-BY-STEP PROCESS:
    c. Extract the exact job title from the posting
    ${applyToExternalJobs ? `
    d. Check if it's an Easy Apply job or external application:
-      - If Easy Apply: Click the "Easy Apply" button and follow steps e-k below
+      - If Easy Apply: Click the "Easy Apply" button and follow steps e-l below
       - If External: Click the external apply button and follow the EXTERNAL JOB APPLICATION INSTRUCTIONS
    ` : 'd. Click the "Easy Apply" button'}
-   e. Fill out the application form (scroll down if you can't see all fields)
-   f. Answer any questions that appear (scroll to see all questions)
-   g. Upload resume if prompted - use the specified LinkedIn resume: "${config.linkedinResume || 'Use the most recent resume available'}"
-   h. SCROLL DOWN to find the "Submit" or "Submit application" button
-   i. Before clicking submit, repeat: "SUBMITTING APPLICATION TO: [COMPANY NAME] - [JOB TITLE]"
-   j. Click submit to complete the application
-   k. Close the modal and move to the next job
+   e. Fill out the application form (ALWAYS scroll down to see all fields - some are hidden below)
+   f. Answer any questions that appear (scroll down after each answer to see more questions)
+   g. For multi-step forms: Complete current step, then scroll down to find "Next" or "Continue" button
+   h. Upload resume if prompted - use the specified LinkedIn resume: "${config.linkedinResume || 'Use the most recent resume available'}"
+   i. CRITICAL: ALWAYS SCROLL DOWN to find the "Submit" or "Submit application" button
+      - The submit button is ALWAYS at the bottom of the form
+      - Keep scrolling down until you see the submit button - it's never visible without scrolling
+      - Look for buttons like "Submit", "Submit application", "Apply", or "Send application"
+      - If you don't see a submit button, scroll down more - it's there
+   j. Before clicking submit, repeat: "SUBMITTING APPLICATION TO: [COMPANY NAME] - [JOB TITLE]"
+   k. Click the submit button to complete the application
+   l. Close the modal and move to the next job
 6. Continue applying to jobs until you've completed ${config.targetCount} applications
 7. If you run out of ${applyToExternalJobs ? 'applicable jobs (Easy Apply or external)' : 'Easy Apply jobs'} on the current page:
    - Scroll down to load more jobs or click "See more jobs" if available
@@ -1345,13 +1350,24 @@ STEP-BY-STEP PROCESS:
    - Try adjusting filters or broadening search criteria
    - Only stop when you've reached the target or no more suitable jobs are available
 
-CRITICAL SCROLLING INSTRUCTIONS:
+🚨 CRITICAL SCROLLING INSTRUCTIONS - MUST FOLLOW:
 
-- ALWAYS scroll down when you can't find buttons like "Submit", "Next", "Continue", or "Apply"
-- LinkedIn forms often have content below the fold - scroll to reveal hidden elements
-- If you encounter form questions but can't see all of them, scroll down to see more questions
-- When stuck on any form, try scrolling both up and down to find missing elements
-- Easy Apply modals often require scrolling to see the submit button
+- **MANDATORY**: ALWAYS scroll down when you can't find buttons like "Submit", "Next", "Continue", or "Apply"
+- **SUBMIT BUTTON RULE**: The submit button is NEVER visible without scrolling down - this is LinkedIn's design
+- **KEEP SCROLLING**: If you don't see a submit button, keep scrolling down until you find it
+- **LinkedIn FORM BEHAVIOR**: LinkedIn forms often have content below the fold - scroll to reveal hidden elements
+- **FORM COMPLETION**: If you encounter form questions but can't see all of them, scroll down to see more questions
+- **TROUBLESHOOTING**: When stuck on any form, try scrolling both up and down to find missing elements
+- **FINAL REVIEW PAGE**: On the final review page, the submit button is always at the bottom - scroll to find it
+- **NEVER SKIP**: Never assume there's no submit button - always scroll down to look for it
+
+📝 SUBMISSION PROCESS - CRITICAL:
+1. **FIND THE SUBMIT BUTTON**: After filling all fields, scroll to the very bottom of the form
+2. **BUTTON VARIATIONS**: Look for "Submit", "Submit application", "Apply", "Send application", or "Review and submit"
+3. **SCROLL PERSISTENCE**: If you don't see any submit button, keep scrolling down - it exists
+4. **PAGE COMPLETION**: Make sure all required fields are filled before the submit button becomes active
+5. **FINAL ACTION**: Click the submit button only after scrolling down and finding it
+6. **CONFIRMATION**: Wait for LinkedIn to show a success message or redirect before moving to next job
 
 COMPANY NAME EXTRACTION REQUIREMENTS:
 - Extract the ACTUAL company name from the LinkedIn job posting
@@ -1371,11 +1387,14 @@ JOB TITLE EXTRACTION REQUIREMENTS:
 - Use the full title as displayed on LinkedIn
 - Examples: "Senior Software Engineer", "Product Manager", "Data Scientist"
 
-FORM HANDLING GUIDELINES:
-- Always scroll down in Easy Apply forms to ensure you see all content
-- If you can't find a "Submit" button, scroll down - it's usually below the visible area
-- For multi-step forms, look for "Next" or "Continue" buttons (may require scrolling)
-- If forms have multiple questions, scroll to see all questions before proceeding
+🔧 FORM HANDLING GUIDELINES - LINKEDIN EASY APPLY:
+- **ESSENTIAL**: Always scroll down in Easy Apply forms to ensure you see all content
+- **SUBMIT BUTTON LOCATION**: Submit buttons are ALWAYS at the bottom - never visible without scrolling
+- **MULTI-STEP PROCESS**: LinkedIn Easy Apply often has 2-4 steps with Next/Continue buttons between them
+- **STEP NAVIGATION**: For multi-step forms, look for "Next" or "Continue" buttons (ALWAYS scroll down to find them)
+- **COMPLETE ALL FIELDS**: If forms have multiple questions, scroll to see all questions before proceeding
+- **FORM VALIDATION**: LinkedIn will not show the submit button until all required fields are filled
+- **FINAL REVIEW**: The last step is usually a review page - scroll down to find the final submit button
 - 🔧 RESUME HANDLING: If prompted to select a resume/CV file:
   * Look for existing resumes in the dropdown/selection list
   * Search for resume named: "${config.linkedinResume}"
