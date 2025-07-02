@@ -29,7 +29,8 @@ import {
   Lightbulb,
   MessageSquare,
   PenTool,
-  Bot
+  Bot,
+  X
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
