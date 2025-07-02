@@ -1359,7 +1359,7 @@ ${isAllJobsMode ? `
    d. Click the "Easy Apply" button
    e. Fill out the application form (scroll down if you can't see all fields)
    f. Answer any questions that appear (scroll to see all questions)
-   g. Upload resume if prompted - use the specified LinkedIn resume: "${config.linkedinResume || 'Use the most recent resume available'}" ${resumeFile ? `(User has uploaded: ${resumeFile.filename})` : ''}
+   g. Select resume if prompted - choose from LinkedIn's resume dropdown the one named: "${config.linkedinResume || 'Use the most recent resume available'}" (DO NOT upload files, only select from existing LinkedIn resumes)
    h. SCROLL DOWN to find the "Submit" or "Submit application" button
    i. Before clicking submit, repeat: "SUBMITTING APPLICATION TO: [COMPANY NAME] - [JOB TITLE]"
    j. Click submit to complete the application
@@ -1383,7 +1383,7 @@ ${isAllJobsMode ? `
         * LinkedIn: ${externalData?.linkedinProfile || 'https://linkedin.com/in/profile'}
         * Portfolio: ${externalData?.portfolioWebsite || ''}
         * GitHub: ${externalData?.githubProfile || ''}
-             - Upload resume if required: ${resumeFile ? `Download and upload the resume from this URL: ${resumeFile.url} (filename: ${resumeFile.filename})` : 'Resume file not available - inform user to upload manually'}
+             - Upload resume if required (EXTERNAL SITES ONLY): ${resumeFile ? `Download and upload the resume from this URL: ${resumeFile.url} (filename: ${resumeFile.filename})` : 'Resume file not available - inform user to upload manually'}
        - Answer application questions intelligently based on the job requirements and resume content
        - Complete all required fields
    e. Before submitting, repeat: "SUBMITTING APPLICATION TO: [COMPANY NAME] - [JOB TITLE] (EXTERNAL)"
@@ -1397,7 +1397,7 @@ ${isAllJobsMode ? `
    d. Click the "Easy Apply" button
    e. Fill out the application form (scroll down if you can't see all fields)
    f. Answer any questions that appear (scroll to see all questions)
-   g. Upload resume if prompted - use the specified LinkedIn resume: "${config.linkedinResume || 'Use the most recent resume available'}" ${resumeFile ? `(User has uploaded: ${resumeFile.filename})` : ''}
+   g. Select resume if prompted - choose from LinkedIn's resume dropdown the one named: "${config.linkedinResume || 'Use the most recent resume available'}" (DO NOT upload files, only select from existing LinkedIn resumes)
    h. SCROLL DOWN to find the "Submit" or "Submit application" button
    i. Before clicking submit, repeat: "SUBMITTING APPLICATION TO: [COMPANY NAME] - [JOB TITLE]"
    j. Click submit to complete the application
@@ -1441,13 +1441,13 @@ FORM HANDLING GUIDELINES:
 - If you can't find a "Submit" button, scroll down - it's usually below the visible area
 - For multi-step forms, look for "Next" or "Continue" buttons (may require scrolling)
 - If forms have multiple questions, scroll to see all questions before proceeding
-- 🔧 RESUME HANDLING: If prompted to select a resume/CV file:
-  * Look for existing resumes in the dropdown/selection list
+- 🔧 RESUME HANDLING FOR EASY APPLY: If prompted to select a resume/CV file:
+  * Look for existing resumes in the dropdown/selection list on LinkedIn
   * Search for resume named: "${config.linkedinResume}"
-  * Select the resume that matches this exact name
-  * DO NOT upload a new file - always use existing uploaded resumes
-  * If you can't find the exact name, select the most recent resume available
-  * NEVER try to upload files during automation
+  * Select the resume that matches this exact name from LinkedIn's uploaded resumes
+  * DO NOT upload a new file - always use existing uploaded resumes from LinkedIn
+  * If you can't find the exact name, select the most recent resume available from LinkedIn
+  * NEVER try to upload files during Easy Apply - only select from LinkedIn's existing resumes
 - Skip optional fields if they're complex, but fill required fields
 - If a form seems stuck, try scrolling up and down to find missing elements
 - When filling contact information:
@@ -1481,7 +1481,11 @@ CREDENTIALS:
 - Password: (use the value from the secret variable ln_password)
 - Country Code: ${config.countryCode.split('-')[0]}
 - Phone Number (without country code): ${config.contactNumber}
-- Resume to Use: ${config.linkedinResume || 'Most recent available'}
+
+RESUME HANDLING SUMMARY:
+- For LinkedIn Easy Apply: SELECT from dropdown the resume named "${config.linkedinResume || 'Most recent available'}"
+- For External Applications: UPLOAD the resume file from the provided URL
+- For All Applications: USE the resume content above to answer questions intelligently
 
 ${config.customInstructions ? `
 CUSTOM INSTRUCTIONS:
