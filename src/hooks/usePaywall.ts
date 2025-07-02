@@ -41,8 +41,32 @@ export const usePaywall = () => {
         reason: accessCheck.reason,
         requiredPlan: accessCheck.requiredPlan
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error checking feature access:', error);
+      
+      // For database/RPC errors, be more lenient with paid users
+      if (error?.message?.includes('function') || error?.code === 'PGRST301') {
+        console.warn('Database function error detected, checking subscription status only');
+        
+        try {
+          // If there's a database function error, at least check if they have a subscription
+          const hasActiveSub = await subscriptionService.hasActiveSubscription(user.id);
+          
+          // If they have an active subscription, allow access (fail open for paid users)
+          if (hasActiveSub) {
+            return {
+              hasAccess: true,
+              showPaywall: false,
+              reason: 'subscription_verified',
+              requiredPlan: undefined
+            };
+          }
+        } catch (subError) {
+          console.error('Error checking subscription fallback:', subError);
+        }
+      }
+      
+      // Only show paywall for non-subscribers or when we can't verify
       return {
         hasAccess: false,
         showPaywall: true,

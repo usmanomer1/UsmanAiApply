@@ -39,4 +39,10 @@ export {
   TableCaption,
 } from './table'
 export { Logo } from './Logo'
-export { default as SessionStatusDisplay } from './SessionStatusDisplay' 
+export { default as SessionStatusDisplay } from './SessionStatusDisplay'
+export { Progress } from './progress'
+export { default as ConditionalBackground } from './ConditionalBackground'
+export { default as ExtensionErrorStatus } from './ExtensionErrorStatus'
+export { PaywallModal } from './PaywallModal'
+export { default as UsageStatusDisplay } from './UsageStatusDisplay'
+export { EmailVerificationError } from './EmailVerificationError' 

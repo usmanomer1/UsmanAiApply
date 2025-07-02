@@ -14,6 +14,7 @@ import { getSubscriptionProducts } from '../../stripe-config';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../contexts/ThemeContext';
 import Turnstile from 'react-turnstile';
+import { EmailVerificationError } from '../ui/EmailVerificationError';
 
 type AuthMode = 'login' | 'signup' | 'forgot-password';
 
@@ -22,6 +23,7 @@ export const CustomAuthPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [emailVerificationError, setEmailVerificationError] = useState<{ email: string } | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -114,6 +116,7 @@ export const CustomAuthPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage(null);
+    setEmailVerificationError(null);
     if (!captchaToken) {
       setMessage({ type: 'error', text: 'Please complete the CAPTCHA.' });
       return;
@@ -162,7 +165,12 @@ export const CustomAuthPage: React.FC = () => {
         }
       }
     } catch (error: any) {
-      setMessage({ type: 'error', text: error.message || 'An error occurred' });
+      // Check if it's an email verification error
+      if (error.message === 'email_not_verified') {
+        setEmailVerificationError({ email: error.email });
+      } else {
+        setMessage({ type: 'error', text: error.message || 'An error occurred' });
+      }
     } finally {
       setLoading(false);
     }
@@ -411,7 +419,13 @@ export const CustomAuthPage: React.FC = () => {
 
               {/* Message Display */}
               <AnimatePresence>
-                {message && (
+                {emailVerificationError && (
+                  <EmailVerificationError
+                    initialEmail={emailVerificationError.email}
+                    onClose={() => setEmailVerificationError(null)}
+                  />
+                )}
+                {message && !emailVerificationError && (
                   <motion.div
                     initial={{ opacity: 0, y: -10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}

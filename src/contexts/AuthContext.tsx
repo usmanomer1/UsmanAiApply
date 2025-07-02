@@ -10,6 +10,7 @@ interface AuthContextType {
   signIn: (email: string, password: string, captchaToken?: string) => Promise<void>;
   signUp: (email: string, password: string, fullName: string, captchaToken?: string) => Promise<void>;
   signOut: () => Promise<void>;
+  resendEmailVerification: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -110,6 +111,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (error) {
+        // Check if it's an email verification error
+        if (error.message.includes('Email not confirmed') || error.message.includes('email address is not confirmed')) {
+          const verificationError = new Error('email_not_verified');
+          (verificationError as any).email = email;
+          (verificationError as any).originalMessage = error.message;
+          toast.error('Your email isn\'t verified. Please check your inbox or resend the verification email.');
+          throw verificationError;
+        }
+        
         toast.error(error.message);
         throw error;
       }
@@ -191,6 +201,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const resendEmailVerification = async (email: string) => {
+    try {
+      if (!isSupabaseConfigured()) {
+        toast.error('Authentication service not configured. Please check your environment variables.');
+        throw new Error('Supabase not configured');
+      }
+
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+      });
+
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+
+      toast.success('Verification email sent! Please check your inbox.');
+    } catch (error) {
+      throw error;
+    }
+  };
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -198,6 +231,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       signIn,
       signUp,
       signOut,
+      resendEmailVerification,
     }}>
       {children}
     </AuthContext.Provider>
