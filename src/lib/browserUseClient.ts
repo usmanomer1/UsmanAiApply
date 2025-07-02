@@ -13,6 +13,7 @@ export interface BrowserUseTaskConfig {
   llm_model?: components['schemas']['LLMModel'];
   allowed_domains?: string[];
   secrets?: { [key: string]: string } | null;
+  included_file_names?: string[] | null;
 }
 
 export interface TaskWithSession {
@@ -61,7 +62,7 @@ export class BrowserUseClient {
       allowed_domains: config.allowed_domains ?? ['linkedin.com', '*.linkedin.com'],
       secrets: config.secrets ?? null,
       structured_output_json: null,
-      included_file_names: null
+      included_file_names: config.included_file_names ?? null
     };
 
     const controller = new AbortController();
@@ -97,6 +98,54 @@ export class BrowserUseClient {
         }
       }
       
+      throw error;
+    }
+  }
+
+  /**
+   * Upload a file to browser-use storage
+   * @param file The file to upload
+   * @returns The filename that can be used in included_file_names
+   */
+  async uploadFile(file: File): Promise<string> {
+    try {
+      // Step 1: Get presigned URL
+      const presignedResponse = await fetch(`${this.baseUrl}/uploads/presigned-url`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey.trim()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          file_name: file.name,
+          content_type: file.type || 'application/octet-stream',
+        }),
+      });
+
+      if (!presignedResponse.ok) {
+        const errorText = await presignedResponse.text();
+        throw new Error(`Failed to get presigned URL: ${errorText}`);
+      }
+
+      const { upload_url }: components['schemas']['UploadFileResponse'] = await presignedResponse.json();
+
+      // Step 2: Upload file to presigned URL
+      const uploadResponse = await fetch(upload_url, {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': file.type || 'application/octet-stream',
+        },
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error(`Failed to upload file: ${uploadResponse.statusText}`);
+      }
+
+      // Return the filename to use in included_file_names
+      return file.name;
+    } catch (error) {
+      console.error('Error uploading file:', error);
       throw error;
     }
   }
