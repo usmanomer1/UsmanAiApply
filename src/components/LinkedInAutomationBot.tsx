@@ -344,6 +344,10 @@ const LinkedInAutomationBot: React.FC = () => {
   const [showPaywall, setShowPaywall] = useState(false);
   const [accessCheckComplete, setAccessCheckComplete] = useState(false);
   
+  // Resume content state
+  const [resumeContent, setResumeContent] = useState<string | null>(null);
+  const [resumeFile, setResumeFile] = useState<{ url: string; filename: string } | null>(null);
+  
   // Browser client state (no session management)
   const [browserClient, setBrowserClient] = useState<BrowserUseClient | null>(null);
 
@@ -651,6 +655,69 @@ const LinkedInAutomationBot: React.FC = () => {
       return content;
     } catch (error) {
       return null;
+    }
+  };
+
+  const fetchUserResumeForAutomation = async (): Promise<{ content: string | null; fileUrl: string | null; filename: string | null }> => {
+    try {
+      if (!user) return { content: null, fileUrl: null, filename: null };
+
+      // Get user profile with resume URL
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('resume_url, full_name')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error || !profile?.resume_url) {
+        return { content: null, fileUrl: null, filename: null };
+      }
+
+      // Get a longer-lived signed URL for file uploads (24 hours)
+      const { data: signedUrlData } = await supabase.storage
+        .from('resumes')
+        .createSignedUrl(profile.resume_url, 86400); // 24 hours for automation
+
+      if (!signedUrlData?.signedUrl) {
+        return { content: null, fileUrl: null, filename: null };
+      }
+
+      // Extract filename from the resume_url
+      const filename = profile.resume_url.split('/').pop() || 'resume.pdf';
+
+      // Fetch the file content for text extraction
+      const response = await fetch(signedUrlData.signedUrl);
+      if (!response.ok) {
+        return { content: null, fileUrl: signedUrlData.signedUrl, filename };
+      }
+
+      let content: string | null = null;
+
+      // Check if it's a PDF file
+      const contentType = response.headers.get('content-type');
+      if (contentType?.includes('application/pdf')) {
+        // For PDF files, try to extract text content
+        try {
+          const arrayBuffer = await response.arrayBuffer();
+          const file = new File([arrayBuffer], filename, { type: 'application/pdf' });
+          const { extractTextFromPDF } = await import('../lib/pdfExtractor');
+          const extractedText = await extractTextFromPDF(file);
+          content = extractedText || `[PDF Resume for ${profile.full_name || 'User'} - Text extraction failed, but user has uploaded their resume]`;
+        } catch (error) {
+          content = `[PDF Resume for ${profile.full_name || 'User'} - Text extraction failed, but user has uploaded their resume]`;
+        }
+      } else {
+        // For text files, read as text
+        content = await response.text();
+      }
+
+      return { 
+        content, 
+        fileUrl: signedUrlData.signedUrl, 
+        filename 
+      };
+    } catch (error) {
+      return { content: null, fileUrl: null, filename: null };
     }
   };
 
@@ -1262,6 +1329,21 @@ const LinkedInAutomationBot: React.FC = () => {
     
     return `You are an AI assistant helping with LinkedIn job applications. Your goal is to apply to ${config.targetCount} jobs ${isAllJobsMode ? 'using both Easy Apply and external company websites' : 'using LinkedIn\'s "Easy Apply" feature'}.
 
+${resumeContent ? `
+RESUME CONTEXT:
+Here is the user's resume content to help you answer application questions intelligently:
+
+${resumeContent}
+
+Use this resume information to:
+- Answer questions about experience, skills, and qualifications
+- Provide relevant examples when applications ask for specific experiences
+- Tailor responses to match the user's background
+- Make intelligent decisions about years of experience, skill levels, etc.
+` : `
+NOTE: No resume content available - you'll need to make reasonable assumptions for application questions.
+`}
+
 STEP-BY-STEP PROCESS:
 1. Navigate directly to the job search URL: ${linkedinUrl}
 2. If you need to login, use the provided credentials (email: ${config.linkedinEmail}, password: (use the value from the secret variable ln_password))
@@ -1277,7 +1359,7 @@ ${isAllJobsMode ? `
    d. Click the "Easy Apply" button
    e. Fill out the application form (scroll down if you can't see all fields)
    f. Answer any questions that appear (scroll to see all questions)
-   g. Upload resume if prompted - use the specified LinkedIn resume: "${config.linkedinResume || 'Use the most recent resume available'}"
+   g. Upload resume if prompted - use the specified LinkedIn resume: "${config.linkedinResume || 'Use the most recent resume available'}" ${resumeFile ? `(User has uploaded: ${resumeFile.filename})` : ''}
    h. SCROLL DOWN to find the "Submit" or "Submit application" button
    i. Before clicking submit, repeat: "SUBMITTING APPLICATION TO: [COMPANY NAME] - [JOB TITLE]"
    j. Click submit to complete the application
@@ -1301,9 +1383,9 @@ ${isAllJobsMode ? `
         * LinkedIn: ${externalData?.linkedinProfile || 'https://linkedin.com/in/profile'}
         * Portfolio: ${externalData?.portfolioWebsite || ''}
         * GitHub: ${externalData?.githubProfile || ''}
-      - Upload resume if required (use browser file upload)
-      - Answer application questions intelligently based on the job requirements
-      - Complete all required fields
+             - Upload resume if required: ${resumeFile ? `Download and upload the resume from this URL: ${resumeFile.url} (filename: ${resumeFile.filename})` : 'Resume file not available - inform user to upload manually'}
+       - Answer application questions intelligently based on the job requirements and resume content
+       - Complete all required fields
    e. Before submitting, repeat: "SUBMITTING APPLICATION TO: [COMPANY NAME] - [JOB TITLE] (EXTERNAL)"
    f. Submit the external application
    g. Return to LinkedIn (navigate back or open new tab to LinkedIn)
@@ -1315,7 +1397,7 @@ ${isAllJobsMode ? `
    d. Click the "Easy Apply" button
    e. Fill out the application form (scroll down if you can't see all fields)
    f. Answer any questions that appear (scroll to see all questions)
-   g. Upload resume if prompted - use the specified LinkedIn resume: "${config.linkedinResume || 'Use the most recent resume available'}"
+   g. Upload resume if prompted - use the specified LinkedIn resume: "${config.linkedinResume || 'Use the most recent resume available'}" ${resumeFile ? `(User has uploaded: ${resumeFile.filename})` : ''}
    h. SCROLL DOWN to find the "Submit" or "Submit application" button
    i. Before clicking submit, repeat: "SUBMITTING APPLICATION TO: [COMPANY NAME] - [JOB TITLE]"
    j. Click submit to complete the application
@@ -1374,17 +1456,20 @@ FORM HANDLING GUIDELINES:
   * Do NOT add the country code to the phone number field if you already selected it in a dropdown
 
 🤖 DYNAMIC FIELD HANDLING:
-- For fields that are dynamic and you don't have specific information to input, make EDUCATED GUESSES
+- For fields that are dynamic and you don't have specific information to input, make EDUCATED GUESSES based on the resume content
+${resumeContent ? '- USE THE RESUME CONTENT ABOVE to answer questions about experience, skills, education, and qualifications accurately' : ''}
 - Use context clues from the job posting, company, and role to provide reasonable answers
 - Examples of educated guesses:
-  * Years of experience: Base on the job level (entry=1-2, mid=3-5, senior=5+)
+  * Years of experience: ${resumeContent ? 'Extract from resume content or calculate based on work history' : 'Base on the job level (entry=1-2, mid=3-5, senior=5+)'}
   * Salary expectations: Research typical ranges for the role/location
   * Availability: Default to "2 weeks notice" or "Available immediately"
-  * Skills questions: Answer positively if it's related to the job title
-  * Certifications: Only claim if commonly associated with the role
+  * Skills questions: ${resumeContent ? 'Answer based on skills mentioned in the resume' : 'Answer positively if it\'s related to the job title'}
+  * Certifications: ${resumeContent ? 'Only claim certifications mentioned in the resume' : 'Only claim if commonly associated with the role'}
+  * Education: ${resumeContent ? 'Use education details from the resume' : 'Make reasonable assumptions'}
+  * Previous companies: ${resumeContent ? 'Reference companies from the resume when relevant' : 'Make reasonable assumptions'}
 - NEVER leave required fields blank - always provide a reasonable guess
-- For yes/no questions about skills/experience, err on the side of confidence if it's job-relevant
-- For text fields asking "Why are you interested?", provide a brief, professional response based on the company/role
+- For yes/no questions about skills/experience, ${resumeContent ? 'answer based on what\'s in the resume, or err on the side of confidence if it\'s job-relevant' : 'err on the side of confidence if it\'s job-relevant'}
+- For text fields asking "Why are you interested?", provide a brief, professional response based on the company/role ${resumeContent ? 'and relevant experience from the resume' : ''}
 
 LOGIN GUIDANCE:
 - If prompted to login, enter email: ${config.linkedinEmail} and password: (use the value from the secret variable ln_password)
@@ -1595,6 +1680,24 @@ This tracking is essential for saving your applications correctly.`;
 
     try {
       addLog('🚀 Starting LinkedIn automation...');
+      
+      // Fetch resume content and file for automation
+      addLog('📄 Fetching resume content and file...');
+      const resumeData = await fetchUserResumeForAutomation();
+      
+      if (resumeData.content) {
+        setResumeContent(resumeData.content);
+        addLog('✅ Resume content loaded successfully');
+      } else {
+        addLog('⚠️ No resume found - applications may be less effective', 'error');
+      }
+      
+      if (resumeData.fileUrl && resumeData.filename) {
+        setResumeFile({ url: resumeData.fileUrl, filename: resumeData.filename });
+        addLog(`✅ Resume file prepared: ${resumeData.filename}`);
+      } else {
+        addLog('⚠️ Resume file not available for external applications', 'error');
+      }
       
       const task = await createLinkedInTask();
       setCurrentTask(task);
