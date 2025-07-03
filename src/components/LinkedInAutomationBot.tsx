@@ -1329,7 +1329,14 @@ STEP-BY-STEP PROCESS:
    ${applyToExternalJobs ? `
    d. Check if it's an Easy Apply job or external application:
       - If Easy Apply: Click the "Easy Apply" button and follow steps e-l below
-      - If External: Click the external apply button and follow the EXTERNAL JOB APPLICATION INSTRUCTIONS
+      - If External: 
+        🚨 **STOP! CRITICAL CHECKPOINT** 🚨
+        1. Click the external apply button
+        2. **IMMEDIATELY** look for new browser tab at top of screen
+        3. Click on the NEW tab (not LinkedIn tab)
+        4. Verify you're on external company website (URL ≠ linkedin.com)
+        5. ONLY THEN follow the EXTERNAL JOB APPLICATION INSTRUCTIONS
+        6. If you're still on LinkedIn after clicking external apply, YOU FAILED - try again
    ` : 'd. Click the "Easy Apply" button'}
    e. Fill out the application form (ALWAYS scroll down to see all fields - some are hidden below)
    f. Answer any questions that appear (scroll down after each answer to see more questions)
@@ -1343,6 +1350,8 @@ STEP-BY-STEP PROCESS:
    j. Before clicking submit, repeat: "SUBMITTING APPLICATION TO: [COMPANY NAME] - [JOB TITLE]"
    k. Click the submit button to complete the application
    l. Close the modal and move to the next job
+   
+   📍 **IMPORTANT**: Steps e-l above are ONLY for Easy Apply jobs on LinkedIn. If you clicked an external apply button, you should NOT be following these steps - you should be on an external company website following the EXTERNAL JOB APPLICATION INSTRUCTIONS.
 6. Continue applying to jobs until you've completed ${config.targetCount} applications
 7. If you run out of ${applyToExternalJobs ? 'applicable jobs (Easy Apply or external)' : 'Easy Apply jobs'} on the current page:
    - Scroll down to load more jobs or click "See more jobs" if available
@@ -1436,16 +1445,81 @@ CREDENTIALS:
 
 ${applyToExternalJobs ? `
 🌐 EXTERNAL JOB APPLICATION INSTRUCTIONS:
+
+🔥🔥🔥 **EMERGENCY ALERT - TAB SWITCHING ISSUE** 🔥🔥🔥
+⚠️  **YOU HAVE BEEN FAILING TO SWITCH TABS PROPERLY**
+⚠️  **THIS IS THE #1 ISSUE THAT MUST BE FIXED IMMEDIATELY**
+
+**THE PROBLEM**: You click external apply buttons but stay on LinkedIn instead of switching to the new tab
+**THE SOLUTION**: Follow the mandatory tab switching steps below EXACTLY
+**THE RESULT**: You will successfully apply to external jobs instead of failing
+
 When you encounter job postings that don't have "Easy Apply" but have external application links:
+
+🔄 **TAB MANAGEMENT RULES** (ABSOLUTELY CRITICAL - MANDATORY BEHAVIOR):
+⚠️  **THIS IS THE MOST IMPORTANT INSTRUCTION - FOLLOW EXACTLY:**
+
+1. **IMMEDIATE TAB SWITCH REQUIREMENT**: The MOMENT you click any external apply button on LinkedIn:
+   - LinkedIn will open the external site in a NEW TAB
+   - You ABSOLUTELY MUST immediately switch to that new tab
+   - DO NOT perform any other actions on LinkedIn before switching tabs
+   - DO NOT look for more jobs on LinkedIn before switching tabs
+   - DO NOT continue browsing LinkedIn before switching tabs
+
+2. **HOW TO SWITCH TABS** (Follow these exact steps):
+   - Step 1: Click the external apply button (new tab opens)
+   - Step 2: Look at the browser tab bar at the top of your screen
+   - Step 3: You will see multiple tabs - one will be LinkedIn, one will be the new external site
+   - Step 4: Click on the NEW tab (not the LinkedIn tab)
+   - Step 5: Verify the URL has changed and you're no longer on linkedin.com
+
+3. **VERIFICATION STEPS** (MANDATORY after each external apply click):
+   - Check the URL bar - it should NOT contain "linkedin.com"
+   - Check the page content - it should be a company career page, not LinkedIn
+   - If you see LinkedIn content after clicking external apply, YOU DID NOT SWITCH TABS
+   - If still on LinkedIn, try again: look for tabs at top and click the non-LinkedIn tab
+
+4. **FORBIDDEN BEHAVIORS** (NEVER DO THESE):
+   ❌ NEVER continue looking at LinkedIn jobs after clicking external apply
+   ❌ NEVER scroll LinkedIn job listings after clicking external apply
+   ❌ NEVER click other LinkedIn buttons after clicking external apply
+   ❌ NEVER assume the external site opened in the same tab
+
+🚨 **TAB SWITCHING TROUBLESHOOTING** (Try these if switching fails):
+- Problem: External link doesn't open new tab
+  Solution: Right-click the apply button → select "Open in new tab"
+- Problem: Can't find tab controls
+  Solution: Look at the very top of browser window for tab bar
+- Problem: Multiple tabs are confusing
+  Solution: Click each tab until you find one that's NOT LinkedIn
+- Problem: Tab switching completely fails
+  Solution: Close all tabs except LinkedIn, try the external apply again
+- Problem: Still seeing LinkedIn after clicking external button
+  Solution: You haven't switched tabs - look for tab controls and click the NEW tab
 
 1. IDENTIFY EXTERNAL JOBS:
    - Look for jobs with "Apply on company website" or similar buttons
    - These typically open new tabs/windows to external career sites
    
-2. CLICK THE EXTERNAL LINK:
-   - Click the external application button/link
-   - Switch to the new tab that opens
-   - Note the domain/website you're now on
+2. CLICK THE EXTERNAL LINK AND IMMEDIATELY SWITCH TABS:
+   🚨 **CRITICAL SEQUENCE - FOLLOW EXACTLY IN THIS ORDER:**
+   
+   A. Click the external application button/link (this opens a new tab)
+   B. **IMMEDIATELY** - within 1 second - switch to the new tab:
+      - Look for browser tabs at the top of the screen
+      - Identify the NEW tab (will have a different title, not LinkedIn)
+      - Click on that NEW tab to switch to it
+   C. Wait for the new tab to fully load (2-3 seconds)
+   D. **MANDATORY VERIFICATION** before proceeding:
+      - Check browser address bar - URL must NOT contain "linkedin.com"
+      - Check page title - should be company name or job site, not LinkedIn
+      - Check page content - should show company career page, not LinkedIn jobs
+   E. If verification fails (still on LinkedIn):
+      - You failed to switch tabs
+      - Look for tabs again and click the correct one
+      - Do NOT continue until you're on the external site
+   
+   **THIS STEP IS CRITICAL**: You must be on the external company website before proceeding to step 3
    
 3. ACCOUNT CREATION (if needed):
    - Look for "Sign up", "Create account", "Register" options
@@ -1495,14 +1569,39 @@ When you encounter job postings that don't have "Easy Apply" but have external a
    
 8. SUBMIT & TRACK:
    - Before submitting: "SUBMITTING EXTERNAL APPLICATION TO: [COMPANY] - [JOB TITLE]"
-   - After successful submission, close the tab and return to LinkedIn
-   - Continue with the next job
+   - Click the submit button to complete the external application
+   - Wait for confirmation that the application was submitted successfully
+   - **CRITICAL TAB MANAGEMENT - RETURN TO LINKEDIN SEQUENCE**:
+     
+     🚨 **MANDATORY STEPS AFTER EXTERNAL APPLICATION SUBMISSION:**
+     
+     1. **CLOSE EXTERNAL TAB**: 
+        - Right-click on the current external job site tab
+        - Select "Close tab" or use Ctrl+W (Cmd+W on Mac)
+        - The external company website should now be closed
+        
+     2. **SWITCH TO LINKEDIN TAB**:
+        - Look at remaining browser tabs
+        - Click on the tab that shows "LinkedIn" in the title
+        - This should be the original tab you started from
+        
+     3. **MANDATORY VERIFICATION** (before continuing):
+        - Check URL bar contains "linkedin.com"
+        - Check page shows LinkedIn job listings (not external company site)
+        - Check you can see the job search results you were working on
+        
+     4. **RESUME JOB HUNTING**:
+        - Look for the next job posting in the LinkedIn results
+        - Continue applying to reach your target count
+        - DO NOT get stuck on external sites - always return here
+     
+     ⚠️ **IF YOU CANNOT RETURN TO LINKEDIN**: Navigate directly to the original LinkedIn search URL: ${linkedinUrl}
 
 9. HANDLING FAILURES:
-   - If email verification is required: Skip and move to next job
-   - If technical errors occur: Try once more, then skip if it fails
-   - If the form is too complex or requires documents you don't have: Skip
-   - Always return to LinkedIn tab to continue searching
+   - If email verification is required: Close tab, return to LinkedIn, skip and move to next job
+   - If technical errors occur: Try once more, then close tab, return to LinkedIn, skip if it fails
+   - If the form is too complex or requires documents you don't have: Close tab, return to LinkedIn, skip
+   - **ALWAYS**: Return to LinkedIn tab to continue searching - never get stuck on external sites
 
 IMPORTANT EXTERNAL JOB NOTES:
 - You can navigate to any domain when applying to external jobs (not just linkedin.com)
@@ -1570,7 +1669,25 @@ URL EXTRACTION:
 - LinkedIn job URLs typically look like: https://www.linkedin.com/jobs/view/[job-id]/
 - Include this URL in your tracking for later reference
 
-This tracking is essential for saving your applications correctly.`;
+This tracking is essential for saving your applications correctly.
+
+🚨🚨🚨 **FINAL CRITICAL REMINDER - TAB SWITCHING** 🚨🚨🚨
+
+**IF YOU ARE APPLYING TO EXTERNAL JOBS:**
+✅ **CORRECT BEHAVIOR**: Click external apply → Switch to new tab → Fill external form → Return to LinkedIn
+❌ **WRONG BEHAVIOR**: Click external apply → Stay on LinkedIn → Continue to next job (THIS IS FAILING)
+
+**THE KEY BEHAVIOR CHANGE NEEDED:**
+- When you click "Apply on company website" or similar external links
+- LinkedIn opens the company website in a NEW BROWSER TAB
+- You MUST click on that new tab to switch to it
+- You MUST complete the application on that external site
+- ONLY THEN return to LinkedIn for the next job
+
+**IF YOU DON'T SWITCH TABS, THE EXTERNAL APPLICATION FAILS**
+**ALWAYS VERIFY**: After clicking external apply, check the URL - it should NOT be linkedin.com
+
+This is the #1 issue that needs to be fixed immediately.`;
   };
 
 
