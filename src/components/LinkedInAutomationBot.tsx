@@ -503,6 +503,8 @@ const LinkedInAutomationBot: React.FC = () => {
       const savedState = localStorage.getItem(`automation_state_${user.id}`);
       if (!savedState) return;
       
+      addLog('🔍 Checking for previous automation session...');
+      
       const state = JSON.parse(savedState);
       
       // Check if state is recent (within last 30 minutes since tasks auto-stop on tab close)
@@ -536,17 +538,47 @@ const LinkedInAutomationBot: React.FC = () => {
             addLog(`🔄 Restored automation session - Task ${state.taskId} is ${currentTaskStatus.status}`);
             addLog(`📊 Restored state: ${state.stepCount || 0} steps, ${state.appliedCount || 0} applications`);
             
-            // Show live preview URL if available
+            // Always show browser preview after restoration
             if (currentTaskStatus.live_url) {
-              addLog(`🌐 Live preview available: ${currentTaskStatus.live_url}`);
+              addLog(`🌐 Live preview restored: ${currentTaskStatus.live_url}`);
+            } else {
+              // If live_url is not immediately available, it will be updated during polling
+              addLog(`🌐 Browser preview will be available shortly...`);
             }
             
             // Resume polling if task is running
             if (currentTaskStatus.status === 'running') {
               startPolling(state.taskId);
               addLog(`▶️ Resumed monitoring task progress`);
+              
+              // Force an immediate status update to ensure we have the latest live_url
+              setTimeout(async () => {
+                try {
+                  const refreshedTask = await getTaskStatus(state.taskId);
+                  setCurrentTask(refreshedTask);
+                  if (refreshedTask.live_url && !currentTaskStatus.live_url) {
+                    addLog(`🌐 Live preview now available: ${refreshedTask.live_url}`);
+                  }
+                } catch (error) {
+                  console.warn('Failed to refresh task status after restoration:', error);
+                }
+              }, 1000);
+              
             } else if (currentTaskStatus.status === 'paused') {
               addLog(`⏸️ Task is paused - you can resume it anytime`);
+              
+              // For paused tasks, also force an immediate status update to ensure we have the live_url
+              setTimeout(async () => {
+                try {
+                  const refreshedTask = await getTaskStatus(state.taskId);
+                  setCurrentTask(refreshedTask);
+                  if (refreshedTask.live_url && !currentTaskStatus.live_url) {
+                    addLog(`🌐 Live preview now available: ${refreshedTask.live_url}`);
+                  }
+                } catch (error) {
+                  console.warn('Failed to refresh paused task status after restoration:', error);
+                }
+              }, 1000);
             }
           } else {
             // Task is finished/failed, clear saved state but show completion info
@@ -1908,6 +1940,19 @@ This is the #1 issue that needs to be fixed immediately.`;
       // Resume polling
       startPolling(currentTask.id);
       
+      // Force an immediate status update to ensure we have the latest live_url after resuming
+      setTimeout(async () => {
+        try {
+          const refreshedTask = await getTaskStatus(currentTask.id);
+          setCurrentTask(refreshedTask);
+          if (refreshedTask.live_url && !currentTask.live_url) {
+            addLog(`🌐 Live preview available: ${refreshedTask.live_url}`);
+          }
+        } catch (error) {
+          console.warn('Failed to refresh task status after resuming:', error);
+        }
+      }, 1000);
+      
       addLog('▶️ Automation resumed - task is now running');
       toast.success('Automation resumed');
     } catch (error) {
@@ -3268,21 +3313,21 @@ This is the #1 issue that needs to be fixed immediately.`;
                 </div>
                 <div>
                   <h3 className="text-xl font-bold text-gray-900 dark:text-white">External Job Applications</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Currently unavailable</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Coming Soon</p>
                 </div>
               </div>
               
-              <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl border border-yellow-200 dark:border-yellow-800">
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
                 <div className="flex items-start space-x-3">
-                  <div className="p-2 bg-yellow-100 dark:bg-yellow-800 rounded-lg">
-                    <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                  <div className="p-2 bg-blue-100 dark:bg-blue-800 rounded-lg">
+                    <Sparkles className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-200 mb-1">
-                      Feature Temporarily Archived
+                    <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-1">
+                      In Development
                     </p>
-                    <p className="text-xs text-yellow-600 dark:text-yellow-300">
-                      External job applications have been temporarily disabled due to a technical issue where the automation agent fails to properly switch browser tabs when clicking external apply buttons. This feature will be re-enabled once the tab switching issue is resolved. For now, the automation will focus on LinkedIn Easy Apply jobs only.
+                    <p className="text-xs text-blue-600 dark:text-blue-300">
+                      We're working on expanding job applications beyond LinkedIn Easy Apply to include external job sites. This feature will allow you to apply to more opportunities automatically. Stay tuned for updates!
                     </p>
                   </div>
                 </div>
