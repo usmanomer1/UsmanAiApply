@@ -42,6 +42,15 @@ import UsageStatusDisplay from './ui/UsageStatusDisplay';
 import { getPlanLimits, getProductByPriceId } from '../stripe-config';
 import { BrowserUseClient } from '../lib/browserUseClient';
 
+// Feature flags
+const FEATURE_FLAGS = {
+  // External job applications are currently disabled due to tab switching issues
+  // The browser automation agent consistently fails to switch to new tabs after clicking external apply buttons
+  // All external job application code is preserved for future re-enabling once the tab switching issue is resolved
+  // Can be overridden with VITE_ENABLE_EXTERNAL_APPLICATIONS=true environment variable
+  ENABLE_EXTERNAL_APPLICATIONS: import.meta.env.VITE_ENABLE_EXTERNAL_APPLICATIONS === 'true' || false,
+};
+
 interface TaskStatus {
   id: string;
   status: 'created' | 'running' | 'paused' | 'finished' | 'failed' | 'stopped';
@@ -276,7 +285,7 @@ const LinkedInAutomationBot: React.FC = () => {
     companySize: undefined,
     datePosted: undefined,
     targetCount: '10',
-    applyToExternalJobs: false,
+    applyToExternalJobs: FEATURE_FLAGS.ENABLE_EXTERNAL_APPLICATIONS,
     externalJobEmail: '',
     externalJobPassword: '',
     firstName: '',
@@ -922,7 +931,7 @@ const LinkedInAutomationBot: React.FC = () => {
     const params = new URLSearchParams();
     
     // Essential LinkedIn parameters
-    if (!config.applyToExternalJobs) {
+    if (!FEATURE_FLAGS.ENABLE_EXTERNAL_APPLICATIONS || !config.applyToExternalJobs) {
       params.append('f_AL', 'true'); // Easy Apply filter only when not applying to external jobs
     }
     params.append('distance', '25'); // Search radius
@@ -1214,11 +1223,17 @@ const LinkedInAutomationBot: React.FC = () => {
 
     const linkedinUrl = buildLinkedInJobsURL();
     
+    // Override external job applications if feature is disabled
+    const effectiveConfig = {
+      ...config,
+      applyToExternalJobs: config.applyToExternalJobs && FEATURE_FLAGS.ENABLE_EXTERNAL_APPLICATIONS
+    };
+    
     // Handle resume for external job applications
     let resumeContent: string | null = null;
     let uploadedFileNames: string[] = [];
     
-    if (config.applyToExternalJobs) {
+    if (effectiveConfig.applyToExternalJobs) {
       addLog('📄 Preparing your resume for external job applications...');
       
       try {
@@ -1276,7 +1291,7 @@ const LinkedInAutomationBot: React.FC = () => {
 
     // Pass the password via secrets, not in the prompt/config
     const secrets: Record<string, string> = { ln_password: config.linkedinPassword || '' };
-    if (config.applyToExternalJobs && config.externalJobPassword) {
+    if (effectiveConfig.applyToExternalJobs && config.externalJobPassword) {
       secrets.ext_password = config.externalJobPassword;
     }
     
@@ -1292,7 +1307,7 @@ const LinkedInAutomationBot: React.FC = () => {
       highlight_elements: true,
       max_agent_steps: Math.max(100, parseInt(config.targetCount) * 15), // 15 steps per application for external jobs
       llm_model: selectedModel,
-      allowed_domains: config.applyToExternalJobs ? undefined : ['linkedin.com', '*.linkedin.com'],
+      allowed_domains: effectiveConfig.applyToExternalJobs ? undefined : ['linkedin.com', '*.linkedin.com'],
       included_file_names: uploadedFileNames.length > 0 ? uploadedFileNames : undefined,
     };
 
@@ -1313,7 +1328,7 @@ const LinkedInAutomationBot: React.FC = () => {
   // Session-based prompts removed - using direct credential login only
 
   const createComprehensivePrompt = (linkedinUrl: string, resumeContent: string | null = null, uploadedFileNames: string[] = []) => {
-    const applyToExternalJobs = config.applyToExternalJobs;
+    const applyToExternalJobs = FEATURE_FLAGS.ENABLE_EXTERNAL_APPLICATIONS && config.applyToExternalJobs;
     
     return `You are an AI assistant helping with LinkedIn job applications. Your goal is to apply to ${config.targetCount} jobs ${applyToExternalJobs ? '(including both Easy Apply and external job postings)' : 'using LinkedIn\'s "Easy Apply" feature'}.
 
@@ -3053,7 +3068,8 @@ This is the #1 issue that needs to be fixed immediately.`;
             />
           </div>
 
-          {/* External Job Application Settings */}
+          {/* External Job Application Settings - Currently Archived */}
+          {FEATURE_FLAGS.ENABLE_EXTERNAL_APPLICATIONS ? (
           <div className="space-y-6">
             <div className="flex items-center space-x-3 pb-4 border-b border-gray-300/50 dark:border-gray-700/50">
               <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
@@ -3244,6 +3260,35 @@ This is the #1 issue that needs to be fixed immediately.`;
               )}
             </div>
           </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="flex items-center space-x-3 pb-4 border-b border-gray-300/50 dark:border-gray-700/50">
+                <div className="w-10 h-10 bg-gradient-to-br from-gray-400 to-gray-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <ExternalLink className="w-5 h-5 text-white opacity-50" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">External Job Applications</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Currently unavailable</p>
+                </div>
+              </div>
+              
+              <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl border border-yellow-200 dark:border-yellow-800">
+                <div className="flex items-start space-x-3">
+                  <div className="p-2 bg-yellow-100 dark:bg-yellow-800 rounded-lg">
+                    <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-200 mb-1">
+                      Feature Temporarily Archived
+                    </p>
+                    <p className="text-xs text-yellow-600 dark:text-yellow-300">
+                      External job applications have been temporarily disabled due to a technical issue where the automation agent fails to properly switch browser tabs when clicking external apply buttons. This feature will be re-enabled once the tab switching issue is resolved. For now, the automation will focus on LinkedIn Easy Apply jobs only.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
         </div>
       )}
