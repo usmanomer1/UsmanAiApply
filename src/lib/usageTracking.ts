@@ -99,6 +99,9 @@ export async function incrementUsage(
  * Get current usage for a user
  */
 export async function getUserUsage(userId: string): Promise<UserUsage> {
+  console.log('=== getUserUsage Debug ===');
+  console.log('userId:', userId);
+  
   const defaultUsage: UserUsage = {
     automation_steps: { used: 0, limit: 0, remaining: 0, percentage: 0 },
     job_search_match: { used: 0, limit: 100, remaining: 100, percentage: 0 },
@@ -108,6 +111,7 @@ export async function getUserUsage(userId: string): Promise<UserUsage> {
   };
 
   if (!isSupabaseConfigured() || !userId) {
+    console.log('❌ Supabase not configured or no userId');
     return defaultUsage;
   }
 
@@ -123,11 +127,15 @@ export async function getUserUsage(userId: string): Promise<UserUsage> {
       .single();
 
     // Get usage from the view
+    console.log('Fetching from user_usage_summary for billing period:', billingPeriodStart.toISOString());
     const { data: usageData, error } = await supabase
       .from('user_usage_summary')
       .select('*')
       .eq('user_id', userId)
       .eq('billing_period_start', billingPeriodStart.toISOString());
+
+    console.log('user_usage_summary data:', usageData);
+    console.log('user_usage_summary error:', error);
 
     if (error) {
       console.error('Error fetching usage:', error);
@@ -138,10 +146,15 @@ export async function getUserUsage(userId: string): Promise<UserUsage> {
     const usage: UserUsage = { ...defaultUsage };
 
     // If user has an active subscription, get plan limits
+    console.log('Checking subscription:', subscription);
     if (subscription) {
+      console.log('Getting plan name for price_id:', subscription.price_id);
       const planName = await supabase.rpc('get_plan_name_from_price_id', { price_id: subscription.price_id });
       
+      console.log('Plan name result:', planName);
+      
       if (planName.data) {
+        console.log('Fetching limits for plan:', planName.data);
         // Get limits for the user's plan
         const { data: planLimits } = await supabase
           .from('usage_limits')
@@ -149,9 +162,12 @@ export async function getUserUsage(userId: string): Promise<UserUsage> {
           .eq('plan_name', planName.data)
           .eq('is_active', true);
 
+        console.log('Plan limits:', planLimits);
+
         if (planLimits) {
           planLimits.forEach(limit => {
             const usageType = limit.usage_type as UsageType;
+            console.log(`Setting limit for ${usageType}: ${limit.monthly_limit}`);
             usage[usageType].limit = limit.monthly_limit;
             usage[usageType].remaining = limit.monthly_limit;
           });
@@ -194,9 +210,12 @@ export async function getUserUsage(userId: string): Promise<UserUsage> {
       }
     }
 
+    console.log('Final usage object being returned:', usage);
+    console.log('=== End getUserUsage Debug ===');
     return usage;
   } catch (error) {
     console.error('Failed to get user usage:', error);
+    console.log('Returning default usage due to error');
     return defaultUsage;
   }
 }
