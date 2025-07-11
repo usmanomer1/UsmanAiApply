@@ -2252,6 +2252,12 @@ This is the #1 issue that needs to be fixed immediately.`;
             
             console.log(`Updated usage tracking - Task: ${taskId}, Steps: ${newStepCount}`);
             
+            // Refresh usage display to show updated numbers
+            if (user) {
+              const updatedUsage = await getUserUsage(user.id);
+              setUserUsage(updatedUsage);
+            }
+            
           // Look for successful application submissions only
             const applicationSteps = updatedTask.steps.filter(step => {
             const stepText = step.next_goal || step.evaluation_previous_goal || '';

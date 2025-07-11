@@ -109,8 +109,10 @@ export async function trackAutomationSteps(
   }
 
   try {
+    console.log(`Tracking automation steps - User: ${userId}, Task: ${taskId}, Steps: ${stepCount}`);
+    
     // Use automation_tasks table which properly tracks max steps per task
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('automation_tasks')
       .upsert({
         user_id: userId,
@@ -121,13 +123,15 @@ export async function trackAutomationSteps(
         onConflict: 'user_id,task_id',
         // This will only update if the new step count is higher
         ignoreDuplicates: false
-      });
+      })
+      .select();
 
     if (error) {
       console.error('Error tracking automation steps:', error);
       return false;
     }
 
+    console.log('Successfully tracked automation steps:', data);
     return true;
   } catch (error) {
     console.error('Failed to track automation steps:', error);
@@ -239,23 +243,28 @@ export async function getUserUsage(userId: string): Promise<UserUsage> {
     }
 
     // Get automation steps from automation_tasks table (properly tracks MAX per task)
-    const currentMonth = new Date();
-    const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-    
-    const { data: automationTasks } = await supabase
+    // Use the same billing period as the rest of the usage tracking
+    const { data: automationTasks, error: automationError } = await supabase
       .from('automation_tasks')
       .select('step_count')
       .eq('user_id', userId)
-      .gte('created_at', firstDayOfMonth.toISOString());
+      .gte('created_at', billingPeriodStart.toISOString());
     
-    if (automationTasks) {
-      // Sum up the step counts from all tasks this month
+    if (automationError) {
+      console.error('Error fetching automation tasks:', automationError);
+    }
+    
+    if (automationTasks && automationTasks.length > 0) {
+      // Sum up the step counts from all tasks this billing period
       const totalSteps = automationTasks.reduce((sum, task) => sum + (task.step_count || 0), 0);
+      console.log(`Automation usage for user ${userId}: ${totalSteps} steps from ${automationTasks.length} tasks`);
       usage.automation_steps.used = totalSteps;
       usage.automation_steps.remaining = Math.max(0, usage.automation_steps.limit - totalSteps);
       usage.automation_steps.percentage = usage.automation_steps.limit > 0 
         ? Math.min(100, (totalSteps / usage.automation_steps.limit) * 100) 
         : 0;
+    } else {
+      console.log(`No automation tasks found for user ${userId} since ${billingPeriodStart.toISOString()}`);
     }
 
     // Ensure free tier limits are set if no subscription
