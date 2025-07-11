@@ -1560,8 +1560,8 @@ This is the #1 issue that needs to be fixed immediately.`;
       }
     }
 
-    // Always clear the browser profile before starting a new task for a new user
-    await browserClient.clearBrowserProfile();
+    // Note: clearBrowserProfile endpoint doesn't exist in Browser Use API
+    // The API automatically manages browser sessions with save_browser_data=true
 
     const linkedinUrl = buildLinkedInJobsURL();
     
@@ -1663,14 +1663,25 @@ This is the #1 issue that needs to be fixed immediately.`;
 
     const result = await browserClient.createLinkedInTask(taskConfig);
     
-    return {
+    console.log('Task creation result:', result);
+    
+    // Immediately fetch task details to get the live URL
+    const taskDetails = await browserClient.getTask(result.id);
+    console.log('Task details after creation:', taskDetails);
+    console.log('Initial live_url:', taskDetails.live_url);
+    
+    const taskStatus = {
       id: result.id,
-      live_url: undefined, // Will be fetched later
-      status: 'created' as const,
-      steps: [],
-      output: undefined,
+      live_url: taskDetails.live_url || undefined,
+      status: taskDetails.status || 'created' as const,
+      steps: taskDetails.steps || [],
+      output: taskDetails.output || undefined,
       error: undefined
     };
+    
+    console.log('Returning task status:', taskStatus);
+    
+    return taskStatus;
   };
 
   const saveJobApplication = async (company: string, role: string, taskId: string, jobUrl?: string | null) => {
@@ -2169,12 +2180,28 @@ This is the #1 issue that needs to be fixed immediately.`;
     const interval = setInterval(async () => {
       try {
         const updatedTask = await getTaskStatus(taskId);
-          setCurrentTask(updatedTask);
+        console.log('Polling - Updated task:', updatedTask);
+        console.log('Polling - Live URL:', updatedTask.live_url);
+        console.log('Polling - Steps:', updatedTask.steps?.length);
+        setCurrentTask(updatedTask);
+        
+        // Log live URL when it first appears
+        if (updatedTask.live_url && (!currentTask || !currentTask.live_url)) {
+          addLog(`🌐 Live preview now available: ${updatedTask.live_url}`);
+        }
 
-          if (updatedTask.steps) {
-            const newStepCount = updatedTask.steps.length;
+        if (updatedTask.steps) {
+          const newStepCount = updatedTask.steps.length;
             
             if (newStepCount > stepCount) {
+              // Log new steps
+              for (let i = stepCount; i < newStepCount; i++) {
+                const step = updatedTask.steps[i];
+                if (step.next_goal) {
+                  addLog(`🤖 Step ${i + 1}: ${step.next_goal}`, 'info');
+                }
+              }
+              
               // Track the TOTAL steps (not incremental) - this will upsert in the database
             // await trackUsage(newStepCount, taskId);
               

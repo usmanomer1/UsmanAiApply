@@ -166,6 +166,9 @@ export class BrowserUseClient {
 
     const task: components['schemas']['TaskResponse'] = await response.json();
     
+    console.log('Raw task response from API:', task);
+    console.log('Task live_url from API:', task.live_url);
+    
     return {
       id: task.id,
       task: task.task,
