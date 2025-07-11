@@ -147,19 +147,26 @@ export async function getUserUsage(userId: string): Promise<UserUsage> {
 
     // If user has an active subscription, get plan limits
     console.log('Checking subscription:', subscription);
-    if (subscription) {
+    if (subscription && subscription.price_id) {
       console.log('Getting plan name for price_id:', subscription.price_id);
-      const planName = await supabase.rpc('get_plan_name_from_price_id', { price_id: subscription.price_id });
       
-      console.log('Plan name result:', planName);
+      // Map price IDs to plan names directly
+      const priceIdToPlanMap: Record<string, string> = {
+        'price_1Rf2oQGkowQ7SwlfhDDuOpFk': 'Plus',
+        'price_1Rf2nJGkowQ7Swlfwvc3CBO8': 'Pro', 
+        'price_1Rf2owGkowQ7SwlfEG4UKU8c': 'Max'
+      };
       
-      if (planName.data) {
-        console.log('Fetching limits for plan:', planName.data);
+      const planName = priceIdToPlanMap[subscription.price_id];
+      console.log('Plan name from mapping:', planName);
+      
+      if (planName) {
+        console.log('Fetching limits for plan:', planName);
         // Get limits for the user's plan
         const { data: planLimits } = await supabase
           .from('usage_limits')
           .select('usage_type, monthly_limit')
-          .eq('plan_name', planName.data)
+          .eq('plan_name', planName)
           .eq('is_active', true);
 
         console.log('Plan limits:', planLimits);
@@ -171,6 +178,20 @@ export async function getUserUsage(userId: string): Promise<UserUsage> {
             usage[usageType].limit = limit.monthly_limit;
             usage[usageType].remaining = limit.monthly_limit;
           });
+        } else {
+          // Fallback: Set default limits based on plan
+          console.log('No limits found in DB, using defaults for plan:', planName);
+          const defaultLimits: Record<string, number> = {
+            'Plus': 620,
+            'Pro': 1250,
+            'Max': 2300
+          };
+          
+          if (defaultLimits[planName]) {
+            usage.automation_steps.limit = defaultLimits[planName];
+            usage.automation_steps.remaining = defaultLimits[planName];
+            console.log('Set default automation_steps limit:', defaultLimits[planName]);
+          }
         }
       }
     }
