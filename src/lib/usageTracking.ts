@@ -96,6 +96,46 @@ export async function incrementUsage(
 }
 
 /**
+ * Track automation steps with proper task-level maximum tracking
+ * This ensures we track the MAX steps for each task, not cumulative
+ */
+export async function trackAutomationSteps(
+  userId: string,
+  taskId: string,
+  stepCount: number
+): Promise<boolean> {
+  if (!isSupabaseConfigured() || !userId) {
+    return true;
+  }
+
+  try {
+    // Use automation_tasks table which properly tracks max steps per task
+    const { error } = await supabase
+      .from('automation_tasks')
+      .upsert({
+        user_id: userId,
+        task_id: taskId,
+        step_count: stepCount,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'user_id,task_id',
+        // This will only update if the new step count is higher
+        ignoreDuplicates: false
+      });
+
+    if (error) {
+      console.error('Error tracking automation steps:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Failed to track automation steps:', error);
+    return false;
+  }
+}
+
+/**
  * Get current usage for a user
  */
 export async function getUserUsage(userId: string): Promise<UserUsage> {
@@ -196,6 +236,26 @@ export async function getUserUsage(userId: string): Promise<UserUsage> {
         const usageType = key as UsageType;
         usage[usageType].remaining = usage[usageType].limit;
       });
+    }
+
+    // Get automation steps from automation_tasks table (properly tracks MAX per task)
+    const currentMonth = new Date();
+    const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+    
+    const { data: automationTasks } = await supabase
+      .from('automation_tasks')
+      .select('step_count')
+      .eq('user_id', userId)
+      .gte('created_at', firstDayOfMonth.toISOString());
+    
+    if (automationTasks) {
+      // Sum up the step counts from all tasks this month
+      const totalSteps = automationTasks.reduce((sum, task) => sum + (task.step_count || 0), 0);
+      usage.automation_steps.used = totalSteps;
+      usage.automation_steps.remaining = Math.max(0, usage.automation_steps.limit - totalSteps);
+      usage.automation_steps.percentage = usage.automation_steps.limit > 0 
+        ? Math.min(100, (totalSteps / usage.automation_steps.limit) * 100) 
+        : 0;
     }
 
     // Ensure free tier limits are set if no subscription
@@ -351,8 +411,8 @@ export async function updateAutomationSession(
       return false;
     }
 
-    // If session completed, track the total steps
-    if (updateData.completed_at && updates.step_count) {
+    // Track usage in real-time, not just at completion
+    if (updates.step_count) {
       const { data: session } = await supabase
         .from('automation_sessions')
         .select('user_id')
@@ -360,10 +420,8 @@ export async function updateAutomationSession(
         .single();
 
       if (session) {
-        await incrementUsage(session.user_id, 'automation_steps', updates.step_count, {
-          task_id: taskId,
-          status: updates.status
-        });
+        // Track automation steps using the proper MAX tracking function
+        await trackAutomationSteps(session.user_id, taskId, updates.step_count);
       }
     }
 
