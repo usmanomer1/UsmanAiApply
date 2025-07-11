@@ -48,6 +48,8 @@ import { supabase } from '../lib/supabase';
 import { extractTextFromPDF } from '../lib/pdfExtractor';
 import { analyzeResume, generateOptimizedResume, downloadResume, validateResumeFile, AnalyzeResponse, GenerateResponse, getApiToken } from '../lib/resumeApiClient';
 import toast from 'react-hot-toast';
+import { Badge } from './ui/badge';
+import { canPerformAIOperation, trackAITokens } from '../lib/aiTokenTracking';
 
 interface ResumeUpload {
   id: string;
@@ -260,6 +262,13 @@ export const ResumePage: React.FC = () => {
       return;
     }
 
+    // Check AI token limits before analyzing
+    const { allowed, reason } = await canPerformAIOperation(user.id);
+    if (!allowed) {
+      toast.error(reason || 'Insufficient AI tokens for resume analysis');
+      return;
+    }
+
     setAnalyzing(true);
     
     // Smooth scroll to results
@@ -327,6 +336,14 @@ export const ResumePage: React.FC = () => {
 
       toast.success('Resume analyzed successfully!');
       
+      // Track AI token usage
+      await trackAITokens(user.id, 'resume_optimization', {
+        action: 'analyze',
+        analysisId: result.data.analysisId,
+        jobTitle: jobTitle,
+        companyName: companyName
+      });
+      
       // Refresh lists
       fetchRecentUploads();
       fetchRecentAnalyses();
@@ -342,6 +359,13 @@ export const ResumePage: React.FC = () => {
   const handleGenerate = async () => {
     if (!analysisResult || !user || !currentAnalysisId) {
       toast.error('Please analyze a resume first');
+      return;
+    }
+
+    // Check AI token limits before generating
+    const { allowed, reason } = await canPerformAIOperation(user.id);
+    if (!allowed) {
+      toast.error(reason || 'Insufficient AI tokens for resume generation');
       return;
     }
 
@@ -403,6 +427,13 @@ export const ResumePage: React.FC = () => {
       }
       
       toast.success('Resume generated successfully!');
+      
+      // Track AI token usage for generation
+      await trackAITokens(user.id, 'resume_optimization', {
+        action: 'generate',
+        generationId: result.data.generationId,
+        editType: editType
+      });
       
     } catch (error: any) {
       console.error('Generation error:', error);

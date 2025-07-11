@@ -28,18 +28,37 @@ export async function trackAITokens(
   }
 
   try {
-    const { error } = await supabase
+    console.log(`Tracking AI tokens - User: ${userId}, Operation: ${operationType}, Tokens: ${TOKENS_PER_OPERATION}`);
+    
+    const { data, error } = await supabase
       .from('ai_token_tracking')
       .insert({
         user_id: userId,
         operation_type: operationType,
         tokens_used: TOKENS_PER_OPERATION,
         metadata: metadata || {}
-      });
+      })
+      .select();
 
     if (error) {
       console.error('Error tracking AI tokens:', error);
       return false;
+    }
+
+    console.log('AI tokens tracked successfully:', data);
+    
+    // Also insert into ai_token_usage for billing page
+    const { error: usageError } = await supabase
+      .from('ai_token_usage')
+      .insert({
+        user_id: userId,
+        operation_type: operationType,
+        used_tokens: TOKENS_PER_OPERATION,
+        metadata: metadata || {}
+      });
+    
+    if (usageError) {
+      console.error('Error updating ai_token_usage:', usageError);
     }
 
     return true;

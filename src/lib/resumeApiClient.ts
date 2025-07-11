@@ -141,6 +141,7 @@ export async function analyzeResume(
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json',
         // Don't set Content-Type - let browser set it for FormData
       },
       body: formData,
@@ -201,6 +202,7 @@ export async function generateOptimizedResume(
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
     },
     body: JSON.stringify({
       analysisId,

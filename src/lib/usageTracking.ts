@@ -267,6 +267,30 @@ export async function getUserUsage(userId: string): Promise<UserUsage> {
       console.log(`No automation tasks found for user ${userId} since ${billingPeriodStart.toISOString()}`);
     }
 
+    // Get AI token usage from ai_token_usage table
+    const { data: aiTokenUsage, error: aiTokenError } = await supabase
+      .from('ai_token_usage')
+      .select('used_tokens')
+      .eq('user_id', userId)
+      .gte('created_at', billingPeriodStart.toISOString());
+    
+    if (aiTokenError) {
+      console.error('Error fetching AI token usage:', aiTokenError);
+    }
+    
+    if (aiTokenUsage && aiTokenUsage.length > 0) {
+      // Sum up all AI token usage for this billing period
+      const totalAITokens = aiTokenUsage.reduce((sum, record) => sum + (record.used_tokens || 0), 0);
+      console.log(`AI token usage for user ${userId}: ${totalAITokens} tokens from ${aiTokenUsage.length} operations`);
+      usage.ai_tokens.used = totalAITokens;
+      usage.ai_tokens.remaining = Math.max(0, usage.ai_tokens.limit - totalAITokens);
+      usage.ai_tokens.percentage = usage.ai_tokens.limit > 0 
+        ? Math.min(100, (totalAITokens / usage.ai_tokens.limit) * 100) 
+        : 0;
+    } else {
+      console.log(`No AI token usage found for user ${userId} since ${billingPeriodStart.toISOString()}`);
+    }
+
     // Ensure free tier limits are set if no subscription
     if (!subscription) {
       const { data: freeLimits } = await supabase

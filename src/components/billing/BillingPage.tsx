@@ -117,11 +117,19 @@ export const BillingPage: React.FC = () => {
       fetchBillingData(true);
     };
 
-    window.addEventListener('billing-refresh-needed', handleBillingRefresh);
+    // Refresh data when page gains focus (user switches tabs)
+    const handleFocus = () => {
+      console.log('Billing page gained focus, refreshing data...');
+      fetchBillingData(true);
+    };
 
-    // Cleanup event listener
+    window.addEventListener('billing-refresh-needed', handleBillingRefresh);
+    window.addEventListener('focus', handleFocus);
+
+    // Cleanup event listeners
     return () => {
       window.removeEventListener('billing-refresh-needed', handleBillingRefresh);
+      window.removeEventListener('focus', handleFocus);
     };
   }, [user]);
 
