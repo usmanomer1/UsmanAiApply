@@ -500,19 +500,6 @@ const LinkedInAutomationBot: React.FC = () => {
     }
   }, [appliedCount, errorCount, elapsedTime]);
 
-  // Debug useEffect for button state
-  useEffect(() => {
-    console.log('=== Button State Debug ===');
-    console.log('config.linkedinEmail:', config.linkedinEmail);
-    console.log('config.linkedinPassword:', config.linkedinPassword);
-    console.log('canStartAutomation():', canStartAutomation());
-    console.log('isRunning:', isRunning);
-    console.log('apiKey:', apiKey ? 'Present' : 'Missing');
-    
-    const buttonDisabled = !canStartAutomation() || !config.linkedinEmail || !config.linkedinPassword;
-    console.log('Button should be disabled:', buttonDisabled);
-    console.log('=== End Button Debug ===');
-  }, [config.linkedinEmail, config.linkedinPassword, userUsage, isRunning]);
 
   // Chart data is now loaded from real usage history in fetchUserSubscription
 
@@ -621,35 +608,16 @@ const LinkedInAutomationBot: React.FC = () => {
   };
 
   const canStartAutomation = () => {
-    console.log('=== canStartAutomation Debug ===');
-    console.log('userUsage:', userUsage);
-    console.log('userSubscription:', userSubscription);
-    
     if (!userUsage) {
-      console.log('❌ No userUsage object');
       return false;
     }
     
-    console.log('automation_steps:', userUsage.automation_steps);
-    console.log('limit:', userUsage.automation_steps.limit);
-    console.log('used:', userUsage.automation_steps.used);
-    console.log('remaining:', userUsage.automation_steps.remaining);
-    
     // Check if user has any limit (not just remaining)
     const hasLimit = userUsage.automation_steps.limit > 0;
-    const hasRemaining = userUsage.automation_steps.remaining > 0;
     const underLimit = userUsage.automation_steps.used < userUsage.automation_steps.limit;
     
-    console.log('hasLimit:', hasLimit);
-    console.log('hasRemaining:', hasRemaining);
-    console.log('underLimit:', underLimit);
-    
-    const result = hasLimit && underLimit;
-    console.log('canStartAutomation result:', result);
-    console.log('=== End Debug ===');
-    
     // For paid users, check limit exists; for usage tracking, check remaining
-    return result;
+    return hasLimit && underLimit;
   };
 
   const getRemainingApplications = () => {
