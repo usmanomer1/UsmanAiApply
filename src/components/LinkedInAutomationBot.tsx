@@ -2250,6 +2250,8 @@ This is the #1 issue that needs to be fixed immediately.`;
               applications_submitted: appliedCount
             });
             
+            console.log(`Updated usage tracking - Task: ${taskId}, Steps: ${newStepCount}`);
+            
           // Look for successful application submissions only
             const applicationSteps = updatedTask.steps.filter(step => {
             const stepText = step.next_goal || step.evaluation_previous_goal || '';
