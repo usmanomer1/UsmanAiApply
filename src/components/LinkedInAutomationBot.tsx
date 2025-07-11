@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
+// Explicitly import AnimatePresence
+import { AnimatePresence } from 'framer-motion';
 import { 
   Bot, 
   Settings, 
@@ -7,20 +9,17 @@ import {
   Pause, 
   Square, 
   AlertCircle, 
-  User, 
-  Globe, 
-  Briefcase, 
-  Search, 
   Activity, 
   Eye, 
   ExternalLink, 
   TrendingUp, 
   Zap, 
-  Loader2, 
-  Sparkles,
-  Shield,
-  Mic,
-  MessageSquare
+  Info,
+  Clock,
+  CheckCircle,
+  BarChart3,
+  Cpu,
+  ChevronDown
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -33,14 +32,17 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import ConditionalBackground from './ui/ConditionalBackground';
-
-import { extensionSuppressor } from '../lib/extensionSuppressor';
-import ExtensionErrorStatus from './ui/ExtensionErrorStatus';
-import UsageStatusDisplay from './ui/UsageStatusDisplay';
 // Session management removed
 import { getPlanLimits, getProductByPriceId } from '../stripe-config';
-import { BrowserUseClient } from '../lib/browserUseClient';
+import { BrowserUseClientProxy } from '../lib/browserUseClientProxy';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { 
+  getUserUsage, 
+  canPerformAction, 
+  createAutomationSession, 
+  updateAutomationSession,
+  getUsageHistory 
+} from '../lib/usageTracking';
 
 // Feature flags
 const FEATURE_FLAGS = {
@@ -99,94 +101,87 @@ interface BrowserUseConfig {
 const LINKEDIN_LOCATIONS = {
   'San Francisco Bay Area': '90000084',
   'New York City': '90000070', 
-  'Los Angeles': '90000071',
-  'Seattle': '90000069',
-  'Chicago': '90000068',
-  'Boston': '90000067',
-  'Vancouver, BC': '103366113',
-  'Vancouver': '103366113',
-  'Toronto, ON': '90000045',
-  'Toronto': '90000045',
-  'London, UK': '90000062',
-  'London': '90000062',
-  'Austin': '90000025',
-  'Denver': '90000049',
-  'Atlanta': '90000023',
-  'Miami': '90000078',
-  'Dallas': '90000050',
-  'Phoenix': '90000080',
-  'San Diego': '90000073',
-  'Portland': '90000081',
-  'Washington DC': '90000031',
-  'Philadelphia': '90000082',
-  'Detroit': '90000052',
-  'Minneapolis': '90000079',
-  'Tampa': '90000083',
-  'Orlando': '90000075',
-  'Las Vegas': '90000063',
-  'Sacramento': '90000085',
-  'San Antonio': '90000086',
-  'Nashville': '90000076',
-  'Charlotte': '90000039',
-  'Raleigh': '90000087',
-  'Pittsburgh': '90000088',
-  'Cincinnati': '90000041',
-  'Kansas City': '90000058',
-  'Columbus': '90000042',
-  'Indianapolis': '90000056',
-  'Cleveland': '90000040',
-  'Milwaukee': '90000077',
-  'Remote': 'remote',
-  // Additional international locations
-  'Montreal': '90000096',
-  'Calgary': '90000097',
-  'Ottawa': '90000098',
-  'Sydney': '90000099',
-  'Melbourne': '90000100',
-  'Berlin': '90000101',
-  'Paris': '90000102',
-  'Amsterdam': '90000103',
-  'Stockholm': '90000104',
-  'Zurich': '90000105'
+  'Los Angeles': '90000049',
+  'Chicago': '90000045',
+  'Boston': '90000024',
+  'Washington DC': '90000096',
+  'Seattle': '90000102',
+  'Austin': '90000023',
+  'Denver': '90000052',
+  'Atlanta': '90000001',
+  'Dallas': '90000051',
+  'Houston': '90000055',
+  'Philadelphia': '90000080',
+  'Phoenix': '90000081',
+  'San Diego': '90000086',
+  'Portland': '90000083',
+  'Miami': '90000068',
+  'Detroit': '90000053',
+  'Minneapolis': '90000069',
+  'Toronto': '100025096',
+  'Vancouver': '100083280',
+  'Montreal': '100073278',
+  'London': '100853491',
+  'Berlin': '102975707',
+  'Amsterdam': '102011674',
+  'Paris': '100985050',
+  'Munich': '100968856',
+  'Zurich': '100036621',
+  'Dublin': '100842717',
+  'Stockholm': '100086362',
+  'Singapore': '102454443',
+  'Hong Kong': '102817007',
+  'Tokyo': '101355337',
+  'Sydney': '105490917',
+  'Melbourne': '101452733',
+  'Dubai': '103588996',
+  'Tel Aviv': '101620260',
+  'Mumbai': '105214831',
+  'Bangalore': '109524677',
+  'Delhi': '102713980',
+  'Hyderabad': '104869687',
+  'Remote': '0'
 };
 
-// Country codes for phone numbers
+// Country codes with flags - sorted by country name
 const COUNTRY_CODES = [
-  { code: '+1', country: 'United States/Canada', flag: '🇺🇸' },
+  { code: '+1', country: 'United States', flag: '🇺🇸' },
+  { code: '+1-CA', country: 'Canada', flag: '🇨🇦' },
   { code: '+44', country: 'United Kingdom', flag: '🇬🇧' },
-  { code: '+91', country: 'India', flag: '🇮🇳' },
+  { code: '+61', country: 'Australia', flag: '🇦🇺' },
   { code: '+49', country: 'Germany', flag: '🇩🇪' },
   { code: '+33', country: 'France', flag: '🇫🇷' },
+  { code: '+91', country: 'India', flag: '🇮🇳' },
   { code: '+81', country: 'Japan', flag: '🇯🇵' },
-  { code: '+86', country: 'China', flag: '🇨🇳' },
-  { code: '+61', country: 'Australia', flag: '🇦🇺' },
-  { code: '+55', country: 'Brazil', flag: '🇧🇷' },
-  { code: '+7', country: 'Russia', flag: '🇷🇺' },
   { code: '+82', country: 'South Korea', flag: '🇰🇷' },
-  { code: '+34', country: 'Spain', flag: '🇪🇸' },
-  { code: '+39', country: 'Italy', flag: '🇮🇹' },
-  { code: '+31', country: 'Netherlands', flag: '🇳🇱' },
-  { code: '+46', country: 'Sweden', flag: '🇸🇪' },
-  { code: '+41', country: 'Switzerland', flag: '🇨🇭' },
-  { code: '+65', country: 'Singapore', flag: '🇸🇬' },
+  { code: '+86', country: 'China', flag: '🇨🇳' },
   { code: '+852', country: 'Hong Kong', flag: '🇭🇰' },
-  { code: '+971', country: 'UAE', flag: '🇦🇪' },
-  { code: '+966', country: 'Saudi Arabia', flag: '🇸🇦' },
-  // Additional countries
-  { code: '+92', country: 'Pakistan', flag: '🇵🇰' },
-  { code: '+880', country: 'Bangladesh', flag: '🇧🇩' },
-  { code: '+62', country: 'Indonesia', flag: '🇮🇩' },
+  { code: '+65', country: 'Singapore', flag: '🇸🇬' },
   { code: '+60', country: 'Malaysia', flag: '🇲🇾' },
+  { code: '+62', country: 'Indonesia', flag: '🇮🇩' },
+  { code: '+63', country: 'Philippines', flag: '🇵🇭' },
   { code: '+66', country: 'Thailand', flag: '🇹🇭' },
   { code: '+84', country: 'Vietnam', flag: '🇻🇳' },
-  { code: '+63', country: 'Philippines', flag: '🇵🇭' },
-  { code: '+90', country: 'Turkey', flag: '🇹🇷' },
-  { code: '+98', country: 'Iran', flag: '🇮🇷' },
+  { code: '+92', country: 'Pakistan', flag: '🇵🇰' },
+  { code: '+880', country: 'Bangladesh', flag: '🇧🇩' },
+  { code: '+94', country: 'Sri Lanka', flag: '🇱🇰' },
+  { code: '+977', country: 'Nepal', flag: '🇳🇵' },
+  { code: '+971', country: 'UAE', flag: '🇦🇪' },
+  { code: '+966', country: 'Saudi Arabia', flag: '🇸🇦' },
   { code: '+20', country: 'Egypt', flag: '🇪🇬' },
   { code: '+27', country: 'South Africa', flag: '🇿🇦' },
   { code: '+234', country: 'Nigeria', flag: '🇳🇬' },
   { code: '+254', country: 'Kenya', flag: '🇰🇪' },
+  { code: '+90', country: 'Turkey', flag: '🇹🇷' },
+  { code: '+7', country: 'Russia', flag: '🇷🇺' },
+  { code: '+380', country: 'Ukraine', flag: '🇺🇦' },
+  { code: '+39', country: 'Italy', flag: '🇮🇹' },
+  { code: '+34', country: 'Spain', flag: '🇪🇸' },
+  { code: '+31', country: 'Netherlands', flag: '🇳🇱' },
+  { code: '+41', country: 'Switzerland', flag: '🇨🇭' },
+  { code: '+46', country: 'Sweden', flag: '🇸🇪' },
   { code: '+52', country: 'Mexico', flag: '🇲🇽' },
+  { code: '+55', country: 'Brazil', flag: '🇧🇷' },
   { code: '+54', country: 'Argentina', flag: '🇦🇷' },
   { code: '+56', country: 'Chile', flag: '🇨🇱' },
   { code: '+57', country: 'Colombia', flag: '🇨🇴' },
@@ -270,7 +265,7 @@ const LinkedInAutomationBot: React.FC = () => {
     apiKey: apiKey,
     linkedinEmail: '',
     contactNumber: '',
-    countryCode: '+1-US',
+    countryCode: '+1',
     linkedinResume: '',
     customInstructions: '',
     jobTitle: 'Software Engineer',
@@ -340,13 +335,14 @@ const LinkedInAutomationBot: React.FC = () => {
   const [currentTask, setCurrentTask] = useState<TaskStatus | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [logs, setLogs] = useState<string[]>([]);
+  const [logs, setLogs] = useState<{ message: string; type: string; timestamp: string }[]>([]);
   const [stepCount, setStepCount] = useState(0);
   const [appliedCount, setAppliedCount] = useState(0);
+  const [errorCount, setErrorCount] = useState(0);
   const [pollInterval, setPollInterval] = useState<number | null>(null);
   const [userStoppedTask, setUserStoppedTask] = useState(false);
   const [userSubscription, setUserSubscription] = useState<any>(null);
-  const [monthlyUsage, setMonthlyUsage] = useState({ tokens_used: 0, ai_requests_used: 0, cost_usd: 0 });
+  const [userUsage, setUserUsage] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showConfigPanel, setShowConfigPanel] = useState(false);
 
@@ -354,10 +350,24 @@ const LinkedInAutomationBot: React.FC = () => {
   const [accessCheckComplete, setAccessCheckComplete] = useState(false);
   
   // Browser client state (no session management)
-  const [browserClient, setBrowserClient] = useState<BrowserUseClient | null>(null);
+  const [browserClient, setBrowserClient] = useState<BrowserUseClientProxy | null>(null);
 
   // Add state for dropdown
   const [showImportantInstructions, setShowImportantInstructions] = useState(false);
+
+  // Time elapsed state
+  const [startTime, setStartTime] = useState<Date | null>(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
+
+  // Stats for display
+  const [stats, setStats] = useState({
+    successRate: 0,
+    avgTimePerApp: 0,
+    totalTime: 0
+  });
+
+  // Monthly usage chart data
+  const [chartData, setChartData] = useState<any[]>([]);
 
   const isSupabaseConfigured = () => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -378,7 +388,7 @@ const LinkedInAutomationBot: React.FC = () => {
     
     // Initialize browser client (no session management)
     if (apiKey) {
-      const client = new BrowserUseClient(apiKey);
+      const client = new BrowserUseClientProxy(apiKey);
       setBrowserClient(client);
     }
     
@@ -399,54 +409,54 @@ const LinkedInAutomationBot: React.FC = () => {
 
   // Handle page close to automatically stop tasks and prevent backend charges
   useEffect(() => {
-          const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-        if (isRunning && currentTask && browserClient && apiKey) {
-          // Immediately attempt to stop the task to prevent backend charges
-          try {
-            // Multiple stop attempts for reliability (browsers limit time for beforeunload)
-            
-            // Method 1: Use browser client (most compatible)
-            browserClient.stopTask(currentTask.id).catch(() => {});
-            
-            // Method 2: Direct API call with keepalive for reliability
-            fetch(`https://api.browseruse.com/tasks/${currentTask.id}/stop`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({}),
-              keepalive: true // Continues even as page unloads
-            }).catch(() => {});
-            
-            // Method 3: Fallback with sendBeacon (most reliable for page unload)
-            const stopData = JSON.stringify({
-              taskId: currentTask.id,
-              authorization: `Bearer ${apiKey}`,
-              timestamp: Date.now()
-            });
-            
-            if (navigator.sendBeacon) {
-              navigator.sendBeacon(
-                `https://api.browseruse.com/tasks/${currentTask.id}/stop`,
-                stopData
-              );
-            }
-            
-            // Clear local state immediately
-            clearAutomationState();
-            
-          } catch (error) {
-            // Even if stop fails, clear local state
-            clearAutomationState();
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (isRunning && currentTask && browserClient && apiKey) {
+        // Immediately attempt to stop the task to prevent backend charges
+        try {
+          // Multiple stop attempts for reliability (browsers limit time for beforeunload)
+          
+          // Method 1: Use browser client (most compatible)
+          browserClient.stopTask(currentTask.id).catch(() => {});
+          
+          // Method 2: Direct API call with keepalive for reliability
+          fetch(`https://api.browseruse.com/tasks/${currentTask.id}/stop`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({}),
+            keepalive: true // Continues even as page unloads
+          }).catch(() => {});
+          
+          // Method 3: Fallback with sendBeacon (most reliable for page unload)
+          const stopData = JSON.stringify({
+            taskId: currentTask.id,
+            authorization: `Bearer ${apiKey}`,
+            timestamp: Date.now()
+          });
+          
+          if (navigator.sendBeacon) {
+            navigator.sendBeacon(
+              `https://api.browseruse.com/tasks/${currentTask.id}/stop`,
+              stopData
+            );
           }
           
-          // Show brief message (no confirmation dialog needed)
-          const message = 'Stopping automation to prevent charges...';
-          event.returnValue = message;
-          return message;
+          // Clear local state immediately
+          clearAutomationState();
+          
+        } catch (error) {
+          // Even if stop fails, clear local state
+          clearAutomationState();
         }
-      };
+        
+        // Show brief message (no confirmation dialog needed)
+        const message = 'Stopping automation to prevent charges...';
+        event.returnValue = message;
+        return message;
+      }
+    };
 
     // Also handle visibility change (tab switching, minimizing)
     const handleVisibilityChange = () => {
@@ -465,6 +475,300 @@ const LinkedInAutomationBot: React.FC = () => {
     };
   }, [isRunning, currentTask, user, browserClient, apiKey]);
 
+  // Timer effect
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isRunning && !isPaused && startTime) {
+      interval = setInterval(() => {
+        setElapsedTime(Math.floor((new Date().getTime() - startTime.getTime()) / 1000));
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isRunning, isPaused, startTime]);
+
+  // Update stats effect
+  useEffect(() => {
+    if (appliedCount > 0) {
+      const successRate = Math.round((appliedCount / (appliedCount + errorCount)) * 100);
+      const avgTime = elapsedTime > 0 ? Math.floor(elapsedTime / appliedCount) : 0;
+      setStats({
+        successRate,
+        avgTimePerApp: avgTime,
+        totalTime: elapsedTime
+      });
+    }
+  }, [appliedCount, errorCount, elapsedTime]);
+
+  // Chart data is now loaded from real usage history in fetchUserSubscription
+
+  const formatTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    if (hours > 0) {
+      return `${hours}h ${minutes}m ${secs}s`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${secs}s`;
+    }
+    return `${secs}s`;
+  };
+
+  const checkAccess = async () => {
+    if (!isSupabaseConfigured()) {
+      // Development mode or no auth configured
+      setAccessCheckComplete(true);
+      return;
+    }
+
+    try {
+      const hasAccess = await checkFeatureAccess('auto_apply');
+      setAccessCheckComplete(true);
+      
+      // If they don't have access and are authenticated, show paywall
+      if (!hasAccess && isAuthenticated) {
+        setShowPaywall(true);
+      }
+    } catch (error) {
+      console.error('Error checking feature access:', error);
+      setAccessCheckComplete(true);
+    }
+  };
+
+  const fetchUserSubscription = async () => {
+    if (!user || !isSupabaseConfigured()) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // Fetch subscription details from stripe_user_subscriptions table (flat structure)
+      const { data: subscription, error: subError } = await supabase
+        .from('stripe_user_subscriptions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('subscription_status', 'active')
+        .maybeSingle();
+
+      if (!subError && subscription) {
+        setUserSubscription(subscription);
+      } else if (subError) {
+        console.warn('Error fetching subscription:', subError);
+      }
+
+      // Get usage from new tracking system
+      const usage = await getUserUsage(user.id);
+      setUserUsage(usage);
+      
+      // Get usage history for chart
+      const history = await getUsageHistory(user.id, 30);
+      if (history.length > 0) {
+        setChartData(history.map(day => ({
+          date: new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          applications: day.applications,
+          steps: day.steps
+        })));
+      }
+    } catch (error) {
+      console.error('Error fetching subscription:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getPlanName = () => {
+    // Legacy support: read product_name directly from the flat subscription object
+    const productName = userSubscription?.product_name;
+    if (!productName) {
+      return isSupabaseConfigured() ? 'Free' : 'Development';
+    }
+    return productName;
+  };
+
+  const getTokenLimit = () => {
+    if (!isSupabaseConfigured()) {
+      return 10000; // High limit for development
+    }
+
+    // Legacy support: read price_id directly from the flat subscription object
+    const priceId = userSubscription?.price_id;
+    if (!priceId) {
+      return 0; // Free tier has no access
+    }
+
+    const limits = getPlanLimits(priceId);
+    if (!limits) {
+      console.error(`No plan limits found for price ID: "${priceId}"`);
+      return 0;
+    }
+
+    // Return the step limit directly (applications * 10)
+    return limits.applications ? limits.applications * 10 : 0;
+  };
+
+  const canStartAutomation = () => {
+    if (!userUsage) return false;
+    return userUsage.automation_steps.remaining > 0;
+  };
+
+  const getRemainingApplications = () => {
+    const stepLimit = getTokenLimit();
+    if (stepLimit === -1) return 'Unlimited';
+    if (stepLimit === 0) return 0;
+    
+    const usedSteps = userUsage?.automation_steps.used || 0;
+    const remainingSteps = Math.max(0, stepLimit - usedSteps);
+    // Convert steps back to applications (10 steps per application)
+    return Math.floor(remainingSteps / 10);
+  };
+
+  const fetchUserResumeContent = async (): Promise<string | null> => {
+    try {
+      if (!user || !user.id) {
+        console.warn('No authenticated user for profile fetch');
+        return null;
+      }
+
+      // Ensure we have a valid session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.warn('No active session for profile fetch');
+        return null;
+      }
+
+      // Get user profile with resume URL
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('resume_url, full_name')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.warn('Error fetching profile for resume:', error);
+        // Try a simpler query if the first one fails
+        const { data: simpleProfile, error: simpleError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+          
+        if (simpleError) {
+          console.error('Failed to fetch profile:', simpleError);
+          return null;
+        }
+        
+        if (!simpleProfile?.resume_url) {
+          return null;
+        }
+        
+        return simpleProfile;
+      }
+      
+      if (!profile?.resume_url) {
+        return null;
+      }
+
+      // Get signed URL and fetch the resume content
+      const { data: signedUrlData } = await supabase.storage
+        .from('resumes')
+        .createSignedUrl(profile.resume_url, 60); // 60 seconds should be enough
+
+      if (!signedUrlData?.signedUrl) {
+        return null;
+      }
+
+      // Fetch the file content
+      const response = await fetch(signedUrlData.signedUrl);
+      if (!response.ok) {
+        return null;
+      }
+
+      // Check if it's a PDF file
+      const contentType = response.headers.get('content-type');
+      if (contentType?.includes('application/pdf')) {
+        // For PDF files, try to extract text content
+        try {
+          const arrayBuffer = await response.arrayBuffer();
+          const file = new File([arrayBuffer], 'resume.pdf', { type: 'application/pdf' });
+          const { extractTextFromPDF } = await import('../lib/pdfExtractor');
+          const extractedText = await extractTextFromPDF(file);
+          return extractedText || `[PDF Resume for ${profile.full_name || 'User'} - Text extraction failed, but user has uploaded their resume]`;
+        } catch (error) {
+          return `[PDF Resume for ${profile.full_name || 'User'} - Text extraction failed, but user has uploaded their resume]`;
+        }
+      }
+
+      // For text files, read as text
+      const content = await response.text();
+      return content;
+    } catch (error) {
+      return null;
+    }
+  };
+
+  const loadConfiguration = async () => {
+    if (!user || !isSupabaseConfigured()) return;
+
+    try {
+      const { data } = await supabase
+        .from('automation_configs')
+        .select('config')
+        .eq('user_id', user.id)
+        .single();
+
+      if (data?.config) {
+        setConfig(prev => ({
+          ...prev,
+          ...data.config,
+          apiKey: apiKey // Always use the environment variable API key
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading configuration:', error);
+    }
+  };
+
+  const saveConfiguration = async () => {
+    if (!user || !isSupabaseConfigured()) return;
+
+    // Don't save API key to database
+    const { apiKey: _, ...configToSave } = config;
+
+    try {
+      const { error } = await supabase
+        .from('automation_configs')
+        .upsert({
+          user_id: user.id,
+          config: configToSave,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id'
+        });
+
+      if (error) throw error;
+      toast.success('Configuration saved');
+    } catch (error) {
+      console.error('Error saving configuration:', error);
+      toast.error('Failed to save configuration');
+    }
+  };
+
+  const addLog = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
+    const timestamp = new Date().toLocaleTimeString();
+    setLogs(prev => [...prev, { message, type, timestamp }]);
+    
+    if (type === 'success') {
+      toast.success(message);
+    } else if (type === 'error') {
+      toast.error(message);
+    }
+    
+    // Extension suppressor will automatically handle extension-related errors
+  };
+
   // Persist automation state to survive page refreshes
   const saveAutomationState = (task: TaskStatus) => {
     if (!user) return;
@@ -478,6 +782,7 @@ const LinkedInAutomationBot: React.FC = () => {
       error: task.error || '',
       stepCount,
       appliedCount,
+      errorCount,
       isRunning,
       isPaused,
       logs: logs.slice(-50), // Save last 50 log entries to avoid storage issues
@@ -485,7 +790,7 @@ const LinkedInAutomationBot: React.FC = () => {
     };
     
     try {
-    localStorage.setItem(`automation_state_${user.id}`, JSON.stringify(automationState));
+      localStorage.setItem(`automation_state_${user.id}`, JSON.stringify(automationState));
     } catch (error) {
       console.warn('Failed to save automation state:', error);
     }
@@ -529,6 +834,7 @@ const LinkedInAutomationBot: React.FC = () => {
             setIsPaused(currentTaskStatus.status === 'paused');
             setStepCount(state.stepCount || 0);
             setAppliedCount(state.appliedCount || 0);
+            setErrorCount(state.errorCount || 0);
             
             // Restore logs if available
             if (state.logs && Array.isArray(state.logs)) {
@@ -608,354 +914,121 @@ const LinkedInAutomationBot: React.FC = () => {
     }
   };
 
-  // Check access on component mount
-  const checkAccess = async () => {
-    if (!isAuthenticated) {
-      setShowPaywall(true);
-      setAccessCheckComplete(true);
-      return;
-    }
 
+  const markTaskCompleted = async (taskId: string, finalSteps: number, status: 'finished' | 'failed' | 'stopped', error?: string) => {
     try {
-      const accessResult = await checkFeatureAccess('auto_apply');
-      // Only show paywall if the paywall logic says to show it (never for paid users)
-      setShowPaywall(accessResult.showPaywall);
-    } catch (error) {
-      // Only show paywall for unauthenticated users
-      setShowPaywall(!isAuthenticated);
-    } finally {
-      setAccessCheckComplete(true);
-    }
-  };
-
-  const addLog = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
-    const timestamp = new Date().toLocaleTimeString();
-    const logMessage = `[${timestamp}] ${message}`;
-    setLogs(prev => [...prev, logMessage]);
-    
-    if (type === 'success') {
-      toast.success(message);
-    } else if (type === 'error') {
-      toast.error(message);
-    }
-  };
-
-  // Session management removed - using direct credential login only
-
-  const fetchUserResumeContent = async (): Promise<string | null> => {
-    try {
-      if (!user) return null;
-
-      // Get user profile with resume URL
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('resume_url, full_name')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (error || !profile?.resume_url) {
-        return null;
-      }
-
-      // Get signed URL and fetch the resume content
-      const { data: signedUrlData } = await supabase.storage
-        .from('resumes')
-        .createSignedUrl(profile.resume_url, 60); // 60 seconds should be enough
-
-      if (!signedUrlData?.signedUrl) {
-        return null;
-      }
-
-      // Fetch the file content
-      const response = await fetch(signedUrlData.signedUrl);
-      if (!response.ok) {
-        return null;
-      }
-
-      // Check if it's a PDF file
-      const contentType = response.headers.get('content-type');
-      if (contentType?.includes('application/pdf')) {
-        // For PDF files, try to extract text content
-        try {
-          const arrayBuffer = await response.arrayBuffer();
-          const file = new File([arrayBuffer], 'resume.pdf', { type: 'application/pdf' });
-          const { extractTextFromPDF } = await import('../lib/pdfExtractor');
-          const extractedText = await extractTextFromPDF(file);
-          return extractedText || `[PDF Resume for ${profile.full_name || 'User'} - Text extraction failed, but user has uploaded their resume]`;
-        } catch (error) {
-          return `[PDF Resume for ${profile.full_name || 'User'} - Text extraction failed, but user has uploaded their resume]`;
-        }
-      }
-
-      // For text files, read as text
-      const content = await response.text();
-      return content;
-    } catch (error) {
-      return null;
-    }
-  };
-
-  const loadConfiguration = async () => {
-    try {
-      if (!isSupabaseConfigured() || !user) {
-        setLoading(false);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('automation_configs')
-        .select('config')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') {
-        // Don't show error toast for configuration loading
-      } else if (data?.config) {
-        // Map empty strings and null values to undefined for select components
-        const loadedConfig = { ...data.config };
-        Object.keys(loadedConfig).forEach(key => {
-          if (loadedConfig[key] === '' || loadedConfig[key] === null) {
-            loadedConfig[key] = undefined;
-          }
-        });
-        setConfig(prev => ({ ...prev, ...loadedConfig }));
-        
-        // Load selected model if saved
-        if (loadedConfig.selectedModel && AI_MODELS[loadedConfig.selectedModel as keyof typeof AI_MODELS]) {
-          setSelectedModel(loadedConfig.selectedModel as keyof typeof AI_MODELS);
-        }
-      }
-    } catch (error) {
-      // Silently fail for configuration loading
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const saveConfiguration = async () => {
-    if (!isSupabaseConfigured() || !user) {
-      toast.error('Database not configured');
-      return;
-    }
-
-    try {
-      // Don't save email in the config (it's not sensitive but we handle it separately)
-      const { linkedinEmail, ...configToSave } = config;
-      
-      // Include selected model in the config
-      const configWithModel = {
-        ...configToSave,
-        selectedModel
-      };
-      
-      const { error } = await supabase
-        .from('automation_configs')
-        .upsert({
-          user_id: user.id,
-          config: configWithModel
-        }, {
-          onConflict: 'user_id'
-        });
-
-      if (error) {
-        throw error;
-      }
-
-      toast.success('Configuration saved successfully');
-    } catch (error) {
-      toast.error('Failed to save configuration');
-    }
-  };
-
-
-
-  const fetchUserSubscription = async () => {
-    try {
-      if (!isSupabaseConfigured() || !user) {
-        setUserSubscription({
-          subscription_status: 'active',
-          price_id: import.meta.env.VITE_STRIPE_PRO_PRICE_ID || null
-        });
-        setMonthlyUsage({ tokens_used: 15, ai_requests_used: 5, cost_usd: 0.15 });
-        return;
-      }
-
-      // Try direct table access first, fallback to subscription service
-      try {
-        const { data: subscription, error: subError } = await supabase
-          .from('stripe_user_subscriptions')
-          .select('*')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (subError) {
-          // Don't throw, just fallback
-        }
-
-        if (subscription && subscription.subscription_status === 'active') {
-          setUserSubscription(subscription);
-        } else {
-          setUserSubscription({ subscription_status: 'inactive', price_id: null });
-        }
-      } catch (tableError) {
-        try {
-          // Fallback to subscription service
-          const { subscriptionService } = await import('../lib/subscriptionService');
-          const serviceSubscription = await subscriptionService.getUserSubscription(user.id);
-
-          if (serviceSubscription && serviceSubscription.subscription_status === 'active') {
-            setUserSubscription(serviceSubscription);
-          } else {
-            setUserSubscription({ subscription_status: 'inactive', price_id: null });
-          }
-        } catch (serviceError) {
-          setUserSubscription({ subscription_status: 'inactive', price_id: null });
-        }
-      }
-
-      // Fetch current month usage with proper timezone handling
-      const today = new Date();
-      const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-
-      const startDate = firstDayOfMonth.toISOString();
-      const endDate = nextMonth.toISOString();
-      
-      // Add warning if system date seems incorrect
-      const currentYear = new Date().getFullYear();
-      if (currentYear > 2024) {
-        // System date validation check
-      }
-      
-      const { data: usageData, error: usageError } = await supabase
-        .from('browser_use_logs')
-        .select('task_id, step_count, cost_usd, created_at')
-        .eq('user_id', user.id)
-        .eq('task_type', 'linkedin_auto_apply')
-        .gte('created_at', startDate)
-        .lt('created_at', endDate)
-        .order('created_at', { ascending: false });
-
-      if (usageError) {
-        // Don't show error toast for usage data loading
-      }
-
-      // Calculate total steps correctly: only count the MAX step_count per task_id (same logic as billing page)
-      
-      let totalSteps = 0;
-      let totalCost = 0;
-      
-      if (usageData && usageData.length > 0) {
-        const taskSteps: Record<string, number> = {};
-        const taskCosts: Record<string, number> = {};
-        
-        // Group by task_id and find the maximum step_count for each task
-        usageData.forEach(log => {
-          const currentSteps = taskSteps[log.task_id] || 0;
-          const currentCost = taskCosts[log.task_id] || 0;
-          
-          // Only keep the highest step count and cost for each task
-          if (log.step_count > currentSteps) {
-            taskSteps[log.task_id] = log.step_count;
-            taskCosts[log.task_id] = parseFloat(log.cost_usd.toString());
-          }
-        });
-        
-        // Sum up the final step counts and costs for all tasks
-        totalSteps = Object.values(taskSteps).reduce((sum, steps) => sum + steps, 0);
-        totalCost = Object.values(taskCosts).reduce((sum, cost) => sum + cost, 0);
-      }
-      
-      const jobTokens = totalSteps; // Use actual steps, not divided by 10
-      
-      setMonthlyUsage({ 
-        tokens_used: jobTokens, 
-        ai_requests_used: usageData?.length || 0,
-        cost_usd: totalCost
+      // Update automation session in new tracking system
+      await updateAutomationSession(taskId, {
+        step_count: finalSteps,
+        status: status,
+        error_message: error
       });
-
-    } catch (error) {
       
-      // Set fallback data so UI doesn't break
-      setUserSubscription({ subscription_status: 'inactive', price_id: null });
-      setMonthlyUsage({ tokens_used: 0, ai_requests_used: 0, cost_usd: 0 });
+      addLog(`✅ Task ${taskId} marked as ${status}`);
+      
+      // Create notification for task completion
+      if (isSupabaseConfigured() && user) {
+        let notificationTitle = '';
+        let notificationMessage = '';
+        let notificationType: 'success' | 'error' | 'info' = 'info';
+        let iconName = 'Clock';
+
+        switch (status) {
+          case 'finished':
+            notificationTitle = 'Automation Completed';
+            notificationMessage = `LinkedIn automation finished successfully. ${finalSteps} steps completed.`;
+            notificationType = 'success';
+            iconName = 'CheckCircle';
+            break;
+          case 'failed':
+            notificationTitle = 'Automation Failed';
+            notificationMessage = error || 'Automation task encountered an error and stopped.';
+            notificationType = 'error';
+            iconName = 'AlertCircle';
+            break;
+          case 'stopped':
+            notificationTitle = 'Automation Stopped';
+            notificationMessage = `Automation was stopped by user. ${finalSteps} steps completed.`;
+            notificationType = 'info';
+            iconName = 'Clock';
+            break;
+        }
+
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: user.id,
+            title: notificationTitle,
+            message: notificationMessage,
+            type: notificationType,
+            icon_name: iconName,
+            data: {
+              taskId: taskId,
+              finalSteps: finalSteps,
+              status: status,
+              error: error || null
+            }
+          });
+      }
+    } catch (error) {
+      console.error('Error marking task completed:', error);
     }
   };
 
-  const getPlanName = () => {
-    if (!userSubscription || userSubscription.subscription_status !== 'active') {
-      return 'Free Plan';
-    }
-    
-    // Use the price_id directly from the subscription
-    const priceId = userSubscription.price_id;
-    
-    if (priceId === import.meta.env.VITE_STRIPE_MAX_PRICE_ID) {
-      return 'Max Plan';
-    }
-    if (priceId === import.meta.env.VITE_STRIPE_PRO_PRICE_ID) {
-      return 'Pro Plan';
-    }
-    if (priceId === import.meta.env.VITE_STRIPE_PLUS_PRICE_ID) {
-      return 'Plus Plan';
-    }
-    
-    // If subscription exists but price ID doesn't match, default to Pro
-    return userSubscription.subscription_status === 'active' ? 'Pro Plan' : 'Free Plan';
-  };
-
-  // Use the EXACT same logic as billing page
-  const getCurrentProduct = () => {
-    if (!userSubscription?.price_id) return null;
-    return getProductByPriceId(userSubscription.price_id);
-  };
-
-  const getPlanUsageLimits = () => {
-    if (!userSubscription) return { applications: 0, aiTokens: 0, isSubscription: false };
-
-    // 1) try strict priceId match
-    if (userSubscription.price_id) {
-      const direct = getPlanLimits(userSubscription.price_id.trim());
-      if (direct) return direct;
+  const getTaskStatus = async (taskId: string): Promise<TaskStatus> => {
+    if (!browserClient) {
+      throw new Error('Browser client not initialized');
     }
 
-    // 2) try derive from product object resolved elsewhere
-    const prod = getCurrentProduct();
-    if (prod) {
+    try {
+      const status = await browserClient.getTaskStatus(taskId);
+      const fullTask = await browserClient.getTask(taskId);
+      
+      // If task is finished, check if it actually completed successfully
+      if (status === 'finished') {
+        // Only mark as successful if we have steps indicating actual job applications
+        const hasJobApplications = fullTask.steps?.some(step => 
+          step.next_goal?.includes('APPLYING TO:') || 
+          step.next_goal?.includes('SUBMITTING APPLICATION') ||
+          step.next_goal?.includes('SUBMITTING EXTERNAL APPLICATION') ||
+          step.evaluation_previous_goal?.includes('application submitted') ||
+          step.next_goal?.includes('Submit application')
+        );
+        
+        if (hasJobApplications) {
+          addLog('✅ Automation completed successfully with job applications', 'success');
+        } else {
+          addLog('⚠️ Task finished but no job applications were completed. This may indicate a login issue.', 'error');
+          addLog('💡 Try clearing your session and running automation again for manual login.', 'info');
+        }
+      }
+      
       return {
-        applications: prod.applicationCount || 0,
-        aiTokens: prod.aiTokenCount || 0,
-        isSubscription: prod.mode === 'subscription'
+        id: taskId,
+        status: status,
+        steps: fullTask.steps || [],
+        output: fullTask.output || undefined,
+        error: undefined,
+        live_url: fullTask.live_url || undefined
       };
+    } catch (error) {
+      throw error;
     }
-
-    // 3) final default
-    return { applications: 0, aiTokens: 0, isSubscription: false };
   };
 
-  const getTokenLimit = () => {
-    if (!userSubscription || userSubscription.subscription_status !== 'active') {
-      return 0; // Free plan gets 0 steps
+  const stopTask = async (taskId: string): Promise<void> => {
+    if (!browserClient) {
+      throw new Error('Browser client not initialized');
     }
-    
-    // Use the same robust logic as billing page
-    const limits = getPlanUsageLimits();
-    
-    const applicationLimit = limits.applications || 0;
-    const stepLimit = applicationLimit * 10; // Convert applications to steps (10 steps per application)
-    return stepLimit;
-  };
 
-  const canStartAutomation = () => {
-    const limit = getTokenLimit();
-    if (limit === 0) {
-      return false;
+    try {
+      addLog(`🛑 Stopping task: ${taskId}`);
+      await browserClient.stopTask(taskId);
+      addLog(`✅ Task stopped successfully: ${taskId}`, 'success');
+    } catch (error) {
+      addLog(`❌ Error stopping task: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      throw error;
     }
-    
-    const estimatedTokensNeeded = 5; // Minimum tokens needed to start
-    const canStart = monthlyUsage.tokens_used + estimatedTokensNeeded <= limit;
-    
-    return canStart;
   };
 
   const buildLinkedInJobsURL = () => {
@@ -987,7 +1060,7 @@ const LinkedInAutomationBot: React.FC = () => {
       
       if (locationKey) {
         const locationId = LINKEDIN_LOCATIONS[locationKey as keyof typeof LINKEDIN_LOCATIONS];
-        if (locationId === 'remote') {
+        if (locationId === 'remote' || locationId === '0') {
           params.append('f_WT', '2');
         } else {
           params.append('geoId', locationId);
@@ -1007,11 +1080,21 @@ const LinkedInAutomationBot: React.FC = () => {
       if (workType) {
         params.append('f_WT', workType);
       }
+    } else if (config.remotePreference && config.remotePreference !== 'All' && !params.has('f_WT')) {
+      const workType = WORK_TYPE_MAP[config.remotePreference as keyof typeof WORK_TYPE_MAP];
+      if (workType) {
+        params.append('f_WT', workType);
+      }
     }
     
     // Experience level
     if (config.experienceLevel && config.experienceLevel !== 'any') {
       const experienceLevel = EXPERIENCE_LEVEL_MAP[config.experienceLevel as keyof typeof EXPERIENCE_LEVEL_MAP];
+      if (experienceLevel) {
+        params.append('f_E', experienceLevel);
+      }
+    } else if (config.experience && config.experience !== 'All') {
+      const experienceLevel = EXPERIENCE_LEVEL_MAP[config.experience as keyof typeof EXPERIENCE_LEVEL_MAP];
       if (experienceLevel) {
         params.append('f_E', experienceLevel);
       }
@@ -1035,7 +1118,18 @@ const LinkedInAutomationBot: React.FC = () => {
     
     // Date posted
     if (config.datePosted) {
-      params.append('f_TPR', config.datePosted);
+      if (config.datePosted.startsWith('r')) {
+        params.append('f_TPR', config.datePosted);
+      } else {
+        const dateMap: { [key: string]: string } = {
+          'Past 24 hours': 'r86400',
+          'Past week': 'r604800',
+          'Past month': 'r2592000'
+        };
+        if (dateMap[config.datePosted]) {
+          params.append('f_TPR', dateMap[config.datePosted]);
+        }
+      }
     }
     
     // Company size
@@ -1050,314 +1144,6 @@ const LinkedInAutomationBot: React.FC = () => {
     
     return finalUrl;
   };
-
-  const trackUsage = async (totalSteps: number, taskId: string) => {
-    if (!user) return;
-
-    try {
-      const costPerStep = 0.03;
-      const initializationCost = 0.01;
-      const costUsd = (totalSteps * costPerStep) + initializationCost;
-      
-      const maxSteps = getTokenLimit();
-      
-      // Check subscription status
-      if (!userSubscription || userSubscription.subscription_status !== 'active') {
-        toast.error('Subscription access issue detected. Please check your billing status.');
-        await stopAutomation();
-        return;
-      }
-      
-      // Check usage limits
-      if (maxSteps > 0 && totalSteps > maxSteps) {
-        toast.error('Monthly usage limit reached. Upgrade your plan or wait until next month to continue automation.');
-        await stopAutomation();
-        return;
-      }
-      
-      // Record usage to database
-      if (isSupabaseConfigured()) {
-        try {
-          // Delete existing record and insert new one
-          await supabase
-            .from('browser_use_logs')
-            .delete()
-            .eq('user_id', user.id)
-            .eq('task_id', taskId);
-
-          await supabase
-            .from('browser_use_logs')
-            .insert({
-              user_id: user.id,
-              task_id: taskId,
-              task_type: 'linkedin_auto_apply',
-              step_count: totalSteps,
-              cost_usd: costUsd
-            });
-        } catch (dbError) {
-          // Continue automation even if logging fails
-        }
-      }
-
-      // Update local state
-      setMonthlyUsage(prev => ({
-        ...prev,
-        tokens_used: totalSteps,
-        cost_usd: costUsd
-      }));
-      
-    } catch (error) {
-      // Continue automation even if tracking fails
-    }
-  };
-
-  const saveJobApplication = async (company: string, role: string, taskId: string, jobUrl?: string | null) => {
-    try {
-      if (!isSupabaseConfigured() || !user) {
-        return false;
-      }
-
-      // Validate and clean the input data
-      const cleanCompany = company?.trim();
-      const cleanRole = role?.trim();
-      
-      if (!cleanCompany || !cleanRole || !isValidCompanyName(cleanCompany) || !isValidJobTitle(cleanRole)) {
-        return false;
-      }
-
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (profileError || !profile) {
-        return false;
-      }
-
-      // Get or create a job campaign
-      const { data: campaign } = await supabase
-        .from('job_campaigns')
-        .select('id')
-        .eq('profile_id', profile.id)
-        .eq('job_title', config.jobTitle || 'LinkedIn Auto Apply')
-        .eq('location', config.location || 'Remote')
-        .maybeSingle();
-
-      let campaignId = campaign?.id;
-
-      if (!campaignId) {
-        const { data: newCampaign, error: campaignError } = await supabase
-          .from('job_campaigns')
-          .insert({
-            profile_id: profile.id,
-            job_title: config.jobTitle || 'LinkedIn Auto Apply',
-            location: config.location || 'Remote',
-            experience_level: config.experienceLevel || config.experience || '',
-            work_type: config.workType || config.remotePreference || '',
-            target_count: parseInt(config.targetCount) || 10
-          })
-          .select('id')
-          .single();
-
-        if (campaignError || !newCampaign) {
-          return false;
-        }
-
-        campaignId = newCampaign.id;
-      }
-
-      if (campaignId) {
-        // Check if this application already exists to avoid duplicates
-        const { data: existingApp } = await supabase
-          .from('applications')
-          .select('id')
-          .eq('campaign_id', campaignId)
-          .eq('company', cleanCompany)
-          .eq('role', cleanRole)
-          .maybeSingle();
-
-        if (!existingApp) {
-          const applicationData = {
-            campaign_id: campaignId,
-            company: cleanCompany,
-            role: cleanRole,
-            status: 'SENT',
-            applied_at: new Date().toISOString(),
-            details: {
-              automated: true,
-              task_id: taskId,
-              job_title: config.jobTitle,
-              location: config.location,
-              contact_number: `${config.countryCode}${config.contactNumber}`,
-              resume_used: config.linkedinResume || 'Default',
-              custom_instructions: config.customInstructions || '',
-              extraction_method: 'browser_use_api_v2',
-              timestamp: new Date().toISOString(),
-              url: jobUrl || null
-            }
-          };
-
-          const { data: newApp, error: appError } = await supabase
-            .from('applications')
-            .insert(applicationData)
-            .select('id')
-            .single();
-
-          if (!appError && newApp) {
-            // Create notification for successful application
-            await supabase
-              .from('notifications')
-              .insert({
-                user_id: user.id,
-                title: 'Job Application Submitted',
-                message: `Applied to ${cleanRole} at ${cleanCompany}`,
-                type: 'success',
-                icon_name: 'Send',
-                data: {
-                  applicationId: newApp.id,
-                  company: cleanCompany,
-                  role: cleanRole,
-                  url: jobUrl
-                }
-              });
-
-            // Only show toast notification for successful saves
-            toast.success(`Applied to ${cleanCompany} - ${cleanRole}`);
-            return true;
-          }
-        }
-      }
-      
-      return false;
-    } catch (error) {
-      return false;
-    }
-  };
-
-  const createLinkedInTask = async () => {
-    if (!browserClient) {
-      throw new Error('Browser client not initialized');
-    }
-
-    // Stop previous task if running or paused
-    if (currentTask && (currentTask.status === 'running' || currentTask.status === 'paused')) {
-      try {
-        await browserClient.stopTask(currentTask.id);
-        addLog('⏹️ Stopped previous automation task before starting a new one', 'info');
-      } catch (err) {
-        addLog('⚠️ Failed to stop previous task (it may already be stopped)', 'info');
-      }
-    }
-
-    // Always clear the browser profile before starting a new task for a new user
-    await browserClient.clearBrowserProfile();
-
-    const linkedinUrl = buildLinkedInJobsURL();
-    
-    // Override external job applications if feature is disabled
-    const effectiveConfig = {
-      ...config,
-      applyToExternalJobs: config.applyToExternalJobs && FEATURE_FLAGS.ENABLE_EXTERNAL_APPLICATIONS
-    };
-    
-    // Handle resume for external job applications
-    let resumeContent: string | null = null;
-    let uploadedFileNames: string[] = [];
-    
-    if (effectiveConfig.applyToExternalJobs) {
-      addLog('📄 Preparing your resume for external job applications...');
-      
-      try {
-        // First try to get the user's resume file
-        if (user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('resume_url')
-            .eq('user_id', user.id)
-            .maybeSingle();
-          
-          if (profile?.resume_url) {
-            // Get signed URL for the resume
-            const { data: signedUrlData } = await supabase.storage
-              .from('resumes')
-              .createSignedUrl(profile.resume_url, 60);
-            
-            if (signedUrlData?.signedUrl) {
-              // Fetch the resume file
-              const response = await fetch(signedUrlData.signedUrl);
-              if (response.ok) {
-                const blob = await response.blob();
-                const fileName = profile.resume_url.split('/').pop() || 'resume.pdf';
-                const file = new File([blob], fileName, { type: blob.type });
-                
-                // Upload to browser-use
-                addLog('📤 Uploading resume to browser automation service...');
-                const uploadedFileName = await browserClient.uploadFile(file);
-                uploadedFileNames.push(uploadedFileName);
-                addLog('✅ Resume uploaded successfully for external applications');
-                
-                // Also get text content for context
-                resumeContent = await fetchUserResumeContent();
-              }
-            }
-          }
-        }
-        
-        if (uploadedFileNames.length === 0) {
-          addLog('⚠️ Warning: Could not upload resume. External job applications may be limited.', 'error');
-        }
-      } catch (error) {
-        console.error('Error preparing resume:', error);
-        addLog('⚠️ Warning: Failed to prepare resume for upload. External applications may be limited.', 'error');
-      }
-    }
-    
-    // Always use direct credential login (no session management)
-    addLog('🔑 Using direct credential login with provided credentials', 'info');
-    addLog('📋 IMPORTANT: Make sure 2FA is disabled on your LinkedIn account', 'info');
-    
-    // Use comprehensive single prompt approach (proven to work better)
-    // INSTRUCTION: Use the LinkedIn password from the secret variable ln_password
-    const comprehensivePrompt = createComprehensivePrompt(linkedinUrl, resumeContent, uploadedFileNames);
-
-    // Pass the password via secrets, not in the prompt/config
-    const secrets: Record<string, string> = { ln_password: config.linkedinPassword || '' };
-    if (effectiveConfig.applyToExternalJobs && config.externalJobPassword) {
-      secrets.ext_password = config.externalJobPassword;
-    }
-    
-    const taskConfig = {
-      task: comprehensivePrompt,
-      
-      secrets: config.linkedinPassword ? secrets : undefined,
-      save_browser_data: false,
-      use_adblock: false,
-      use_proxy: true,
-      
-      proxy_country_code: 'us' as const,
-      highlight_elements: true,
-      max_agent_steps: Math.max(100, parseInt(config.targetCount) * 15), // 15 steps per application for external jobs
-      llm_model: selectedModel,
-      allowed_domains: effectiveConfig.applyToExternalJobs ? undefined : ['linkedin.com', '*.linkedin.com'],
-      included_file_names: uploadedFileNames.length > 0 ? uploadedFileNames : undefined,
-    };
-
-    addLog(`🚀 Starting LinkedIn automation with ${AI_MODELS[selectedModel].name} (${AI_MODELS[selectedModel].provider})`, 'success');
-
-    const result = await browserClient.createLinkedInTask(taskConfig);
-    
-    return {
-      id: result.id,
-      live_url: undefined, // Will be fetched later
-      status: 'created' as const,
-      steps: [],
-      output: undefined,
-      error: undefined
-    };
-  };
-
-  // Session-based prompts removed - using direct credential login only
 
   const createComprehensivePrompt = (linkedinUrl: string, resumeContent: string | null = null, uploadedFileNames: string[] = []) => {
     const applyToExternalJobs = FEATURE_FLAGS.ENABLE_EXTERNAL_APPLICATIONS && config.applyToExternalJobs;
@@ -1377,13 +1163,19 @@ STEP-BY-STEP PROCESS:
    d. Check if it's an Easy Apply job or external application:
       - If Easy Apply: Click the "Easy Apply" button and follow steps e-l below
       - If External: 
-        🚨 **STOP! CRITICAL CHECKPOINT** 🚨
-        1. Click the external apply button
-        2. **IMMEDIATELY** look for new browser tab at top of screen
-        3. Click on the NEW tab (not LinkedIn tab)
-        4. Verify you're on external company website (URL ≠ linkedin.com)
-        5. ONLY THEN follow the EXTERNAL JOB APPLICATION INSTRUCTIONS
-        6. If you're still on LinkedIn after clicking external apply, YOU FAILED - try again
+        🚨 **CRITICAL TAB SWITCHING INSTRUCTIONS** 🚨
+        1. Click the external apply button/link
+        2. **WAIT 2-3 SECONDS** for new tab to open
+        3. Look at the browser tab bar at the top - you should see TWO tabs now
+        4. **CLICK ON THE NEW TAB** (it will have the company name, not LinkedIn)
+        5. Verify URL changed - you should NOT be on linkedin.com anymore
+        6. If still on LinkedIn:
+           - Look for tabs at the very top of the browser window
+           - The new tab might be to the right of the LinkedIn tab
+           - Click directly on that new tab
+           - Or try keyboard shortcut: Ctrl+Tab (Windows) or Cmd+Tab (Mac)
+        7. ONLY after switching tabs, follow the EXTERNAL JOB APPLICATION INSTRUCTIONS
+        8. **STAY ON EXTERNAL SITE** until application is fully submitted - DO NOT return to LinkedIn prematurely
    ` : 'd. Click the "Easy Apply" button'}
    e. Fill out the application form (ALWAYS scroll down to see all fields - some are hidden below)
    f. Answer any questions that appear (scroll down after each answer to see more questions)
@@ -1617,10 +1409,16 @@ When you encounter job postings that don't have "Easy Apply" but have external a
 8. SUBMIT & TRACK:
    - Before submitting: "SUBMITTING EXTERNAL APPLICATION TO: [COMPANY] - [JOB TITLE]"
    - Click the submit button to complete the external application
-   - Wait for confirmation that the application was submitted successfully
-   - **CRITICAL TAB MANAGEMENT - RETURN TO LINKEDIN SEQUENCE**:
+   - **WAIT FOR CONFIRMATION** - Do not leave the page until you see:
+     * Success message
+     * Confirmation page
+     * "Application submitted" notification
+     * Thank you page
+   - Only AFTER seeing confirmation, proceed to return to LinkedIn
+   
+9. **RETURN TO LINKEDIN** (ONLY after application is confirmed submitted):
      
-     🚨 **MANDATORY STEPS AFTER EXTERNAL APPLICATION SUBMISSION:**
+     🚨 **DO NOT SKIP THESE STEPS - REQUIRED TO CONTINUE JOB SEARCH:**
      
      1. **CLOSE EXTERNAL TAB**: 
         - Right-click on the current external job site tab
@@ -1737,61 +1535,358 @@ This tracking is essential for saving your applications correctly.
 This is the #1 issue that needs to be fixed immediately.`;
   };
 
-
-
-  const getTaskStatus = async (taskId: string): Promise<TaskStatus> => {
+  const createLinkedInTask = async (): Promise<TaskStatus> => {
     if (!browserClient) {
       throw new Error('Browser client not initialized');
     }
 
-    try {
-      const status = await browserClient.getTaskStatus(taskId);
-      const fullTask = await browserClient.getTask(taskId);
+    // Stop previous task if running or paused
+    if (currentTask && (currentTask.status === 'running' || currentTask.status === 'paused')) {
+      try {
+        await browserClient.stopTask(currentTask.id);
+        addLog('⏹️ Stopped previous automation task before starting a new one', 'info');
+      } catch (err) {
+        addLog('⚠️ Failed to stop previous task (it may already be stopped)', 'info');
+      }
+    }
+
+    // Always clear the browser profile before starting a new task for a new user
+    await browserClient.clearBrowserProfile();
+
+    const linkedinUrl = buildLinkedInJobsURL();
+    
+    // Override external job applications if feature is disabled
+    const effectiveConfig = {
+      ...config,
+      applyToExternalJobs: config.applyToExternalJobs && FEATURE_FLAGS.ENABLE_EXTERNAL_APPLICATIONS
+    };
+    
+    // Handle resume for external job applications
+    let resumeContent: string | null = null;
+    let uploadedFileNames: string[] = [];
+    
+    if (effectiveConfig.applyToExternalJobs) {
+      addLog('📄 Preparing your resume for external job applications...');
       
-      // If task is finished, check if it actually completed successfully
-      if (status === 'finished') {
-        // Only mark as successful if we have steps indicating actual job applications
-        const hasJobApplications = fullTask.steps?.some(step => 
-          step.next_goal?.includes('APPLYING TO:') || 
-          step.next_goal?.includes('SUBMITTING APPLICATION') ||
-          step.evaluation_previous_goal?.includes('application submitted') ||
-          step.next_goal?.includes('Submit application')
-        );
+      try {
+        // First try to get the user's resume file
+        if (user) {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('resume_url')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          
+          if (profileError) {
+            console.warn('Error fetching profile:', profileError);
+          }
+          
+          if (profile?.resume_url) {
+            // Get signed URL for the resume
+            const { data: signedUrlData } = await supabase.storage
+              .from('resumes')
+              .createSignedUrl(profile.resume_url, 60);
+            
+            if (signedUrlData?.signedUrl) {
+              // Fetch the resume file
+              const response = await fetch(signedUrlData.signedUrl);
+              if (response.ok) {
+                const blob = await response.blob();
+                const fileName = profile.resume_url.split('/').pop() || 'resume.pdf';
+                const file = new File([blob], fileName, { type: blob.type });
+                
+                // Upload to browser-use
+                addLog('📤 Uploading resume to browser automation service...');
+                const uploadedFileName = await browserClient.uploadFile(file);
+                uploadedFileNames.push(uploadedFileName);
+                addLog('✅ Resume uploaded successfully for external applications');
+                
+                // Also get text content for context
+                resumeContent = await fetchUserResumeContent();
+              }
+            }
+          }
+        }
         
-        if (hasJobApplications) {
-          addLog('✅ Automation completed successfully with job applications', 'success');
-        } else {
-          addLog('⚠️ Task finished but no job applications were completed. This may indicate a login issue.', 'error');
-          addLog('💡 Try clearing your session and running automation again for manual login.', 'info');
+        if (uploadedFileNames.length === 0) {
+          addLog('⚠️ Warning: Could not upload resume. External job applications may be limited.', 'error');
+        }
+      } catch (error) {
+        console.error('Error preparing resume:', error);
+        addLog('⚠️ Warning: Failed to prepare resume for upload. External applications may be limited.', 'error');
+      }
+    }
+    
+    // Always use direct credential login (no session management)
+    addLog('🔑 Using direct credential login with provided credentials', 'info');
+    addLog('📋 IMPORTANT: Make sure 2FA is disabled on your LinkedIn account', 'info');
+    
+    // Use comprehensive single prompt approach (proven to work better)
+    // INSTRUCTION: Use the LinkedIn password from the secret variable ln_password
+    const comprehensivePrompt = createComprehensivePrompt(linkedinUrl, resumeContent, uploadedFileNames);
+
+    // Pass the password via secrets, not in the prompt/config
+    const secrets: Record<string, string> = { ln_password: config.linkedinPassword || '' };
+    if (effectiveConfig.applyToExternalJobs && config.externalJobPassword) {
+      secrets.ext_password = config.externalJobPassword;
+    }
+    
+    const taskConfig = {
+      task: comprehensivePrompt,
+      
+      secrets: config.linkedinPassword ? secrets : undefined,
+      save_browser_data: false,
+      use_adblock: false,
+      use_proxy: true,
+      
+      proxy_country_code: 'us' as const,
+      highlight_elements: true,
+      max_agent_steps: Math.max(100, parseInt(config.targetCount) * 15), // 15 steps per application for external jobs
+      llm_model: selectedModel,  allowed_domains: undefined
+    ,
+      included_file_names: uploadedFileNames.length > 0 ? uploadedFileNames : undefined,
+    };
+
+    addLog(`🚀 Starting LinkedIn automation with ${AI_MODELS[selectedModel].name} (${AI_MODELS[selectedModel].provider})`, 'success');
+
+    const result = await browserClient.createLinkedInTask(taskConfig);
+    
+    return {
+      id: result.id,
+      live_url: undefined, // Will be fetched later
+      status: 'created' as const,
+      steps: [],
+      output: undefined,
+      error: undefined
+    };
+  };
+
+  const saveJobApplication = async (company: string, role: string, taskId: string, jobUrl?: string | null) => {
+    try {
+      if (!isSupabaseConfigured() || !user) {
+        return false;
+      }
+
+      // Validate and clean the input data
+      const cleanCompany = company?.trim();
+      const cleanRole = role?.trim();
+      
+      if (!cleanCompany || !cleanRole || !isValidCompanyName(cleanCompany) || !isValidJobTitle(cleanRole)) {
+        return false;
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (profileError) {
+        console.warn('Error fetching profile:', profileError);
+        return false;
+      }
+      
+      if (!profile) {
+        return false;
+      }
+
+      // Get or create a job campaign
+      const { data: campaign } = await supabase
+        .from('job_campaigns')
+        .select('id')
+        .eq('profile_id', profile.id)
+        .eq('job_title', config.jobTitle || 'LinkedIn Auto Apply')
+        .eq('location', config.location || 'Remote')
+        .maybeSingle();
+
+      let campaignId = campaign?.id;
+
+      if (!campaignId) {
+        const { data: newCampaign, error: campaignError } = await supabase
+          .from('job_campaigns')
+          .insert({
+            profile_id: profile.id,
+            job_title: config.jobTitle || 'LinkedIn Auto Apply',
+            location: config.location || 'Remote',
+            experience_level: config.experienceLevel || config.experience || '',
+            work_type: config.workType || config.remotePreference || '',
+            target_count: parseInt(config.targetCount) || 10
+          })
+          .select('id')
+          .single();
+
+        if (campaignError || !newCampaign) {
+          return false;
+        }
+
+        campaignId = newCampaign.id;
+      }
+
+      if (campaignId) {
+        // Check if this application already exists to avoid duplicates
+        const { data: existingApp } = await supabase
+          .from('applications')
+          .select('id')
+          .eq('campaign_id', campaignId)
+          .eq('company', cleanCompany)
+          .eq('role', cleanRole)
+          .maybeSingle();
+
+        if (!existingApp) {
+          const applicationData = {
+            campaign_id: campaignId,
+            company: cleanCompany,
+            role: cleanRole,
+            status: 'SENT',
+            applied_at: new Date().toISOString(),
+            details: {
+              automated: true,
+              task_id: taskId,
+              job_title: config.jobTitle,
+              location: config.location,
+              contact_number: `${config.countryCode}${config.contactNumber}`,
+              resume_used: config.linkedinResume || 'Default',
+              custom_instructions: config.customInstructions || '',
+              extraction_method: 'browser_use_api_v2',
+              timestamp: new Date().toISOString(),
+              url: jobUrl || null
+            }
+          };
+
+          const { data: newApp, error: appError } = await supabase
+            .from('applications')
+            .insert(applicationData)
+            .select('id')
+            .single();
+
+          if (!appError && newApp) {
+            // Create notification for successful application
+            await supabase
+              .from('notifications')
+              .insert({
+                user_id: user.id,
+                title: 'Job Application Submitted',
+                message: `Applied to ${cleanRole} at ${cleanCompany}`,
+                type: 'success',
+                icon_name: 'Send',
+                data: {
+                  applicationId: newApp.id,
+                  company: cleanCompany,
+                  role: cleanRole,
+                  url: jobUrl
+                }
+              });
+
+            // Only show toast notification for successful saves
+            toast.success(`Applied to ${cleanCompany} - ${cleanRole}`);
+            return true;
+          }
         }
       }
       
-      return {
-        id: taskId,
-        status: status,
-        steps: fullTask.steps || [],
-        output: fullTask.output || undefined,
-        error: undefined,
-        live_url: fullTask.live_url || undefined
-      };
+      return false;
     } catch (error) {
-      throw error;
+      return false;
     }
   };
 
-  const stopTask = async (taskId: string): Promise<void> => {
-    if (!browserClient) {
-      throw new Error('Browser client not initialized');
+  const extractCompanyRoleFromStep = (stepText: string): { company: string | null; role: string | null; url: string | null } => {
+    // Look for multiple patterns: "SUBMITTING APPLICATION TO:", "SUBMITTING EXTERNAL APPLICATION TO:", or "APPLYING TO:"
+    const patterns = [
+      /SUBMITTING (?:EXTERNAL )?APPLICATION TO:\s*([^-\n]+?)\s*-\s*([^\n]+)/i,
+      /APPLYING TO:\s*([^-\n]+?)\s*-\s*([^\n]+)/i
+    ];
+    
+    let match = null;
+    for (const pattern of patterns) {
+      match = stepText.match(pattern);
+      if (match) break;
     }
+    
+    if (!match) {
+      return { company: null, role: null, url: null };
+    }
+    
+    let company = match[1]?.trim();
+    let role = match[2]?.trim();
+    
+    if (!company || !role) {
+      return { company: null, role: null, url: null };
+    }
+    
+    // Clean extracted text
+    company = company.replace(/['"[\]{}()]/g, '').trim();
+    role = role.replace(/['"[\]{}()]/g, '').trim();
+    
+    // Remove instruction words that might leak in
+    const instructionWords = /\b(scroll|click|submit|fill|enter|navigate|wait|find|search|apply|button|form|field|page|down|up)\b/gi;
+    role = role.replace(instructionWords, '').replace(/\s+/g, ' ').trim();
+    
+    // Extract only the core job title (before any instruction text)
+    role = role.split(/\s+(to|for|at|in|on|with|by|the|a|an)\s+/i)[0].trim();
+    
+    // Extract URL if present in the step text
+    let url: string | null = null;
+    const urlPattern = /https?:\/\/[^\s\]}"']+/g;
+    const urlMatches = stepText.match(urlPattern);
+    if (urlMatches) {
+      // Look for LinkedIn job URLs or external career site URLs
+      const jobUrl = urlMatches.find(u => 
+        u.includes('linkedin.com/jobs/view/') || 
+        u.includes('linkedin.com/jobs/collections/') ||
+        u.includes('careers.') ||
+        u.includes('jobs.') ||
+        u.includes('job-openings') ||
+        u.includes('apply')
+      );
+      url = jobUrl || urlMatches[0] || null; // Use first URL if no specific job URL found
+    }
+    
+    // Final validation - must be real company and clean job title
+    if (isValidCompanyName(company) && isValidJobTitle(role) && role.length >= 3 && role.length <= 50) {
+      return { company, role, url };
+    }
+    
+    return { company: null, role: null, url: null };
+  };
 
-    try {
-      addLog(`🛑 Stopping task: ${taskId}`);
-      await browserClient.stopTask(taskId);
-      addLog(`✅ Task stopped successfully: ${taskId}`, 'success');
-    } catch (error) {
-      addLog(`❌ Error stopping task: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
-      throw error;
+  // Helper function to validate company names
+  const isValidCompanyName = (company: string): boolean => {
+    if (!company || company.length < 2) return false;
+    
+    const invalidTerms = ['company', 'linkedin', 'employer', 'organization', 'corp', 'the company'];
+    const lowerCompany = company.toLowerCase();
+    
+    for (const term of invalidTerms) {
+      if (lowerCompany === term || lowerCompany.includes(term)) {
+        return false;
+      }
     }
+    
+    // Company names should have at least one letter and not be all numbers
+    return /[a-zA-Z]/.test(company) && !/^\d+$/.test(company);
+  };
+
+  // Helper function to validate job titles
+  const isValidJobTitle = (role: string): boolean => {
+    if (!role || role.length < 3 || role.length > 50) return false;
+    
+    // Must contain letters and be a reasonable job title
+    if (!/[a-zA-Z]/.test(role)) return false;
+    
+    // Reject if it contains instruction words
+    const instructionWords = /\b(scroll|click|submit|fill|enter|navigate|wait|find|search|apply|button|form|field|page|down|up|linkedin|instructions|continue|next|previous|step)\b/i;
+    if (instructionWords.test(role)) return false;
+    
+    // Reject if it's mostly punctuation or numbers
+    const alphaRatio = (role.match(/[a-zA-Z]/g) || []).length / role.length;
+    if (alphaRatio < 0.6) return false;
+    
+    return true;
   };
 
   const startAutomation = async () => {
@@ -1807,9 +1902,10 @@ This is the #1 issue that needs to be fixed immediately.`;
 
     try {
       // Validate subscription and usage limits
-      const limits = getPlanUsageLimits();
-      const currentUsage = monthlyUsage.tokens_used || 0;
-      const maxSteps = limits.applications * 10;
+      const product = userSubscription?.prices ? getProductByPriceId(userSubscription.prices.id) : null;
+      const limits = product ? getPlanLimits(product.name) : null;
+      const currentUsage = userUsage?.automation_steps.used || 0 || 0;
+      const maxSteps = limits ? limits.applications * 10 : 0;
       
       // Check if user has an active subscription
       if (!userSubscription || userSubscription.subscription_status !== 'active') {
@@ -1827,10 +1923,6 @@ This is the #1 issue that needs to be fixed immediately.`;
       toast.error('Unable to validate access - please try again');
       return;
     }
-
-    // Activate extension error suppressor for cleaner console
-    extensionSuppressor.activate();
-    addLog('🛡️ Extension error suppressor activated for cleaner console output');
 
     if (!config.jobTitle.trim()) {
       toast.error('Please enter a job title or keywords to search for');
@@ -1867,7 +1959,7 @@ This is the #1 issue that needs to be fixed immediately.`;
       if (limit === 0) {
         toast.error(`No steps available. Current plan: ${getPlanName()}. Please upgrade your subscription.`);
       } else {
-        toast.error(`Usage limit reached! You have used ${monthlyUsage.tokens_used}/${limit} steps this month.`);
+        toast.error(`Usage limit reached! You have used ${userUsage?.automation_steps.used || 0}/${limit} steps this month.`);
       }
       return;
     }
@@ -1877,6 +1969,9 @@ This is the #1 issue that needs to be fixed immediately.`;
     setLogs([]);
     setStepCount(0);
     setAppliedCount(0);
+    setStartTime(new Date());
+    setElapsedTime(0);
+    setErrorCount(0);
 
     try {
       addLog('🚀 Starting LinkedIn automation...');
@@ -1885,6 +1980,17 @@ This is the #1 issue that needs to be fixed immediately.`;
       setCurrentTask(task);
       
       addLog(`✅ Task created: ${task.id}`);
+      
+      // Create automation session in new tracking system
+      if (isSupabaseConfigured() && user) {
+        await createAutomationSession(
+          user.id,
+          task.id,
+          config.jobTitle,
+          config.location,
+          parseInt(config.targetCount) || 10
+        );
+      }
       
       // Save initial automation state
       saveAutomationState(task);
@@ -1995,8 +2101,7 @@ This is the #1 issue that needs to be fixed immediately.`;
         const finalStepCount = finalTask.steps?.length || 0;
         setStepCount(finalStepCount);
         
-        // Track final step count (this will upsert to ensure we have the correct total)
-        await trackUsage(finalStepCount, currentTask.id);
+        // Final step count is tracked via markTaskCompleted
         addLog(`📈 Final step count recorded: ${finalStepCount} steps`);
         
         // Mark task as stopped in database with final step count
@@ -2004,8 +2109,11 @@ This is the #1 issue that needs to be fixed immediately.`;
         
         addLog(`📊 Final step count: ${finalStepCount}`);
         
-        // Refresh usage data
-        fetchUserSubscription();
+        // Wait for database writes to complete, then refresh usage data
+        setTimeout(async () => {
+          await fetchUserSubscription();
+          addLog('📊 Usage data refreshed');
+        }, 2000);
         
       } catch (error) {
         addLog('⚠️ Could not fetch final task details after stop', 'error');
@@ -2058,7 +2166,7 @@ This is the #1 issue that needs to be fixed immediately.`;
             
             if (newStepCount > stepCount) {
               // Track the TOTAL steps (not incremental) - this will upsert in the database
-            await trackUsage(newStepCount, taskId);
+            // await trackUsage(newStepCount, taskId);
               
               // Calculate total steps used for limit checking
             const limit = getTokenLimit(); // getTokenLimit() already returns step limit (applications * 10)
@@ -2084,11 +2192,17 @@ This is the #1 issue that needs to be fixed immediately.`;
             
             setStepCount(newStepCount);
             
+            // Update automation session with latest step count
+            await updateAutomationSession(taskId, {
+              step_count: newStepCount,
+              applications_submitted: appliedCount
+            });
+            
           // Look for successful application submissions only
             const applicationSteps = updatedTask.steps.filter(step => {
             const stepText = step.next_goal || step.evaluation_previous_goal || '';
-            // Only count steps with our specific announcement format
-            return /SUBMITTING APPLICATION TO:/i.test(stepText);
+            // Count steps with any of our announcement formats
+            return /SUBMITTING (?:EXTERNAL )?APPLICATION TO:/i.test(stepText) || /APPLYING TO:/i.test(stepText);
           });
           
           // Process new applications with deduplication
@@ -2173,8 +2287,7 @@ This is the #1 issue that needs to be fixed immediately.`;
               
               addLog(`📊 Final Summary: ${finalStepCount} total steps, ${finalApplicationCount} applications submitted`);
               
-              // Track final step count (this will upsert to ensure we have the correct total)
-            await trackUsage(finalStepCount, taskId);
+              // Final step count is tracked via markTaskCompleted
               addLog(`📈 Final step count recorded: ${finalStepCount} steps`);
               
               // Mark task as completed in database with final step count
@@ -2197,10 +2310,13 @@ This is the #1 issue that needs to be fixed immediately.`;
             
           // Clear automation state and refresh usage data
           clearAutomationState();
-            fetchUserSubscription();
-            
+          
+          // Wait for database writes to complete before refreshing
+          setTimeout(async () => {
+            await fetchUserSubscription();
             // Force billing page to refresh by dispatching a custom event
             window.dispatchEvent(new CustomEvent('billing-refresh-needed'));
+          }, 2000);
           } else if (updatedTask.status === 'failed') {
           clearInterval(interval);
           setPollInterval(null);
@@ -2218,8 +2334,7 @@ This is the #1 issue that needs to be fixed immediately.`;
               const finalStepCount = finalTask.steps?.length || 0;
               setStepCount(finalStepCount);
               
-              // Track final step count (this will upsert to ensure we have the correct total)
-            await trackUsage(finalStepCount, taskId);
+              // Final step count is tracked via markTaskCompleted
               addLog(`📈 Final step count recorded: ${finalStepCount} steps`);
               
               // Mark task as failed in database with final step count
@@ -2235,10 +2350,13 @@ This is the #1 issue that needs to be fixed immediately.`;
             
           // Clear automation state and refresh usage data
           clearAutomationState();
-            fetchUserSubscription();
-            
+          
+          // Wait for database writes to complete before refreshing
+          setTimeout(async () => {
+            await fetchUserSubscription();
             // Force billing page to refresh by dispatching a custom event
             window.dispatchEvent(new CustomEvent('billing-refresh-needed'));
+          }, 2000);
           } else if (updatedTask.status === 'stopped') {
           clearInterval(interval);
           setPollInterval(null);
@@ -2258,8 +2376,7 @@ This is the #1 issue that needs to be fixed immediately.`;
                 const finalStepCount = finalTask.steps?.length || 0;
                 setStepCount(finalStepCount);
                 
-                // Track final step count (this will upsert to ensure we have the correct total)
-              await trackUsage(finalStepCount, taskId);
+                // Final step count is tracked via markTaskCompleted
                 addLog(`📈 Final step count recorded: ${finalStepCount} steps`);
                 
                 // Mark task as stopped in database with final step count
@@ -2275,10 +2392,13 @@ This is the #1 issue that needs to be fixed immediately.`;
               
             // Clear automation state and refresh usage data
             clearAutomationState();
-              fetchUserSubscription();
-              
+            
+            // Wait for database writes to complete before refreshing
+            setTimeout(async () => {
+              await fetchUserSubscription();
               // Force billing page to refresh by dispatching a custom event
               window.dispatchEvent(new CustomEvent('billing-refresh-needed'));
+            }, 2000);
             }
           }
         } catch (error) {
@@ -2301,1354 +2421,821 @@ This is the #1 issue that needs to be fixed immediately.`;
       }, 30 * 60 * 1000);
   };
 
-  const markTaskCompleted = async (taskId: string, finalSteps: number, status: 'finished' | 'failed' | 'stopped', error?: string) => {
-    try {
-      if (!isSupabaseConfigured() || !user) return;
-
-      const finalCost = Math.ceil(finalSteps / 10) * 0.01;
-      
-      const { error: updateError } = await supabase
-        .from('automation_tasks')
-        .update({
-          status: status,
-          step_count: finalSteps,
-          cost_usd: finalCost,
-          completed_at: new Date().toISOString(),
-          error_message: error || null
-        })
-        .eq('task_id', taskId)
-        .eq('user_id', user.id);
-
-      if (updateError) {
-        addLog(`⚠️ Failed to mark task as completed: ${updateError.message}`, 'error');
-      } else {
-        addLog(`✅ Task ${taskId} marked as ${status}`);
-        
-        // Create notification for task completion
-        let notificationTitle = '';
-        let notificationMessage = '';
-        let notificationType: 'success' | 'error' | 'info' = 'info';
-        let iconName = 'Clock';
-
-        switch (status) {
-          case 'finished':
-            notificationTitle = 'Automation Completed';
-            notificationMessage = `LinkedIn automation finished successfully. ${finalSteps} steps completed.`;
-            notificationType = 'success';
-            iconName = 'CheckCircle';
-            break;
-          case 'failed':
-            notificationTitle = 'Automation Failed';
-            notificationMessage = error || 'Automation task encountered an error and stopped.';
-            notificationType = 'error';
-            iconName = 'AlertCircle';
-            break;
-          case 'stopped':
-            notificationTitle = 'Automation Stopped';
-            notificationMessage = `Automation was stopped by user. ${finalSteps} steps completed.`;
-            notificationType = 'info';
-            iconName = 'Clock';
-            break;
-        }
-
-        await supabase
-          .from('notifications')
-          .insert({
-            user_id: user.id,
-            title: notificationTitle,
-            message: notificationMessage,
-            type: notificationType,
-            icon_name: iconName,
-            data: {
-              taskId: taskId,
-              finalSteps: finalSteps,
-              finalCost: finalCost,
-              status: status,
-              error: error || null
-            }
-          });
-      }
-    } catch (error) {
-      // Error marking task completed
-    }
-  };
-
-
-
-    const extractCompanyRoleFromStep = (stepText: string): { company: string | null; role: string | null; url: string | null } => {
-    // Only use our specific format: "SUBMITTING APPLICATION TO: Company - Job Title"
-    const pattern = /SUBMITTING APPLICATION TO:\s*([^-\n]+?)\s*-\s*([^\n]+)/i;
-    const match = stepText.match(pattern);
-    
-    if (!match) {
-      return { company: null, role: null, url: null };
-    }
-    
-    let company = match[1]?.trim();
-    let role = match[2]?.trim();
-    
-    if (!company || !role) {
-      return { company: null, role: null, url: null };
-    }
-    
-    // Clean extracted text
-    company = company.replace(/['"[\]{}()]/g, '').trim();
-    role = role.replace(/['"[\]{}()]/g, '').trim();
-    
-    // Remove instruction words that might leak in
-    const instructionWords = /\b(scroll|click|submit|fill|enter|navigate|wait|find|search|apply|button|form|field|page|down|up)\b/gi;
-    role = role.replace(instructionWords, '').replace(/\s+/g, ' ').trim();
-    
-    // Extract only the core job title (before any instruction text)
-    role = role.split(/\s+(to|for|at|in|on|with|by|the|a|an)\s+/i)[0].trim();
-    
-    // Extract URL if present in the step text
-    let url: string | null = null;
-    const urlPattern = /https?:\/\/[^\s\]}"']+/g;
-    const urlMatches = stepText.match(urlPattern);
-    if (urlMatches) {
-      // Look for LinkedIn job URLs specifically
-      const jobUrl = urlMatches.find(u => u.includes('linkedin.com/jobs/view/') || u.includes('linkedin.com/jobs/collections/'));
-      url = jobUrl || null;
-    }
-    
-    // Final validation - must be real company and clean job title
-    if (isValidCompanyName(company) && isValidJobTitle(role) && role.length >= 3 && role.length <= 50) {
-      return { company, role, url };
-    }
-    
-    return { company: null, role: null, url: null };
-  };
-
-  // Helper function to validate company names
-  const isValidCompanyName = (company: string): boolean => {
-    if (!company || company.length < 2) return false;
-    
-    const invalidTerms = ['company', 'linkedin', 'employer', 'organization', 'corp', 'the company'];
-    const lowerCompany = company.toLowerCase();
-    
-    for (const term of invalidTerms) {
-      if (lowerCompany === term || lowerCompany.includes(term)) {
-        return false;
-      }
-    }
-    
-    // Company names should have at least one letter and not be all numbers
-    return /[a-zA-Z]/.test(company) && !/^\d+$/.test(company);
-  };
-
-  // Helper function to validate job titles
-  const isValidJobTitle = (role: string): boolean => {
-    if (!role || role.length < 3 || role.length > 50) return false;
-    
-    // Must contain letters and be a reasonable job title
-    if (!/[a-zA-Z]/.test(role)) return false;
-    
-    // Reject if it contains instruction words
-    const instructionWords = /\b(scroll|click|submit|fill|enter|navigate|wait|find|search|apply|button|form|field|page|down|up|linkedin|instructions|continue|next|previous|step)\b/i;
-    if (instructionWords.test(role)) return false;
-    
-    // Reject if it's mostly punctuation or numbers
-    const alphaRatio = (role.match(/[a-zA-Z]/g) || []).length / role.length;
-    if (alphaRatio < 0.6) return false;
-    
-    return true;
-  };
-
-
-
-  if (loading) {
+  try {
     return (
-      <div className="space-y-8">
-        <div className="animate-pulse">
-                      <div className="h-10 bg-white/20 dark:bg-white/20 rounded-lg w-1/3 mb-4 shimmer"></div>
-            <div className="h-96 bg-white/20 dark:bg-white/20 rounded-2xl shimmer"></div>
-        </div>
-      </div>
-    );
-  }
-
-  const handleUpgrade = () => {
-    navigate('/billing');
-  };
-
-  // Show loading state while checking access
-  if (!accessCheckComplete) {
-    return (
-      <div className="max-w-4xl mx-auto space-y-8">
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <span className="ml-3 text-gray-600 dark:text-gray-300">Checking access...</span>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <>
-                      <ConditionalBackground className="fixed inset-0 z-0" animate={false} />
-      <div className="relative min-h-screen max-w-4xl mx-auto space-y-8 z-10">
-      {/* Paywall Modal */}
-      <PaywallModal
-        isOpen={showPaywall}
-        onClose={() => setShowPaywall(false)}
-        feature="LinkedIn Auto Apply"
-        description="Automate your job applications with AI-powered LinkedIn bot that applies to relevant positions based on your preferences"
-        onUpgrade={handleUpgrade}
-        requiredPlan="any"
-      />
-      {/* Simple Header */}
-      <div className="text-center">
-        <div className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full mb-6 shadow-lg">
-          <Bot className="w-5 h-5 text-white mr-2" />
-          <span className="text-white font-semibold">LinkedIn Auto Apply</span>
-        </div>
-        
-        <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
-          AI-Powered Job Applications
-        </h1>
-        
-        <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-          Automate your LinkedIn job applications with AI. Set your preferences and let our bot apply to relevant positions.
-        </p>
-      </div>
-
-      {/* API Configuration Warning */}
-      {!apiKey && (
-        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-6">
-          <div className="flex items-start space-x-4">
-            <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-xl">
-              <AlertCircle className="w-6 h-6 text-amber-600 dark:text-amber-400" />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold text-amber-800 dark:text-amber-200 mb-2">
-                API Configuration Required
-              </h3>
-              <p className="text-amber-700 dark:text-amber-300 mb-4">
-                Please configure your Browser Use API key to enable LinkedIn automation.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Configuration Panel Toggle */}
-      <div className="flex justify-center mb-8">
-        <button
-          onClick={() => setShowConfigPanel(!showConfigPanel)}
-          className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
-        >
-          <Settings className="w-5 h-5 mr-2" />
-          {showConfigPanel ? 'Hide Configuration' : 'Configure AI Agent'}
-          {showConfigPanel ? (
-            <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-            </svg>
-          ) : (
-            <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          )}
-        </button>
-      </div>
-
-      {/* Important Instructions Dropdown */}
-      <div className="flex justify-center mb-8">
-        <button
-          onClick={() => setShowImportantInstructions((prev) => !prev)}
-          className={`inline-flex items-center px-8 py-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 border-2 border-amber-600 ${showImportantInstructions ? 'ring-4 ring-amber-300/40' : ''}`}
-        >
-          <AlertCircle className="w-6 h-6 mr-3 text-white animate-pulse" />
-          IMPORTANT: You MUST read these instructions before using the AI Agent
-          <svg className={`w-5 h-5 ml-3 transition-transform duration-200 ${showImportantInstructions ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
-      </div>
-      {showImportantInstructions && (
-        <div className="mb-8 mx-auto max-w-2xl p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl shadow flex items-start space-x-4">
-          <div className="p-2 bg-blue-100 dark:bg-blue-800 rounded-lg">
-            <AlertCircle className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-          </div>
-          <div>
-            <p className="text-base font-semibold text-blue-800 dark:text-blue-200 mb-2">
-              Important Instructions for LinkedIn Automation
-            </p>
-            <ul className="list-disc pl-5 text-sm text-blue-700 dark:text-blue-100 space-y-2">
-              <li>
-                <strong>After entering your email and password, stay on the browser preview.</strong> If you see any verification, CAPTCHA, or 2FA prompt, <span className="font-bold text-blue-900 dark:text-white">immediately press the <span className='underline'>Pause</span> button</span> in our UI. <br/>
-                <span className="text-blue-900 dark:text-blue-200">If you do not press Pause, the AI agent will automatically shut down to save your credits, as it cannot bypass these security checks.</span> <br/>
-                Once you complete the verification manually in the browser preview, press <span className='underline'>Resume</span> to continue automation.
-              </li>
-              <li>
-                <strong>Resume Upload:</strong> To save your credits, our AI agent <span className="font-bold">does NOT upload your resume for you</span>. <br/>
-                <span className="text-blue-900 dark:text-blue-200">You must upload your resume to LinkedIn yourself. When prompted for the resume name in the AI Agent configuration panel, enter the <span className='underline'>exact name</span> of your resume as it appears on LinkedIn. The agent will use the resume with that exact name for job applications.</span>
-              </li>
-            </ul>
-          </div>
-        </div>
-      )}
-
-            {/* AI Model Selection - Minimalistic Dropdown */}
-      <div className="glass-card rounded-xl p-6">
-        {/* Dropdown Header */}
-        <div 
-          className="flex items-center justify-between cursor-pointer group hover:bg-white/5 dark:hover:bg-gray-800/10 rounded-lg p-2 -m-2 transition-all duration-200"
-          onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
-        >
-          <div className="flex items-center space-x-4">
-            <div className={`w-10 h-10 bg-gradient-to-br ${AI_MODELS[selectedModel].color} rounded-xl flex items-center justify-center shadow-lg`}>
-              <span className="text-xl">{AI_MODELS[selectedModel].icon}</span>
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {AI_MODELS[selectedModel].name}
-                </h3>
-                <span className="text-sm text-gray-500 dark:text-gray-400">
-                  ({AI_MODELS[selectedModel].requestLabel})
-                </span>
+      <div className="min-h-screen -m-8">
+      {/* Hero Section */}
+      <div className="bg-gradient-to-br from-teal-50 to-white border-b border-gray-100">
+        <div className="px-8 py-12">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h1 className="text-4xl font-bold text-gray-900 mb-3">LinkedIn Auto Apply Agent</h1>
+                <p className="text-lg text-gray-600">
+                  AI-powered automation that applies to jobs while you focus on what matters
+                </p>
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {AI_MODELS[selectedModel].provider} • {AI_MODELS[selectedModel].description}
-              </p>
+              <div className="flex items-center gap-3">
+                <motion.div
+                  animate={{
+                    scale: isRunning ? [1, 1.1, 1] : 1,
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: isRunning ? Infinity : 0,
+                  }}
+                  className={`px-4 py-2 rounded-full flex items-center gap-2 ${
+                    isRunning
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  <div className={`w-2 h-2 rounded-full ${
+                    isRunning ? 'bg-green-500' : 'bg-gray-400'
+                  }`} />
+                  <span className="font-medium">{isRunning ? 'Active' : 'Inactive'}</span>
+                </motion.div>
+              </div>
             </div>
-          </div>
-          
-          <div className="flex items-center space-x-3">
-            <div className="text-right">
-                             <p className="text-xs text-gray-500 dark:text-gray-400">
-                 {(() => {
-                   const stepsPerApp = 10;
-                   const totalSteps = parseInt(config.targetCount) * stepsPerApp;
-                   const stepMultiplier = AI_MODELS[selectedModel].stepMultiplier;
-                   const totalSteps_calculated = totalSteps * stepMultiplier;
-                   return `${totalSteps_calculated.toLocaleString()} steps`;
-                 })()}
-               </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500">for {config.targetCount} applications</p>
-            </div>
-            
-            <div className={`p-2 rounded-lg bg-white/10 dark:bg-gray-800/20 transition-all duration-300 group-hover:bg-white/20 dark:group-hover:bg-gray-700/30 ${
-              isModelDropdownOpen ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''
-            }`}>
-              <svg 
-                className={`w-5 h-5 text-gray-600 dark:text-gray-400 transition-transform duration-300 ${
-                  isModelDropdownOpen ? 'rotate-180' : ''
-                }`} 
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
+
+            {/* Quick Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-gray-600">Applications Sent</span>
+                  <CheckCircle className="h-5 w-5 text-teal-600" />
+                </div>
+                <motion.div
+                  key={appliedCount}
+                  initial={{ scale: 0.8 }}
+                  animate={{ scale: 1 }}
+                  className="text-3xl font-bold text-gray-900"
+                >
+                  {appliedCount}
+                </motion.div>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-gray-600">Success Rate</span>
+                  <TrendingUp className="h-5 w-5 text-blue-600" />
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="text-3xl font-bold text-gray-900">{stats.successRate}%</div>
+                  <div className="flex-1">
+                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${stats.successRate}%` }}
+                        transition={{ duration: 1, delay: 0.5 }}
+                        className="h-full bg-blue-600"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-gray-600">Time Elapsed</span>
+                  <Clock className="h-5 w-5 text-purple-600" />
+                </div>
+                <div className="text-3xl font-bold text-gray-900">{formatTime(elapsedTime)}</div>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-gray-600">Steps Used</span>
+                  <Zap className="h-5 w-5 text-amber-600" />
+                </div>
+                <div className="text-3xl font-bold text-gray-900">{stepCount}</div>
+              </motion.div>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Dropdown Content */}
-        <AnimatePresence>
-          {isModelDropdownOpen && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.3, ease: 'easeInOut' }}
-              className="overflow-hidden"
-            >
-              <div className="mt-6 pt-6 border-t border-white/10 dark:border-gray-700/20">
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Choose AI model:</p>
-                
-                <div className="space-y-3">
-                  {Object.entries(AI_MODELS).map(([modelKey, modelInfo]) => {
-                    const isSelected = selectedModel === modelKey;
-                    return (
-                      <div
-                        key={modelKey}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedModel(modelKey as keyof typeof AI_MODELS);
-                          setIsModelDropdownOpen(false);
-                          saveConfiguration();
-                        }}
-                        className={`relative p-4 rounded-lg border cursor-pointer transition-all duration-200 hover:scale-[1.02] ${
-                          isSelected 
-                            ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 shadow-md' 
-                            : 'border-white/20 dark:border-gray-600/20 bg-white/10 dark:bg-gray-800/10 hover:border-white/40 dark:hover:border-gray-500/40 hover:bg-white/20 dark:hover:bg-gray-700/20'
-                        }`}
-                      >
-                        {/* Selection indicator */}
-                        {isSelected && (
-                          <div className="absolute top-3 right-3 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
-                            <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                          </div>
-                        )}
+      <div className="px-8 py-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Configuration Panel */}
+            <div className="lg:col-span-1 space-y-6">
+              {/* AI Model Selector */}
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="bg-white rounded-xl border border-gray-200 shadow-sm"
+              >
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Cpu className="h-5 w-5 text-gray-600" />
+                      <h3 className="text-lg font-semibold text-gray-900">AI Model</h3>
+                    </div>
+                    <button className="text-gray-400 hover:text-gray-600">
+                      <Info className="h-4 w-4" />
+                    </button>
+                  </div>
 
-                        <div className="flex items-center space-x-3">
-                          <div className={`w-10 h-10 bg-gradient-to-br ${modelInfo.color} rounded-lg flex items-center justify-center shadow-md`}>
-                            <span className="text-lg">{modelInfo.icon}</span>
-                          </div>
-                          
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-2 mb-1">
-                              <h4 className="font-semibold text-gray-900 dark:text-white">{modelInfo.name}</h4>
-                              <span className="text-xs text-gray-500 dark:text-gray-400">{modelInfo.provider}</span>
-                              {modelInfo.stepMultiplier === 1 && (
-                                <div className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium rounded-full">
-                                  Most Efficient
-                                </div>
-                              )}
-                            </div>
-                            
-                            <div className="flex items-center justify-between">
-                              <p className="text-sm text-gray-600 dark:text-gray-400">{modelInfo.description}</p>
-                              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{modelInfo.requestLabel}</span>
-                            </div>
-                          </div>
+                  <div className="relative z-20">
+                    <button
+                      onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
+                      className="w-full px-4 py-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200 flex items-center justify-between hover:border-gray-300 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{AI_MODELS[selectedModel].icon}</span>
+                        <div className="text-left">
+                          <div className="font-medium text-gray-900">{AI_MODELS[selectedModel].name}</div>
+                          <div className="text-xs text-gray-500">{AI_MODELS[selectedModel].speed} • {AI_MODELS[selectedModel].requestLabel}</div>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
+                      <ChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${isModelDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
 
-                <div className="mt-4 p-3 bg-gray-50/50 dark:bg-gray-800/20 rounded-lg">
-                  <p className="text-xs text-gray-600 dark:text-gray-400 text-center">
-                    Each job application uses approximately 10 automation steps
-                  </p>
+                    <AnimatePresence>
+                      {isModelDropdownOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg border border-gray-200 shadow-lg z-50"
+                        >
+                          {Object.entries(AI_MODELS).map(([key, model]) => (
+                            <button
+                              key={key}
+                              onClick={() => {
+                                setSelectedModel(key as any);
+                                setIsModelDropdownOpen(false);
+                              }}
+                              className={`w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors ${
+                                selectedModel === key ? 'bg-teal-50' : ''
+                              }`}
+                            >
+                              <span className="text-2xl">{model.icon}</span>
+                              <div className="flex-1 text-left">
+                                <div className="font-medium text-gray-900">{model.name}</div>
+                                <div className="text-xs text-gray-500">{model.description}</div>
+                              </div>
+                              {selectedModel === key && (
+                                <CheckCircle className="h-5 w-5 text-teal-600" />
+                              )}
+                            </button>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+              </motion.div>
 
-      {/* Configuration Panel */}
-      {showConfigPanel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop */}
-          <div 
-            className="absolute inset-0 bg-black/60 backdrop-blur-xl animate-fade-in" 
-            onClick={() => setShowConfigPanel(false)} 
-          />
-          
-          {/* Modal */}
-          <div className="relative glass-card rounded-3xl p-8 w-full max-w-5xl max-h-[90vh] overflow-y-auto animate-modal-popup">
-            {/* Premium Header */}
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-xl">
-                  <Settings className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-3xl font-bold text-white dark:text-white">
-                    AI Agent Configuration
-                  </h2>
-                  <p className="text-white/80 dark:text-white/80 mt-1">
-                    Customize your intelligent LinkedIn automation assistant
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-3">
-                <button
-                  onClick={saveConfiguration}
-                  className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
-                >
-                  <Settings className="w-5 h-5 mr-2" />
-                  Save Configuration
-                </button>
-                <button
-                  onClick={() => setShowConfigPanel(false)}
-                  className="p-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-white/10 dark:hover:bg-white/10 rounded-xl transition-colors"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* LinkedIn Credentials */}
-            <div className="space-y-6">
-              <div className="flex items-center space-x-3 pb-4 border-b border-white/20 dark:border-gray-700/20">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <User className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-white dark:text-white">LinkedIn Account</h3>
-                  <p className="text-sm text-white/70 dark:text-white/70">Your LinkedIn login credentials</p>
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-white/90 dark:text-white/90 mb-2">
-                  LinkedIn Email Address *
-                </label>
-                <input
-                  type="email"
-                  className="w-full px-4 py-3 border border-white/20 dark:border-gray-600/20 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-600 dark:placeholder-white/60 transition-all duration-200"
-                  placeholder="your.email@company.com"
-                  value={config.linkedinEmail}
-                  onChange={(e) => setConfig(prev => ({ ...prev, linkedinEmail: e.target.value }))}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-white/90 dark:text-white/90 mb-2">
-                  LinkedIn Password *
-                </label>
-                <input
-                  type="password"
-                  className="w-full px-4 py-3 border border-white/20 dark:border-gray-600/20 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-600 dark:placeholder-white/60 transition-all duration-200"
-                  placeholder="Your LinkedIn password"
-                  value={config.linkedinPassword || ''}
-                  onChange={(e) => setConfig(prev => ({ ...prev, linkedinPassword: e.target.value }))}
-                />
-                <div className="mt-1 text-xs text-white/60">
-                  Used for automated login - you'll handle 2FA manually if required
-                </div>
-              </div>
-              
-              <div className="bg-red-900/20 border border-red-500/20 rounded-lg p-4">
-                <h4 className="text-sm font-semibold text-red-400 mb-2 flex items-center gap-2">
-                  ⚠️ Important: Disable 2FA Before Using Automation
-                </h4>
-                <div className="text-xs text-red-300 space-y-2">
-                  <p><strong>Required steps:</strong></p>
-                  <ol className="list-decimal list-inside space-y-1 ml-2">
-                    <li>Go to LinkedIn Settings & Privacy → Account access</li>
-                    <li>Temporarily disable Two-step verification</li>
-                    <li>Run the automation with just email/password</li>
-                    <li>Re-enable 2FA after automation completes</li>
-                  </ol>
-                  <p className="mt-3 text-emerald-300">
-                    ✨ <strong>This ensures reliable automation</strong> - no manual intervention needed
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-white/90 dark:text-white/90 mb-2">
-                  Phone Number
-                </label>
-                <div className="grid grid-cols-3 gap-3">
-                  <select
-                    className="col-span-1 px-3 py-3 border border-white/20 dark:border-gray-600/20 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm text-gray-900 dark:text-white transition-all duration-200"
-                    value={config.countryCode}
-                    onChange={(e) => setConfig(prev => ({ ...prev, countryCode: e.target.value }))}
-                  >
-                    <option value="+1-US">🇺🇸 +1 (US)</option>
-                    <option value="+1-CA">🇨🇦 +1 (Canada)</option>
-                    <option value="+44">🇬🇧 +44</option>
-                    <option value="+33">🇫🇷 +33</option>
-                    <option value="+49">🇩🇪 +49</option>
-                    <option value="+39">🇮🇹 +39</option>
-                    <option value="+34">🇪🇸 +34</option>
-                    <option value="+31">🇳🇱 +31</option>
-                    <option value="+46">🇸🇪 +46</option>
-                    <option value="+47">🇳🇴 +47</option>
-                    <option value="+45">🇩🇰 +45</option>
-                    <option value="+358">🇫🇮 +358</option>
-                    <option value="+41">🇨🇭 +41</option>
-                    <option value="+43">🇦🇹 +43</option>
-                    <option value="+32">🇧🇪 +32</option>
-                    <option value="+351">🇵🇹 +351</option>
-                    <option value="+353">🇮🇪 +353</option>
-                    <option value="+91">🇮🇳 +91</option>
-                    <option value="+86">🇨🇳 +86</option>
-                    <option value="+81">🇯🇵 +81</option>
-                    <option value="+82">🇰🇷 +82</option>
-                    <option value="+65">🇸🇬 +65</option>
-                    <option value="+852">🇭🇰 +852</option>
-                    <option value="+61">🇦🇺 +61</option>
-                    <option value="+64">🇳🇿 +64</option>
-                    <option value="+55">🇧🇷 +55</option>
-                    <option value="+52">🇲🇽 +52</option>
-                    <option value="+54">🇦🇷 +54</option>
-                    <option value="+56">🇨🇱 +56</option>
-                    <option value="+57">🇨🇴 +57</option>
-                    <option value="+51">🇵🇪 +51</option>
-                    <option value="+27">🇿🇦 +27</option>
-                    <option value="+234">🇳🇬 +234</option>
-                    <option value="+20">🇪🇬 +20</option>
-                    <option value="+971">🇦🇪 +971</option>
-                    <option value="+966">🇸🇦 +966</option>
-                    <option value="+90">🇹🇷 +90</option>
-                    <option value="+7">🇷🇺 +7</option>
-                    <option value="+380">🇺🇦 +380</option>
-                    <option value="+48">🇵🇱 +48</option>
-                    <option value="+420">🇨🇿 +420</option>
-                    <option value="+36">🇭🇺 +36</option>
-                    <option value="+40">🇷🇴 +40</option>
-                  </select>
-                  <input
-                    type="tel"
-                    className="col-span-2 px-4 py-3 border border-white/20 dark:border-gray-600/20 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-600 dark:placeholder-white/60 transition-all duration-200"
-                    placeholder="Phone number"
-                    value={config.contactNumber}
-                    onChange={(e) => setConfig(prev => ({ ...prev, contactNumber: e.target.value }))}
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-white/90 dark:text-white/90 mb-2">
-                  Resume Name
-                </label>
-                <input
-                  type="text"
-                  className="w-full px-4 py-3 border border-white/20 dark:border-gray-600/20 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-600 dark:placeholder-white/60 transition-all duration-200"
-                  placeholder="e.g., 'Software Engineer Resume'"
-                  value={config.linkedinResume}
-                  onChange={(e) => setConfig(prev => ({ ...prev, linkedinResume: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            {/* Job Preferences */}
-            <div className="space-y-6">
-              <div className="flex items-center space-x-3 pb-4 border-b border-white/20 dark:border-gray-700/20">
-                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <Briefcase className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-white dark:text-white">Job Preferences</h3>
-                  <p className="text-sm text-white/70 dark:text-white/70">Define your job search criteria</p>
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-white/90 dark:text-white/90 mb-2">
-                  Job Title
-                </label>
-                <input
-                  type="text"
-                  className="w-full px-4 py-3 border border-white/20 dark:border-gray-600/20 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-600 dark:placeholder-white/60 transition-all duration-200"
-                  placeholder="Software Engineer, Data Scientist..."
-                  value={config.jobTitle}
-                  onChange={(e) => setConfig(prev => ({ ...prev, jobTitle: e.target.value }))}
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-white/90 dark:text-white/90 mb-2">
-                  Location
-                </label>
-                <input
-                  type="text"
-                  className="w-full px-4 py-3 border border-white/20 dark:border-gray-600/20 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-600 dark:placeholder-white/60 transition-all duration-200"
-                  placeholder="San Francisco, Remote..."
-                  value={config.location}
-                                              onChange={(e) => {
-                              const newLocation = e.target.value;
-                              setConfig(prev => ({ 
-                                ...prev, 
-                                location: newLocation,
-                                // Reset locationId when location changes to force fresh lookup
-                                locationId: LINKEDIN_LOCATIONS[newLocation as keyof typeof LINKEDIN_LOCATIONS] || ''
-                              }));
-                            }}
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-white/90 dark:text-white/90 mb-2">
-                  Target Applications
-                </label>
-                <input
-                  type="number"
-                  className="w-full px-4 py-3 border border-white/20 dark:border-gray-600/20 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-600 dark:placeholder-white/60 transition-all duration-200"
-                  placeholder="10"
-                  min="1"
-                  max="50"
-                  value={config.targetCount}
-                  onChange={(e) => setConfig(prev => ({ ...prev, targetCount: e.target.value }))}
-                />
-              </div>
-
-            </div>
-
-            {/* Optional Filters */}
-            <div className="space-y-6">
-              <div className="flex items-center space-x-3 pb-4 border-b border-white/20 dark:border-gray-700/20">
-                <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <Search className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-white dark:text-white">Advanced Filters</h3>
-                  <p className="text-sm text-white/70 dark:text-white/70">Optional LinkedIn search filters</p>
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-white/90 dark:text-white/90 mb-2">
-                  Work Type
-                </label>
-                <select
-                  className="w-full px-4 py-3 border border-white/20 dark:border-gray-600/20 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm text-gray-900 dark:text-white transition-all duration-200"
-                  value={config.workType || ''}
-                  onChange={(e) => setConfig(prev => ({ ...prev, workType: e.target.value || undefined }))}
-                >
-                  <option value="">Any work type</option>
-                  <option value="Remote">Remote</option>
-                  <option value="On-site">On-site</option>
-                  <option value="Hybrid">Hybrid</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-white/90 dark:text-white/90 mb-2">
-                  Experience Level
-                </label>
-                <select
-                  className="w-full px-4 py-3 border border-white/20 dark:border-gray-600/20 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm text-gray-900 dark:text-white transition-all duration-200"
-                  value={config.experienceLevel || ''}
-                  onChange={(e) => setConfig(prev => ({ ...prev, experienceLevel: e.target.value || undefined }))}
-                >
-                  <option value="">Any experience level</option>
-                  <option value="Internship">Internship</option>
-                  <option value="Entry level">Entry level</option>
-                  <option value="Associate">Associate</option>
-                  <option value="Mid-Senior level">Mid-Senior level</option>
-                  <option value="Director">Director</option>
-                  <option value="Executive">Executive</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-white/90 dark:text-white/90 mb-2">
-                  Job Type
-                </label>
-                <select
-                  className="w-full px-4 py-3 border border-white/20 dark:border-gray-600/20 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm text-gray-900 dark:text-white transition-all duration-200"
-                  value={config.jobType || ''}
-                  onChange={(e) => setConfig(prev => ({ ...prev, jobType: e.target.value || undefined }))}
-                >
-                  <option value="">Any job type</option>
-                  <option value="Full-time">Full-time</option>
-                  <option value="Part-time">Part-time</option>
-                  <option value="Contract">Contract</option>
-                  <option value="Temporary">Temporary</option>
-                  <option value="Volunteer">Volunteer</option>
-                  <option value="Internship">Internship</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-white/90 dark:text-white/90 mb-2">
-                  Date Posted
-                </label>
-                <select
-                  className="w-full px-4 py-3 border border-white/20 dark:border-gray-600/20 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm text-gray-900 dark:text-white transition-all duration-200"
-                  value={config.datePosted || ''}
-                  onChange={(e) => setConfig(prev => ({ ...prev, datePosted: e.target.value || undefined }))}
-                >
-                  <option value="">Any time</option>
-                  <option value="r86400">Past 24 hours</option>
-                  <option value="r604800">Past week</option>
-                  <option value="r2592000">Past month</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-white/90 dark:text-white/90 mb-2">
-                  Company Size
-                </label>
-                <select
-                  className="w-full px-4 py-3 border border-white/20 dark:border-gray-600/20 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white/10 dark:bg-gray-800/10 backdrop-blur-sm text-gray-900 dark:text-white transition-all duration-200"
-                  value={config.companySize || ''}
-                  onChange={(e) => setConfig(prev => ({ ...prev, companySize: e.target.value || undefined }))}
-                >
-                  <option value="">Any company size</option>
-                  <option value="A">Self-employed</option>
-                  <option value="B">1-10 employees</option>
-                  <option value="C">11-50 employees</option>
-                  <option value="D">51-200 employees</option>
-                  <option value="E">201-500 employees</option>
-                  <option value="F">501-1000 employees</option>
-                  <option value="G">1001-5000 employees</option>
-                  <option value="H">5001-10000 employees</option>
-                  <option value="I">10001+ employees</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* AI Instructions - Full Width */}
-          <div className="lg:col-span-3 mt-8 pt-8 border-t border-gray-200/50 dark:border-gray-700/50">
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                <Sparkles className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white">AI Agent Instructions</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Prompt your AI agent with custom behavior instructions</p>
-              </div>
-            </div>
-            
-            <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
-              <div className="flex items-start space-x-3">
-                <div className="p-2 bg-blue-100 dark:bg-blue-800 rounded-lg">
-                  <Sparkles className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-1">
-                    Prompt Your AI Agent
-                  </p>
-                  <p className="text-xs text-blue-600 dark:text-blue-300">
-                    Give your AI agent specific instructions beyond the standard filters. This is for behavioral guidance, preferences, and custom decision-making criteria.
-                  </p>
-                </div>
-              </div>
-            </div>
-            
-            <textarea
-              className="w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 resize-none transition-all duration-200"
-              rows={4}
-              placeholder="e.g., 'Prioritize companies with good work-life balance', 'Avoid positions requiring extensive travel', 'Focus on mission-driven organizations'..."
-              value={config.customInstructions}
-              onChange={(e) => setConfig(prev => ({ ...prev, customInstructions: e.target.value }))}
-            />
-          </div>
-
-          {/* External Job Application Settings - Currently Archived */}
-          {FEATURE_FLAGS.ENABLE_EXTERNAL_APPLICATIONS ? (
-          <div className="space-y-6">
-            <div className="flex items-center space-x-3 pb-4 border-b border-gray-300/50 dark:border-gray-700/50">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
-                <ExternalLink className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white">External Job Applications</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Configure settings for non-Easy Apply jobs</p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <label className="flex items-center space-x-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="w-5 h-5 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 dark:focus:ring-purple-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-                  checked={config.applyToExternalJobs || false}
-                  onChange={(e) => setConfig(prev => ({ ...prev, applyToExternalJobs: e.target.checked }))}
-                />
-                <span className="text-sm font-medium text-gray-900 dark:text-white">
-                  Apply to jobs that open external links
-                </span>
-              </label>
-
-              {config.applyToExternalJobs && (
-                <div className="space-y-4 pl-8">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Email for External Jobs
-                      </label>
-                      <input
-                        type="email"
-                        className="w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200"
-                        placeholder="email@example.com"
-                        value={config.externalJobEmail || ''}
-                        onChange={(e) => setConfig(prev => ({ ...prev, externalJobEmail: e.target.value }))}
-                      />
+              {/* Configuration Settings */}
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1 }}
+                className="bg-white rounded-xl border border-gray-200 shadow-sm"
+              >
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Settings className="h-5 w-5 text-gray-600" />
+                      <h3 className="text-lg font-semibold text-gray-900">Configuration</h3>
                     </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Password for External Jobs
-                      </label>
-                      <input
-                        type="password"
-                        className="w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200"
-                        placeholder="••••••••"
-                        value={config.externalJobPassword || ''}
-                        onChange={(e) => setConfig(prev => ({ ...prev, externalJobPassword: e.target.value }))}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        First Name
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200"
-                        placeholder="John"
-                        value={config.firstName || ''}
-                        onChange={(e) => setConfig(prev => ({ ...prev, firstName: e.target.value }))}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Last Name
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200"
-                        placeholder="Doe"
-                        value={config.lastName || ''}
-                        onChange={(e) => setConfig(prev => ({ ...prev, lastName: e.target.value }))}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Address
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200"
-                        placeholder="123 Main St"
-                        value={config.address || ''}
-                        onChange={(e) => setConfig(prev => ({ ...prev, address: e.target.value }))}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        City
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200"
-                        placeholder="San Francisco"
-                        value={config.city || ''}
-                        onChange={(e) => setConfig(prev => ({ ...prev, city: e.target.value }))}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        State
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200"
-                        placeholder="CA"
-                        value={config.state || ''}
-                        onChange={(e) => setConfig(prev => ({ ...prev, state: e.target.value }))}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Zip Code
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200"
-                        placeholder="94105"
-                        value={config.zipCode || ''}
-                        onChange={(e) => setConfig(prev => ({ ...prev, zipCode: e.target.value }))}
-                      />
-                    </div>
-
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        LinkedIn Profile URL
-                      </label>
-                      <input
-                        type="url"
-                        className="w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200"
-                        placeholder="https://linkedin.com/in/yourprofile"
-                        value={config.linkedInProfileUrl || ''}
-                        onChange={(e) => setConfig(prev => ({ ...prev, linkedInProfileUrl: e.target.value }))}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Portfolio URL (Optional)
-                      </label>
-                      <input
-                        type="url"
-                        className="w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200"
-                        placeholder="https://yourportfolio.com"
-                        value={config.portfolioUrl || ''}
-                        onChange={(e) => setConfig(prev => ({ ...prev, portfolioUrl: e.target.value }))}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        GitHub URL (Optional)
-                      </label>
-                      <input
-                        type="url"
-                        className="w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200"
-                        placeholder="https://github.com/yourusername"
-                        value={config.githubUrl || ''}
-                        onChange={(e) => setConfig(prev => ({ ...prev, githubUrl: e.target.value }))}
-                      />
-                    </div>
+                    <button
+                      onClick={() => setShowConfigPanel(!showConfigPanel)}
+                      className="text-sm text-teal-600 hover:text-teal-700 font-medium"
+                    >
+                      {showConfigPanel ? 'Hide' : 'Edit'}
+                    </button>
                   </div>
 
-                  <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
-                    <div className="flex items-start space-x-3">
-                      <div className="p-2 bg-purple-100 dark:bg-purple-800 rounded-lg">
-                        <Shield className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                  {showConfigPanel ? (
+                    <div className="space-y-4 max-h-[600px] overflow-y-auto">
+                      {/* Login Credentials */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">LinkedIn Email</label>
+                        <input
+                          type="email"
+                          value={config.linkedinEmail}
+                          onChange={(e) => setConfig({ ...config, linkedinEmail: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                          placeholder="your@email.com"
+                        />
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-purple-800 dark:text-purple-200 mb-1">
-                          Account Creation & Security
-                        </p>
-                        <p className="text-xs text-purple-600 dark:text-purple-300">
-                          The AI agent will use this information to create accounts on external job platforms and fill application forms. Your resume from the profile section will be automatically uploaded when needed.
-                        </p>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">LinkedIn Password</label>
+                        <input
+                          type="password"
+                          value={config.linkedinPassword || ''}
+                          onChange={(e) => setConfig({ ...config, linkedinPassword: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                          placeholder="••••••••"
+                        />
                       </div>
+
+                      {/* Contact Information */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                          <select
+                            value={config.countryCode}
+                            onChange={(e) => setConfig({ ...config, countryCode: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                          >
+                            {COUNTRY_CODES.map(country => (
+                              <option key={country.code} value={country.code}>
+                                {country.flag} {country.code}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                          <input
+                            type="tel"
+                            value={config.contactNumber}
+                            onChange={(e) => setConfig({ ...config, contactNumber: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                            placeholder="123-456-7890"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Job Search Criteria */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
+                        <input
+                          type="text"
+                          value={config.jobTitle}
+                          onChange={(e) => setConfig({ ...config, jobTitle: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                          placeholder="Software Engineer"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                        <select
+                          value={config.location}
+                          onChange={(e) => {
+                            const location = e.target.value;
+                            const locationId = LINKEDIN_LOCATIONS[location as keyof typeof LINKEDIN_LOCATIONS] || '0';
+                            setConfig({ ...config, location, locationId });
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        >
+                          {Object.keys(LINKEDIN_LOCATIONS).map(loc => (
+                            <option key={loc} value={loc}>{loc}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Experience Level</label>
+                        <select
+                          value={config.experience}
+                          onChange={(e) => setConfig({ ...config, experience: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        >
+                          <option value="All">All</option>
+                          <option value="Internship">Internship</option>
+                          <option value="Entry level">Entry level</option>
+                          <option value="Associate">Associate</option>
+                          <option value="Mid-Senior level">Mid-Senior level</option>
+                          <option value="Director">Director</option>
+                          <option value="Executive">Executive</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Work Type</label>
+                        <select
+                          value={config.remotePreference}
+                          onChange={(e) => setConfig({ ...config, remotePreference: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        >
+                          <option value="All">All</option>
+                          <option value="Remote">Remote</option>
+                          <option value="On-site">On-site</option>
+                          <option value="Hybrid">Hybrid</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Date Posted</label>
+                        <select
+                          value={config.datePosted || 'All time'}
+                          onChange={(e) => setConfig({ ...config, datePosted: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        >
+                          <option value="All time">All time</option>
+                          <option value="Past 24 hours">Past 24 hours</option>
+                          <option value="Past week">Past week</option>
+                          <option value="Past month">Past month</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Target Applications</label>
+                        <input
+                          type="number"
+                          value={config.targetCount}
+                          onChange={(e) => setConfig({ ...config, targetCount: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                          min="1"
+                          max="50"
+                        />
+                      </div>
+
+                      {FEATURE_FLAGS.ENABLE_EXTERNAL_APPLICATIONS && (
+                        <>
+                          <div className="col-span-2 border-t pt-4">
+                            <h4 className="text-sm font-semibold text-gray-900 mb-3">External Job Applications</h4>
+                          </div>
+
+                          <div className="col-span-2">
+                            <label className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={config.applyToExternalJobs}
+                                onChange={(e) => setConfig({ ...config, applyToExternalJobs: e.target.checked })}
+                                className="h-4 w-4 text-teal-600 rounded border-gray-300 focus:ring-teal-500"
+                              />
+                              <span className="text-sm font-medium text-gray-700">Apply to external jobs (non-Easy Apply)</span>
+                            </label>
+                          </div>
+
+                          {config.applyToExternalJobs && (
+                            <>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">External Job Email</label>
+                                <input
+                                  type="email"
+                                  value={config.externalJobEmail}
+                                  onChange={(e) => setConfig({ ...config, externalJobEmail: e.target.value })}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                  placeholder="email@example.com"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">External Job Password</label>
+                                <input
+                                  type="password"
+                                  value={config.externalJobPassword}
+                                  onChange={(e) => setConfig({ ...config, externalJobPassword: e.target.value })}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                  placeholder="Password for external sites"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                                <input
+                                  type="text"
+                                  value={config.firstName}
+                                  onChange={(e) => setConfig({ ...config, firstName: e.target.value })}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                  placeholder="John"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                                <input
+                                  type="text"
+                                  value={config.lastName}
+                                  onChange={(e) => setConfig({ ...config, lastName: e.target.value })}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                  placeholder="Doe"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">LinkedIn Profile URL</label>
+                                <input
+                                  type="url"
+                                  value={config.linkedInProfileUrl}
+                                  onChange={(e) => setConfig({ ...config, linkedInProfileUrl: e.target.value })}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                  placeholder="https://linkedin.com/in/johndoe"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Street Address</label>
+                                <input
+                                  type="text"
+                                  value={config.address}
+                                  onChange={(e) => setConfig({ ...config, address: e.target.value })}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                  placeholder="123 Main St"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                                <input
+                                  type="text"
+                                  value={config.city}
+                                  onChange={(e) => setConfig({ ...config, city: e.target.value })}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                  placeholder="San Francisco"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                                <input
+                                  type="text"
+                                  value={config.state}
+                                  onChange={(e) => setConfig({ ...config, state: e.target.value })}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                  placeholder="CA"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">ZIP Code</label>
+                                <input
+                                  type="text"
+                                  value={config.zipCode}
+                                  onChange={(e) => setConfig({ ...config, zipCode: e.target.value })}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                  placeholder="94105"
+                                />
+                              </div>
+
+                              <div className="col-span-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                                <div className="flex items-start gap-2">
+                                  <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5" />
+                                  <div className="text-sm text-amber-800">
+                                    <p className="font-medium">External Job Applications Note:</p>
+                                    <p className="mt-1">The bot will automatically switch between tabs to apply on external company websites. Make sure your resume is uploaded in your profile settings.</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </>
+                      )}
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Custom Instructions (Optional)</label>
+                        <textarea
+                          value={config.customInstructions}
+                          onChange={(e) => setConfig({ ...config, customInstructions: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                          rows={3}
+                          placeholder="Any special instructions for the AI..."
+                        />
+                      </div>
+
+                      <button
+                        onClick={saveConfiguration}
+                        className="w-full px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+                      >
+                        Save Configuration
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between py-1.5">
+                        <span className="text-sm text-gray-600">Email</span>
+                        <span className="text-sm font-medium text-gray-900 truncate max-w-[150px]">
+                          {config.linkedinEmail || 'Not configured'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between py-1.5">
+                        <span className="text-sm text-gray-600">Job Title</span>
+                        <span className="text-sm font-medium text-gray-900">
+                          {config.jobTitle}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between py-1.5">
+                        <span className="text-sm text-gray-600">Location</span>
+                        <span className="text-sm font-medium text-gray-900">
+                          {config.location}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between py-1.5">
+                        <span className="text-sm text-gray-600">Experience</span>
+                        <span className="text-sm font-medium text-gray-900">
+                          {config.experience}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between py-1.5">
+                        <span className="text-sm text-gray-600">Work Type</span>
+                        <span className="text-sm font-medium text-gray-900">
+                          {config.remotePreference}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between py-1.5">
+                        <span className="text-sm text-gray-600">Target Jobs</span>
+                        <span className="text-sm font-medium text-gray-900">{config.targetCount}</span>
+                      </div>
+                      {FEATURE_FLAGS.ENABLE_EXTERNAL_APPLICATIONS && config.applyToExternalJobs && (
+                        <div className="flex items-center justify-between py-1.5">
+                          <span className="text-sm text-gray-600">External Jobs</span>
+                          <span className="text-sm font-medium text-green-600">Enabled</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+
+              {/* Usage Metrics */}
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2 }}
+                className="bg-white rounded-xl border border-gray-200 shadow-sm"
+              >
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="h-5 w-5 text-gray-600" />
+                      <h3 className="text-lg font-semibold text-gray-900">Usage This Month</h3>
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
-          </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="flex items-center space-x-3 pb-4 border-b border-gray-300/50 dark:border-gray-700/50">
-                <div className="w-10 h-10 bg-gradient-to-br from-gray-400 to-gray-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <ExternalLink className="w-5 h-5 text-white opacity-50" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">External Job Applications</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Coming Soon</p>
-                </div>
-              </div>
-              
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
-                <div className="flex items-start space-x-3">
-                  <div className="p-2 bg-blue-100 dark:bg-blue-800 rounded-lg">
-                    <Sparkles className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-600">Steps Used</span>
+                        <span className="text-sm font-medium text-gray-900">
+                          {userUsage?.automation_steps.used || 0} / {getTokenLimit() === -1 ? '∞' : getTokenLimit()}
+                        </span>
+                      </div>
+                      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: getTokenLimit() === -1 ? '0%' : `${((userUsage?.automation_steps.used || 0) / getTokenLimit()) * 100}%` }}
+                          className="h-full bg-gradient-to-r from-teal-500 to-teal-600"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2">
+                      <span className="text-sm text-gray-600">Remaining Applications</span>
+                      <span className="text-sm font-bold text-teal-600">
+                        {getRemainingApplications() === 'Unlimited' ? '∞' : getRemainingApplications()}
+                      </span>
+                    </div>
+
+                    {getTokenLimit() > 0 && (userUsage?.automation_steps.used || 0) / getTokenLimit() > 0.8 && (
+                      <div className="mt-4 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                        <div className="flex items-center gap-2 text-amber-800">
+                          <AlertCircle className="h-4 w-4" />
+                          <span className="text-sm font-medium">Approaching limit</span>
+                        </div>
+                        <p className="text-xs text-amber-700 mt-1">
+                          Consider upgrading for more applications
+                        </p>
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-1">
-                      In Development
-                    </p>
-                    <p className="text-xs text-blue-600 dark:text-blue-300">
-                      We're working on expanding job applications beyond LinkedIn Easy Apply to include external job sites. This feature will allow you to apply to more opportunities automatically. Stay tuned for updates!
-                    </p>
-                  </div>
                 </div>
-              </div>
-            </div>
-          )}
-        </div>
-        </div>
-      )}
+              </motion.div>
 
-      {/* Control Panel */}
-                      <div className="glass-card rounded-xl p-8">
-        <div className="flex items-center space-x-4 mb-8">
-          <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg">
-            <Activity className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Automation Control</h3>
-            <p className="text-gray-600 dark:text-gray-300">Monitor and control your LinkedIn automation</p>
-          </div>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
-            <div className="flex items-center justify-between mb-2">
-              <Search className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-            </div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">{stepCount}</div>
-            <div className="text-sm text-blue-600 dark:text-blue-400">Steps</div>
-          </div>
-
-          <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-4 border border-purple-200 dark:border-purple-800">
-            <div className="flex items-center justify-between mb-2">
-              <Zap className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-              <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
-            </div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">{Math.ceil(stepCount / 10)}</div>
-            <div className="text-sm text-purple-600 dark:text-purple-400">Tokens</div>
-          </div>
-
-          <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-4 border border-emerald-200 dark:border-emerald-800">
-            <div className="flex items-center justify-between mb-2">
-              <Briefcase className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-            </div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">{appliedCount}</div>
-            <div className="text-sm text-emerald-600 dark:text-emerald-400">Applied</div>
-          </div>
-
-          <div className="bg-orange-50 dark:bg-orange-900/20 rounded-xl p-4 border border-orange-200 dark:border-orange-800">
-            <div className="flex items-center justify-between mb-2">
-              <TrendingUp className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-              <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
-            </div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">
-              {appliedCount > 0 ? Math.round((appliedCount / parseInt(config.targetCount)) * 100) : 0}%
-            </div>
-            <div className="text-sm text-orange-600 dark:text-orange-400">Progress</div>
-          </div>
-        </div>
-
-        {/* Auto-Stop Warning */}
-        {(isRunning || isPaused) && (
-          <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
-            <div className="flex items-start space-x-3">
-              <div className="p-2 bg-amber-100 dark:bg-amber-800 rounded-lg">
-                <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-amber-800 dark:text-amber-200 mb-1">
-                  💰 Cost Protection Active
-                </p>
-                <p className="text-xs text-amber-600 dark:text-amber-300">
-                  Your automation will automatically stop if you close this tab or navigate away to prevent unnecessary backend charges. 
-                  Keep this tab open to monitor progress.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Control Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          {!isRunning ? (
-            <button
-              onClick={startAutomation}
-              disabled={!canStartAutomation() || !apiKey}
-              className="flex-1 inline-flex items-center justify-center px-6 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-            >
-              <Play className="w-5 h-5 mr-2" />
-              Start Auto Apply
-            </button>
-          ) : (
-            <>
-              {!isPaused ? (
-                <button
-                  onClick={pauseAutomation}
-                  disabled={!currentTask?.id}
-                  className="flex-1 inline-flex items-center justify-center px-6 py-4 bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Pause className="w-5 h-5 mr-2" />
-                  Pause
-                </button>
-              ) : (
-                <button
-                  onClick={resumeAutomation}
-                  className="flex-1 inline-flex items-center justify-center px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
-                >
-                  <Play className="w-5 h-5 mr-2" />
-                  Resume
-                </button>
-              )}
-              <button
-                onClick={stopAutomation}
-                disabled={!currentTask?.id}
-                className="flex-1 inline-flex items-center justify-center px-6 py-4 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+              {/* Control Button */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.3 }}
               >
-                <Square className="w-5 h-5 mr-2" />
-                Stop
-              </button>
-            </>
-          )}
-        </div>
-
-        {/* Status Display */}
-        {currentTask && (
-                          <div className="mt-6 p-4 rounded-xl"
-                  style={{
-                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02))',
-                    backdropFilter: 'blur(10px)'
-                  }}>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Current Status</span>
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                currentTask.status === 'running' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' :
-                currentTask.status === 'paused' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400' :
-                currentTask.status === 'finished' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400' :
-                                  'bg-white/10 text-gray-800 dark:bg-white/10 dark:text-gray-400 backdrop-blur-sm'
-              }`}>
-                {currentTask.status}
-              </span>
-            </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">
-              Task ID: {currentTask.id}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Usage Status Display */}
-      <div className="glass-card rounded-xl p-6 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg">
-              <Bot className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Current Usage</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {getPlanName()} - Automation steps this month
-              </p>
-            </div>
-          </div>
-        </div>
-        
-        {(() => {
-          const limits = getPlanUsageLimits();
-          const current = monthlyUsage.tokens_used || 0;
-          const maxSteps = limits.applications * 10; // Convert applications to steps
-          const percentage = maxSteps > 0 ? Math.min((current / maxSteps) * 100, 100) : 0;
-          const remaining = Math.max(0, maxSteps - current);
-          
-          return (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {current}
-                </span>
-                <span className="text-sm text-gray-500 dark:text-gray-400">
-                  {maxSteps > 0 ? `of ${maxSteps} included` : 'No plan limits available'}
-                </span>
-              </div>
-              
-              {maxSteps > 0 && (
-                <div className="w-full bg-white/20 dark:bg-white/20 rounded-full h-3">
-                  <div
-                    className={`h-3 rounded-full transition-all duration-300 ${
-                      percentage >= 90 ? 'bg-gradient-to-r from-red-500 to-red-600' :
-                      percentage >= 75 ? 'bg-gradient-to-r from-orange-500 to-red-500' :
-                      percentage >= 50 ? 'bg-gradient-to-r from-yellow-500 to-orange-500' :
-                      'bg-gradient-to-r from-green-500 to-blue-500'
-                    }`}
-                    style={{ width: `${percentage}%` }}
-                  />
-                </div>
-              )}
-              
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-500 dark:text-gray-400">
-                  {maxSteps === 0 ? 
-                    'Subscribe to get automation steps' :
-                    percentage >= 100 ? 
-                      'Additional: $0.03 per step' :
-                      `${remaining} remaining`
-                  }
-                </span>
-                {maxSteps > 0 && (
-                  <span className={`font-bold ${
-                    percentage >= 90 ? 'text-red-600 dark:text-red-400' :
-                    percentage >= 75 ? 'text-orange-600 dark:text-orange-400' :
-                    percentage >= 50 ? 'text-yellow-600 dark:text-yellow-400' :
-                    'text-green-600 dark:text-green-400'
-                  }`}>
-                    {Math.round(percentage)}% used
-                  </span>
+                {!isRunning ? (
+                  <button
+                    onClick={startAutomation}
+                    disabled={!canStartAutomation() || !config.linkedinEmail || !config.linkedinPassword}
+                    className="w-full px-6 py-4 bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-xl font-semibold text-lg hover:from-teal-700 hover:to-teal-800 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                  >
+                    <Play className="h-6 w-6" />
+                    Start Automation
+                  </button>
+                ) : isPaused ? (
+                  <div className="space-y-3">
+                    <button
+                      onClick={resumeAutomation}
+                      className="w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
+                    >
+                      <Play className="h-6 w-6" />
+                      Resume
+                    </button>
+                    <button
+                      onClick={stopAutomation}
+                      className="w-full px-6 py-3 bg-gray-200 text-gray-700 rounded-xl font-medium hover:bg-gray-300 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Square className="h-5 w-5" />
+                      Stop
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <button
+                      onClick={pauseAutomation}
+                      className="w-full px-6 py-4 bg-gradient-to-r from-amber-600 to-amber-700 text-white rounded-xl font-semibold text-lg hover:from-amber-700 hover:to-amber-800 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
+                    >
+                      <Pause className="h-6 w-6" />
+                      Pause
+                    </button>
+                    <button
+                      onClick={stopAutomation}
+                      className="w-full px-6 py-3 bg-gray-200 text-gray-700 rounded-xl font-medium hover:bg-gray-300 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Square className="h-5 w-5" />
+                      Stop
+                    </button>
+                  </div>
                 )}
-              </div>
+              </motion.div>
             </div>
-          );
-        })()}
-      </div>
 
-      {/* Extension Error Status */}
-      <ExtensionErrorStatus className="mb-6" />
+            {/* Activity Feed & Browser Preview */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Browser Preview */}
+              {currentTask?.live_url && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
+                >
+                  <div className="p-6 border-b border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Eye className="h-5 w-5 text-gray-600" />
+                        <h3 className="text-lg font-semibold text-gray-900">Live Browser Preview</h3>
+                      </div>
+                      <a
+                        href={currentTask.live_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-sm text-teal-600 hover:text-teal-700 font-medium"
+                      >
+                        Open Full View
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                    </div>
+                  </div>
+                  <div className="relative bg-gray-50" style={{ height: '600px' }}>
+                    <iframe
+                      src={currentTask.live_url}
+                      className="w-full h-full"
+                      title="LinkedIn Automation Preview"
+                      sandbox="allow-scripts allow-same-origin"
+                    />
+                    <div className="absolute top-4 right-4 bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center gap-2">
+                      <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                      Live
+                    </div>
+                  </div>
+                </motion.div>
+              )}
 
-      {/* Browser Preview */}
-      {currentTask?.live_url && (
-                  <div className="glass-card rounded-xl p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                <Eye className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Live Browser Preview</h3>
-                <p className="text-gray-600 dark:text-gray-300">Watch your automation in real-time</p>
-              </div>
-            </div>
-            <a
-              href={currentTask.live_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <ExternalLink className="w-4 h-4 mr-2" />
-              Full Screen
-            </a>
-          </div>
-          
-          <div className="relative w-full rounded-xl overflow-hidden border border-white/20 dark:border-white/10"
-            style={{
-              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02))',
-              backdropFilter: 'blur(10px)'
-            }}>
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/20 dark:border-white/10"
-              style={{
-                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03))',
-                backdropFilter: 'blur(15px)'
-              }}>
-              <div className="flex items-center space-x-2">
-                <div className="flex space-x-1">
-                  <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                  <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+              {/* Activity Logs */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="bg-white rounded-xl border border-gray-200 shadow-sm"
+              >
+                <div className="p-6 border-b border-gray-200">
+                  <div className="flex items-center gap-2">
+                    <Activity className="h-5 w-5 text-gray-600" />
+                    <h3 className="text-lg font-semibold text-gray-900">Activity Feed</h3>
+                  </div>
                 </div>
-                <Globe className="w-4 h-4 text-gray-500 ml-4" />
-                <span className="text-sm text-gray-600 dark:text-gray-400 font-mono">
-                  {currentTask.live_url}
-                </span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-xs text-green-600 dark:text-green-400 font-medium">LIVE</span>
-              </div>
-            </div>
-            <div className="relative" style={{ paddingBottom: '56.25%', height: 0 }}>
-              <iframe
-                id="browser-preview-iframe"
-                src={currentTask.live_url}
-                className="absolute top-0 left-0 w-full h-full"
-                style={{ border: 'none' }}
-                allow="camera; microphone; display-capture"
-                sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-downloads allow-top-navigation-by-user-activation"
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-                onLoad={() => {
-                  // Hide iframe-related extension errors
-                  const iframe = document.getElementById('browser-preview-iframe') as HTMLIFrameElement;
-                  if (iframe && iframe.contentWindow) {
-                    try {
-                      // Prevent extension scripts from accessing iframe content
-                      iframe.contentWindow.addEventListener('error', (e) => {
-                        // Suppress common extension errors
-                        if (e.error?.message?.includes('FrameDoesNotExistError') ||
-                            e.error?.message?.includes('ERR_FILE_NOT_FOUND') ||
-                            e.filename?.includes('extensionState.js') ||
-                            e.filename?.includes('heuristicsRedefinitions.js') ||
-                            e.filename?.includes('utils.js')) {
-                          e.preventDefault();
-                          e.stopPropagation();
-                        }
-                      }, true);
-                    } catch (error) {
-                      // Cross-origin restrictions prevent access - this is expected
-                    }
-                  }
-                }}
-                onError={() => {
-                  // Browser preview iframe error (this may be due to browser extensions)
-                }}
-              />
+                <div className="p-6 max-h-96 overflow-y-auto">
+                  {logs.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Bot className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                      <p className="text-gray-500">No activity yet. Start automation to see logs.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {logs.map((log, index) => (
+                        <motion.div
+                          key={index}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.05 }}
+                          className={`flex items-start gap-3 p-3 rounded-lg ${
+                            log.type === 'error'
+                              ? 'bg-red-50'
+                              : log.type === 'success'
+                              ? 'bg-green-50'
+                              : 'bg-gray-50'
+                          }`}
+                        >
+                          <span className="text-xs text-gray-500 font-mono whitespace-nowrap">
+                            {log.timestamp}
+                          </span>
+                          <span className={`text-sm ${
+                            log.type === 'error'
+                              ? 'text-red-700'
+                              : log.type === 'success'
+                              ? 'text-green-700'
+                              : 'text-gray-700'
+                          }`}>
+                            {log.message}
+                          </span>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+
+              {/* Monthly Usage Chart */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="bg-white rounded-xl border border-gray-200 shadow-sm"
+              >
+                <div className="p-6 border-b border-gray-200">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-gray-600" />
+                    <h3 className="text-lg font-semibold text-gray-900">30-Day Activity</h3>
+                  </div>
+                </div>
+                <div className="p-6">
+                  <ResponsiveContainer width="100%" height={200}>
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                      <XAxis 
+                        dataKey="date" 
+                        stroke="#9ca3af"
+                        fontSize={12}
+                        tickFormatter={(value) => value.split(' ')[1]}
+                      />
+                      <YAxis stroke="#9ca3af" fontSize={12} />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: 'white',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px',
+                          padding: '8px'
+                        }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="applications"
+                        stroke="#14b8a6"
+                        strokeWidth={2}
+                        dot={{ fill: '#14b8a6', r: 4 }}
+                        activeDot={{ r: 6 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </motion.div>
             </div>
           </div>
         </div>
-      )}
-
       </div>
-    </>
+
+      {/* Paywall Modal */}
+      <PaywallModal 
+        isOpen={showPaywall}
+        onClose={() => setShowPaywall(false)}
+        feature="LinkedIn Automation"
+      />
+    </div>
   );
+  } catch (error) {
+    console.error('LinkedInAutomationBot: Error rendering component', error);
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-red-600 mb-4">Error Loading Component</h2>
+          <p className="text-gray-600 mb-4">There was an error loading the LinkedIn Automation Bot.</p>
+          <p className="text-sm text-gray-500">Please check the console for more details.</p>
+        </div>
+      </div>
+    );
+  }
 };
 
 export default LinkedInAutomationBot;

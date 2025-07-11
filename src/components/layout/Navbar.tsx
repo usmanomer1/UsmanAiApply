@@ -72,8 +72,7 @@ export const Navbar: React.FC = () => {
   // Career tools dropdown items
   const careerTools = [
     { name: 'Resume Tools', href: '/resume', icon: FileText, description: 'Resume Optimization' },
-    { name: 'CV Generator', href: '/cv-generator', icon: Bot, description: 'AI CV Generation', badge: 'AI' },
-    { name: 'Cover Letters', href: '/cover-letter', icon: PenTool, description: 'AI-Generated Letters' },
+    { name: 'Job Search', href: '/job-search', icon: Search, description: 'AI-Powered Job Matching', badge: 'New' },
   ];
 
   const navigation = [
@@ -85,8 +84,6 @@ export const Navbar: React.FC = () => {
 
   const quickActions = [
     { name: 'Start Auto Apply', href: '/auto-apply', icon: Zap, description: 'Begin automated job applications' },
-    { name: 'Generate CV', href: '/cv-generator', icon: Bot, description: 'Create AI-powered CV' },
-    { name: 'Generate Cover Letter', href: '/cover-letter', icon: PenTool, description: 'Write personalized cover letters' },
     { name: 'Analyze Resume', href: '/resume', icon: FileText, description: 'Get AI resume feedback' },
     { name: 'View Analytics', href: '/dashboard', icon: BarChart3, description: 'Check your job search progress' },
     { name: 'Manage Profile', href: '/profile', icon: User, description: 'Update personal information' },
@@ -192,15 +189,6 @@ export const Navbar: React.FC = () => {
       });
     }
 
-    if (query.includes('cover') || query.includes('letter')) {
-      results.unshift({
-        type: 'suggestion',
-        name: 'Cover Letter Generator',
-        href: '/cover-letter',
-        icon: PenTool,
-        description: 'Create personalized cover letters'
-      });
-    }
 
     setSearchResults(results.slice(0, 8)); // Limit to 8 results
   }, [searchQuery]);
@@ -1256,7 +1244,7 @@ export const Navbar: React.FC = () => {
                           No results found
                         </h3>
                         <p className="text-gray-500 dark:text-gray-400">
-                          Try searching for "resume", "jobs", "cover letter", or "billing"
+                          Try searching for "resume", "jobs", or "billing"
                         </p>
                       </div>
                     )}

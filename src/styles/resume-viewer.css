@@ -1,0 +1,97 @@
+/* Resume Viewer Styles - Compatible with pdf2htmlEX */
+
+/* Ensure pdf2htmlEX container styles are preserved */
+.resume-viewer-content {
+  /* Preserve pdf2htmlEX layout */
+  position: relative;
+  background: white;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Dark mode support for resume content */
+.dark .resume-viewer-content {
+  background: white; /* Keep resume background white even in dark mode */
+  color: black;
+}
+
+/* Ensure pdf2htmlEX page elements are properly displayed */
+.resume-viewer-content .pf,
+.resume-viewer-content .pc,
+.resume-viewer-content [class*="page"] {
+  margin: 0 auto;
+  position: relative !important;
+}
+
+/* Preserve pdf2htmlEX text positioning */
+.resume-viewer-content .t {
+  position: absolute !important;
+  white-space: pre;
+}
+
+/* Preserve pdf2htmlEX font classes */
+.resume-viewer-content [class*="ff"],
+.resume-viewer-content [class*="fs"],
+.resume-viewer-content [class*="fc"] {
+  /* Let pdf2htmlEX handle fonts */
+}
+
+/* Suggestion highlight overlays */
+.resume-viewer-content [data-suggestion-id] {
+  position: relative;
+  z-index: 10;
+  border-radius: 2px;
+  padding: 0 2px;
+  margin: 0 -2px;
+}
+
+/* Ensure highlighted text remains readable */
+.resume-viewer-content [data-suggestion-id]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 2px;
+}
+
+/* Animation for newly added suggestions */
+@keyframes suggestion-pulse {
+  0% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0.3;
+  }
+}
+
+.resume-viewer-content [data-suggestion-id]:not([data-applied]):not([data-rejected]) {
+  animation: suggestion-pulse 2s ease-in-out infinite;
+}
+
+/* Smooth transitions for zoom */
+.resume-viewer-content {
+  transition: transform 0.3s ease-out;
+}
+
+/* Print styles */
+@media print {
+  .resume-viewer-content {
+    transform: none !important;
+    box-shadow: none;
+  }
+  
+  /* Hide suggestion highlights when printing */
+  .resume-viewer-content [data-suggestion-id] {
+    background-color: transparent !important;
+  }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .resume-viewer-content {
+    max-width: 100vw;
+    overflow-x: auto;
+  }
+}

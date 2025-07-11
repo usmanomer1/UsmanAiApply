@@ -47,6 +47,7 @@ secrets/
 
 # Database and migration files
 *.sql
+!supabase/migrations/*.sql
 *.sqlite
 *.db
 
@@ -76,6 +77,12 @@ docs/
 # Package manager alternative files
 yarn.lock
 pnpm-lock.yaml
+
+# Claude Code configuration
+.mcp.json
+
+# Deployment scripts (used locally but not deployed)
+set-netlify-env.sh
 
 # IDE and system files
 .DS_Store

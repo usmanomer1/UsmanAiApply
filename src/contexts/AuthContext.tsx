@@ -105,10 +105,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Maintenance mode');
       }
 
+      // Skip CAPTCHA in development mode
+      const isCaptchaDisabled = import.meta.env.VITE_DISABLE_CAPTCHA === 'true';
+      
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
-        options: captchaToken ? { captchaToken } : undefined,
+        options: (!isCaptchaDisabled && captchaToken) ? { captchaToken } : undefined,
       });
 
       if (error) {
@@ -126,6 +129,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       toast.success('Welcome back!');
+      
+      // Get the current session to ensure user is set
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUser(session.user);
+      }
     } catch (error) {
       throw error;
     } finally {
@@ -148,6 +157,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Maintenance mode');
       }
 
+      // Skip CAPTCHA in development mode
+      const isCaptchaDisabled = import.meta.env.VITE_DISABLE_CAPTCHA === 'true';
+      
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -156,7 +168,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             name: fullName,
             full_name: fullName,
           },
-          ...(captchaToken ? { captchaToken } : {}),
+          ...(!isCaptchaDisabled && captchaToken ? { captchaToken } : {}),
         },
       });
 
