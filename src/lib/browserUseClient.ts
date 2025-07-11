@@ -59,7 +59,7 @@ export class BrowserUseClient {
       browser_viewport_height: config.browser_viewport_height ?? 960,
       max_agent_steps: config.max_agent_steps ?? 150,
       llm_model: config.llm_model ?? 'gpt-4o',
-      allowed_domains: config.allowed_domains ?? ['linkedin.com', '*.linkedin.com'],
+      allowed_domains: config.allowed_domains,  // Don't default to LinkedIn-only domains
       secrets: config.secrets ?? null,
       structured_output_json: null,
       included_file_names: config.included_file_names ?? null

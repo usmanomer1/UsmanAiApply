@@ -42,7 +42,7 @@ export const CustomAuthPage: React.FC = () => {
   // Redirect logic after successful authentication
   const handleAuthSuccess = async () => {
     if (!planParam) {
-      // No plan specified, go to dashboard
+      // No plan specified, go to jobs page
       navigate('/dashboard');
       return;
     }
@@ -103,7 +103,7 @@ export const CustomAuthPage: React.FC = () => {
     if (user) {
       handleAuthSuccess();
     }
-  }, [user, planParam, navigate]);
+  }, [user]); // Remove dependencies to avoid re-running
 
   // Clear message after 5 seconds
   useEffect(() => {
@@ -117,7 +117,11 @@ export const CustomAuthPage: React.FC = () => {
     e.preventDefault();
     setMessage(null);
     setEmailVerificationError(null);
-    if (!captchaToken) {
+    
+    // Check if captcha is disabled for local development
+    const isCaptchaDisabled = import.meta.env.VITE_DISABLE_CAPTCHA === 'true';
+    
+    if (!isCaptchaDisabled && !captchaToken) {
       setMessage({ type: 'error', text: 'Please complete the CAPTCHA.' });
       return;
     }
@@ -137,21 +141,28 @@ export const CustomAuthPage: React.FC = () => {
     setLoading(true);
 
     try {
+      const finalCaptchaToken = isCaptchaDisabled ? 'dev-bypass' : captchaToken;
+      
       if (authMode === 'login') {
-        await signIn(formData.email, formData.password, captchaToken);
-        // handleAuthSuccess will be called by useEffect when user state updates
+        await signIn(formData.email, formData.password, finalCaptchaToken);
+        // Navigate immediately after successful login
+        navigate(planParam ? '/billing' : '/dashboard');
       } else if (authMode === 'signup') {
         // Disable signup during maintenance mode
         if (isMaintenanceMode) {
           setMessage({ type: 'error', text: 'New registrations are temporarily disabled during maintenance.' });
           return;
         }
-        await signUp(formData.email, formData.password, formData.fullName, captchaToken);
-        // handleAuthSuccess will be called by useEffect when user state updates
+        await signUp(formData.email, formData.password, formData.fullName, finalCaptchaToken);
+        // Don't navigate after signup - user needs to verify email first
+        setMessage({ 
+          type: 'success', 
+          text: 'Account created! Please check your email to verify your account, then sign in.' 
+        });
       } else if (authMode === 'forgot-password') {
         const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
           redirectTo: `${window.location.origin}/auth${planParam ? `?plan=${planParam}` : ''}`,
-          captchaToken,
+          captchaToken: finalCaptchaToken,
         });
         
         if (error) {
@@ -532,11 +543,26 @@ export const CustomAuthPage: React.FC = () => {
                   </div>
                 )}
 
-                <Turnstile
-                  sitekey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-                  onSuccess={setCaptchaToken}
-                  className="my-4"
-                />
+                {/* Conditionally render Turnstile based on environment variable */}
+                {import.meta.env.VITE_DISABLE_CAPTCHA !== 'true' && (
+                  <Turnstile
+                    sitekey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+                    onSuccess={setCaptchaToken}
+                    className="my-4"
+                  />
+                )}
+                
+                {/* Development mode indicator */}
+                {import.meta.env.VITE_DISABLE_CAPTCHA === 'true' && (
+                  <div className="my-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <Shield className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                      <span className="text-sm text-yellow-700 dark:text-yellow-300 font-medium">
+                        Development Mode: CAPTCHA verification disabled
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 <motion.div
                   whileHover={{ scale: 1.02 }}

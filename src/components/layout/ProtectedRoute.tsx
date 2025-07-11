@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Bot, Sparkles } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
+import Onboarding from '../onboarding/Onboarding';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -10,6 +12,8 @@ interface ProtectedRouteProps {
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { user, loading } = useAuth();
+  const [onboardingCompleted, setOnboardingCompleted] = useState<boolean | null>(null);
+  const [checkingOnboarding, setCheckingOnboarding] = useState(true);
 
   // Check if Supabase is configured
   const isSupabaseConfigured = () => {
@@ -18,7 +22,47 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return !!(supabaseUrl && supabaseKey && supabaseUrl !== 'your_supabase_url_here' && supabaseKey !== 'your_supabase_anon_key_here');
   };
 
-  if (loading) {
+  // Check onboarding status
+  useEffect(() => {
+    const checkOnboardingStatus = async () => {
+      if (!user?.id || !isSupabaseConfigured()) {
+        setCheckingOnboarding(false);
+        return;
+      }
+
+      try {
+        const { data: profiles, error } = await supabase
+          .from('profiles')
+          .select('onboarding_completed')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1);
+          
+        const data = profiles?.[0] || null;
+
+        if (error) {
+          console.error('Error checking onboarding status:', error);
+          // If profile doesn't exist or error, assume onboarding not completed
+          setOnboardingCompleted(false);
+        } else {
+          setOnboardingCompleted(data?.onboarding_completed || false);
+        }
+      } catch (error) {
+        console.error('Error checking onboarding:', error);
+        setOnboardingCompleted(false);
+      } finally {
+        setCheckingOnboarding(false);
+      }
+    };
+
+    if (user) {
+      checkOnboardingStatus();
+    } else {
+      setCheckingOnboarding(false);
+    }
+  }, [user]);
+
+  if (loading || checkingOnboarding) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
         <motion.div
@@ -62,6 +106,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   // If Supabase is configured but no user, redirect to auth
   if (!user) {
     return <Navigate to="/auth" replace />;
+  }
+
+  // If user hasn't completed onboarding, show onboarding flow
+  if (onboardingCompleted === false) {
+    return <Onboarding onComplete={() => setOnboardingCompleted(true)} />;
   }
 
   return <>{children}</>;

@@ -32,30 +32,20 @@ const updateFavicon = (isDark: boolean) => {
 };
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Always use light mode
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem('theme');
-    if (saved) {
-      setIsDark(saved === 'dark');
-    } else {
-      setIsDark(window.matchMedia('(prefers-color-scheme: dark)').matches);
-    }
+    // Force light mode
+    document.documentElement.classList.remove('dark');
+    localStorage.setItem('theme', 'light');
+    updateFavicon(false);
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    
-    // Update favicon when theme changes
-    updateFavicon(isDark);
-  }, [isDark]);
-
-  const toggleTheme = () => setIsDark(!isDark);
+  // Disable theme toggle
+  const toggleTheme = () => {
+    // Do nothing - keep light mode
+  };
 
   return (
     <ThemeContext.Provider value={{ isDark, toggleTheme }}>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, Zap, Bot, Brain, CreditCard, Shield, RefreshCw } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface FAQItem {
   question: string;
@@ -202,22 +203,41 @@ export const PricingFAQ: React.FC = () => {
       </div>
 
       {/* Contact CTA */}
-      <div className="mt-12 text-center">
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-2xl p-8">
-          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-            Still have questions?
-          </h3>
-          <p className="text-gray-600 dark:text-gray-300 mb-4">
-            Our team is here to help you succeed in your job search
-          </p>
-          <a
-            href="mailto:usman@jobotic.ai"
-            className="inline-flex items-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
-          >
-            Contact Support
-          </a>
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.6 }}
+        className="mt-16 text-center"
+      >
+        <div className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-2xl border border-blue-200/50 dark:border-blue-700/50 p-8 shadow-xl">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-cyan-500/5" />
+          <div className="relative">
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.8, type: "spring" }}
+              className="w-16 h-16 mx-auto mb-6 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-2xl flex items-center justify-center shadow-lg"
+            >
+              <Zap className="w-8 h-8 text-white" />
+            </motion.div>
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+              Still have questions?
+            </h3>
+            <p className="text-gray-700 dark:text-gray-300 mb-8 leading-relaxed max-w-md mx-auto">
+              Our team is here to help you succeed in your job search
+            </p>
+            <motion.a
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              href="mailto:usman@jobotic.ai"
+              className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-xl font-semibold transition-all duration-200 shadow-xl hover:shadow-2xl"
+            >
+              <Zap className="w-5 h-5 mr-2" />
+              Contact Support
+            </motion.a>
+          </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }; 

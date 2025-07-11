@@ -35,7 +35,7 @@ export type Database = {
         Row: {
           id: string;
           user_id: string;
-          full_name: string;
+          full_name: string | null;
           phone: string | null;
           resume_url: string | null;
           created_at: string;
@@ -43,7 +43,7 @@ export type Database = {
         Insert: {
           id?: string;
           user_id: string;
-          full_name: string;
+          full_name?: string | null;
           phone?: string | null;
           resume_url?: string | null;
           created_at?: string;
@@ -51,7 +51,7 @@ export type Database = {
         Update: {
           id?: string;
           user_id?: string;
-          full_name?: string;
+          full_name?: string | null;
           phone?: string | null;
           resume_url?: string | null;
           created_at?: string;
@@ -158,30 +158,45 @@ export type Database = {
           id: string;
           user_id: string;
           task_id: string;
-          step_count: number;
-          cost_usd: number;
           task_type: string;
-          campaign_id: string | null;
+          task_prompt: string | null;
+          cost: number;
+          status: string;
+          started_at: string;
+          completed_at: string | null;
+          error_message: string | null;
+          screenshot_url: string | null;
+          metadata: any | null;
           created_at: string;
         };
         Insert: {
           id?: string;
           user_id: string;
           task_id: string;
-          step_count: number;
-          cost_usd: number;
           task_type: string;
-          campaign_id?: string | null;
+          task_prompt?: string | null;
+          cost?: number;
+          status?: string;
+          started_at?: string;
+          completed_at?: string | null;
+          error_message?: string | null;
+          screenshot_url?: string | null;
+          metadata?: any | null;
           created_at?: string;
         };
         Update: {
           id?: string;
           user_id?: string;
           task_id?: string;
-          step_count?: number;
-          cost_usd?: number;
           task_type?: string;
-          campaign_id?: string | null;
+          task_prompt?: string | null;
+          cost?: number;
+          status?: string;
+          started_at?: string;
+          completed_at?: string | null;
+          error_message?: string | null;
+          screenshot_url?: string | null;
+          metadata?: any | null;
           created_at?: string;
         };
       };
@@ -193,10 +208,10 @@ export type Database = {
           prompt_tokens: number;
           completion_tokens: number;
           total_tokens: number;
-          max_tokens_requested: number;
-          model_used: string;
-          request_data: any;
-          response_data: any;
+          max_tokens_requested: number | null;
+          model_used: string | null;
+          request_data: any | null;
+          response_data: any | null;
           cost_usd: number;
           created_at: string;
         };
@@ -301,25 +316,63 @@ export const uploadResume = async (file: File, userId: string): Promise<string |
       throw new Error('Supabase not configured for file uploads');
     }
 
-    // Get file extension with fallback
-    const fileExt = file.name.split('.').pop() || 'pdf';
-    const fileName = `${userId}/resume.${fileExt}`;
+    // Get current session to ensure we're authenticated
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session) {
+      throw new Error('User not authenticated');
+    }
+
+    // Validate file type - MUST be PDF
+    if (file.type !== 'application/pdf') {
+      throw new Error('Only PDF files are allowed. Please upload a PDF resume.');
+    }
+
+    // Additional validation: check file extension
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
+    if (fileExt !== 'pdf') {
+      throw new Error('File must have .pdf extension');
+    }
+
+    // Check file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      throw new Error('File size must be less than 10MB');
+    }
+
+    const fileName = `${userId}/resume.pdf`;
 
     // Delete existing file first (if any) to ensure clean upload
+    // Using the authenticated client
     const { error: deleteError } = await supabase.storage
       .from('resumes')
       .remove([fileName]);
     
     // Ignore delete errors (file might not exist)
+    if (deleteError) {
+      console.log('Delete error (can be ignored if file doesn\'t exist):', deleteError);
+    }
 
-    const { error: uploadError } = await supabase.storage
+    console.log('Attempting to upload file:', fileName, 'size:', file.size);
+    
+    // Upload the new file with proper authentication
+    const { data: uploadData, error: uploadError } = await supabase.storage
       .from('resumes')
       .upload(fileName, file, {
         upsert: true,
+        cacheControl: '3600',
       });
+
+    console.log('Upload response:', { uploadData, uploadError });
 
     if (uploadError) {
       console.error('Supabase upload error:', uploadError);
+      
+      // If it's an RLS error, provide a more helpful message
+      if (uploadError.message.includes('row-level security')) {
+        throw new Error('Storage permissions not configured. Please contact support.');
+      }
+      
       throw new Error(`Upload failed: ${uploadError.message}`);
     }
 

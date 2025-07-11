@@ -107,10 +107,10 @@ export const STRIPE_PRODUCTS: StripeProduct[] = [
     interval: 'month',
     category: 'subscription',
     applicationCount: 40, // Updated from 37 to 40
-    aiTokenCount: 30000,
+    aiTokenCount: 120000,
     features: [
       '40 automated job applications/month', // Updated count
-      '30,000 AI tokens for resume & cover letters',
+      '120,000 AI tokens for job search & resume optimization',
       'Complex requests count as 2x tokens',
       'Additional applications: $0.80 each',
       'Extra AI tokens: $0.10 per 1,000',
@@ -128,10 +128,10 @@ export const STRIPE_PRODUCTS: StripeProduct[] = [
     interval: 'month',
     category: 'subscription',
     applicationCount: 110, // Updated from 77 to 110
-    aiTokenCount: 30000,
+    aiTokenCount: 120000,
     features: [
       '110 automated job applications/month', // Updated count
-      '30,000 AI tokens for resume & cover letters',
+      '120,000 AI tokens for job search & resume optimization',
       'Complex requests count as 2x tokens',
       'Additional applications: $0.80 each',
       'Extra AI tokens: $0.10 per 1,000',
@@ -150,10 +150,10 @@ export const STRIPE_PRODUCTS: StripeProduct[] = [
     interval: 'month',
     category: 'subscription',
     applicationCount: 230, // Updated from 158 to 230
-    aiTokenCount: 30000,
+    aiTokenCount: 120000,
     features: [
       '230 automated job applications/month', // Updated count
-      '30,000 AI tokens for resume & cover letters',
+      '120,000 AI tokens for job search & resume optimization',
       'Complex requests count as 2x tokens',
       'Priority support & early access',
       'Additional applications: $0.80 each',
@@ -381,13 +381,30 @@ export const getCurrencySymbol = (currency: string): string => {
 // Helper function to get plan limits
 export const getPlanLimits = (priceId: string) => {
   const product = getProductByPriceId(priceId);
-  if (!product) return null;
-
-  return {
-    applications: product.applicationCount || 0,
-    aiTokens: product.aiTokenCount || 0,
-    isSubscription: product.mode === 'subscription'
+  if (product) {
+    return {
+      applications: product.applicationCount || 0,
+      aiTokens: product.aiTokenCount || 0,
+      isSubscription: product.mode === 'subscription'
+    };
+  }
+  
+  // Fallback for hardcoded price IDs
+  const hardcodedLimits: Record<string, { applications: number; aiTokens: number }> = {
+    'price_1Rf2oQGkowQ7SwlfhDDuOpFk': { applications: 40, aiTokens: 30000 }, // Plus
+    'price_1Rf2nJGkowQ7Swlfwvc3CBO8': { applications: 110, aiTokens: 30000 }, // Pro
+    'price_1Rf2owGkowQ7SwlfEG4UKU8c': { applications: 230, aiTokens: 30000 }, // Max
   };
+  
+  if (hardcodedLimits[priceId]) {
+    return {
+      ...hardcodedLimits[priceId],
+      isSubscription: true
+    };
+  }
+  
+  console.warn('⚠️ No plan limits found for price ID:', priceId);
+  return null;
 };
 
 // Helper function to get plan name by price ID with better fallbacks
@@ -402,6 +419,11 @@ export const getPlanNameByPriceId = (priceId: string): string => {
   if (priceId === stripeConfig.PLUS_PRICE_ID) return 'Plus';
   if (priceId === stripeConfig.PRO_PRICE_ID) return 'Pro';
   if (priceId === stripeConfig.MAX_PRICE_ID) return 'Max';
+  
+  // Additional fallback: match against hardcoded price IDs
+  if (priceId === 'price_1Rf2oQGkowQ7SwlfhDDuOpFk') return 'Plus';
+  if (priceId === 'price_1Rf2nJGkowQ7Swlfwvc3CBO8') return 'Pro';
+  if (priceId === 'price_1Rf2owGkowQ7SwlfEG4UKU8c') return 'Max';
 
   // If price ID looks like a product ID, return default
   if (priceId && priceId.startsWith('prod_')) {
@@ -409,6 +431,7 @@ export const getPlanNameByPriceId = (priceId: string): string => {
     return 'Pro'; // Default fallback
   }
 
+  console.warn('⚠️ Unknown price ID:', priceId);
   return 'Unknown Plan';
 };
 
