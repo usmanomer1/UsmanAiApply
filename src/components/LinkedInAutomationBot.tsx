@@ -607,7 +607,11 @@ const LinkedInAutomationBot: React.FC = () => {
 
   const canStartAutomation = () => {
     if (!userUsage) return false;
-    return userUsage.automation_steps.remaining > 0;
+    // Check if user has any limit (not just remaining)
+    const hasLimit = userUsage.automation_steps.limit > 0;
+    const hasRemaining = userUsage.automation_steps.remaining > 0;
+    // For paid users, check limit exists; for usage tracking, check remaining
+    return hasLimit && (userUsage.automation_steps.used < userUsage.automation_steps.limit);
   };
 
   const getRemainingApplications = () => {
