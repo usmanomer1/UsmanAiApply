@@ -14,10 +14,7 @@ export class BrowserUseClientProxy extends BrowserUseClient {
     this.originalApiKey = apiKey;
     
     if (this.useNetlifyFunction) {
-      console.log('BrowserUseClientProxy: Using Netlify function for API calls');
       this.interceptFetchCalls();
-    } else {
-      console.log('BrowserUseClientProxy: Using direct API calls with key');
     }
   }
 
@@ -44,8 +41,10 @@ export class BrowserUseClientProxy extends BrowserUseClient {
           }
         }
         
-        // Route through Netlify function
-        return originalFetch('/.netlify/functions/browser-use-api', {
+        // Route through Netlify function - use absolute URL
+        const netlifyUrl = `${window.location.origin}/.netlify/functions/browser-use-api`;
+        
+        return originalFetch(netlifyUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
