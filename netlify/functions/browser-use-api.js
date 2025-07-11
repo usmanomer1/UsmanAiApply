@@ -1,8 +1,15 @@
 // Browser Use API proxy function
 exports.handler = async (event, context) => {
+  try {
+    console.log('Browser Use Function called');
+    console.log('Method:', event.httpMethod);
+    console.log('Path:', event.path);
+  
   // Get API key from environment
   const API_KEY = process.env.BROWSER_USE_API_KEY;
-  const API_URL = 'https://api.browser-use.com/v1';
+  const API_URL = 'https://api.browser-use.com/api/v1';
+
+  console.log('API_KEY exists:', !!API_KEY);
 
   if (!API_KEY) {
     console.error('BROWSER_USE_API_KEY not configured');
@@ -13,7 +20,10 @@ exports.handler = async (event, context) => {
   }
 
   try {
+    console.log('Request body:', event.body);
     const { method, endpoint, body: requestBody } = JSON.parse(event.body || '{}');
+    
+    console.log('Parsed - Method:', method, 'Endpoint:', endpoint);
     
     if (!endpoint) {
       return {
@@ -40,9 +50,17 @@ exports.handler = async (event, context) => {
     }
 
     // Make the request to Browser Use API
+    console.log('Making request to:', url);
+    console.log('With options:', JSON.stringify(options));
+    
     const response = await fetch(url, options);
     
+    console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+    
     const responseText = await response.text();
+    console.log('Response text:', responseText);
+    
     let data;
     
     try {
@@ -64,6 +82,13 @@ exports.handler = async (event, context) => {
     return {
       statusCode: 500,
       body: JSON.stringify({ error: 'Internal server error', details: error.message }),
+    };
+  }
+  } catch (outerError) {
+    console.error('Function failed:', outerError);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: 'Function error', message: outerError.message }),
     };
   }
 };
