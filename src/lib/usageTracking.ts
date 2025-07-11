@@ -270,7 +270,7 @@ export async function getUserUsage(userId: string): Promise<UserUsage> {
     // Get AI token usage from ai_token_usage table
     const { data: aiTokenUsage, error: aiTokenError } = await supabase
       .from('ai_token_usage')
-      .select('used_tokens')
+      .select('total_tokens')  // Use the correct column name
       .eq('user_id', userId)
       .gte('created_at', billingPeriodStart.toISOString());
     
@@ -280,7 +280,7 @@ export async function getUserUsage(userId: string): Promise<UserUsage> {
     
     if (aiTokenUsage && aiTokenUsage.length > 0) {
       // Sum up all AI token usage for this billing period
-      const totalAITokens = aiTokenUsage.reduce((sum, record) => sum + (record.used_tokens || 0), 0);
+      const totalAITokens = aiTokenUsage.reduce((sum, record) => sum + (record.total_tokens || 0), 0);
       console.log(`AI token usage for user ${userId}: ${totalAITokens} tokens from ${aiTokenUsage.length} operations`);
       usage.ai_tokens.used = totalAITokens;
       usage.ai_tokens.remaining = Math.max(0, usage.ai_tokens.limit - totalAITokens);

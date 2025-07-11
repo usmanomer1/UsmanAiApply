@@ -53,8 +53,14 @@ export async function trackAITokens(
       .insert({
         user_id: userId,
         operation_type: operationType,
-        used_tokens: TOKENS_PER_OPERATION,
-        metadata: metadata || {}
+        prompt_tokens: 0,  // We don't have exact breakdown, so set to 0
+        completion_tokens: 0,  // We don't have exact breakdown, so set to 0
+        total_tokens: TOKENS_PER_OPERATION,  // This is the actual total
+        max_tokens_requested: 0,  // Not applicable for this operation
+        model_used: 'gpt-4o-mini',  // Default model
+        request_data: metadata || {},
+        response_data: {},
+        cost_usd: 0  // Can be calculated based on token usage
       });
     
     if (usageError) {
