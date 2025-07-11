@@ -6,15 +6,18 @@ export class BrowserUseClientProxy extends BrowserUseClient {
   private originalApiKey: string;
 
   constructor(apiKey: string, baseUrl: string = 'https://api.browser-use.com/api/v1') {
-    // If no API key, we'll use the Netlify function
-    const shouldUseFunction = !apiKey || apiKey === '';
+    // If no API key or using 'proxy', we'll use the Netlify function
+    const shouldUseFunction = !apiKey || apiKey === '' || apiKey === 'proxy';
     super(shouldUseFunction ? 'dummy-key' : apiKey, baseUrl);
     
     this.useNetlifyFunction = shouldUseFunction;
     this.originalApiKey = apiKey;
     
     if (this.useNetlifyFunction) {
+      console.log('BrowserUseClientProxy: Using Netlify function for API calls');
       this.interceptFetchCalls();
+    } else {
+      console.log('BrowserUseClientProxy: Using direct API calls with key');
     }
   }
 

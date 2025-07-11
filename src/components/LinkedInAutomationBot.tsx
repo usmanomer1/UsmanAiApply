@@ -259,7 +259,8 @@ const LinkedInAutomationBot: React.FC = () => {
   const { checkFeatureAccess, isAuthenticated } = usePaywall();
   
   // Get API key from environment variable with proper fallback
-  const apiKey = import.meta.env.VITE_BROWSER_USE_API_KEY || import.meta.env.VITE_BROWSERUSE_API_KEY || '';
+  // When using Netlify Functions, we don't need the API key on client side
+  const apiKey = import.meta.env.VITE_BROWSER_USE_API_KEY || import.meta.env.VITE_BROWSERUSE_API_KEY || 'proxy';
   
   const [config, setConfig] = useState<BrowserUseConfig>({
     apiKey: apiKey,
