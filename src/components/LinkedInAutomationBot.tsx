@@ -2179,7 +2179,22 @@ This is the #1 issue that needs to be fixed immediately.`;
     // Start polling for task status
     const interval = setInterval(async () => {
       try {
-        const updatedTask = await getTaskStatus(taskId);
+        if (!browserClient) {
+          console.error('Browser client not initialized during polling');
+          return;
+        }
+        
+        // Fetch full task details during polling, not just status
+        const fullTaskDetails = await browserClient.getTask(taskId);
+        const updatedTask: TaskStatus = {
+          id: taskId,
+          status: fullTaskDetails.status,
+          steps: fullTaskDetails.steps || [],
+          output: fullTaskDetails.output || undefined,
+          error: undefined,
+          live_url: fullTaskDetails.live_url || undefined
+        };
+        
         console.log('Polling - Updated task:', updatedTask);
         console.log('Polling - Live URL:', updatedTask.live_url);
         console.log('Polling - Steps:', updatedTask.steps?.length);
