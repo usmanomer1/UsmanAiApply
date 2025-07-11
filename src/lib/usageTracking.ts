@@ -114,6 +114,14 @@ export async function getUserUsage(userId: string): Promise<UserUsage> {
   try {
     const billingPeriodStart = await getUserBillingPeriodStart(userId);
 
+    // Get user's subscription to determine plan limits
+    const { data: subscription } = await supabase
+      .from('stripe_user_subscriptions')
+      .select('price_id, subscription_status')
+      .eq('user_id', userId)
+      .eq('subscription_status', 'active')
+      .single();
+
     // Get usage from the view
     const { data: usageData, error } = await supabase
       .from('user_usage_summary')
@@ -129,31 +137,61 @@ export async function getUserUsage(userId: string): Promise<UserUsage> {
     // Process the data into our format
     const usage: UserUsage = { ...defaultUsage };
 
-    if (usageData) {
+    // If user has an active subscription, get plan limits
+    if (subscription) {
+      const planName = await supabase.rpc('get_plan_name_from_price_id', { price_id: subscription.price_id });
+      
+      if (planName.data) {
+        // Get limits for the user's plan
+        const { data: planLimits } = await supabase
+          .from('usage_limits')
+          .select('usage_type, monthly_limit')
+          .eq('plan_name', planName.data)
+          .eq('is_active', true);
+
+        if (planLimits) {
+          planLimits.forEach(limit => {
+            const usageType = limit.usage_type as UsageType;
+            usage[usageType].limit = limit.monthly_limit;
+            usage[usageType].remaining = limit.monthly_limit;
+          });
+        }
+      }
+    }
+
+    // Update with actual usage if any exists
+    if (usageData && usageData.length > 0) {
       usageData.forEach(row => {
         const usageType = row.usage_type as UsageType;
         usage[usageType] = {
           used: row.used || 0,
-          limit: row.limit || 0,
-          remaining: Math.max(0, row.remaining || 0),
+          limit: row.limit || usage[usageType].limit,
+          remaining: Math.max(0, row.remaining || (usage[usageType].limit - (row.used || 0))),
           percentage: row.limit > 0 ? Math.min(100, (row.used / row.limit) * 100) : 0
         };
       });
+    } else {
+      // No usage data exists, but we already set the limits above
+      // Just calculate remaining based on limit - used (which is 0)
+      Object.keys(usage).forEach(key => {
+        const usageType = key as UsageType;
+        usage[usageType].remaining = usage[usageType].limit;
+      });
     }
 
-    // Ensure free tier limits are set even if no usage records exist
-    const { data: freeLimits } = await supabase
-      .from('free_tier_limits')
-      .select('usage_type, free_limit');
+    // Ensure free tier limits are set if no subscription
+    if (!subscription) {
+      const { data: freeLimits } = await supabase
+        .from('free_tier_limits')
+        .select('usage_type, free_limit');
 
-    if (freeLimits) {
-      freeLimits.forEach(limit => {
-        const usageType = limit.usage_type as UsageType;
-        if (usage[usageType].limit === 0) {
+      if (freeLimits) {
+        freeLimits.forEach(limit => {
+          const usageType = limit.usage_type as UsageType;
           usage[usageType].limit = limit.free_limit;
           usage[usageType].remaining = limit.free_limit;
-        }
-      });
+        });
+      }
     }
 
     return usage;
