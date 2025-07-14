@@ -28,7 +28,7 @@ export async function trackAITokens(
   }
 
   try {
-    console.log(`Tracking AI tokens - User: ${userId}, Operation: ${operationType}, Tokens: ${TOKENS_PER_OPERATION}`);
+    // console.log(`Tracking AI tokens - User: ${userId}, Operation: ${operationType}, Tokens: ${TOKENS_PER_OPERATION}`);
     
     const { data, error } = await supabase
       .from('ai_token_tracking')
@@ -45,27 +45,10 @@ export async function trackAITokens(
       return false;
     }
 
-    console.log('AI tokens tracked successfully:', data);
+    // console.log('AI tokens tracked successfully in ai_token_tracking:', data);
     
-    // Also insert into ai_token_usage for billing page
-    const { error: usageError } = await supabase
-      .from('ai_token_usage')
-      .insert({
-        user_id: userId,
-        operation_type: operationType,
-        prompt_tokens: 0,  // We don't have exact breakdown, so set to 0
-        completion_tokens: 0,  // We don't have exact breakdown, so set to 0
-        total_tokens: TOKENS_PER_OPERATION,  // This is the actual total
-        max_tokens_requested: 0,  // Not applicable for this operation
-        model_used: 'gpt-4o-mini',  // Default model
-        request_data: metadata || {},
-        response_data: {},
-        cost_usd: 0  // Can be calculated based on token usage
-      });
-    
-    if (usageError) {
-      console.error('Error updating ai_token_usage:', usageError);
-    }
+    // Emit event to refresh billing page when AI tokens are tracked
+    window.dispatchEvent(new Event('billing-refresh-needed'));
 
     return true;
   } catch (error) {
@@ -91,29 +74,48 @@ export async function getAITokenUsage(userId: string): Promise<AITokenUsage> {
   }
 
   try {
-    // Query the summary view for current month
-    const { data, error } = await supabase
-      .from('ai_token_usage_summary')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
+    // Get billing period start (first day of current month)
+    const now = new Date();
+    const billingPeriodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    billingPeriodStart.setHours(0, 0, 0, 0);
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+    // Query the ai_token_tracking table (the accurate source)
+    const { data: aiTokenUsage, error } = await supabase
+      .from('ai_token_tracking')
+      .select('tokens_used, operation_type')
+      .eq('user_id', userId)
+      .gte('created_at', billingPeriodStart.toISOString());
+
+    if (error) {
       console.error('Error fetching AI token usage:', error);
       return defaultUsage;
     }
 
-    if (!data) {
+    if (!aiTokenUsage || aiTokenUsage.length === 0) {
       return defaultUsage;
     }
 
-    const totalTokensUsed = data.total_tokens_used || 0;
+    // Calculate totals
+    let totalTokensUsed = 0;
+    let jobSearches = 0;
+    let resumeOptimizations = 0;
+
+    aiTokenUsage.forEach(record => {
+      totalTokensUsed += record.tokens_used || 0;
+      if (record.operation_type === 'job_search_match') {
+        jobSearches++;
+      } else if (record.operation_type === 'resume_optimization') {
+        resumeOptimizations++;
+      }
+    });
+
+    // console.log(`AI token usage check - Total: ${totalTokensUsed}, Job searches: ${jobSearches}, Resume optimizations: ${resumeOptimizations}`);
     
     return {
       totalTokensUsed,
-      totalOperations: data.total_operations || 0,
-      jobSearches: data.job_searches || 0,
-      resumeOptimizations: data.resume_optimizations || 0,
+      totalOperations: aiTokenUsage.length,
+      jobSearches,
+      resumeOptimizations,
       remainingTokens: Math.max(0, TOKEN_LIMIT - totalTokensUsed)
     };
   } catch (error) {

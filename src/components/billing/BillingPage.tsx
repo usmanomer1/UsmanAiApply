@@ -119,17 +119,26 @@ export const BillingPage: React.FC = () => {
 
     // Refresh data when page gains focus (user switches tabs)
     const handleFocus = () => {
-      console.log('Billing page gained focus, refreshing data...');
+      // console.log('Billing page gained focus, refreshing data...');
       fetchBillingData(true);
     };
 
     window.addEventListener('billing-refresh-needed', handleBillingRefresh);
     window.addEventListener('focus', handleFocus);
 
+    // Auto-refresh data every 5 seconds while page is visible
+    const intervalId = setInterval(() => {
+      if (!document.hidden) {
+        // console.log('Auto-refreshing billing data...');
+        fetchBillingData(true);
+      }
+    }, 5000);
+
     // Cleanup event listeners
     return () => {
       window.removeEventListener('billing-refresh-needed', handleBillingRefresh);
       window.removeEventListener('focus', handleFocus);
+      clearInterval(intervalId);
     };
   }, [user]);
 
@@ -180,19 +189,23 @@ export const BillingPage: React.FC = () => {
       setSubscription(subData);
       
       // Debug logging
-      console.log('Subscription data:', subData);
-      if (subData?.price_id) {
-        console.log('Looking up product for price_id:', subData.price_id);
-        const product = getProductByPriceId(subData.price_id);
-        console.log('Found product:', product);
-      }
+      // console.log('Subscription data:', subData);
+      // if (subData?.price_id) {
+      //   console.log('Looking up product for price_id:', subData.price_id);
+      //   const product = getProductByPriceId(subData.price_id);
+      //   console.log('Found product:', product);
+      // }
 
       // Fetch usage stats for current month
       const now = new Date();
       const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
       const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
       
-      if (subData) {
+      // Always get usage data, regardless of subscription status
+      const usage = await getUserUsage(user.id);
+      // console.log('Usage from getUserUsage:', usage);
+      
+      if (subData || true) { // Always process usage data
         // Get job applications count for current month - simplified query
         const { data: applicationsData, error: applicationsError } = await supabase
           .from('applications')
@@ -202,25 +215,6 @@ export const BillingPage: React.FC = () => {
           .lt('created_at', nextMonthStart.toISOString());
 
         const applicationsCount = applicationsData?.length || 0;
-
-        // Get AI token usage for current month - use max_tokens_requested field
-        const { data: aiUsageData, error: aiUsageError } = await supabase
-          .from('ai_token_usage')
-          .select('max_tokens_requested, operation_type')
-          .eq('user_id', user.id)
-          .gte('created_at', currentMonthStart.toISOString())
-          .lt('created_at', nextMonthStart.toISOString());
-
-        // Calculate AI token usage from max_tokens_requested
-        let aiRequestsCount = 0;
-        let aiTokensUsed = 0;
-        if (aiUsageData && !aiUsageError) {
-          aiTokensUsed = aiUsageData.reduce((sum, log) => sum + (log.max_tokens_requested || 0), 0);
-          aiRequestsCount = aiUsageData.length;
-        }
-
-        // Get usage from new tracking system
-        const usage = await getUserUsage(user.id);
         
         // Get automation sessions for detailed stats
         const sessions = await getAutomationSessions(user.id, 100);
@@ -250,9 +244,9 @@ export const BillingPage: React.FC = () => {
           cover_letters: usage.cover_letter_generation.used
         };
         
+        // console.log('Setting usage state with ai_tokens_used:', currentUsage.ai_tokens_used);
+        // console.log('Full currentUsage object:', currentUsage);
         setUsage(currentUsage);
-      } else {
-        setUsage({ total_steps: 0, total_cost: 0, job_tokens: 0, applications_count: 0, ai_requests_count: 0, ai_tokens_used: 0, job_search_matches: 0, resume_optimizations: 0, cover_letters: 0 });
       }
     } catch (error) {
       console.error('Error fetching billing data:', error);
@@ -429,7 +423,7 @@ This will create the default configuration needed for the billing portal to work
     
     // If no exact match, log for debugging
     console.warn('No product found for price_id:', subscription.price_id);
-    console.log('Available price IDs:', getSubscriptionProducts().map(p => ({ name: p.name, priceId: p.priceId })));
+    // console.log('Available price IDs:', getSubscriptionProducts().map(p => ({ name: p.name, priceId: p.priceId })));
     
     return null;
   };
@@ -904,6 +898,7 @@ This will create the default configuration needed for the billing portal to work
                         animate={{ scale: 1, opacity: 1 }}
                         className="text-5xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent"
                       >
+                        {/* console.log('Rendering AI tokens value:', usage?.ai_tokens_used) */}
                         {(usage?.ai_tokens_used || 0).toLocaleString()}
                       </motion.span>
                       <span className="text-sm text-gray-600 dark:text-gray-400 mb-2">

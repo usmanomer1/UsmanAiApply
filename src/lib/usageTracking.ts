@@ -56,7 +56,10 @@ export async function getUserBillingPeriodStart(userId: string): Promise<Date> {
   }
 
   // Default to first day of current month if no active subscription
-  return new Date(new Date().setDate(1));
+  const defaultDate = new Date(new Date().setDate(1));
+  defaultDate.setHours(0, 0, 0, 0);
+  // console.log(`Using default billing period start: ${defaultDate.toISOString()}`);
+  return defaultDate;
 }
 
 /**
@@ -102,26 +105,53 @@ export async function incrementUsage(
 export async function trackAutomationSteps(
   userId: string,
   taskId: string,
-  stepCount: number
+  stepCount: number,
+  status: 'running' | 'completed' | 'failed' | 'stopped' = 'running'
 ): Promise<boolean> {
   if (!isSupabaseConfigured() || !userId) {
     return true;
   }
 
   try {
-    console.log(`Tracking automation steps - User: ${userId}, Task: ${taskId}, Steps: ${stepCount}`);
+    // console.log(`Tracking automation steps - User: ${userId}, Task: ${taskId}, Steps: ${stepCount}`);
     
+    // First, check if a record exists for this task
+    const { data: existing, error: checkError } = await supabase
+      .from('automation_tasks')
+      .select('step_count')
+      .eq('task_id', taskId)
+      .single();
+
+    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows
+      console.error('Error checking existing automation task:', checkError);
+      return false;
+    }
+
+    // If record exists and current step count is lower, don't update
+    if (existing && existing.step_count >= stepCount) {
+      // console.log(`Existing step count (${existing.step_count}) is >= new step count (${stepCount}), skipping update`);
+      return true;
+    }
+
     // Use automation_tasks table which properly tracks max steps per task
+    const upsertData: any = {
+      user_id: userId,
+      task_id: taskId,
+      task_type: 'linkedin_auto_apply', // Required field
+      step_count: stepCount,
+      status: status,
+      updated_at: new Date().toISOString()
+    };
+
+    // Add completed_at if task is finished
+    if (['completed', 'failed', 'stopped'].includes(status)) {
+      upsertData.completed_at = new Date().toISOString();
+    }
+
     const { data, error } = await supabase
       .from('automation_tasks')
-      .upsert({
-        user_id: userId,
-        task_id: taskId,
-        step_count: stepCount,
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'user_id,task_id',
-        // This will only update if the new step count is higher
+      .upsert(upsertData, {
+        onConflict: 'task_id', // Only task_id has unique constraint
         ignoreDuplicates: false
       })
       .select();
@@ -131,7 +161,7 @@ export async function trackAutomationSteps(
       return false;
     }
 
-    console.log('Successfully tracked automation steps:', data);
+    // console.log('Successfully tracked automation steps:', data);
     return true;
   } catch (error) {
     console.error('Failed to track automation steps:', error);
@@ -257,38 +287,51 @@ export async function getUserUsage(userId: string): Promise<UserUsage> {
     if (automationTasks && automationTasks.length > 0) {
       // Sum up the step counts from all tasks this billing period
       const totalSteps = automationTasks.reduce((sum, task) => sum + (task.step_count || 0), 0);
-      console.log(`Automation usage for user ${userId}: ${totalSteps} steps from ${automationTasks.length} tasks`);
+      // console.log(`Automation usage for user ${userId}: ${totalSteps} steps from ${automationTasks.length} tasks`);
       usage.automation_steps.used = totalSteps;
       usage.automation_steps.remaining = Math.max(0, usage.automation_steps.limit - totalSteps);
       usage.automation_steps.percentage = usage.automation_steps.limit > 0 
         ? Math.min(100, (totalSteps / usage.automation_steps.limit) * 100) 
         : 0;
     } else {
-      console.log(`No automation tasks found for user ${userId} since ${billingPeriodStart.toISOString()}`);
+      // console.log(`No automation tasks found for user ${userId} since ${billingPeriodStart.toISOString()}`);
     }
 
-    // Get AI token usage from ai_token_usage table
-    const { data: aiTokenUsage, error: aiTokenError } = await supabase
-      .from('ai_token_usage')
-      .select('total_tokens')  // Use the correct column name
+    // Get AI token usage from ai_token_tracking table (the accurate source)
+    const { data: aiTokenTracking, error: aiTokenError } = await supabase
+      .from('ai_token_tracking')
+      .select('tokens_used, operation_type')
       .eq('user_id', userId)
       .gte('created_at', billingPeriodStart.toISOString());
     
     if (aiTokenError) {
-      console.error('Error fetching AI token usage:', aiTokenError);
+      console.error('Error fetching AI token tracking:', aiTokenError);
     }
     
-    if (aiTokenUsage && aiTokenUsage.length > 0) {
+    if (aiTokenTracking && aiTokenTracking.length > 0) {
       // Sum up all AI token usage for this billing period
-      const totalAITokens = aiTokenUsage.reduce((sum, record) => sum + (record.total_tokens || 0), 0);
-      console.log(`AI token usage for user ${userId}: ${totalAITokens} tokens from ${aiTokenUsage.length} operations`);
+      const totalAITokens = aiTokenTracking.reduce((sum, record) => sum + (record.tokens_used || 0), 0);
+      
+      // Count operations by type
+      let jobSearchCount = 0;
+      let resumeOptCount = 0;
+      aiTokenTracking.forEach(record => {
+        if (record.operation_type === 'job_search_match') jobSearchCount++;
+        if (record.operation_type === 'resume_optimization') resumeOptCount++;
+      });
+      
+      // console.log(`AI token tracking for user ${userId}: ${totalAITokens} tokens from ${aiTokenTracking.length} operations (${jobSearchCount} job searches, ${resumeOptCount} resume optimizations)`);
       usage.ai_tokens.used = totalAITokens;
       usage.ai_tokens.remaining = Math.max(0, usage.ai_tokens.limit - totalAITokens);
       usage.ai_tokens.percentage = usage.ai_tokens.limit > 0 
         ? Math.min(100, (totalAITokens / usage.ai_tokens.limit) * 100) 
         : 0;
+      
+      // Update operation counts
+      usage.job_search_match.used = jobSearchCount;
+      usage.resume_optimization.used = resumeOptCount;
     } else {
-      console.log(`No AI token usage found for user ${userId} since ${billingPeriodStart.toISOString()}`);
+      // console.log(`No AI token tracking found for user ${userId} since ${billingPeriodStart.toISOString()}`);
     }
 
     // Ensure free tier limits are set if no subscription
@@ -454,7 +497,19 @@ export async function updateAutomationSession(
 
       if (session) {
         // Track automation steps using the proper MAX tracking function
-        await trackAutomationSteps(session.user_id, taskId, updates.step_count);
+        // Pass the status if it's being updated
+        const taskStatus = updates.status as 'running' | 'completed' | 'failed' | 'stopped' | undefined;
+        const tracked = await trackAutomationSteps(
+          session.user_id, 
+          taskId, 
+          updates.step_count,
+          taskStatus || 'running'
+        );
+        
+        // Emit event to refresh billing page if tracking was successful
+        if (tracked) {
+          window.dispatchEvent(new Event('billing-refresh-needed'));
+        }
       }
     }
 

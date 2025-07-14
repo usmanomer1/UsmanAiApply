@@ -1,25 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, Mail, Lock, User, Eye, EyeOff, Sparkles, Shield, Zap, CheckCircle, ArrowRight, ArrowLeft, AlertCircle, Crown } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, Github } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Logo } from '../ui/Logo';
 import { getMaintenanceConfig, canAccessDuringMaintenance } from '../../lib/maintenance';
-import Silk from '../ui/Silk';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { getSubscriptionProducts } from '../../stripe-config';
 import toast from 'react-hot-toast';
-import { useTheme } from '../../contexts/ThemeContext';
 import Turnstile from 'react-turnstile';
 import { EmailVerificationError } from '../ui/EmailVerificationError';
 
 type AuthMode = 'login' | 'signup' | 'forgot-password';
+type AuthStep = 'email' | 'password';
 
 export const CustomAuthPage: React.FC = () => {
   const [authMode, setAuthMode] = useState<AuthMode>('login');
+  const [authStep, setAuthStep] = useState<AuthStep>('email');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -28,11 +23,11 @@ export const CustomAuthPage: React.FC = () => {
     email: '',
     password: '',
     fullName: '',
+    avatar_url: '',
   });
   const [captchaToken, setCaptchaToken] = useState("");
 
   const { signIn, signUp, user } = useAuth();
-  const { isDark } = useTheme();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
@@ -42,7 +37,6 @@ export const CustomAuthPage: React.FC = () => {
   // Redirect logic after successful authentication
   const handleAuthSuccess = async () => {
     if (!planParam) {
-      // No plan specified, go to jobs page
       navigate('/dashboard');
       return;
     }
@@ -85,7 +79,6 @@ export const CustomAuthPage: React.FC = () => {
       }
 
       if (data?.url) {
-        // Redirect to Stripe Checkout
         window.location.href = data.url;
       } else {
         toast.error('No checkout URL received. Redirecting to billing page.');
@@ -103,7 +96,7 @@ export const CustomAuthPage: React.FC = () => {
     if (user) {
       handleAuthSuccess();
     }
-  }, [user]); // Remove dependencies to avoid re-running
+  }, [user]);
 
   // Clear message after 5 seconds
   useEffect(() => {
@@ -113,12 +106,47 @@ export const CustomAuthPage: React.FC = () => {
     }
   }, [message]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.email) return;
+    
+    // For login, try to fetch the user's profile to get their avatar
+    if (authMode === 'login') {
+      try {
+        // Try to fetch profile by email
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('avatar_url')
+          .eq('email', formData.email)
+          .maybeSingle();
+        
+        if (profile?.avatar_url) {
+          setFormData(prev => ({ ...prev, avatar_url: profile.avatar_url }));
+        } else {
+          // If no profile found by email, generate a deterministic avatar based on email
+          // This ensures consistent avatars even before login
+          const emailHash = formData.email.toLowerCase().trim();
+          const generatedAvatar = `https://api.dicebear.com/7.x/notionists/svg?seed=${emailHash}`;
+          setFormData(prev => ({ ...prev, avatar_url: generatedAvatar }));
+        }
+      } catch (error) {
+        // Generate avatar as fallback
+        const emailHash = formData.email.toLowerCase().trim();
+        const generatedAvatar = `https://api.dicebear.com/7.x/notionists/svg?seed=${emailHash}`;
+        setFormData(prev => ({ ...prev, avatar_url: generatedAvatar }));
+      }
+      setAuthStep('password');
+    } else {
+      // For signup, also proceed to password step
+      setAuthStep('password');
+    }
+  };
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage(null);
     setEmailVerificationError(null);
     
-    // Check if captcha is disabled for local development
     const isCaptchaDisabled = import.meta.env.VITE_DISABLE_CAPTCHA === 'true';
     
     if (!isCaptchaDisabled && !captchaToken) {
@@ -126,13 +154,11 @@ export const CustomAuthPage: React.FC = () => {
       return;
     }
     
-    // Check if Supabase is configured
     if (!isSupabaseConfigured()) {
       setMessage({ type: 'error', text: 'Authentication service is not configured. Please contact support.' });
       return;
     }
     
-    // Check maintenance mode for non-admin users
     if (!canAccessDuringMaintenance(formData.email)) {
       setMessage({ type: 'error', text: maintenanceMessage });
       return;
@@ -145,38 +171,21 @@ export const CustomAuthPage: React.FC = () => {
       
       if (authMode === 'login') {
         await signIn(formData.email, formData.password, finalCaptchaToken);
-        // Navigate immediately after successful login
         navigate(planParam ? '/billing' : '/dashboard');
       } else if (authMode === 'signup') {
-        // Disable signup during maintenance mode
         if (isMaintenanceMode) {
           setMessage({ type: 'error', text: 'New registrations are temporarily disabled during maintenance.' });
           return;
         }
         await signUp(formData.email, formData.password, formData.fullName, finalCaptchaToken);
-        // Don't navigate after signup - user needs to verify email first
         setMessage({ 
           type: 'success', 
           text: 'Account created! Please check your email to verify your account, then sign in.' 
         });
-      } else if (authMode === 'forgot-password') {
-        const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
-          redirectTo: `${window.location.origin}/auth${planParam ? `?plan=${planParam}` : ''}`,
-          captchaToken: finalCaptchaToken,
-        });
-        
-        if (error) {
-          setMessage({ type: 'error', text: error.message });
-        } else {
-          setMessage({ 
-            type: 'success', 
-            text: 'Password reset email sent! Check your inbox and follow the instructions.' 
-          });
-          setFormData({ email: '', password: '', fullName: '' });
-        }
+        setAuthMode('login');
+        setAuthStep('email');
       }
     } catch (error: any) {
-      // Check if it's an email verification error
       if (error.message === 'email_not_verified') {
         setEmailVerificationError({ email: error.email });
       } else {
@@ -187,464 +196,271 @@ export const CustomAuthPage: React.FC = () => {
     }
   };
 
-  const features = [
-    {
-      icon: Zap,
-      title: 'AI-Powered Applications',
-      description: 'Automatically apply to 100+ jobs daily with intelligent matching'
-    },
-    {
-      icon: Shield,
-      title: 'Enterprise Security',
-      description: 'Bank-level encryption and privacy protection for your data'
-    },
-    {
-      icon: Sparkles,
-      title: 'Smart Optimization',
-      description: 'AI-generated cover letters and resume optimization'
+  const handleForgotPassword = async () => {
+    if (!formData.email) {
+      setMessage({ type: 'error', text: 'Please enter your email first' });
+      return;
     }
-  ];
+    
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
+        redirectTo: `${window.location.origin}/auth`,
+      });
+      
+      if (error) {
+        setMessage({ type: 'error', text: error.message });
+      } else {
+        setMessage({ 
+          type: 'success', 
+          text: 'Password reset email sent! Check your inbox.' 
+        });
+      }
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error.message || 'An error occurred' });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getFormTitle = () => {
-    switch (authMode) {
-      case 'login': return planParam ? `Sign in to upgrade to ${planParam}` : 'Welcome Back';
-      case 'signup': return planParam ? `Create account for ${planParam} plan` : 'Get Started';
-      case 'forgot-password': return 'Reset Password';
-      default: return 'Welcome';
-    }
+    if (authMode === 'signup') return 'Create your account';
+    return 'Sign in to Jobotic';
   };
 
-  const getFormDescription = () => {
-    switch (authMode) {
-      case 'login': return planParam ? `Continue to complete your ${planParam} subscription` : 'Sign in to continue your job search journey';
-      case 'signup': return planParam ? `Sign up and get instant access to ${planParam} features` : 'Create your account and start applying with AI';
-      case 'forgot-password': return 'Enter your email to receive reset instructions';
-      default: return '';
-    }
+  const getFormSubtitle = () => {
+    if (authMode === 'signup') return 'Start your journey with AI-powered job search';
+    return 'Welcome back! Please sign in to continue.';
   };
 
-  // Get selected plan details for display
-  const selectedPlan = planParam ? getSubscriptionProducts().find(p => p.name.toLowerCase() === planParam.toLowerCase()) : null;
+  const getInitial = (email: string) => {
+    return email ? email[0].toUpperCase() : 'U';
+  };
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left Side - Silk Background with Branding */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
-        {/* Silk Background */}
-        <div className="absolute inset-0">
-          <Silk
-            speed={5}
-            scale={1}
-            noiseIntensity={1.5}
-            rotation={0}
-          />
+    <div className="min-h-screen bg-white flex items-center justify-center p-4" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", sans-serif' }}>
+      <div className="w-full max-w-[400px] animate-fadeIn">
+        {/* Logo and Title */}
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center gap-2 mb-6">
+            <img
+              src="/images/logos/jobotic-logo.png"
+              alt="Jobotic"
+              className="w-8 h-8 object-contain"
+            />
+            <span className="text-xl font-semibold text-[#18181b]">Jobotic</span>
+          </div>
+          <h1 className="text-2xl font-semibold text-[#18181b] mb-2">
+            {getFormTitle()}
+          </h1>
+          <p className="text-sm text-[#71717a]">
+            {getFormSubtitle()}
+          </p>
         </div>
-        
-        {/* Enhanced Overlay for better text readability */}
-        <div className="absolute inset-0 bg-black/60"></div>
-        
-        {/* Content */}
-        <div className="relative z-10 flex flex-col justify-center px-12 py-16">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-          >
-            <div className="flex items-center space-x-3 mb-8">
-              <div className="p-3 bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg">
-                {/* Custom logo logic for auth page: use light.png in dark mode */}
-                {isDark ? (
-                  <img
-                    src="/images/logos/light.png"
-                    alt="Jobotic Logo"
-                    width={48}
-                    height={48}
-                    style={{ objectFit: 'contain', maxWidth: '100%', height: 'auto' }}
-                  />
-                ) : (
-                  <Logo width={48} height={48} />
-                )}
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-white">Jobotic</h1>
-                <p className="text-gray-100 text-sm font-medium">Premium Job Search Platform</p>
-              </div>
-            </div>
 
-            {selectedPlan ? (
-              <div className="mb-8">
-                <div className="flex items-center space-x-3 mb-4">
-                  <Crown className="w-8 h-8 text-amber-400" />
-                  <div>
-                    <h2 className="text-3xl font-bold text-white">{selectedPlan.name} Plan</h2>
-                    <div>
-                      <p className="text-xl text-gray-100">${selectedPlan.price}/month</p>
-                      <p className="text-xs text-gray-300 mt-1">Terms and Conditions Apply</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 mb-6">
-                  <h3 className="text-white font-semibold mb-2">What you'll get:</h3>
-                  <ul className="space-y-1">
-                    {selectedPlan.features?.slice(0, 4).map((feature, index) => (
-                      <li key={index} className="text-gray-100 text-sm flex items-center">
-                        <CheckCircle className="w-4 h-4 text-green-400 mr-2 flex-shrink-0" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+        {/* Error Messages */}
+        {emailVerificationError && (
+          <EmailVerificationError
+            initialEmail={emailVerificationError.email}
+            onClose={() => setEmailVerificationError(null)}
+          />
+        )}
+        {message && !emailVerificationError && (
+          <div className={`mb-6 p-3 rounded-md text-sm ${
+            message.type === 'success'
+              ? 'bg-green-50 text-green-800'
+              : 'bg-red-50 text-red-800'
+          }`}>
+            {message.text}
+          </div>
+        )}
+
+        {/* Auth Form */}
+        {authStep === 'email' ? (
+          <form onSubmit={handleEmailSubmit} className="space-y-4">
+            {/* Name field for signup */}
+            {authMode === 'signup' && (
+              <div>
+                <input
+                  type="text"
+                  required
+                  value={formData.fullName}
+                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                  className="w-full h-10 px-3.5 text-sm border border-[#e4e4e7] rounded-md focus:outline-none focus:ring-2 focus:ring-[#14b8a6] focus:border-transparent"
+                  placeholder="Full name"
+                />
               </div>
-            ) : (
-              <>
-                <h2 className="text-4xl font-bold text-white mb-6 leading-tight">
-                  Land Your Dream Job with AI-Powered Automation
-                </h2>
-                
-                <p className="text-xl text-gray-100 mb-12 leading-relaxed">
-                  Join thousands of professionals who've accelerated their job search with our intelligent automation platform.
-                </p>
-              </>
             )}
 
-            <div className="space-y-6">
-              {features.map((feature, index) => {
-                const Icon = feature.icon;
-                return (
-                  <motion.div
-                    key={feature.title}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.6, delay: 0.2 + index * 0.1 }}
-                    className="flex items-start space-x-4"
-                  >
-                    <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
-                      <Icon className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="text-white font-semibold mb-2 text-lg">{feature.title}</h3>
-                      <p className="text-gray-100 text-sm leading-relaxed">{feature.description}</p>
-                    </div>
-                  </motion.div>
-                );
-              })}
+            {/* Email Input */}
+            <div>
+              <input
+                type="email"
+                required
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className="w-full h-10 px-3.5 text-sm border border-[#e4e4e7] rounded-md focus:outline-none focus:ring-2 focus:ring-[#14b8a6] focus:border-transparent"
+                placeholder="Email address"
+                autoFocus
+              />
             </div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.8 }}
-              className="mt-12 p-6 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20 shadow-xl"
+            {/* Continue Button */}
+            <button
+              type="submit"
+              className="w-full h-10 px-4 bg-[#18181b] text-white text-sm font-medium rounded-md hover:bg-[#27272a] transition-colors"
             >
-              <div className="flex items-center space-x-3 mb-3">
-                <CheckCircle className="w-6 h-6 text-emerald-300" />
-                <span className="text-white font-semibold text-lg">Success Story</span>
+              Continue
+            </button>
+
+            {/* Toggle Mode */}
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode(authMode === 'login' ? 'signup' : 'login');
+                  setFormData({ ...formData, fullName: '', password: '', avatar_url: '' });
+                }}
+                className="text-sm text-[#71717a] hover:text-[#18181b] transition-colors"
+              >
+                {authMode === 'login'
+                  ? "No account? Sign up"
+                  : 'Have an account? Sign in'
+                }
+              </button>
+            </div>
+          </form>
+        ) : (
+          <form onSubmit={handlePasswordSubmit} className="space-y-4">
+            {/* Back Link */}
+            <button
+              type="button"
+              onClick={() => {
+                setAuthStep('email');
+                setFormData({ ...formData, password: '', avatar_url: '' });
+                setCaptchaToken('');
+              }}
+              className="flex items-center gap-1 text-sm text-[#71717a] hover:text-[#18181b] transition-colors mb-6"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back
+            </button>
+
+            {/* User Card */}
+            <div className="bg-[#f4f4f5] rounded-md p-4 flex items-center gap-3 mb-6">
+              {formData.avatar_url ? (
+                <img
+                  src={formData.avatar_url}
+                  alt="User avatar"
+                  className="w-10 h-10 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-10 h-10 bg-[#e4e4e7] rounded-full flex items-center justify-center">
+                  <span className="text-sm font-medium text-[#18181b]">
+                    {getInitial(formData.email)}
+                  </span>
+                </div>
+              )}
+              <div className="flex-1">
+                <p className="text-sm font-medium text-[#18181b]">{formData.email}</p>
               </div>
-              <p className="text-gray-100 text-sm italic leading-relaxed">
-                "Jobotic helped me land my dream job at Google in just 2 weeks. The AI automation saved me hours of manual applications!"
-              </p>
-              <p className="text-gray-200 text-xs mt-3 font-medium">- Sarah Chen, Software Engineer</p>
-            </motion.div>
-          </motion.div>
+            </div>
+
+            {/* Password Input */}
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                required
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                className="w-full h-10 px-3.5 pr-10 text-sm border border-[#e4e4e7] rounded-md focus:outline-none focus:ring-2 focus:ring-[#14b8a6] focus:border-transparent"
+                placeholder="Password"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71717a] hover:text-[#18181b]"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+
+            {/* Forgot Password */}
+            {authMode === 'login' && (
+              <div className="text-right">
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  className="text-sm text-[#71717a] hover:text-[#18181b] transition-colors"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
+
+            {/* Captcha */}
+            {import.meta.env.VITE_DISABLE_CAPTCHA !== 'true' && (
+              <div className="flex justify-center py-2">
+                <Turnstile
+                  sitekey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+                  onSuccess={setCaptchaToken}
+                />
+              </div>
+            )}
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full h-10 px-4 bg-[#18181b] text-white text-sm font-medium rounded-md hover:bg-[#27272a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Processing...</span>
+                </div>
+              ) : (
+                authMode === 'login' ? 'Continue' : 'Create account'
+              )}
+            </button>
+          </form>
+        )}
+
+        {/* Footer */}
+        <div className="mt-8 text-center">
+          <p className="text-xs text-[#71717a]">
+            By continuing, you agree to Jobotic's{' '}
+            <a
+              href="https://www.jobotic.ai/terms"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-[#18181b]"
+            >
+              Terms of Service
+            </a>{' '}
+            and{' '}
+            <a
+              href="https://www.jobotic.ai/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-[#18181b]"
+            >
+              Privacy Policy
+            </a>
+          </p>
         </div>
       </div>
 
-      {/* Right Side - Auth Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="w-full max-w-md"
-        >
-          <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-2xl transition-colors duration-200">
-            {/* Mobile Logo */}
-            <div className="lg:hidden text-center mb-8 pt-8">
-              <div className="inline-flex items-center justify-center mb-4">
-                <div className="p-3 bg-indigo-100 dark:bg-indigo-900 rounded-2xl transition-colors duration-200">
-                  <Logo width={64} height={64} />
-                </div>
-              </div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white transition-colors duration-200">Jobotic</h1>
-              <p className="text-gray-600 dark:text-gray-300 mt-1 transition-colors duration-200">Premium Job Search Platform</p>
-              {planParam && (
-                <div className="mt-4 inline-flex items-center flex-col space-y-1">
-                  <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-slate-100 to-stone-100 dark:from-slate-800 dark:to-stone-800 rounded-full border border-slate-200 dark:border-slate-700 transition-colors duration-200">
-                    <Crown className="w-4 h-4 text-slate-600 dark:text-slate-400 mr-2 transition-colors duration-200" />
-                    <span className="text-slate-800 dark:text-slate-200 font-semibold text-sm transition-colors duration-200">Upgrading to {planParam}</span>
-                  </div>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">Terms and Conditions Apply</span>
-                </div>
-              )}
-            </div>
-
-            <CardHeader className="text-center pb-4">
-              <CardTitle className="text-3xl font-bold text-gray-900 dark:text-white mb-2 transition-colors duration-200">
-                {getFormTitle()}
-              </CardTitle>
-              <CardDescription className="text-gray-600 dark:text-gray-300 text-base transition-colors duration-200">
-                {getFormDescription()}
-              </CardDescription>
-            </CardHeader>
-
-            <CardContent>
-              {/* Maintenance Mode Banner */}
-              {isMaintenanceMode && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl transition-colors duration-200"
-                >
-                  <div className="flex items-center space-x-2">
-                    <Shield className="w-5 h-5 text-amber-600 dark:text-amber-400 transition-colors duration-200" />
-                    <span className="text-amber-800 dark:text-amber-200 font-medium transition-colors duration-200">Maintenance Mode</span>
-                  </div>
-                  <p className="text-amber-700 dark:text-amber-300 text-sm mt-1 transition-colors duration-200">
-                    {maintenanceMessage}
-                  </p>
-                  <p className="text-amber-600 dark:text-amber-400 text-xs mt-2 transition-colors duration-200">
-                    Admin access only during this period.
-                  </p>
-                </motion.div>
-              )}
-
-              {/* Plan Info Banner */}
-              {planParam && selectedPlan && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mb-6 p-4 bg-gradient-to-r from-slate-50 to-stone-50 dark:from-slate-800/20 dark:to-stone-800/20 border border-slate-200 dark:border-slate-700 rounded-xl transition-colors duration-200"
-                >
-                  <div className="flex items-center space-x-3">
-                    <Crown className="w-5 h-5 text-slate-600 dark:text-slate-400 transition-colors duration-200" />
-                    <div className="flex-1">
-                      <p className="text-slate-800 dark:text-slate-200 font-semibold transition-colors duration-200">Upgrading to {selectedPlan.name}</p>
-                      <div className="flex items-center justify-between">
-                        <p className="text-slate-600 dark:text-slate-300 text-sm transition-colors duration-200">${selectedPlan.price}/month • {selectedPlan.applicationCount} applications/month</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Terms and Conditions Apply</p>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Message Display */}
-              <AnimatePresence>
-                {emailVerificationError && (
-                  <EmailVerificationError
-                    initialEmail={emailVerificationError.email}
-                    onClose={() => setEmailVerificationError(null)}
-                  />
-                )}
-                {message && !emailVerificationError && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                    className={`mb-6 p-4 rounded-xl border transition-colors duration-200 ${
-                      message.type === 'success'
-                        ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200'
-                        : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700 text-red-800 dark:text-red-200'
-                    }`}
-                  >
-                    <div className="flex items-start space-x-2">
-                      {message.type === 'success' ? (
-                        <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0 transition-colors duration-200" />
-                      ) : (
-                        <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0 transition-colors duration-200" />
-                      )}
-                      <p className="text-sm leading-relaxed">{message.text}</p>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Form */}
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <AnimatePresence mode="wait">
-                  {authMode === 'signup' && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2 transition-colors duration-200">
-                        Full Name
-                      </label>
-                      <div className="relative">
-                        <User className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5 z-10 transition-colors duration-200" />
-                        <Input
-                          type="text"
-                          required
-                          value={formData.fullName}
-                          onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                          className="pl-12 h-12 text-base border-gray-300 dark:border-gray-600 focus:border-slate-500 focus:ring-slate-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-colors duration-200"
-                          placeholder="Enter your full name"
-                        />
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2 transition-colors duration-200">
-                    Email Address
-                  </label>
-                  <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5 z-10 transition-colors duration-200" />
-                    <Input
-                      type="email"
-                      required
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="pl-12 h-12 text-base border-gray-300 dark:border-gray-600 focus:border-slate-500 focus:ring-slate-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-colors duration-200"
-                      placeholder="Enter your email"
-                    />
-                  </div>
-                </div>
-
-                {authMode !== 'forgot-password' && (
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2 transition-colors duration-200">
-                      Password
-                    </label>
-                    <div className="relative">
-                      <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5 z-10 transition-colors duration-200" />
-                      <Input
-                        type={showPassword ? 'text' : 'password'}
-                        required
-                        value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        className="pl-12 pr-12 h-12 text-base border-gray-300 dark:border-gray-600 focus:border-slate-500 focus:ring-slate-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-colors duration-200"
-                        placeholder="Enter your password"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors z-10"
-                      >
-                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Forgot Password Link */}
-                {authMode === 'login' && (
-                  <div className="text-right">
-                    <button
-                      type="button"
-                      onClick={() => setAuthMode('forgot-password')}
-                      className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 font-medium transition-colors"
-                    >
-                      Forgot your password?
-                    </button>
-                  </div>
-                )}
-
-                {/* Conditionally render Turnstile based on environment variable */}
-                {import.meta.env.VITE_DISABLE_CAPTCHA !== 'true' && (
-                  <Turnstile
-                    sitekey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-                    onSuccess={setCaptchaToken}
-                    className="my-4"
-                  />
-                )}
-                
-                {/* Development mode indicator */}
-                {import.meta.env.VITE_DISABLE_CAPTCHA === 'true' && (
-                  <div className="my-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg">
-                    <div className="flex items-center space-x-2">
-                      <Shield className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
-                      <span className="text-sm text-yellow-700 dark:text-yellow-300 font-medium">
-                        Development Mode: CAPTCHA verification disabled
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                <motion.div
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <Button
-                    type="submit"
-                    disabled={loading}
-                    size="lg"
-                    className={`w-full text-lg font-bold shadow-xl h-12 transition-colors duration-200 ${
-                      planParam 
-                        ? 'bg-gradient-to-r from-slate-700 to-stone-700 hover:from-slate-800 hover:to-stone-800 text-white border border-slate-600 shadow-slate-500/25' 
-                        : 'bg-slate-800 hover:bg-slate-900 text-white border border-slate-700 shadow-slate-500/25'
-                    }`}
-                  >
-                    {loading ? (
-                      <div className="flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
-                        Processing...
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center">
-                        {authMode === 'login' && (planParam ? `Sign In & Upgrade to ${planParam}` : 'Sign In')}
-                        {authMode === 'signup' && (planParam ? `Create Account & Get ${planParam}` : 'Create Account')}
-                        {authMode === 'forgot-password' && 'Send Reset Email'}
-                        <ArrowRight className="w-5 h-5 ml-2" />
-                      </div>
-                    )}
-                  </Button>
-                </motion.div>
-              </form>
-
-              {/* Navigation Links */}
-              <div className="mt-8 space-y-4">
-                {authMode === 'forgot-password' && (
-                  <div className="text-center">
-                    <button
-                      onClick={() => setAuthMode('login')}
-                      className="text-slate-600 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 font-semibold transition-colors flex items-center justify-center"
-                    >
-                      <ArrowLeft className="w-4 h-4 mr-2" />
-                      Back to Sign In
-                    </button>
-                  </div>
-                )}
-
-                {(authMode === 'login' || authMode === 'signup') && (
-                  <div className="text-center">
-                    <button
-                      onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
-                      className="text-slate-600 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 font-semibold transition-colors"
-                    >
-                      {authMode === 'login'
-                        ? "Don't have an account? Sign up"
-                        : 'Already have an account? Sign in'
-                      }
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Trust Indicators */}
-              <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700 transition-colors duration-200">
-                <div className="flex items-center justify-center space-x-6 text-xs text-gray-500 dark:text-gray-400 transition-colors duration-200">
-                  <div className="flex items-center">
-                    <Shield className="w-4 h-4 mr-1" />
-                    <span>256-bit SSL</span>
-                  </div>
-                  <div className="flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-1" />
-                    <span>GDPR Compliant</span>
-                  </div>
-                  <div className="flex items-center">
-                    <Sparkles className="w-4 h-4 mr-1" />
-                    <span>SOC 2 Type II</span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.4s ease-out;
+        }
+      `}</style>
     </div>
   );
 };

@@ -107,8 +107,8 @@ class JoboticApiService {
     const isNetlifyFunction = USE_NETLIFY_FUNCTION;
     const url = isNetlifyFunction ? '/.netlify/functions/jobotic-api' : `${API_BASE_URL}${endpoint}`;
     
-    console.log(`Making request to: ${url}`);
-    console.log('Request payload:', JSON.stringify(data, null, 2));
+    // console.log(`Making request to: ${url}`);
+    // console.log('Request payload:', JSON.stringify(data, null, 2));
     
     const requestBody = isNetlifyFunction 
       ? { endpoint, ...data }
@@ -274,7 +274,7 @@ class JoboticApiService {
     downloadUrl: string; 
     previewUrl: string;
   }> {
-    console.log('Download request:', request);
+    // console.log('Download request:', request);
     
     const response = await fetch(`${API_BASE_URL}/api/download/generate`, {
       method: 'POST',
@@ -297,7 +297,7 @@ class JoboticApiService {
     }
 
     const result = await response.json();
-    console.log('Download API result:', result);
+    // console.log('Download API result:', result);
     
     return {
       fileId: result.data.fileId,

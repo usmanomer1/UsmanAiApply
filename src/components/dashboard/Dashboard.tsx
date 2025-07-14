@@ -76,6 +76,18 @@ const Dashboard: React.FC = () => {
     }
   }, [user]);
 
+  // Refresh dashboard data when the page gains focus (e.g., after adding an application)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (user) {
+        fetchDashboardData();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [user]);
+
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
@@ -91,17 +103,20 @@ const Dashboard: React.FC = () => {
 
       console.log('Dashboard applications data:', applications);
 
-      // Calculate stats
+      // Calculate stats - handle both uppercase and lowercase status values
       const total = applications?.length || 0;
-      const interviewed = applications?.filter(app => 
-        app.status === 'interviewing' || app.status === 'offered'
-      ).length || 0;
-      const responded = applications?.filter(app => 
-        app.status !== 'applied' && app.status !== 'pending'
-      ).length || 0;
-      const active = applications?.filter(app => 
-        app.status === 'applied' || app.status === 'interviewing'
-      ).length || 0;
+      const interviewed = applications?.filter(app => {
+        const status = app.status?.toUpperCase();
+        return status === 'INTERVIEW' || status === 'OA' || status === 'INTERVIEWING' || status === 'OFFERED';
+      }).length || 0;
+      const responded = applications?.filter(app => {
+        const status = app.status?.toUpperCase();
+        return status !== 'SENT' && status !== 'PENDING' && status !== 'APPLIED';
+      }).length || 0;
+      const active = applications?.filter(app => {
+        const status = app.status?.toUpperCase();
+        return status === 'SENT' || status === 'PENDING' || status === 'INTERVIEW' || status === 'OA' || status === 'APPLIED' || status === 'INTERVIEWING';
+      }).length || 0;
 
       // Calculate weekly change
       const lastWeek = new Date();
@@ -125,19 +140,26 @@ const Dashboard: React.FC = () => {
 
       // Calculate status distribution - handle various status values
       const statusCounts = {
-        applied: applications?.filter(app => 
-          app.status === 'applied' || app.status === 'pending' || app.status === 'success'
-        ).length || 0,
-        interviewing: applications?.filter(app => 
-          app.status === 'interviewing' || app.status === 'interview'
-        ).length || 0,
-        rejected: applications?.filter(app => 
-          app.status === 'rejected' || app.status === 'failed'
-        ).length || 0,
-        offered: applications?.filter(app => 
-          app.status === 'offered' || app.status === 'offer'
-        ).length || 0
+        applied: applications?.filter(app => {
+          const status = app.status?.toUpperCase();
+          return status === 'SENT' || status === 'PENDING' || status === 'APPLIED' || status === 'SUCCESS';
+        }).length || 0,
+        interviewing: applications?.filter(app => {
+          const status = app.status?.toUpperCase();
+          return status === 'INTERVIEW' || status === 'OA' || status === 'INTERVIEWING';
+        }).length || 0,
+        rejected: applications?.filter(app => {
+          const status = app.status?.toUpperCase();
+          return status === 'REJECTED' || status === 'FAILED';
+        }).length || 0,
+        offered: applications?.filter(app => {
+          const status = app.status?.toUpperCase();
+          return status === 'ACCEPTED' || status === 'OFFERED' || status === 'OFFER';
+        }).length || 0
       };
+      
+      console.log('Raw application statuses:', applications?.map(app => app.status));
+      console.log('Calculated status counts:', statusCounts);
 
       const statusDistribution = [
         { name: 'Applied', value: statusCounts.applied, color: '#14b8a6' },

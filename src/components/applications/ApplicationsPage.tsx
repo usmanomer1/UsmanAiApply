@@ -56,7 +56,7 @@ export const ApplicationsPage: React.FC = () => {
     job_title: '',
     company_name: '',
     location: '',
-    status: 'pending',
+    status: 'SENT',
     job_url: '',
     notes: '',
     applied_date: new Date().toISOString().split('T')[0]
@@ -176,6 +176,8 @@ export const ApplicationsPage: React.FC = () => {
         if (!campaign) throw new Error('Failed to create campaign');
       }
 
+      console.log('Saving application with status:', formData.status);
+
       if (editingApplication) {
         // Update existing application
         const { error } = await supabase
@@ -204,29 +206,33 @@ export const ApplicationsPage: React.FC = () => {
         toast.success('Application updated successfully');
       } else {
         // Add new application
-        const { error } = await supabase
-          .from('applications')
-          .insert({
-            campaign_id: campaign.id,
-            user_id: user?.id, // Add user_id directly
-            company: formData.company_name,
-            company_name: formData.company_name, // Add both fields
-            role: formData.job_title,
-            job_title: formData.job_title, // Add both fields
+        const insertData = {
+          campaign_id: campaign.id,
+          user_id: user?.id, // Add user_id directly
+          company: formData.company_name,
+          company_name: formData.company_name, // Add both fields
+          role: formData.job_title,
+          job_title: formData.job_title, // Add both fields
+          location: formData.location,
+          job_url: formData.job_url,
+          notes: formData.notes,
+          applied_at: formData.applied_date,
+          status: formData.status || 'SENT',
+          is_automated: false,
+          source: 'manual',
+          details: {
             location: formData.location,
             job_url: formData.job_url,
             notes: formData.notes,
-            applied_at: formData.applied_date,
-            status: formData.status || 'applied',
-            is_automated: false,
-            source: 'manual',
-            details: {
-              location: formData.location,
-              job_url: formData.job_url,
-              notes: formData.notes,
-              applied_via: 'manual'
-            }
-          });
+            applied_via: 'manual'
+          }
+        };
+        
+        console.log('Inserting application data:', insertData);
+        
+        const { error } = await supabase
+          .from('applications')
+          .insert(insertData);
 
         if (error) throw error;
         toast.success('Application added successfully');
@@ -361,9 +367,12 @@ export const ApplicationsPage: React.FC = () => {
               className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="success">Success</option>
-              <option value="rejected">Rejected</option>
+              <option value="SENT">Sent</option>
+              <option value="PENDING">Pending</option>
+              <option value="INTERVIEW">Interview</option>
+              <option value="OA">Online Assessment</option>
+              <option value="ACCEPTED">Accepted</option>
+              <option value="REJECTED">Rejected</option>
             </select>
             
             <button
@@ -554,10 +563,12 @@ export const ApplicationsPage: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="pending">Pending</option>
-                    <option value="applied">Applied</option>
-                    <option value="success">Success</option>
-                    <option value="rejected">Rejected</option>
+                    <option value="SENT">Sent</option>
+                    <option value="PENDING">Pending</option>
+                    <option value="INTERVIEW">Interview</option>
+                    <option value="OA">Online Assessment</option>
+                    <option value="ACCEPTED">Accepted</option>
+                    <option value="REJECTED">Rejected</option>
                   </select>
                 </div>
                 

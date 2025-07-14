@@ -38,6 +38,7 @@ export type Database = {
           full_name: string | null;
           phone: string | null;
           resume_url: string | null;
+          avatar_url: string;
           created_at: string;
         };
         Insert: {
@@ -46,6 +47,7 @@ export type Database = {
           full_name?: string | null;
           phone?: string | null;
           resume_url?: string | null;
+          avatar_url?: string;
           created_at?: string;
         };
         Update: {
@@ -54,6 +56,7 @@ export type Database = {
           full_name?: string | null;
           phone?: string | null;
           resume_url?: string | null;
+          avatar_url?: string;
           created_at?: string;
         };
       };
@@ -309,6 +312,41 @@ export type Database = {
   };
 };
 
+// Avatar generation helper
+export const generateAvatarUrl = (userId: string): string => {
+  return `https://api.dicebear.com/7.x/notionists/svg?seed=${userId}`;
+};
+
+// Helper to upload avatar to Supabase Storage
+export const uploadAvatar = async (userId: string, file: File): Promise<string | null> => {
+  try {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${userId}-${Date.now()}.${fileExt}`;
+    const filePath = `avatars/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, file, {
+        upsert: true,
+        cacheControl: '3600'
+      });
+
+    if (uploadError) {
+      console.error('Error uploading avatar:', uploadError);
+      return null;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(filePath);
+
+    return publicUrl;
+  } catch (error) {
+    console.error('Error in uploadAvatar:', error);
+    return null;
+  }
+};
+
 // Helper functions for common operations
 export const uploadResume = async (file: File, userId: string): Promise<string | null> => {
   try {
@@ -350,10 +388,10 @@ export const uploadResume = async (file: File, userId: string): Promise<string |
     
     // Ignore delete errors (file might not exist)
     if (deleteError) {
-      console.log('Delete error (can be ignored if file doesn\'t exist):', deleteError);
+      // console.log('Delete error (can be ignored if file doesn\'t exist):', deleteError);
     }
 
-    console.log('Attempting to upload file:', fileName, 'size:', file.size);
+    // console.log('Attempting to upload file:', fileName, 'size:', file.size);
     
     // Upload the new file with proper authentication
     const { data: uploadData, error: uploadError } = await supabase.storage
@@ -363,7 +401,7 @@ export const uploadResume = async (file: File, userId: string): Promise<string |
         cacheControl: '3600',
       });
 
-    console.log('Upload response:', { uploadData, uploadError });
+    // console.log('Upload response:', { uploadData, uploadError });
 
     if (uploadError) {
       console.error('Supabase upload error:', uploadError);
