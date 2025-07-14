@@ -38,11 +38,12 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import toast from 'react-hot-toast';
 import ConditionalBackground from '../ui/ConditionalBackground';
+import { cn } from '../../lib/utils';
 
 interface DashboardStats {
   totalApplications: number;
   thisWeekApplications: number;
-  successRate: number;
+  successRate: number; // Actually interview rate now
   activeJobs: number;
   tokensUsed: number;
   tokensRemaining: number;
@@ -77,6 +78,7 @@ interface NewApplicationData {
   status: string;
   location: string;
   url: string;
+  appliedDate: string;
 }
 
 export const DashboardHome: React.FC = () => {
@@ -103,7 +105,8 @@ export const DashboardHome: React.FC = () => {
     role: '',
     status: 'SENT',
     location: '',
-    url: ''
+    url: '',
+    appliedDate: new Date().toISOString().split('T')[0]
   });
 
   const isSupabaseConfigured = () => {
@@ -119,7 +122,9 @@ export const DashboardHome: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchDashboardData();
+    if (user) {
+      fetchDashboardData();
+    }
   }, [user]);
 
 
@@ -138,15 +143,8 @@ export const DashboardHome: React.FC = () => {
 
       const { data: applicationsData, error } = await supabase
         .from('applications')
-        .select(`
-          created_at,
-          job_campaigns!campaign_id(
-            profiles!inner(
-              user_id
-            )
-          )
-        `)
-        .eq('job_campaigns.profiles.user_id', user.id)
+        .select('created_at')
+        .eq('user_id', user.id)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString());
 
@@ -197,15 +195,8 @@ export const DashboardHome: React.FC = () => {
       // Get all applications for the user
       const { data: applicationsData, error } = await supabase
         .from('applications')
-        .select(`
-          status,
-          job_campaigns!campaign_id(
-            profiles!inner(
-              user_id
-            )
-          )
-        `)
-        .eq('job_campaigns.profiles.user_id', user.id);
+        .select('status')
+        .eq('user_id', user.id);
 
       if (error) {
         console.error('Error fetching status distribution data:', error);
@@ -243,6 +234,12 @@ export const DashboardHome: React.FC = () => {
         color: statusColors[status] || '#6B7280'
       }));
 
+      // console.log('Status distribution:', {
+      //   totalApplications,
+      //   statusCounts,
+      //   distributionData
+      // });
+
       setStatusDistributionData(distributionData);
     } catch (error) {
       console.error('Error fetching status distribution data:', error);
@@ -273,61 +270,38 @@ export const DashboardHome: React.FC = () => {
       const weekAgo = new Date(currentDate.getTime() - 7 * 24 * 60 * 60 * 1000);
       const monthAgo = new Date(currentDate.getTime() - 30 * 24 * 60 * 60 * 1000);
 
+      // Use direct user_id query since we have it on applications
       // Get total applications for the user
-      const { count: totalCount } = await supabase
+      const { data: totalData, count: totalCount, error: totalError } = await supabase
         .from('applications')
         .select('*', { count: 'exact', head: true })
-        .in('campaign_id', 
-          await supabase
-            .from('job_campaigns')
-            .select('id')
-            .in('profile_id',
-              await supabase
-                .from('profiles')
-                .select('id')
-                .eq('user_id', user.id)
-                .then(({ data }) => data?.map(p => p.id) || [])
-            )
-            .then(({ data }) => data?.map(c => c.id) || [])
-        );
+        .eq('user_id', user.id);
+
+      if (totalError) {
+        console.error('Error fetching total count:', totalError);
+      }
 
       // Get this week's applications
-      const { count: weekCount } = await supabase
+      const { data: weekData, count: weekCount, error: weekError } = await supabase
         .from('applications')
         .select('*', { count: 'exact', head: true })
-        .gte('created_at', weekAgo.toISOString())
-        .in('campaign_id', 
-          await supabase
-            .from('job_campaigns')
-            .select('id')
-            .in('profile_id',
-              await supabase
-                .from('profiles')
-                .select('id')
-                .eq('user_id', user.id)
-                .then(({ data }) => data?.map(p => p.id) || [])
-            )
-            .then(({ data }) => data?.map(c => c.id) || [])
-        );
+        .eq('user_id', user.id)
+        .gte('created_at', weekAgo.toISOString());
 
-      // Get accepted applications for success rate calculation
-      const { count: acceptedCount } = await supabase
+      if (weekError) {
+        console.error('Error fetching week count:', weekError);
+      }
+
+      // Get interview and OA applications for interview rate calculation
+      const { data: interviewData, count: interviewCount, error: interviewError } = await supabase
         .from('applications')
         .select('*', { count: 'exact', head: true })
-        .eq('status', 'ACCEPTED')
-        .in('campaign_id', 
-          await supabase
-            .from('job_campaigns')
-            .select('id')
-            .in('profile_id',
-              await supabase
-                .from('profiles')
-                .select('id')
-                .eq('user_id', user.id)
-                .then(({ data }) => data?.map(p => p.id) || [])
-            )
-            .then(({ data }) => data?.map(c => c.id) || [])
-        );
+        .eq('user_id', user.id)
+        .in('status', ['INTERVIEW', 'OA']);
+
+      if (interviewError) {
+        console.error('Error fetching interview count:', interviewError);
+      }
 
       // Get recent applications
       const { data: applicationsData } = await supabase
@@ -335,13 +309,10 @@ export const DashboardHome: React.FC = () => {
         .select(`
           *,
           job_campaigns!campaign_id(
-            location,
-            profiles!inner(
-              user_id
-            )
+            location
           )
         `)
-        .eq('job_campaigns.profiles.user_id', user.id)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(5);
 
@@ -355,16 +326,42 @@ export const DashboardHome: React.FC = () => {
       const totalSteps = usageData?.reduce((sum, log) => sum + log.step_count, 0) || 0;
       const tokensUsed = Math.ceil(totalSteps / 10);
 
-      // Calculate success rate as accepted/applied * 100
-      const successRate = totalCount && totalCount > 0 
-        ? Math.round(((acceptedCount || 0) / totalCount) * 100)
+      // Get count of active jobs (need separate query since applicationsData is limited to 5)
+      const { count: activeJobsCount, error: activeJobsError } = await supabase
+        .from('applications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .in('status', ['SENT', 'PENDING', 'INTERVIEW', 'OA']);
+
+      if (activeJobsError) {
+        console.error('Error fetching active jobs count:', activeJobsError);
+      }
+
+      // Calculate interview rate as (interviews + OAs)/applied * 100
+      const interviewRate = totalCount && totalCount > 0 
+        ? Math.round(((interviewCount || 0) / totalCount) * 100)
         : 0;
 
+      // Debug logging to see what's happening
+      console.log('Dashboard stats:', {
+        userId: user.id,
+        totalCount,
+        interviewCount,
+        interviewRate,
+        activeJobsCount,
+        errors: {
+          totalError,
+          weekError,
+          interviewError,
+          activeJobsError
+        }
+      });
+
       setStats({
-        totalApplications: totalCount || 0,
-        thisWeekApplications: weekCount || 0,
-        successRate,
-        activeJobs: applicationsData?.filter(app => ['SENT', 'PENDING', 'INTERVIEW'].includes(app.status)).length || 0,
+        totalApplications: totalCount ?? 0,
+        thisWeekApplications: weekCount ?? 0,
+        successRate: interviewRate,
+        activeJobs: activeJobsCount ?? 0,
         tokensUsed,
         tokensRemaining: Math.max(0, 75 - tokensUsed)
       });
@@ -455,15 +452,16 @@ export const DashboardHome: React.FC = () => {
         campaign = newCampaign;
       }
 
-      // Add the application
+      // Add the application WITH user_id
       const { error: applicationError } = await supabase
         .from('applications')
         .insert({
           campaign_id: campaign.id,
+          user_id: user.id, // IMPORTANT: Add user_id directly
           company: newApplication.company.trim(),
           role: newApplication.role.trim(),
           status: newApplication.status,
-          applied_at: new Date().toISOString(),
+          applied_at: new Date(newApplication.appliedDate).toISOString(),
           details: {
             location: newApplication.location.trim() || null,
             source: 'manual',
@@ -481,7 +479,8 @@ export const DashboardHome: React.FC = () => {
         role: '',
         status: 'SENT',
         location: '',
-        url: ''
+        url: '',
+        appliedDate: new Date().toISOString().split('T')[0]
       });
       setIsAddModalOpen(false);
       
@@ -502,6 +501,7 @@ export const DashboardHome: React.FC = () => {
       case 'SENT': return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800';
       case 'PENDING': return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800';
       case 'INTERVIEW': return 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800';
+      case 'OA': return 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800';
       case 'ACCEPTED': return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800';
       case 'REJECTED': return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800';
       default: return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600';
@@ -637,7 +637,7 @@ export const DashboardHome: React.FC = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Success Rate</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Interview Rate</p>
                 <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.successRate}%</p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
@@ -955,6 +955,7 @@ export const DashboardHome: React.FC = () => {
                   <SelectItem value="SENT">Sent</SelectItem>
                   <SelectItem value="PENDING">Pending</SelectItem>
                   <SelectItem value="INTERVIEW">Interview</SelectItem>
+                  <SelectItem value="OA">Online Assessment</SelectItem>
                   <SelectItem value="ACCEPTED">Accepted</SelectItem>
                   <SelectItem value="REJECTED">Rejected</SelectItem>
                 </SelectContent>
@@ -1009,9 +1010,9 @@ export const DashboardHome: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex items-center space-x-3">
-                      <Badge className={getStatusColor(application.status)}>
+                      <div className={cn("inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold transition-all duration-200", getStatusColor(application.status))}>
                         {application.status}
-                      </Badge>
+                      </div>
                       <Link to="/applications">
                         <Button 
                           variant="ghost" 
@@ -1103,6 +1104,7 @@ export const DashboardHome: React.FC = () => {
                     <SelectItem value="SENT">Sent</SelectItem>
                     <SelectItem value="PENDING">Pending</SelectItem>
                     <SelectItem value="INTERVIEW">Interview</SelectItem>
+                    <SelectItem value="OA">Online Assessment</SelectItem>
                     <SelectItem value="ACCEPTED">Accepted</SelectItem>
                     <SelectItem value="REJECTED">Rejected</SelectItem>
                   </SelectContent>
@@ -1133,7 +1135,17 @@ export const DashboardHome: React.FC = () => {
               />
             </div>
 
-
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Date Applied
+              </label>
+              <Input
+                type="date"
+                value={newApplication.appliedDate}
+                onChange={(e) => setNewApplication(prev => ({ ...prev, appliedDate: e.target.value }))}
+                className="premium-input"
+              />
+            </div>
 
             <div className="flex justify-end space-x-3 pt-4">
               <Button

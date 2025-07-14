@@ -56,7 +56,7 @@ export const handleApiError = (error: ApiError) => {
     
     // Log request ID for debugging
     if (error.requestId) {
-      console.log(`Request ID for debugging: ${error.requestId}`);
+      // console.log(`Request ID for debugging: ${error.requestId}`);
     }
     return;
   }

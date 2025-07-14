@@ -37,7 +37,8 @@ import {
   Linkedin
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, uploadResume } from '../lib/supabase';
+import { supabase, uploadResume, uploadAvatar } from '../lib/supabase';
+import { getPlanNameByPriceId } from '../stripe-config';
 import { extractTextFromPDF } from '../lib/pdfExtractor';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -49,6 +50,7 @@ interface Profile {
   email?: string | null;
   phone: string | null;
   resume_url: string | null;
+  avatar_url: string;
   created_at: string;
 }
 
@@ -58,6 +60,7 @@ const ProfilePage: React.FC = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   
   const [activeTab, setActiveTab] = useState<TabType>('general');
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -78,6 +81,16 @@ const ProfilePage: React.FC = () => {
     confirmPassword: ''
   });
   const [passwordLoading, setPasswordLoading] = useState(false);
+  
+  // Stats state
+  const [profileStats, setProfileStats] = useState({
+    totalApplications: 0,
+    totalInterviews: 0,
+    successRate: 0
+  });
+  
+  // Subscription state
+  const [subscriptionPlan, setSubscriptionPlan] = useState<string>('Free');
 
   // Form data
   const [formData, setFormData] = useState({
@@ -114,6 +127,8 @@ const ProfilePage: React.FC = () => {
 
   useEffect(() => {
     fetchProfile();
+    fetchProfileStats();
+    fetchSubscription();
     // Set up autosave
     const autosaveInterval = setInterval(() => {
       if (hasUnsavedChanges) {
@@ -181,6 +196,69 @@ const ProfilePage: React.FC = () => {
     }
   };
 
+  const fetchProfileStats = async () => {
+    if (!user) return;
+    
+    try {
+      // Get total applications
+      const { count: totalCount } = await supabase
+        .from('applications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+
+      // Get interview and OA applications
+      const { count: interviewCount } = await supabase
+        .from('applications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .in('status', ['INTERVIEW', 'OA']);
+
+      // Calculate success rate
+      const successRate = totalCount && totalCount > 0 
+        ? Math.round(((interviewCount || 0) / totalCount) * 100)
+        : 0;
+
+      setProfileStats({
+        totalApplications: totalCount || 0,
+        totalInterviews: interviewCount || 0,
+        successRate
+      });
+    } catch (error) {
+      console.error('Error fetching profile stats:', error);
+    }
+  };
+  
+  const fetchSubscription = async () => {
+    if (!user) return;
+    
+    try {
+      // Fetch subscription using the same view as billing page
+      const { data: subData, error: subError } = await supabase
+        .from('stripe_user_subscriptions')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (subError) {
+        console.error('Error fetching subscription:', subError);
+        setSubscriptionPlan('Free');
+        return;
+      }
+
+      if (!subData || !subData.price_id || subData.subscription_status !== 'active') {
+        setSubscriptionPlan('Free');
+        return;
+      }
+
+      // Get plan name from price ID
+      const planName = getPlanNameByPriceId(subData.price_id);
+      setSubscriptionPlan(planName || 'Free');
+    } catch (error) {
+      console.error('Error fetching subscription:', error);
+      setSubscriptionPlan('Free');
+    }
+  };
+
   const handleSave = async (isAutosave = false) => {
     setSaving(true);
     try {
@@ -241,6 +319,53 @@ const ProfilePage: React.FC = () => {
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setHasUnsavedChanges(true);
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Please select an image smaller than 5MB');
+      return;
+    }
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Please select a valid image file (JPG, PNG, GIF, or WebP)');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const avatarUrl = await uploadAvatar(user!.id, file);
+      
+      if (!avatarUrl) {
+        toast.error('Failed to upload avatar');
+        return;
+      }
+
+      // Update profile with new avatar URL
+      const { error } = await supabase
+        .from('profiles')
+        .update({ avatar_url: avatarUrl })
+        .eq('user_id', user!.id);
+
+      if (error) {
+        console.error('Error updating avatar:', error);
+        toast.error('Failed to update profile picture');
+      } else {
+        setProfile(prev => prev ? { ...prev, avatar_url: avatarUrl } : null);
+        toast.success('Profile picture updated successfully');
+      }
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      toast.error('Failed to upload profile picture');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleResumeUpload = async (file: File) => {
@@ -556,9 +681,17 @@ const ProfilePage: React.FC = () => {
                 </h2>
                 
                 {/* Plan Badge */}
-                <div className="mt-2 inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                <div className={`mt-2 inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                  subscriptionPlan === 'Free' 
+                    ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                    : subscriptionPlan === 'Pro' 
+                    ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
+                    : subscriptionPlan === 'Premium'
+                    ? 'bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300'
+                    : 'bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300'
+                }`}>
                   <Crown className="h-3 w-3 mr-1" />
-                  Free Plan
+                  {subscriptionPlan} Plan
                 </div>
                 
                 <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
@@ -574,15 +707,15 @@ const ProfilePage: React.FC = () => {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-500 dark:text-gray-400">Applications</span>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">0</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">{profileStats.totalApplications}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-500 dark:text-gray-400">Interviews</span>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">0</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">{profileStats.totalInterviews}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-500 dark:text-gray-400">Success Rate</span>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">0%</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">{profileStats.successRate}%</span>
                   </div>
                 </div>
               </div>
@@ -644,6 +777,46 @@ const ProfilePage: React.FC = () => {
                       transition={{ duration: 0.2 }}
                       className="space-y-6"
                     >
+                      {/* Avatar Section */}
+                      <div className="mb-8">
+                        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                          Profile Picture
+                        </h3>
+                        <div className="flex items-center space-x-6">
+                          <div className="relative">
+                            <img
+                              src={profile?.avatar_url || `https://api.dicebear.com/7.x/notionists/svg?seed=${user?.id}`}
+                              alt="Avatar"
+                              className="w-24 h-24 rounded-full object-cover border-4 border-gray-200 dark:border-gray-700"
+                            />
+                            <button
+                              onClick={() => avatarInputRef.current?.click()}
+                              className="absolute -bottom-2 -right-2 p-2 bg-teal-600 text-white rounded-full hover:bg-teal-700 transition-colors shadow-lg"
+                            >
+                              <Camera className="h-4 w-4" />
+                            </button>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                              Upload a professional photo for your profile
+                            </p>
+                            <button
+                              onClick={() => avatarInputRef.current?.click()}
+                              className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm font-medium"
+                            >
+                              Change Photo
+                            </button>
+                          </div>
+                          <input
+                            ref={avatarInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleAvatarUpload}
+                            className="hidden"
+                          />
+                        </div>
+                      </div>
+
                       <div>
                         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
                           Account Information

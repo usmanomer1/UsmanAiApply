@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Check, X, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import DOMPurify from 'dompurify';
 
 export interface MappedSuggestion {
   id: string;
@@ -331,7 +332,7 @@ export const ResumeViewer: React.FC<ResumeViewerProps> = ({
             transformOrigin: 'top center',
             width: 'fit-content'
           }}
-          dangerouslySetInnerHTML={{ __html: processedHtmlContent }}
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(processedHtmlContent) }}
         />
       </div>
 

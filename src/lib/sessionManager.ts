@@ -34,7 +34,7 @@ export class SessionManager {
       };
       
       localStorage.setItem(this.config.storageKey, JSON.stringify(sessionInfo));
-      console.log('✅ LinkedIn session stored successfully');
+      // console.log('✅ LinkedIn session stored successfully');
     } catch (error) {
       console.warn('Failed to store LinkedIn session:', error);
     }
@@ -52,7 +52,7 @@ export class SessionManager {
       
       // Check if session is for the right email
       if (sessionData.email !== email.toLowerCase().trim()) {
-        console.log('Session email mismatch, clearing stored session');
+        // console.log('Session email mismatch, clearing stored session');
         this.clearSession();
         return null;
       }
@@ -60,7 +60,7 @@ export class SessionManager {
       // Check if session is still valid (not expired)
       const isValid = Date.now() - sessionData.timestamp < this.config.maxSessionAge;
       if (!isValid) {
-        console.log('Session expired, clearing stored session');
+        // console.log('Session expired, clearing stored session');
         this.clearSession();
         return null;
       }
@@ -86,7 +86,7 @@ export class SessionManager {
   clearSession(): void {
     try {
       localStorage.removeItem(this.config.storageKey);
-      console.log('LinkedIn session cleared');
+      // console.log('LinkedIn session cleared');
     } catch (error) {
       console.warn('Failed to clear LinkedIn session:', error);
     }

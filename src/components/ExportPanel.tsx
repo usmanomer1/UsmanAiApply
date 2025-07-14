@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Download, FileText, Loader2, Check, X, Eye, AlertCircle } from 'lucide-react';
 import { MappedSuggestion } from './ResumeViewer';
 import toast from 'react-hot-toast';
+import DOMPurify from 'dompurify';
 
 interface ExportPanelProps {
   sessionId: string | null;
@@ -357,7 +358,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
                 <div className="max-w-3xl mx-auto bg-white shadow-lg rounded-lg">
                   <div 
                     className="p-8 resume-preview"
-                    dangerouslySetInnerHTML={{ __html: getFinalHtml() }}
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(getFinalHtml()) }}
                   />
                 </div>
               </div>
