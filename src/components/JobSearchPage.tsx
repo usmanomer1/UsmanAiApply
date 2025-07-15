@@ -77,6 +77,33 @@ const JobSearchPage: React.FC = () => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [usageStats, setUsageStats] = useState<{ jobsViewed: number; jobLimit: number }>({ jobsViewed: 0, jobLimit: 100 });
 
+  // Compute filtered jobs based on activeTab and filters
+  const filteredJobs = jobs.filter(job => {
+    // First filter by tab
+    if (activeTab === 'liked') return savedJobs.has(job.job_id);
+    if (activeTab === 'applied') return appliedJobs.has(job.job_id);
+    
+    // For 'recommended' tab, apply additional filters
+    if (filters.employment_types.length > 0 && !filters.employment_types.includes(job.job_employment_type)) return false;
+    if (filters.remote_jobs_only && !job.job_is_remote) return false;
+    if (filters.date_posted) {
+      const postedDate = new Date(job.job_posted_at_datetime_utc);
+      const now = new Date();
+      const diffDays = Math.floor((now.getTime() - postedDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      switch(filters.date_posted) {
+        case 'today': if (diffDays > 1) return false; break;
+        case '3days': if (diffDays > 3) return false; break;
+        case 'week': if (diffDays > 7) return false; break;
+        case 'month': if (diffDays > 30) return false; break;
+        case 'all': break; // Show all
+      }
+    }
+    
+    // Note: Experience level filtering would require the API to return this data
+    return true;
+  });
+
   // Load saved job interactions and usage stats
   useEffect(() => {
     const loadJobInteractionsAndUsage = async () => {
@@ -738,9 +765,38 @@ const JobSearchPage: React.FC = () => {
 
   // Function to load more jobs for infinite scroll
   const loadMoreJobs = useCallback(async () => {
-    if (loadingMore || !hasMore || !sessionId) return;
-    if (totalPages > 0 && currentPage >= totalPages) return;
-    if (!searchQuery || searchQuery.trim() === '') return;
+    console.log('loadMoreJobs called with state:', {
+      loadingMore,
+      hasMore,
+      sessionId,
+      totalPages,
+      currentPage,
+      searchQuery,
+      location
+    });
+    
+    if (loadingMore) {
+      console.log('Blocked: loadingMore is true');
+      return;
+    }
+    if (!hasMore) {
+      console.log('Blocked: hasMore is false');
+      return;
+    }
+    if (!sessionId) {
+      console.log('Blocked: no sessionId');
+      return;
+    }
+    if (totalPages > 0 && currentPage >= totalPages) {
+      console.log('Blocked: already at last page');
+      return;
+    }
+    if (!searchQuery || searchQuery.trim() === '') {
+      console.log('Blocked: no searchQuery');
+      return;
+    }
+    
+    console.log('All checks passed, making API call...');
 
     setLoadingMore(true);
     const nextPage = currentPage + 1;
@@ -1132,33 +1188,9 @@ const JobSearchPage: React.FC = () => {
           </div>
         )}
 
-        {!loading && !initializing && jobs.length > 0 && (
+        {!loading && !initializing && filteredJobs.length > 0 && (
           <div className="grid gap-4">
-            {jobs.filter(job => {
-              if (activeTab === 'liked') return savedJobs.has(job.job_id);
-              if (activeTab === 'applied') return appliedJobs.has(job.job_id);
-              return true;
-            }).filter(job => {
-              // Apply filters
-              if (filters.employment_types.length > 0 && !filters.employment_types.includes(job.job_employment_type)) return false;
-              if (filters.remote_jobs_only && !job.job_is_remote) return false;
-              if (filters.date_posted) {
-                const postedDate = new Date(job.job_posted_at_datetime_utc);
-                const now = new Date();
-                const diffDays = Math.floor((now.getTime() - postedDate.getTime()) / (1000 * 60 * 60 * 24));
-                
-                switch(filters.date_posted) {
-                  case 'today': if (diffDays > 1) return false; break;
-                  case '3days': if (diffDays > 3) return false; break;
-                  case 'week': if (diffDays > 7) return false; break;
-                  case 'month': if (diffDays > 30) return false; break;
-                  case 'all': break; // Show all
-                }
-              }
-              
-              // Note: Experience level filtering would require the API to return this data
-              return true;
-            }).map((job, index) => (
+            {filteredJobs.map((job, index) => (
               <motion.div
                 key={job.job_id}
                 initial={{ opacity: 0, y: 20 }}
@@ -1346,7 +1378,7 @@ const JobSearchPage: React.FC = () => {
           
 
         {/* Infinite Scroll Loading */}
-        {!loading && !initializing && jobs.length > 0 && (
+        {!loading && !initializing && jobs.length > 0 && activeTab === 'recommended' && (
           <>
             {/* Show loading state when loading more */}
             {loadingMore && (
@@ -1365,7 +1397,10 @@ const JobSearchPage: React.FC = () => {
                   Showing {jobs.length} jobs • Page {currentPage} of {totalPages || '?'}
                 </p>
                 <button
-                  onClick={loadMoreJobs}
+                  onClick={() => {
+                    console.log('Load More button clicked!');
+                    loadMoreJobs();
+                  }}
                   className="px-6 py-3 bg-teal-600 text-white font-medium rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-2 mx-auto"
                 >
                   Load More Jobs
