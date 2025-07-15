@@ -40,6 +40,13 @@ exports.handler = async (event, context) => {
         body: JSON.stringify({ error: 'Endpoint is required' }),
       };
     }
+    
+    console.log('Jobotic API Proxy:', {
+      endpoint,
+      method: event.httpMethod,
+      hasAuthHeader: !!(event.headers.authorization || event.headers.Authorization),
+      apiKeySet: !!API_KEY
+    });
 
     // Extract authorization header if present (for endpoints requiring auth)
     const headers = {
@@ -48,8 +55,10 @@ exports.handler = async (event, context) => {
     };
     
     // Pass through Authorization header if present
-    if (event.headers.authorization) {
-      headers['Authorization'] = event.headers.authorization;
+    // Netlify normalizes headers to lowercase
+    if (event.headers.authorization || event.headers.Authorization) {
+      headers['Authorization'] = event.headers.authorization || event.headers.Authorization;
+      console.log('Passing through auth header');
     }
 
     // Make the request to Jobotic API
