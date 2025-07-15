@@ -150,9 +150,10 @@ class JoboticApiService {
     const isNetlifyFunction = USE_NETLIFY_FUNCTION;
     const url = isNetlifyFunction ? '/.netlify/functions/jobotic-api' : `${API_BASE_URL}${endpoint}`;
     
-    console.log(`Making request to: ${url}`);
-    console.log('Using Netlify function:', isNetlifyFunction);
-    console.log('Requires auth:', options.requiresAuth);
+    // Only log in development
+    if (import.meta.env.DEV) {
+      console.log(`Making request to: ${url}`);
+    }
     
     const requestBody = isNetlifyFunction 
       ? { endpoint, ...data }
@@ -173,20 +174,13 @@ class JoboticApiService {
     if (options.requiresAuth) {
       const { supabase } = await import('./supabase');
       const { data: { session } } = await supabase.auth.getSession();
-      console.log('Supabase session check:', { 
-        hasSession: !!session, 
-        hasToken: !!session?.access_token,
-        tokenPreview: session?.access_token ? session.access_token.substring(0, 20) + '...' : 'none'
-      });
       if (session?.access_token) {
         headers['Authorization'] = `Bearer ${session.access_token}`;
-        console.log('Added auth header to request');
       } else {
         console.warn('No session token available - user may not be logged in');
       }
     }
     
-    console.log('Sending request with headers:', Object.keys(headers));
     
     const response = await fetch(url, {
       method: options.method || 'POST',
@@ -227,15 +221,7 @@ class JoboticApiService {
         // Ignore if we can't read the error body
       }
       
-      console.error('API Error Details:', {
-        status: response.status,
-        endpoint,
-        errorDetail,
-        errorJson,
-        requestId,
-        isNetlifyFunction,
-        hasAuth: !!headers['Authorization']
-      });
+      console.error(`API Error: ${response.status} on ${endpoint}${errorDetail}`);
       
       const error = new Error(`API request failed: ${response.status}${errorDetail}`);
       (error as any).status = response.status;

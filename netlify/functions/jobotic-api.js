@@ -54,15 +54,8 @@ exports.handler = async (event, context) => {
       };
     }
     
-    console.log('Jobotic API Proxy:', {
-      endpoint,
-      method: event.httpMethod,
-      hasAuthHeader: !!(event.headers.authorization || event.headers.Authorization),
-      apiKeySet: !!API_KEY,
-      apiUrl: API_URL,
-      authHeaderPreview: event.headers.authorization ? event.headers.authorization.substring(0, 20) + '...' : 'none',
-      allHeaders: Object.keys(event.headers)
-    });
+    // Keep minimal logging for production debugging
+    console.log(`Jobotic API Proxy: ${event.httpMethod} ${endpoint}`);
 
     // Extract authorization header if present (for endpoints requiring auth)
     const headers = {
@@ -80,18 +73,9 @@ exports.handler = async (event, context) => {
       } else {
         headers['Authorization'] = `Bearer ${authHeader}`;
       }
-      console.log('Passing through auth header:', headers['Authorization'].substring(0, 30) + '...');
     }
     
     const fullUrl = `${API_URL}${endpoint}`;
-    console.log('Sending to backend:', {
-      url: fullUrl,
-      method: event.httpMethod,
-      headers: {
-        ...headers,
-        'Authorization': headers['Authorization'] ? headers['Authorization'].substring(0, 30) + '...' : 'NOT SET'
-      }
-    });
 
     // Make the request to Jobotic API
     const response = await fetch(fullUrl, {
@@ -103,10 +87,7 @@ exports.handler = async (event, context) => {
     const data = await response.json();
     
     if (!response.ok) {
-      console.log('API Error Response:', {
-        status: response.status,
-        data: JSON.stringify(data).substring(0, 200)
-      });
+      console.error(`API Error Response: ${response.status}`);
     }
 
     return {
@@ -119,7 +100,7 @@ exports.handler = async (event, context) => {
       body: JSON.stringify(data),
     };
   } catch (error) {
-    console.error('Jobotic API error:', error);
+    console.error('Jobotic API proxy error:', error.message || error);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: 'Internal server error' }),
