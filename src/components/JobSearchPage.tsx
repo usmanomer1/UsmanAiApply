@@ -698,8 +698,18 @@ const JobSearchPage: React.FC = () => {
 
   // Function to load more jobs for infinite scroll
   const loadMoreJobs = useCallback(async () => {
-    console.log('loadMoreJobs called:', { loadingMore, hasMore, sessionId, currentPage, totalPages });
-    if (loadingMore || !hasMore || !sessionId || currentPage >= totalPages) return;
+    console.log('loadMoreJobs called:', { 
+      loadingMore, 
+      hasMore, 
+      sessionId, 
+      currentPage, 
+      totalPages,
+      willLoad: !loadingMore && hasMore && sessionId && currentPage < totalPages
+    });
+    
+    if (loadingMore || !hasMore || !sessionId) return;
+    if (totalPages > 0 && currentPage >= totalPages) return;
+    if (!searchQuery && !location) return; // Need at least one search parameter
 
     setLoadingMore(true);
     const nextPage = currentPage + 1;
@@ -782,7 +792,14 @@ const JobSearchPage: React.FC = () => {
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        console.log('Intersection observed:', entries[0].isIntersecting, { hasMore, loadingMore });
+        console.log('Intersection observed:', {
+          isIntersecting: entries[0].isIntersecting,
+          hasMore,
+          loadingMore,
+          currentPage,
+          totalPages,
+          jobsLength: jobs.length
+        });
         if (entries[0].isIntersecting && hasMore && !loadingMore) {
           loadMoreJobs();
         }
@@ -791,7 +808,14 @@ const JobSearchPage: React.FC = () => {
     );
 
     const sentinel = document.getElementById('scroll-sentinel');
-    console.log('Sentinel element:', sentinel);
+    console.log('Setting up observer:', { 
+      sentinelExists: !!sentinel, 
+      hasMore, 
+      currentPage, 
+      totalPages,
+      activeTab
+    });
+    
     if (sentinel) {
       observer.observe(sentinel);
     }
@@ -801,7 +825,7 @@ const JobSearchPage: React.FC = () => {
         observer.unobserve(sentinel);
       }
     };
-  }, [hasMore, loadingMore, currentPage, totalPages, sessionId, searchQuery, location, filters, resumeText, jobs.length]);
+  }, [hasMore, loadingMore, currentPage, totalPages, sessionId, searchQuery, location, filters, resumeText, jobs.length, loadMoreJobs, activeTab]);
 
   return (
     <>
@@ -1323,27 +1347,31 @@ const JobSearchPage: React.FC = () => {
           
         {/* Infinite Scroll Loading - Show only for recommended tab */}
         {!loading && !initializing && jobs.length > 0 && activeTab === 'recommended' && (
-            <>
-              <div id="scroll-sentinel" className="h-32 bg-gradient-to-b from-transparent to-gray-100/50 mt-4">
-                <div className="flex items-center justify-center h-full">
-                  <p className="text-sm text-gray-400">Scroll down to load more jobs</p>
+          <>
+            {/* Show loading state when loading more */}
+            {loadingMore && (
+              <div className="flex items-center justify-center py-8 mt-4">
+                <div className="flex items-center gap-3">
+                  <Loader2 className="h-5 w-5 animate-spin text-teal-600" />
+                  <span className="text-gray-600 font-medium">Loading more jobs...</span>
                 </div>
               </div>
-              {loadingMore && (
-                <div className="flex items-center justify-center py-8 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <Loader2 className="h-5 w-5 animate-spin text-teal-600" />
-                    <span className="text-gray-600 font-medium">Loading more jobs...</span>
-                  </div>
-                </div>
-              )}
-              {!hasMore && jobs.length >= 10 && (
-                <div className="text-center py-8 bg-gray-50 rounded-lg">
-                  <p className="text-gray-500">No more jobs to load</p>
-                </div>
-              )}
-            </>
-          )}
+            )}
+            
+            {/* Show sentinel when there are more pages to load */}
+            {hasMore && (
+              <div id="scroll-sentinel" className="h-20 mt-4" />
+            )}
+            
+            {/* Show end message only when we've loaded all pages */}
+            {!hasMore && totalPages > 1 && (
+              <div className="text-center py-8 bg-gray-50 rounded-lg mt-4">
+                <p className="text-gray-500 font-medium">You've reached the end</p>
+                <p className="text-sm text-gray-400 mt-1">No more jobs to load</p>
+              </div>
+            )}
+          </>
+        )}
 
         {/* Empty State */}
         {!loading && !initializing && jobs.length === 0 && !error && (
