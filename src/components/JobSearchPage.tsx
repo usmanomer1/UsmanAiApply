@@ -293,6 +293,10 @@ const JobSearchPage: React.FC = () => {
                 };
 
                 setLoading(true);
+                // Set session ID for infinite scroll
+                setSessionId(Date.now().toString());
+                setHasMore(true);
+                setCurrentOffset(0);
                 try {
                   // Use basic search for initial load (no AI token requirement)
                   const response = await joboticApi.searchJobsBasic(request);
@@ -319,6 +323,10 @@ const JobSearchPage: React.FC = () => {
                 };
 
                 setLoading(true);
+                // Set session ID for infinite scroll
+                setSessionId(Date.now().toString());
+                setHasMore(true);
+                setCurrentOffset(0);
                 try {
                   // Use basic search for default search (no AI token requirement)
                   const response = await joboticApi.searchJobsBasic(request);
