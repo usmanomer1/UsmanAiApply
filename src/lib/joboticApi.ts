@@ -165,14 +165,15 @@ class JoboticApiService {
     if (!isNetlifyFunction) {
       // Always add X-API-Key for direct API calls
       headers['X-API-Key'] = this.apiKey;
-      
-      // Add Bearer token for endpoints that require authentication
-      if (options.requiresAuth) {
-        const { supabase } = await import('./supabase');
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.access_token) {
-          headers['Authorization'] = `Bearer ${session.access_token}`;
-        }
+    }
+    
+    // Add Bearer token for endpoints that require authentication
+    // This works for both Netlify function and direct API calls
+    if (options.requiresAuth) {
+      const { supabase } = await import('./supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
       }
     }
     
@@ -242,7 +243,27 @@ class JoboticApiService {
   
   // Get job details - only requires X-API-Key
   async getJobDetails(jobId: string): Promise<any> {
-    return this.makeRequest<any>(`/api/jobs/${jobId}`, null, { method: 'GET', requiresAuth: false });
+    const isNetlifyFunction = USE_NETLIFY_FUNCTION;
+    if (isNetlifyFunction) {
+      // For Netlify function with GET method, we need to pass endpoint as query param
+      const url = `/.netlify/functions/jobotic-api?endpoint=/api/jobs/${jobId}`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        const error = new Error(`API request failed: ${response.status}`);
+        (error as any).status = response.status;
+        throw error;
+      }
+      
+      return response.json();
+    } else {
+      return this.makeRequest<any>(`/api/jobs/${jobId}`, null, { method: 'GET', requiresAuth: false });
+    }
   }
   
   // Get salary estimate - only requires X-API-Key

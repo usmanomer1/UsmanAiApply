@@ -1,7 +1,7 @@
 // Jobotic API proxy function
 exports.handler = async (event, context) => {
-  // Only allow POST requests
-  if (event.httpMethod !== 'POST') {
+  // Only allow POST and GET requests
+  if (event.httpMethod !== 'POST' && event.httpMethod !== 'GET') {
     return {
       statusCode: 405,
       body: JSON.stringify({ error: 'Method not allowed' }),
@@ -20,7 +20,19 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    const { endpoint, ...body } = JSON.parse(event.body || '{}');
+    let endpoint, body;
+    
+    if (event.httpMethod === 'GET') {
+      // For GET requests, extract endpoint from query parameters
+      endpoint = event.queryStringParameters?.endpoint;
+      body = null;
+    } else {
+      // For POST requests, parse the body
+      const parsed = JSON.parse(event.body || '{}');
+      endpoint = parsed.endpoint;
+      body = parsed;
+      delete body.endpoint; // Remove endpoint from body
+    }
     
     if (!endpoint) {
       return {
@@ -29,14 +41,22 @@ exports.handler = async (event, context) => {
       };
     }
 
+    // Extract authorization header if present (for endpoints requiring auth)
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-API-Key': API_KEY,
+    };
+    
+    // Pass through Authorization header if present
+    if (event.headers.authorization) {
+      headers['Authorization'] = event.headers.authorization;
+    }
+
     // Make the request to Jobotic API
     const response = await fetch(`${API_URL}${endpoint}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': API_KEY,
-      },
-      body: JSON.stringify(body),
+      method: event.httpMethod,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
     });
 
     const data = await response.json();
