@@ -1,5 +1,18 @@
 // Jobotic API proxy function
 exports.handler = async (event, context) => {
+  // Handle CORS preflight
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      },
+      body: '',
+    };
+  }
+
   // Only allow POST and GET requests
   if (event.httpMethod !== 'POST' && event.httpMethod !== 'GET') {
     return {
@@ -59,13 +72,29 @@ exports.handler = async (event, context) => {
     
     // Pass through Authorization header if present
     // Netlify normalizes headers to lowercase
-    if (event.headers.authorization || event.headers.Authorization) {
-      headers['Authorization'] = event.headers.authorization || event.headers.Authorization;
-      console.log('Passing through auth header');
+    const authHeader = event.headers.authorization || event.headers.Authorization;
+    if (authHeader) {
+      // Ensure it starts with "Bearer " (with capital B)
+      if (authHeader.toLowerCase().startsWith('bearer ')) {
+        headers['Authorization'] = authHeader;
+      } else {
+        headers['Authorization'] = `Bearer ${authHeader}`;
+      }
+      console.log('Passing through auth header:', headers['Authorization'].substring(0, 30) + '...');
     }
+    
+    const fullUrl = `${API_URL}${endpoint}`;
+    console.log('Sending to backend:', {
+      url: fullUrl,
+      method: event.httpMethod,
+      headers: {
+        ...headers,
+        'Authorization': headers['Authorization'] ? headers['Authorization'].substring(0, 30) + '...' : 'NOT SET'
+      }
+    });
 
     // Make the request to Jobotic API
-    const response = await fetch(`${API_URL}${endpoint}`, {
+    const response = await fetch(fullUrl, {
       method: event.httpMethod,
       headers,
       body: body ? JSON.stringify(body) : undefined,
@@ -84,6 +113,8 @@ exports.handler = async (event, context) => {
       statusCode: response.status,
       headers: {
         'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       },
       body: JSON.stringify(data),
     };
