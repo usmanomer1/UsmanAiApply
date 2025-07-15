@@ -291,16 +291,54 @@ const JobSearchPage: React.FC = () => {
                 setCurrentOffset(0);
                 
                 try {
-                  // Temporarily use basic search to test if the API is working
-                  const basicRequest: JobSearchRequest = {
-                    query: primaryRole,
-                    location: primaryLocation || undefined,
-                    page: 1,
-                    num_pages: 1
-                  };
-                  const response = await joboticApi.searchJobsBasic(basicRequest);
-                  console.log('Basic auto-search response:', response.data?.jobs?.[0]);
-                  setJobs(response.data?.jobs || []);
+                  if (text && text.length > 100) {
+                    // We have a resume, use AI search to get match scores
+                    const { allowed } = await canPerformAIOperation(user.id);
+                    if (allowed) {
+                      const aiRequest: JobMatchRequest = {
+                        resumeText: text,
+                        query: primaryRole,
+                        location: primaryLocation || undefined,
+                        page: 1,
+                        num_pages: 1
+                      };
+                      const response = await joboticApi.searchJobs(aiRequest);
+                      console.log('AI auto-search response:', response.data?.jobs?.[0]);
+                      setJobs(response.data?.jobs || []);
+                      
+                      // Track AI usage
+                      if (response.data?.jobs && response.data.jobs.length > 0) {
+                        await trackAITokens(user.id, 'job_search_match', {
+                          jobTitle: primaryRole,
+                          location: primaryLocation || 'Not specified',
+                          resultsCount: response.data.jobs.length,
+                          isAutoSearch: true
+                        });
+                      }
+                    } else {
+                      // Fall back to basic search if no AI tokens
+                      const basicRequest: JobSearchRequest = {
+                        query: primaryRole,
+                        location: primaryLocation || undefined,
+                        page: 1,
+                        num_pages: 1
+                      };
+                      const response = await joboticApi.searchJobsBasic(basicRequest);
+                      console.log('Basic auto-search response:', response.data?.jobs?.[0]);
+                      setJobs(response.data?.jobs || []);
+                    }
+                  } else {
+                    // No resume, use basic search
+                    const basicRequest: JobSearchRequest = {
+                      query: primaryRole,
+                      location: primaryLocation || undefined,
+                      page: 1,
+                      num_pages: 1
+                    };
+                    const response = await joboticApi.searchJobsBasic(basicRequest);
+                    console.log('Basic auto-search response:', response.data?.jobs?.[0]);
+                    setJobs(response.data?.jobs || []);
+                  }
                   setInitialLoad(false);
                 } catch (err) {
                   console.error('Auto-search error:', err);

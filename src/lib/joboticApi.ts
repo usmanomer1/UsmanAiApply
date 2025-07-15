@@ -173,13 +173,20 @@ class JoboticApiService {
     if (options.requiresAuth) {
       const { supabase } = await import('./supabase');
       const { data: { session } } = await supabase.auth.getSession();
+      console.log('Supabase session check:', { 
+        hasSession: !!session, 
+        hasToken: !!session?.access_token,
+        tokenPreview: session?.access_token ? session.access_token.substring(0, 20) + '...' : 'none'
+      });
       if (session?.access_token) {
         headers['Authorization'] = `Bearer ${session.access_token}`;
-        console.log('Added auth header');
+        console.log('Added auth header to request');
       } else {
-        console.warn('No session token available');
+        console.warn('No session token available - user may not be logged in');
       }
     }
+    
+    console.log('Sending request with headers:', Object.keys(headers));
     
     const response = await fetch(url, {
       method: options.method || 'POST',
