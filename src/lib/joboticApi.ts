@@ -31,31 +31,19 @@ interface JobMatchRequest {
   jobTitle?: string;
   location?: string;
   
-  // Pagination for infinite scroll
-  limit?: number;
-  offset?: number;
-  session_id?: string;
-  
-  // Pages to fetch from JSearch
+  // Pagination
   page?: number;
   num_pages?: number;
+  
+  // Session tracking
+  session_id?: string;
+  offset?: number;
   
   // Filters
   date_posted?: 'all' | 'today' | '3days' | 'week' | 'month';
   remote_jobs_only?: boolean;
   employment_types?: ('FULLTIME' | 'PARTTIME' | 'INTERN' | 'CONTRACTOR')[];
   job_requirements?: ('no_exp' | 'under_3_years_exp' | 'more_than_3_years_exp' | 'no_degree' | 'fair_chance')[];
-  
-  // AI Filtering
-  min_score?: number;
-  
-  // Legacy preferences support
-  preferences?: {
-    jobTitle?: string;
-    location?: string;
-    keywords?: string[];
-    datePosted?: string;
-  };
 }
 
 // PDF Export Types
@@ -102,7 +90,14 @@ interface JobMatchResponse {
       match_reasons: string[];
       missing_skills: string[];
       key_strengths: string[];
-      // New fields from backend update
+      job_apply_is_direct?: boolean;
+      // Salary estimate when available
+      salary_estimate?: {
+        min: number;
+        max: number;
+        median: number;
+      };
+      // Additional fields
       job_highlights?: {
         Qualifications?: string[];
         Responsibilities?: string[];
@@ -112,31 +107,43 @@ interface JobMatchResponse {
       job_offer_expiration_timestamp?: number;
       application_deadline_days?: number;
     }>;
+    // Updated pagination info per new API
     totalFound: number;
-    totalMatched: number;
+    jobsReturned: number;
     currentPage: number;
+    pagesReturned: number;
     totalPages: number;
-    hasMore?: boolean; // New field from backend
-    resultsPerPage?: number; // New field from backend
+    hasMore: boolean;
+    jobsPerPage: number;
+    // Search criteria echo
     searchCriteria: {
-      query: string;
+      query?: string;
       jobTitle?: string;
       location?: string;
       datePosted?: string;
       remote?: boolean;
+      employmentTypes?: string[];
     };
-    timestamp: string;
   };
+  // Enhanced usage tracking
+  usage?: {
+    // API usage
+    credits_used: number;
+    pages_fetched: number;
+    jobs_processed: number;
+    ai_batches: number;
+    // User limits
+    plan: string;
+    monthly_limit: number;
+    monthly_used: number;
+    remaining: number | 'unlimited';
+  };
+  session_id?: string;
   timing?: {
     total: number;
     search: number;
     matching: string;
     fromCache: boolean;
-  };
-  usage?: { // New usage tracking from backend
-    monthly_limit: number;
-    monthly_used: number;
-    remaining: number | 'unlimited';
   };
 }
 

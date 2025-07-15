@@ -77,31 +77,11 @@ const JobSearchPage: React.FC = () => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [usageStats, setUsageStats] = useState<{ jobsViewed: number; jobLimit: number }>({ jobsViewed: 0, jobLimit: 100 });
 
-  // Compute filtered jobs based on activeTab and filters
-  const filteredJobs = jobs.filter(job => {
-    // First filter by tab
+  // Filter jobs based on activeTab only (backend handles other filters)
+  const displayedJobs = jobs.filter(job => {
     if (activeTab === 'liked') return savedJobs.has(job.job_id);
     if (activeTab === 'applied') return appliedJobs.has(job.job_id);
-    
-    // For 'recommended' tab, apply additional filters
-    if (filters.employment_types.length > 0 && !filters.employment_types.includes(job.job_employment_type)) return false;
-    if (filters.remote_jobs_only && !job.job_is_remote) return false;
-    if (filters.date_posted) {
-      const postedDate = new Date(job.job_posted_at_datetime_utc);
-      const now = new Date();
-      const diffDays = Math.floor((now.getTime() - postedDate.getTime()) / (1000 * 60 * 60 * 24));
-      
-      switch(filters.date_posted) {
-        case 'today': if (diffDays > 1) return false; break;
-        case '3days': if (diffDays > 3) return false; break;
-        case 'week': if (diffDays > 7) return false; break;
-        case 'month': if (diffDays > 30) return false; break;
-        case 'all': break; // Show all
-      }
-    }
-    
-    // Note: Experience level filtering would require the API to return this data
-    return true;
+    return activeTab === 'recommended'; // Show all jobs for recommended tab
   });
 
   // Load saved job interactions and usage stats
@@ -314,83 +294,45 @@ const JobSearchPage: React.FC = () => {
                 // Perform auto-search - use AI search if we have resume for match scores
                 setLoading(true);
                 // Set session ID for infinite scroll
-                setSessionId(Date.now().toString());
+                const newSessionId = Date.now().toString();
+                setSessionId(newSessionId);
                 setHasMore(true);
                 setCurrentPage(1);
                 
                 try {
-                  if (text && text.length > 100) {
-                    // We have a resume, use AI search to get match scores
-                    const { allowed } = await canPerformAIOperation(user.id);
-                    if (allowed) {
-                      const aiRequest: JobMatchRequest = {
-                        resumeText: text,
-                        query: primaryRole,
-                        location: primaryLocation || undefined,
-                        page: 1,
-                        num_pages: 1
-                      };
-                      const response = await joboticApi.searchJobs(aiRequest);
-                      const jobs = response.data?.jobs || [];
-                      setJobs(jobs);
-                      // Use hasMore flag from API with fallback logic
-                      const apiHasMore = response.data?.hasMore;
-                      const totalPagesValue = response.data?.totalPages || 1;
-                      const currentPageValue = response.data?.currentPage || 1;
-                      
-                      // If API doesn't provide hasMore, calculate it based on totalPages
-                      const calculatedHasMore = apiHasMore !== undefined ? apiHasMore : currentPageValue < totalPagesValue;
-                      
-                      setHasMore(calculatedHasMore);
-                      setTotalPages(totalPagesValue);
-                      setCurrentPage(currentPageValue);
-                      
-                      // Track AI usage
-                      if (response.data?.jobs && response.data.jobs.length > 0) {
-                        await trackAITokens(user.id, 'job_search_match', {
-                          jobTitle: primaryRole,
-                          location: primaryLocation || 'Not specified',
-                          resultsCount: response.data.jobs.length,
-                          isAutoSearch: true
-                        });
-                      }
-                    } else {
-                      // Fall back to basic search if no AI tokens
-                      const basicRequest: JobSearchRequest = {
-                        query: primaryRole,
-                        location: primaryLocation || undefined,
-                        page: 1,
-                        num_pages: 1
-                      };
-                      const response = await joboticApi.searchJobsBasic(basicRequest);
-                      const jobs = response.data?.jobs || [];
-                      setJobs(jobs);
-                      // Use hasMore flag from API with fallback logic
-                      const apiHasMore = response.data?.hasMore;
-                      const totalPagesValue = response.data?.totalPages || 1;
-                      const currentPageValue = response.data?.currentPage || 1;
-                      const calculatedHasMore = apiHasMore !== undefined ? apiHasMore : currentPageValue < totalPagesValue;
-                      setHasMore(calculatedHasMore);
-                      setTotalPages(totalPagesValue);
-                      setCurrentPage(currentPageValue);
-                    }
-                  } else {
-                    // No resume, use basic search
-                    const basicRequest: JobSearchRequest = {
-                      query: primaryRole,
-                      location: primaryLocation || undefined,
-                      page: 1,
-                      num_pages: 1
-                    };
-                    const response = await joboticApi.searchJobsBasic(basicRequest);
-                    console.log('Basic auto-search response:', response.data?.jobs?.[0]);
-                    const jobs = response.data?.jobs || [];
-                    setJobs(jobs);
-                    setHasMore(response.data?.hasMore || false);
-                    setTotalPages(response.data?.totalPages || 1);
-                    setCurrentPage(response.data?.currentPage || 1);
+                  const aiRequest: JobMatchRequest = {
+                    resumeText: text,
+                    query: primaryRole,
+                    location: primaryLocation || undefined,
+                    page: 1,
+                    num_pages: 10, // Get 100 jobs by default
+                    session_id: newSessionId,
+                    // Apply saved filters if available
+                    ...(filters.remote_jobs_only && { remote_jobs_only: true })
+                  };
+                  
+                  const response = await joboticApi.searchJobs(aiRequest);
+                  const jobs = response.data?.jobs || [];
+                  setJobs(jobs);
+                  
+                  // Update pagination state
+                  setHasMore(response.data?.hasMore || false);
+                  setTotalPages(response.data?.totalPages || 1);
+                  setCurrentPage(response.data?.currentPage || 1);
+                  
+                  // Update usage stats from API response
+                  if (response.usage) {
+                    setUsageStats({
+                      jobsViewed: response.usage.monthly_used,
+                      jobLimit: typeof response.usage.monthly_limit === 'number' ? response.usage.monthly_limit : -1
+                    });
                   }
+                  
                   setInitialLoad(false);
+                  
+                  if (response.data?.jobs && response.data.jobs.length > 0) {
+                    toast.success(`Found ${response.data.jobsReturned} jobs matching your profile`);
+                  }
                 } catch (err) {
                   console.error('Auto-search error:', err);
                 } finally {
@@ -402,31 +344,38 @@ const JobSearchPage: React.FC = () => {
                 setSearchQuery('Software Engineer'); // Default search
                 setLocation('Remote');
                 
-                const request: JobSearchRequest = {
+                const newSessionId = Date.now().toString();
+                const aiRequest: JobMatchRequest = {
+                  resumeText: text,
                   query: 'Software Engineer',
                   location: 'Remote',
                   page: 1,
-                  num_pages: 1
-                  // No filters on initial load
+                  num_pages: 10, // Get 100 jobs by default
+                  session_id: newSessionId
                 };
 
                 setLoading(true);
                 // Set session ID for infinite scroll
-                setSessionId(Date.now().toString());
+                setSessionId(newSessionId);
                 setHasMore(true);
                 setCurrentPage(1);
                 try {
-                  // Use basic search for default search (no AI token requirement)
-                  const response = await joboticApi.searchJobsBasic(request);
+                  // Always use AI-powered search
+                  const response = await joboticApi.searchJobs(aiRequest);
                   setJobs(response.data?.jobs || []);
-                  // IMPORTANT: Set pagination state from response with fallback
-                  const apiHasMore = response.data?.hasMore;
-                  const totalPagesValue = response.data?.totalPages || 1;
-                  const currentPageValue = response.data?.currentPage || 1;
-                  const calculatedHasMore = apiHasMore !== undefined ? apiHasMore : currentPageValue < totalPagesValue;
-                  setHasMore(calculatedHasMore);
-                  setTotalPages(totalPagesValue);
-                  setCurrentPage(currentPageValue);
+                  // Set pagination state from response
+                  setHasMore(response.data?.hasMore || false);
+                  setTotalPages(response.data?.totalPages || 1);
+                  setCurrentPage(response.data?.currentPage || 1);
+                  
+                  // Update usage stats from API response
+                  if (response.usage) {
+                    setUsageStats({
+                      jobsViewed: response.usage.monthly_used,
+                      jobLimit: typeof response.usage.monthly_limit === 'number' ? response.usage.monthly_limit : -1
+                    });
+                  }
+                  
                   setInitialLoad(false);
                 } catch (err) {
                   console.error('Default search error:', err);
@@ -466,89 +415,52 @@ const JobSearchPage: React.FC = () => {
     // Reset infinite scroll state
     setCurrentPage(1);
     setHasMore(true);
-    setSessionId(Date.now().toString()); // Generate new session ID
+    const newSessionId = Date.now().toString();
+    setSessionId(newSessionId); // Generate new session ID
 
     try {
-      // Check if we have any filters applied
-      const hasFilters = filters.employment_types.length > 0 || 
-                        filters.date_posted !== '' || 
-                        filters.job_requirements.length > 0 || 
-                        filters.remote_jobs_only;
+      // Always use AI-powered search endpoint
+      if (!resumeText) {
+        toast.warning('Please upload your resume in your profile to get AI-matched job recommendations.');
+        setError('Resume required for job matching. Please upload your resume in your profile.');
+        return;
+      }
 
-      // Use basic search if no resume or when filters are applied from the start
-      if (!resumeText || hasFilters) {
-        const request: JobSearchRequest = {
-          query: searchQuery,
-          location: location || undefined,
-          page: 1,
-          num_pages: 1,
-          // Only include filters if they are set
-          ...(filters.employment_types.length > 0 && { employment_types: filters.employment_types as ('FULLTIME' | 'PARTTIME' | 'INTERN' | 'CONTRACTOR')[] }),
-          ...(filters.date_posted && { date_posted: filters.date_posted as 'all' | 'today' | '3days' | 'week' | 'month' }),
-          ...(filters.remote_jobs_only && { remote_jobs_only: true }),
-          ...(filters.job_requirements.length > 0 && { job_requirements: filters.job_requirements as ('no_exp' | 'under_3_years_exp' | 'more_than_3_years_exp' | 'no_degree' | 'fair_chance')[] })
-        };
+      const request: JobMatchRequest = {
+        resumeText: resumeText,
+        query: searchQuery,
+        location: location || undefined,
+        page: 1,
+        num_pages: 10, // Default to 10 pages (100 jobs)
+        session_id: newSessionId,
+        // Include filters
+        ...(filters.employment_types.length > 0 && { employment_types: filters.employment_types as ('FULLTIME' | 'PARTTIME' | 'INTERN' | 'CONTRACTOR')[] }),
+        ...(filters.date_posted && { date_posted: filters.date_posted as 'all' | 'today' | '3days' | 'week' | 'month' }),
+        ...(filters.remote_jobs_only && { remote_jobs_only: true }),
+        ...(filters.job_requirements.length > 0 && { job_requirements: filters.job_requirements as ('no_exp' | 'under_3_years_exp' | 'more_than_3_years_exp' | 'no_degree' | 'fair_chance')[] })
+      };
 
-        const response = await joboticApi.searchJobsBasic(request);
-        const jobs = response.data?.jobs || [];
-        setJobs(jobs);
-        // Set pagination state with fallback
-        const apiHasMore = response.data?.hasMore;
-        const totalPagesValue = response.data?.totalPages || 1;
-        const currentPageValue = response.data?.currentPage || 1;
-        const calculatedHasMore = apiHasMore !== undefined ? apiHasMore : currentPageValue < totalPagesValue;
-        setHasMore(calculatedHasMore);
-        setTotalPages(totalPagesValue);
-        setCurrentPage(currentPageValue);
-        
-        
-        if (!response.data?.jobs || response.data.jobs.length === 0) {
-          toast.info('No jobs found. Try different keywords or location.');
-        }
+      const response = await joboticApi.searchJobs(request);
+      const jobs = response.data?.jobs || [];
+      setJobs(jobs);
+      
+      // Update pagination state
+      setHasMore(response.data?.hasMore || false);
+      setTotalPages(response.data?.totalPages || 1);
+      setCurrentPage(response.data?.currentPage || 1);
+      
+      // Update usage stats from API response
+      if (response.usage) {
+        setUsageStats({
+          jobsViewed: response.usage.monthly_used,
+          jobLimit: typeof response.usage.monthly_limit === 'number' ? response.usage.monthly_limit : -1
+        });
+      }
+      
+      if (!response.data?.jobs || response.data.jobs.length === 0) {
+        toast.info('No jobs found. Try different keywords or location.');
       } else {
-        // Use AI-powered search with resume matching
-        // Check AI token limits
-        const { allowed, reason } = await canPerformAIOperation(user.id);
-        if (!allowed) {
-          toast.error(reason || 'Insufficient AI tokens for job search');
-          return;
-        }
-
-        const request: JobMatchRequest = {
-          resumeText: resumeText,
-          query: searchQuery,
-          location: location || undefined,
-          page: 1,
-          num_pages: 1,
-          // Include filters if set
-          ...(filters.employment_types.length > 0 && { employment_types: filters.employment_types as ('FULLTIME' | 'PARTTIME' | 'INTERN' | 'CONTRACTOR')[] }),
-          ...(filters.date_posted && { date_posted: filters.date_posted as 'all' | 'today' | '3days' | 'week' | 'month' }),
-          ...(filters.remote_jobs_only && { remote_jobs_only: true }),
-          ...(filters.job_requirements.length > 0 && { job_requirements: filters.job_requirements as ('no_exp' | 'under_3_years_exp' | 'more_than_3_years_exp' | 'no_degree' | 'fair_chance')[] })
-        };
-
-        const response = await joboticApi.searchJobs(request);
-        const jobs = response.data?.jobs || [];
-        setJobs(jobs);
-        // Set pagination state with fallback
-        const apiHasMore = response.data?.hasMore;
-        const totalPagesValue = response.data?.totalPages || 1;
-        const currentPageValue = response.data?.currentPage || 1;
-        const calculatedHasMore = apiHasMore !== undefined ? apiHasMore : currentPageValue < totalPagesValue;
-        setHasMore(calculatedHasMore);
-        setTotalPages(totalPagesValue);
-        setCurrentPage(currentPageValue);
-        
-        if (!response.data?.jobs || response.data.jobs.length === 0) {
-          toast.info('No jobs found. Try different keywords or location.');
-        } else {
-          // Track successful search
-          await trackAITokens(user.id, 'job_search_match', {
-            jobTitle: searchQuery,
-            location: location || 'Not specified',
-            resultsCount: response.data.jobs.length
-          });
-        }
+        toast.success(`Found ${response.data.jobsReturned} jobs matching your profile`);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
@@ -586,10 +498,24 @@ const JobSearchPage: React.FC = () => {
   };
 
   const getMatchScoreColor = (score: number) => {
-    if (score >= 80) return 'text-teal-600 bg-teal-50';
-    if (score >= 60) return 'text-blue-600 bg-blue-50';
-    if (score >= 40) return 'text-amber-600 bg-amber-50';
-    return 'text-gray-600 bg-gray-50';
+    if (score >= 80) return 'text-teal-600 bg-teal-50 border-teal-200';
+    if (score >= 60) return 'text-blue-600 bg-blue-50 border-blue-200';
+    if (score >= 40) return 'text-amber-600 bg-amber-50 border-amber-200';
+    return 'text-gray-600 bg-gray-50 border-gray-200';
+  };
+  
+  const getMatchLabel = (score: number): string => {
+    if (score >= 80) return 'Excellent Match';
+    if (score >= 60) return 'Good Match';
+    if (score >= 40) return 'Fair Match';
+    return 'Low Match';
+  };
+  
+  const getMatchIcon = (score: number) => {
+    if (score >= 80) return '🎯';
+    if (score >= 60) return '✨';
+    if (score >= 40) return '👍';
+    return '🔍';
   };
 
   const toggleSaveJob = async (jobId: string) => {
@@ -787,10 +713,8 @@ const JobSearchPage: React.FC = () => {
       console.log('Blocked: no sessionId');
       return;
     }
-    if (totalPages > 0 && currentPage >= totalPages) {
-      console.log('Blocked: already at last page');
-      return;
-    }
+    // Remove totalPages check since it can be unreliable
+    // The hasMore flag from API is the authoritative source
     if (!searchQuery || searchQuery.trim() === '') {
       console.log('Blocked: no searchQuery');
       return;
@@ -802,67 +726,46 @@ const JobSearchPage: React.FC = () => {
     const nextPage = currentPage + 1;
     
     try {
-      const hasFilters = filters.employment_types.length > 0 || 
-                        filters.date_posted !== '' || 
-                        filters.job_requirements.length > 0 || 
-                        filters.remote_jobs_only;
+      if (!resumeText) {
+        toast.warning('Resume required for loading more jobs');
+        setLoadingMore(false);
+        return;
+      }
+      
+      // Always use AI-powered search for loading more with session
+      const request: JobMatchRequest = {
+        resumeText: resumeText,
+        query: searchQuery,
+        location: location || undefined,
+        page: nextPage,
+        num_pages: 1,
+        session_id: sessionId,
+        offset: jobs.length, // Number of jobs already displayed
+        ...(filters.employment_types.length > 0 && { employment_types: filters.employment_types as ('FULLTIME' | 'PARTTIME' | 'INTERN' | 'CONTRACTOR')[] }),
+        ...(filters.date_posted && { date_posted: filters.date_posted as 'all' | 'today' | '3days' | 'week' | 'month' }),
+        ...(filters.remote_jobs_only && { remote_jobs_only: true }),
+        ...(filters.job_requirements.length > 0 && { job_requirements: filters.job_requirements as ('no_exp' | 'under_3_years_exp' | 'more_than_3_years_exp' | 'no_degree' | 'fair_chance')[] })
+      };
 
-      if (!resumeText || hasFilters) {
-        // Use basic search for loading more
-        const request: JobSearchRequest = {
-          query: searchQuery,
-          location: location || undefined,
-          page: nextPage,
-          num_pages: 1,
-          ...(filters.employment_types.length > 0 && { employment_types: filters.employment_types as ('FULLTIME' | 'PARTTIME' | 'INTERN' | 'CONTRACTOR')[] }),
-          ...(filters.date_posted && { date_posted: filters.date_posted as 'all' | 'today' | '3days' | 'week' | 'month' }),
-          ...(filters.remote_jobs_only && { remote_jobs_only: true }),
-          ...(filters.job_requirements.length > 0 && { job_requirements: filters.job_requirements as ('no_exp' | 'under_3_years_exp' | 'more_than_3_years_exp' | 'no_degree' | 'fair_chance')[] })
-        };
-
-        const response = await joboticApi.searchJobsBasic(request);
+      const response = await joboticApi.searchJobs(request);
+      
+      if (response.data?.jobs && response.data.jobs.length > 0) {
+        setJobs(prev => [...prev, ...response.data.jobs]);
+        setCurrentPage(response.data?.currentPage || nextPage);
+        setHasMore(response.data?.hasMore || false);
+        setTotalPages(response.data?.totalPages || totalPages);
         
-        if (response.data?.jobs && response.data.jobs.length > 0) {
-          setJobs(prev => [...prev, ...response.data.jobs]);
-          // Set pagination state with fallback
-          const apiHasMore = response.data?.hasMore;
-          const totalPagesValue = response.data?.totalPages || totalPages;
-          const currentPageValue = response.data?.currentPage || nextPage;
-          const calculatedHasMore = apiHasMore !== undefined ? apiHasMore : currentPageValue < totalPagesValue;
-          
-          setCurrentPage(currentPageValue);
-          setHasMore(calculatedHasMore);
-          setTotalPages(totalPagesValue);
-        } else {
-          setHasMore(false);
+        // Update usage stats from API response
+        if (response.usage) {
+          setUsageStats({
+            jobsViewed: response.usage.monthly_used,
+            jobLimit: typeof response.usage.monthly_limit === 'number' ? response.usage.monthly_limit : -1
+          });
         }
-      } else {
-        // Use AI-powered search for loading more with session
-        const request: JobMatchRequest = {
-          resumeText: resumeText,
-          query: searchQuery,
-          location: location || undefined,
-          page: nextPage,
-          num_pages: 1,
-          session_id: sessionId,
-          offset: jobs.length, // Number of jobs already displayed
-          ...(filters.employment_types.length > 0 && { employment_types: filters.employment_types as ('FULLTIME' | 'PARTTIME' | 'INTERN' | 'CONTRACTOR')[] }),
-          ...(filters.date_posted && { date_posted: filters.date_posted as 'all' | 'today' | '3days' | 'week' | 'month' }),
-          ...(filters.remote_jobs_only && { remote_jobs_only: true }),
-          ...(filters.job_requirements.length > 0 && { job_requirements: filters.job_requirements as ('no_exp' | 'under_3_years_exp' | 'more_than_3_years_exp' | 'no_degree' | 'fair_chance')[] })
-        };
-
-        const response = await joboticApi.searchJobs(request);
         
-        if (response.data?.jobs && response.data.jobs.length > 0) {
-          setJobs(prev => [...prev, ...response.data.jobs]);
-          setCurrentPage(response.data?.currentPage || nextPage);
-          setHasMore(response.data?.hasMore || false);
-          setTotalPages(response.data?.totalPages || totalPages);
-          
-          // Track AI usage for pagination
-          if (user?.id) {
-            await trackAITokens(user.id, 'job_search_match', {
+        // Track AI usage for pagination
+        if (user?.id) {
+          await trackAITokens(user.id, 'job_search_match', {
               jobTitle: searchQuery,
               location: location || 'Not specified',
               resultsCount: response.data.jobs.length,
@@ -872,7 +775,6 @@ const JobSearchPage: React.FC = () => {
         } else {
           setHasMore(false);
         }
-      }
     } catch (error) {
       console.error('Error loading more jobs:', error);
       toast.error('Failed to load more jobs. Please try again.');
@@ -1188,9 +1090,9 @@ const JobSearchPage: React.FC = () => {
           </div>
         )}
 
-        {!loading && !initializing && filteredJobs.length > 0 && (
+        {!loading && !initializing && displayedJobs.length > 0 && (
           <div className="grid gap-4">
-            {filteredJobs.map((job, index) => (
+            {displayedJobs.map((job, index) => (
               <motion.div
                 key={job.job_id}
                 initial={{ opacity: 0, y: 20 }}
@@ -1273,7 +1175,8 @@ const JobSearchPage: React.FC = () => {
                     {/* Match Score */}
                     {job.match_score !== undefined && (
                       <div className="text-right">
-                        <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold ${getMatchScoreColor(job.match_score || 0)}`}>
+                        <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold border ${getMatchScoreColor(job.match_score || 0)}`}>
+                          <span className="text-lg">{getMatchIcon(job.match_score)}</span>
                           <div className="relative">
                             <svg className="w-8 h-8 transform -rotate-90">
                               <circle
@@ -1300,7 +1203,7 @@ const JobSearchPage: React.FC = () => {
                           </div>
                           <span>{job.match_score || 0}%</span>
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">Match Score</p>
+                        <p className="text-xs text-gray-500 mt-1">{job.match_label || getMatchLabel(job.match_score || 0)}</p>
                       </div>
                     )}
                   </div>
@@ -1340,6 +1243,28 @@ const JobSearchPage: React.FC = () => {
                     <div className="mb-4 p-3 bg-teal-50 rounded-lg border border-teal-100">
                       <p className="text-xs font-medium text-teal-700 mb-1">Why you're a match:</p>
                       <p className="text-xs text-teal-600 line-clamp-2">{job.match_reasons[0]}</p>
+                    </div>
+                  )}
+                  
+                  {/* Key Strengths */}
+                  {job.key_strengths && job.key_strengths.length > 0 && (
+                    <div className="mb-4 flex flex-wrap gap-1">
+                      {job.key_strengths.slice(0, 3).map((strength, idx) => (
+                        <span key={idx} className="px-2 py-1 bg-green-50 text-green-700 text-xs rounded-full border border-green-200">
+                          ✓ {strength}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Missing Skills */}
+                  {job.missing_skills && job.missing_skills.length > 0 && (
+                    <div className="mb-4 flex flex-wrap gap-1">
+                      {job.missing_skills.slice(0, 2).map((skill, idx) => (
+                        <span key={idx} className="px-2 py-1 bg-orange-50 text-orange-700 text-xs rounded-full border border-orange-200">
+                          ⚡ {skill}
+                        </span>
+                      ))}
                     </div>
                   )}
 

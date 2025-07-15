@@ -946,6 +946,99 @@ This will create the default configuration needed for the billing portal to work
                   </div>
                 </div>
               </motion.div>
+              
+              {/* Job Search Usage */}
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.4 }}
+                className="relative overflow-hidden bg-gradient-to-br from-teal-50 to-green-50 dark:from-teal-900/20 dark:to-green-900/20 rounded-2xl border border-teal-200/50 dark:border-teal-700/50 backdrop-blur-xl shadow-xl"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-teal-500/5 to-green-500/5" />
+                <div className="relative p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center space-x-4">
+                      <motion.div 
+                        whileHover={{ scale: 1.1, rotate: 10 }}
+                        className="relative p-3 bg-gradient-to-br from-teal-500 to-green-600 rounded-xl shadow-lg"
+                      >
+                        <Search className="w-6 h-6 text-white" />
+                        <motion.div 
+                          className="absolute inset-0 bg-white/30 rounded-xl"
+                          animate={{ scale: [1, 1.2, 1] }}
+                          transition={{ duration: 2, repeat: Infinity, delay: 1 }}
+                        />
+                      </motion.div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Job Searches</h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          AI-powered job matches this month
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="flex items-end justify-between">
+                      <motion.span 
+                        key={jobSearchUsage?.used || 0}
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        className="text-5xl font-bold bg-gradient-to-r from-teal-600 to-green-600 bg-clip-text text-transparent"
+                      >
+                        {(jobSearchUsage?.used || 0).toLocaleString()}
+                      </motion.span>
+                      <span className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                        {jobSearchUsage?.limit === -1 ? 'Unlimited' : 
+                         jobSearchUsage?.limit ? `of ${jobSearchUsage.limit.toLocaleString()} included` : 
+                         <span className="text-gray-400 italic">100 searches/month</span>}
+                      </span>
+                    </div>
+                  
+                    {jobSearchUsage && jobSearchUsage.limit > 0 && (
+                      <div className="relative">
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${Math.min(100, jobSearchUsage.percentage)}%` }}
+                            transition={{ duration: 1, delay: 0.9, ease: "easeOut" }}
+                            className="h-full relative overflow-hidden"
+                          >
+                            <div className={`absolute inset-0 bg-gradient-to-r ${getProgressBarColor(jobSearchUsage.percentage)}`} />
+                            <motion.div 
+                              className="absolute inset-0 bg-white/30"
+                              animate={{ x: ['-100%', '100%'] }}
+                              transition={{ duration: 2, repeat: Infinity, ease: "linear", delay: 1 }}
+                            />
+                          </motion.div>
+                        </div>
+                      </div>
+                    )}
+                  
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-600 dark:text-gray-400">
+                        {!jobSearchUsage ? 
+                          <span className="italic">Loading usage data...</span> :
+                          jobSearchUsage.limit === -1 ? 
+                            <span>Unlimited searches available</span> :
+                            jobSearchUsage.percentage >= 100 ? 
+                              <span className="text-orange-600 dark:text-orange-400 font-medium">Limit reached for this month</span> :
+                              <span>{Math.max(0, jobSearchUsage.limit - jobSearchUsage.used).toLocaleString()} searches remaining</span>
+                        }
+                      </span>
+                      {jobSearchUsage && jobSearchUsage.limit > 0 && (
+                        <motion.span 
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className={`text-sm font-bold ${getUsageStatusColor(jobSearchUsage.percentage)}`}
+                        >
+                          {Math.round(jobSearchUsage.percentage)}% used
+                        </motion.span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
             </div>
 
             {/* New Usage Metrics */}
