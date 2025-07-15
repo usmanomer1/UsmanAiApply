@@ -1318,7 +1318,7 @@ const JobSearchPage: React.FC = () => {
                   </div>
 
                   {/* Match Insights */}
-                  {job.match_reasons && job.match_reasons.length > 0 && (
+                  {job.match_reasons && job.match_reasons.length > 0 && !job.match_reasons[0].toLowerCase().includes('unable to') && (
                     <div className="mb-4 p-3 bg-teal-50 rounded-lg border border-teal-100">
                       <p className="text-xs font-medium text-teal-700 mb-1">Why you're a match:</p>
                       <p className="text-xs text-teal-600 line-clamp-2">{job.match_reasons[0]}</p>
@@ -1358,6 +1358,15 @@ const JobSearchPage: React.FC = () => {
           </div>
         )}
           
+        {/* Debug Info */}
+        <div className="mt-4 p-4 bg-yellow-100 border border-yellow-300 rounded">
+          <p className="text-sm font-bold">Debug Info:</p>
+          <p className="text-xs">loading: {String(loading)}, initializing: {String(initializing)}</p>
+          <p className="text-xs">jobs.length: {jobs.length}</p>
+          <p className="text-xs">hasMore: {String(hasMore)}, currentPage: {currentPage}, totalPages: {totalPages}</p>
+          <p className="text-xs">sessionId: {sessionId || 'none'}</p>
+        </div>
+
         {/* Infinite Scroll Loading */}
         {!loading && !initializing && jobs.length > 0 && (
           <>
@@ -1373,8 +1382,8 @@ const JobSearchPage: React.FC = () => {
             
             {/* Show sentinel when there are more pages to load */}
             {hasMore && (
-              <div id="scroll-sentinel" className="h-20 mt-4 bg-red-100 flex items-center justify-center">
-                <p className="text-sm text-red-600">Scroll sentinel - Debug: hasMore={String(hasMore)}, page={currentPage}/{totalPages}</p>
+              <div id="scroll-sentinel" className="h-20 mt-4 bg-red-100 border-2 border-red-500 flex items-center justify-center">
+                <p className="text-sm text-red-600 font-bold">Scroll sentinel - Debug: hasMore={String(hasMore)}, page={currentPage}/{totalPages}</p>
               </div>
             )}
             
