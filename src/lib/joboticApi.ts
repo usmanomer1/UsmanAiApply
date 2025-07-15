@@ -150,8 +150,9 @@ class JoboticApiService {
     const isNetlifyFunction = USE_NETLIFY_FUNCTION;
     const url = isNetlifyFunction ? '/.netlify/functions/jobotic-api' : `${API_BASE_URL}${endpoint}`;
     
-    // console.log(`Making request to: ${url}`);
-    // console.log('Request payload:', JSON.stringify(data, null, 2));
+    console.log(`Making request to: ${url}`);
+    console.log('Using Netlify function:', isNetlifyFunction);
+    console.log('Requires auth:', options.requiresAuth);
     
     const requestBody = isNetlifyFunction 
       ? { endpoint, ...data }
@@ -174,6 +175,9 @@ class JoboticApiService {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.access_token) {
         headers['Authorization'] = `Bearer ${session.access_token}`;
+        console.log('Added auth header');
+      } else {
+        console.warn('No session token available');
       }
     }
     
@@ -215,6 +219,16 @@ class JoboticApiService {
       } catch (e) {
         // Ignore if we can't read the error body
       }
+      
+      console.error('API Error Details:', {
+        status: response.status,
+        endpoint,
+        errorDetail,
+        errorJson,
+        requestId,
+        isNetlifyFunction,
+        hasAuth: !!headers['Authorization']
+      });
       
       const error = new Error(`API request failed: ${response.status}${errorDetail}`);
       (error as any).status = response.status;
