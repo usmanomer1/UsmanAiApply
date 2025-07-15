@@ -9,7 +9,7 @@ exports.handler = async (event, context) => {
   }
 
   const API_KEY = process.env.JOBOTIC_API_KEY;
-  const API_URL = process.env.JOBOTIC_API_URL || 'https://jobotic-backend2-production.up.railway.app';
+  const API_URL = process.env.JOBOTIC_API_URL || process.env.VITE_JOBOTIC_API_URL || 'https://jobotic-backend2-production.up.railway.app';
 
   if (!API_KEY) {
     console.error('JOBOTIC_API_KEY not configured');
@@ -45,7 +45,9 @@ exports.handler = async (event, context) => {
       endpoint,
       method: event.httpMethod,
       hasAuthHeader: !!(event.headers.authorization || event.headers.Authorization),
-      apiKeySet: !!API_KEY
+      apiKeySet: !!API_KEY,
+      apiUrl: API_URL,
+      authHeaderPreview: event.headers.authorization ? event.headers.authorization.substring(0, 20) + '...' : 'none'
     });
 
     // Extract authorization header if present (for endpoints requiring auth)
@@ -69,6 +71,13 @@ exports.handler = async (event, context) => {
     });
 
     const data = await response.json();
+    
+    if (!response.ok) {
+      console.log('API Error Response:', {
+        status: response.status,
+        data: JSON.stringify(data).substring(0, 200)
+      });
+    }
 
     return {
       statusCode: response.status,
