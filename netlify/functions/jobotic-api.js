@@ -47,7 +47,8 @@ exports.handler = async (event, context) => {
       hasAuthHeader: !!(event.headers.authorization || event.headers.Authorization),
       apiKeySet: !!API_KEY,
       apiUrl: API_URL,
-      authHeaderPreview: event.headers.authorization ? event.headers.authorization.substring(0, 20) + '...' : 'none'
+      authHeaderPreview: event.headers.authorization ? event.headers.authorization.substring(0, 20) + '...' : 'none',
+      allHeaders: Object.keys(event.headers)
     });
 
     // Extract authorization header if present (for endpoints requiring auth)
