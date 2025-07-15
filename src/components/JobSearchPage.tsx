@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, MapPin, Briefcase, Filter, X, Loader2, ChevronRight, Heart, Users, DollarSign, Building2, Star, Bookmark, ArrowUpRight, TrendingUp } from 'lucide-react';
 import { joboticApi, JobSearchRequest, JobMatchRequest } from '../lib/joboticApi';
 import { motion } from 'framer-motion';
@@ -72,7 +72,8 @@ const JobSearchPage: React.FC = () => {
   const [sessionId, setSessionId] = useState<string>('');
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [currentOffset, setCurrentOffset] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [usageStats, setUsageStats] = useState<{ jobsViewed: number; jobLimit: number }>({ jobsViewed: 0, jobLimit: 100 });
 
@@ -288,7 +289,7 @@ const JobSearchPage: React.FC = () => {
                 // Set session ID for infinite scroll
                 setSessionId(Date.now().toString());
                 setHasMore(true);
-                setCurrentOffset(0);
+                setCurrentPage(1);
                 
                 try {
                   if (text && text.length > 100) {
@@ -303,8 +304,15 @@ const JobSearchPage: React.FC = () => {
                         num_pages: 1
                       };
                       const response = await joboticApi.searchJobs(aiRequest);
-                      console.log('AI auto-search response:', response.data?.jobs?.[0]);
+                      console.log('AI auto-search response:', {
+                        firstJob: response.data?.jobs?.[0],
+                        totalJobs: response.data?.jobs?.length,
+                        totalPages: response.data?.totalPages,
+                        currentPage: response.data?.currentPage
+                      });
                       setJobs(response.data?.jobs || []);
+                      setTotalPages(response.data?.totalPages || 1);
+                      setHasMore(response.data?.totalPages > 1);
                       
                       // Track AI usage
                       if (response.data?.jobs && response.data.jobs.length > 0) {
@@ -363,7 +371,7 @@ const JobSearchPage: React.FC = () => {
                 // Set session ID for infinite scroll
                 setSessionId(Date.now().toString());
                 setHasMore(true);
-                setCurrentOffset(0);
+                setCurrentPage(1);
                 try {
                   // Use basic search for default search (no AI token requirement)
                   const response = await joboticApi.searchJobsBasic(request);
@@ -405,7 +413,7 @@ const JobSearchPage: React.FC = () => {
     setError(null);
     
     // Reset infinite scroll state
-    setCurrentOffset(0);
+    setCurrentPage(1);
     setHasMore(true);
     setSessionId(Date.now().toString()); // Generate new session ID
 
@@ -461,6 +469,8 @@ const JobSearchPage: React.FC = () => {
         const response = await joboticApi.searchJobs(request);
         console.log('AI search response:', response.data?.jobs?.[0]); // Log first job to see structure
         setJobs(response.data?.jobs || []);
+        setTotalPages(response.data?.totalPages || 1);
+        setHasMore(response.data?.totalPages > 1);
         
         if (!response.data?.jobs || response.data.jobs.length === 0) {
           toast.info('No jobs found. Try different keywords or location.');
@@ -687,11 +697,13 @@ const JobSearchPage: React.FC = () => {
   };
 
   // Function to load more jobs for infinite scroll
-  const loadMoreJobs = async () => {
-    console.log('loadMoreJobs called:', { loadingMore, hasMore, sessionId, currentOffset });
-    if (loadingMore || !hasMore || !sessionId) return;
+  const loadMoreJobs = useCallback(async () => {
+    console.log('loadMoreJobs called:', { loadingMore, hasMore, sessionId, currentPage, totalPages });
+    if (loadingMore || !hasMore || !sessionId || currentPage >= totalPages) return;
 
     setLoadingMore(true);
+    const nextPage = currentPage + 1;
+    
     try {
       const hasFilters = filters.employment_types.length > 0 || 
                         filters.date_posted !== '' || 
@@ -703,7 +715,7 @@ const JobSearchPage: React.FC = () => {
         const request: JobSearchRequest = {
           query: searchQuery,
           location: location || undefined,
-          page: Math.floor(currentOffset / 10) + 2, // Calculate next page
+          page: nextPage,
           num_pages: 1,
           ...(filters.employment_types.length > 0 && { employment_types: filters.employment_types as ('FULLTIME' | 'PARTTIME' | 'INTERN' | 'CONTRACTOR')[] }),
           ...(filters.date_posted && { date_posted: filters.date_posted as 'all' | 'today' | '3days' | 'week' | 'month' }),
@@ -714,7 +726,8 @@ const JobSearchPage: React.FC = () => {
         const response = await joboticApi.searchJobsBasic(request);
         if (response.data?.jobs && response.data.jobs.length > 0) {
           setJobs(prev => [...prev, ...response.data.jobs]);
-          setCurrentOffset(prev => prev + response.data.jobs.length);
+          setCurrentPage(nextPage);
+          setHasMore(nextPage < (response.data?.totalPages || 1));
         } else {
           setHasMore(false);
         }
@@ -724,9 +737,10 @@ const JobSearchPage: React.FC = () => {
           resumeText: resumeText,
           query: searchQuery,
           location: location || undefined,
+          page: nextPage,
+          num_pages: 1,
           session_id: sessionId,
-          offset: currentOffset + 10,
-          limit: 10,
+          offset: jobs.length, // Number of jobs already displayed
           ...(filters.employment_types.length > 0 && { employment_types: filters.employment_types as ('FULLTIME' | 'PARTTIME' | 'INTERN' | 'CONTRACTOR')[] }),
           ...(filters.date_posted && { date_posted: filters.date_posted as 'all' | 'today' | '3days' | 'week' | 'month' }),
           ...(filters.remote_jobs_only && { remote_jobs_only: true }),
@@ -734,9 +748,25 @@ const JobSearchPage: React.FC = () => {
         };
 
         const response = await joboticApi.searchJobs(request);
+        console.log('Infinite scroll response:', {
+          page: nextPage,
+          jobsReturned: response.data?.jobs?.length,
+          totalPages: response.data?.totalPages,
+          currentPage: response.data?.currentPage
+        });
+        
         if (response.data?.jobs && response.data.jobs.length > 0) {
           setJobs(prev => [...prev, ...response.data.jobs]);
-          setCurrentOffset(prev => prev + response.data.jobs.length);
+          setCurrentPage(nextPage);
+          setHasMore(nextPage < (response.data?.totalPages || 1));
+          
+          // Track AI usage for pagination
+          await trackAITokens(user.id, 'job_search_match', {
+            jobTitle: searchQuery,
+            location: location || 'Not specified',
+            resultsCount: response.data.jobs.length,
+            page: nextPage
+          });
         } else {
           setHasMore(false);
         }
@@ -746,7 +776,7 @@ const JobSearchPage: React.FC = () => {
     } finally {
       setLoadingMore(false);
     }
-  };
+  }, [loadingMore, hasMore, sessionId, currentPage, totalPages, searchQuery, location, filters, resumeText, jobs.length, user?.id]);
 
   // Infinite scroll observer
   useEffect(() => {
@@ -771,7 +801,7 @@ const JobSearchPage: React.FC = () => {
         observer.unobserve(sentinel);
       }
     };
-  }, [hasMore, loadingMore, currentOffset, sessionId, searchQuery, location, filters, resumeText]);
+  }, [hasMore, loadingMore, currentPage, totalPages, sessionId, searchQuery, location, filters, resumeText, jobs.length]);
 
   return (
     <>
