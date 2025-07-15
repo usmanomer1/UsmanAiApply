@@ -69,7 +69,7 @@ const JobSearchPage: React.FC = () => {
   const [initialLoad, setInitialLoad] = useState(true);
   const [initializing, setInitializing] = useState(true);
   const [showLoadingTransition, setShowLoadingTransition] = useState(false);
-  const [sessionId, setSessionId] = useState<string>('');
+  const [sessionId, setSessionId] = useState<string>(Date.now().toString());
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -304,6 +304,12 @@ const JobSearchPage: React.FC = () => {
                         num_pages: 1
                       };
                       const response = await joboticApi.searchJobs(aiRequest);
+                      console.log('AI Search Response (initial load):', {
+                        hasMore: response.data?.hasMore,
+                        totalPages: response.data?.totalPages,
+                        currentPage: response.data?.currentPage,
+                        jobsCount: response.data?.jobs?.length
+                      });
                       const jobs = response.data?.jobs || [];
                       setJobs(jobs);
                       // Use hasMore flag from API
@@ -709,10 +715,40 @@ const JobSearchPage: React.FC = () => {
 
   // Function to load more jobs for infinite scroll
   const loadMoreJobs = useCallback(async () => {
-    if (loadingMore || !hasMore || !sessionId) return;
-    if (totalPages > 0 && currentPage >= totalPages) return;
-    if (!searchQuery && !location) return;
+    console.log('=== Load More Button Clicked ===');
+    console.log('Current state:', {
+      loadingMore,
+      hasMore,
+      sessionId,
+      totalPages,
+      currentPage,
+      searchQuery,
+      location,
+      jobsCount: jobs.length
+    });
+    
+    if (loadingMore) {
+      console.log('Already loading more, returning...');
+      return;
+    }
+    if (!hasMore) {
+      console.log('No more jobs to load (hasMore is false), returning...');
+      return;
+    }
+    if (!sessionId) {
+      console.log('No session ID, returning...');
+      return;
+    }
+    if (totalPages > 0 && currentPage >= totalPages) {
+      console.log(`Already at last page (${currentPage}/${totalPages}), returning...`);
+      return;
+    }
+    if (!searchQuery && !location) {
+      console.log('No search query or location, returning...');
+      return;
+    }
 
+    console.log('All checks passed, proceeding to load more...');
     setLoadingMore(true);
     const nextPage = currentPage + 1;
     
@@ -735,13 +771,23 @@ const JobSearchPage: React.FC = () => {
           ...(filters.job_requirements.length > 0 && { job_requirements: filters.job_requirements as ('no_exp' | 'under_3_years_exp' | 'more_than_3_years_exp' | 'no_degree' | 'fair_chance')[] })
         };
 
+        console.log('Making basic search request:', request);
         const response = await joboticApi.searchJobsBasic(request);
+        console.log('Basic search response:', {
+          status: response.success,
+          hasMore: response.data?.hasMore,
+          totalPages: response.data?.totalPages,
+          currentPage: response.data?.currentPage,
+          jobsCount: response.data?.jobs?.length
+        });
+        
         if (response.data?.jobs && response.data.jobs.length > 0) {
           setJobs(prev => [...prev, ...response.data.jobs]);
           setCurrentPage(response.data?.currentPage || nextPage);
           setHasMore(response.data?.hasMore || false);
           setTotalPages(response.data?.totalPages || totalPages);
         } else {
+          console.log('No more jobs in response');
           setHasMore(false);
         }
       } else {
@@ -769,18 +815,25 @@ const JobSearchPage: React.FC = () => {
           setTotalPages(response.data?.totalPages || totalPages);
           
           // Track AI usage for pagination
-          await trackAITokens(user.id, 'job_search_match', {
-            jobTitle: searchQuery,
-            location: location || 'Not specified',
-            resultsCount: response.data.jobs.length,
-            page: nextPage
-          });
+          if (user?.id) {
+            await trackAITokens(user.id, 'job_search_match', {
+              jobTitle: searchQuery,
+              location: location || 'Not specified',
+              resultsCount: response.data.jobs.length,
+              page: nextPage
+            });
+          }
         } else {
           setHasMore(false);
         }
       }
     } catch (error) {
       console.error('Error loading more jobs:', error);
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      toast.error('Failed to load more jobs. Please try again.');
     } finally {
       setLoadingMore(false);
     }
@@ -1326,12 +1379,22 @@ const JobSearchPage: React.FC = () => {
                   Showing {jobs.length} jobs • Page {currentPage} of {totalPages || '?'}
                 </p>
                 <button
-                  onClick={loadMoreJobs}
+                  onClick={() => {
+                    console.log('Button onClick triggered');
+                    loadMoreJobs();
+                  }}
                   className="px-6 py-3 bg-teal-600 text-white font-medium rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-2 mx-auto"
                 >
                   Load More Jobs
                   <ChevronRight className="h-4 w-4" />
                 </button>
+              </div>
+            )}
+            
+            {/* Debug Info - Remove in production */}
+            {hasMore && (
+              <div className="mt-2 text-xs text-gray-400 text-center">
+                Debug: hasMore={String(hasMore)}, sessionId={sessionId}, currentPage={currentPage}, totalPages={totalPages}
               </div>
             )}
             
