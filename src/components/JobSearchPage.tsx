@@ -335,7 +335,12 @@ const JobSearchPage: React.FC = () => {
                         num_pages: 1
                       };
                       const response = await joboticApi.searchJobsBasic(basicRequest);
-                      console.log('Basic auto-search response:', response.data?.jobs?.[0]);
+                      console.log('Basic auto-search response:', {
+                        hasMore: response.data?.hasMore,
+                        totalPages: response.data?.totalPages,
+                        currentPage: response.data?.currentPage,
+                        jobsCount: response.data?.jobs?.length
+                      });
                       const jobs = response.data?.jobs || [];
                       setJobs(jobs);
                       setHasMore(response.data?.hasMore || false);
@@ -386,7 +391,17 @@ const JobSearchPage: React.FC = () => {
                 try {
                   // Use basic search for default search (no AI token requirement)
                   const response = await joboticApi.searchJobsBasic(request);
+                  console.log('Default search response:', {
+                    hasMore: response.data?.hasMore,
+                    totalPages: response.data?.totalPages,
+                    currentPage: response.data?.currentPage,
+                    jobsCount: response.data?.jobs?.length
+                  });
                   setJobs(response.data?.jobs || []);
+                  // IMPORTANT: Set pagination state from response
+                  setHasMore(response.data?.hasMore || false);
+                  setTotalPages(response.data?.totalPages || 1);
+                  setCurrentPage(response.data?.currentPage || 1);
                   setInitialLoad(false);
                 } catch (err) {
                   console.error('Default search error:', err);
