@@ -709,28 +709,9 @@ const JobSearchPage: React.FC = () => {
 
   // Function to load more jobs for infinite scroll
   const loadMoreJobs = useCallback(async () => {
-    console.log('loadMoreJobs called!', {
-      loadingMore,
-      hasMore,
-      sessionId,
-      currentPage,
-      totalPages,
-      searchQuery,
-      location
-    });
-    
-    if (loadingMore || !hasMore || !sessionId) {
-      console.log('Early return:', { loadingMore, hasMore, sessionId });
-      return;
-    }
-    if (totalPages > 0 && currentPage >= totalPages) {
-      console.log('Already at last page');
-      return;
-    }
-    if (!searchQuery && !location) {
-      console.log('No search params');
-      return;
-    }
+    if (loadingMore || !hasMore || !sessionId) return;
+    if (totalPages > 0 && currentPage >= totalPages) return;
+    if (!searchQuery && !location) return;
 
     setLoadingMore(true);
     const nextPage = currentPage + 1;
@@ -760,15 +741,8 @@ const JobSearchPage: React.FC = () => {
           setCurrentPage(response.data?.currentPage || nextPage);
           setHasMore(response.data?.hasMore || false);
           setTotalPages(response.data?.totalPages || totalPages);
-          console.log('Loaded more jobs:', {
-            newJobs: response.data.jobs.length,
-            hasMore: response.data?.hasMore,
-            currentPage: response.data?.currentPage,
-            totalPages: response.data?.totalPages
-          });
         } else {
           setHasMore(false);
-          console.log('No more jobs to load');
         }
       } else {
         // Use AI-powered search for loading more with session
@@ -793,12 +767,6 @@ const JobSearchPage: React.FC = () => {
           setCurrentPage(response.data?.currentPage || nextPage);
           setHasMore(response.data?.hasMore || false);
           setTotalPages(response.data?.totalPages || totalPages);
-          console.log('Loaded more AI jobs:', {
-            newJobs: response.data.jobs.length,
-            hasMore: response.data?.hasMore,
-            currentPage: response.data?.currentPage,
-            totalPages: response.data?.totalPages
-          });
           
           // Track AI usage for pagination
           await trackAITokens(user.id, 'job_search_match', {
@@ -809,7 +777,6 @@ const JobSearchPage: React.FC = () => {
           });
         } else {
           setHasMore(false);
-          console.log('No more AI jobs to load');
         }
       }
     } catch (error) {
@@ -819,40 +786,6 @@ const JobSearchPage: React.FC = () => {
     }
   }, [loadingMore, hasMore, sessionId, currentPage, totalPages, searchQuery, location, filters, resumeText, jobs.length, user?.id]);
 
-  // Infinite scroll observer
-  useEffect(() => {
-    console.log('IntersectionObserver setup:', { hasMore, loadingMore, sessionId });
-    
-    const observer = new IntersectionObserver(
-      (entries) => {
-        console.log('Observer fired:', {
-          isIntersecting: entries[0].isIntersecting,
-          hasMore,
-          loadingMore,
-          willLoad: entries[0].isIntersecting && hasMore && !loadingMore
-        });
-        
-        if (entries[0].isIntersecting && hasMore && !loadingMore) {
-          console.log('CALLING loadMoreJobs!');
-          loadMoreJobs();
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    const sentinel = document.getElementById('scroll-sentinel');
-    console.log('Sentinel found:', !!sentinel);
-    
-    if (sentinel) {
-      observer.observe(sentinel);
-    }
-
-    return () => {
-      if (sentinel) {
-        observer.unobserve(sentinel);
-      }
-    };
-  }, [hasMore, loadingMore, currentPage, totalPages, sessionId, searchQuery, location, filters, resumeText, jobs.length, loadMoreJobs, activeTab]);
 
   return (
     <>
@@ -1386,10 +1319,19 @@ const JobSearchPage: React.FC = () => {
               </div>
             )}
             
-            {/* Show sentinel when there are more pages to load */}
-            {hasMore && (
-              <div id="scroll-sentinel" className="h-20 mt-4 bg-blue-200 border-2 border-blue-500 flex items-center justify-center">
-                <p className="text-blue-800 font-bold">SCROLL HERE TO LOAD MORE</p>
+            {/* Load More Button */}
+            {hasMore && !loadingMore && (
+              <div className="mt-6 text-center">
+                <p className="text-sm text-gray-500 mb-3">
+                  Showing {jobs.length} jobs • Page {currentPage} of {totalPages || '?'}
+                </p>
+                <button
+                  onClick={loadMoreJobs}
+                  className="px-6 py-3 bg-teal-600 text-white font-medium rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-2 mx-auto"
+                >
+                  Load More Jobs
+                  <ChevronRight className="h-4 w-4" />
+                </button>
               </div>
             )}
             
