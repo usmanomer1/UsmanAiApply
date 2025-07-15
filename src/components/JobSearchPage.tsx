@@ -304,12 +304,6 @@ const JobSearchPage: React.FC = () => {
                         num_pages: 1
                       };
                       const response = await joboticApi.searchJobs(aiRequest);
-                      console.log('AI auto-search response:', {
-                        firstJob: response.data?.jobs?.[0],
-                        totalJobs: response.data?.jobs?.length,
-                        totalPages: response.data?.totalPages,
-                        currentPage: response.data?.currentPage
-                      });
                       const jobs = response.data?.jobs || [];
                       setJobs(jobs);
                       // If we got 10 or more jobs, assume there might be more pages
@@ -456,12 +450,6 @@ const JobSearchPage: React.FC = () => {
         setHasMore(mightHaveMore);
         setTotalPages(response.data?.totalPages || (mightHaveMore ? 999 : 1));
         
-        console.log('Basic search response:', {
-          totalJobs: jobs.length,
-          totalPages: response.data?.totalPages,
-          currentPage: response.data?.currentPage,
-          hasMore: mightHaveMore
-        });
         
         if (!response.data?.jobs || response.data.jobs.length === 0) {
           toast.info('No jobs found. Try different keywords or location.');
@@ -489,7 +477,6 @@ const JobSearchPage: React.FC = () => {
         };
 
         const response = await joboticApi.searchJobs(request);
-        console.log('AI search response:', response.data?.jobs?.[0]); // Log first job to see structure
         const jobs = response.data?.jobs || [];
         setJobs(jobs);
         const mightHaveMore = jobs.length >= 10;
@@ -722,14 +709,6 @@ const JobSearchPage: React.FC = () => {
 
   // Function to load more jobs for infinite scroll
   const loadMoreJobs = useCallback(async () => {
-    console.log('loadMoreJobs called:', { 
-      loadingMore, 
-      hasMore, 
-      sessionId, 
-      currentPage, 
-      totalPages,
-      willLoad: !loadingMore && hasMore && sessionId && currentPage < totalPages
-    });
     
     if (loadingMore || !hasMore || !sessionId) return;
     if (totalPages > 0 && currentPage >= totalPages) return;
@@ -763,14 +742,8 @@ const JobSearchPage: React.FC = () => {
           setCurrentPage(nextPage);
           // If we got less than 10 jobs, we've probably reached the end
           setHasMore(response.data.jobs.length >= 10);
-          console.log('Loaded more jobs:', {
-            newJobsCount: response.data.jobs.length,
-            totalNow: jobs.length + response.data.jobs.length,
-            hasMore: response.data.jobs.length >= 10
-          });
         } else {
           setHasMore(false);
-          console.log('No more jobs returned from API');
         }
       } else {
         // Use AI-powered search for loading more with session
@@ -789,23 +762,12 @@ const JobSearchPage: React.FC = () => {
         };
 
         const response = await joboticApi.searchJobs(request);
-        console.log('Infinite scroll response:', {
-          page: nextPage,
-          jobsReturned: response.data?.jobs?.length,
-          totalPages: response.data?.totalPages,
-          currentPage: response.data?.currentPage
-        });
         
         if (response.data?.jobs && response.data.jobs.length > 0) {
           setJobs(prev => [...prev, ...response.data.jobs]);
           setCurrentPage(nextPage);
           // If we got less than 10 jobs, we've probably reached the end
           setHasMore(response.data.jobs.length >= 10);
-          console.log('Loaded more jobs (AI):', {
-            newJobsCount: response.data.jobs.length,
-            totalNow: jobs.length + response.data.jobs.length,
-            hasMore: response.data.jobs.length >= 10
-          });
           
           // Track AI usage for pagination
           await trackAITokens(user.id, 'job_search_match', {
@@ -816,7 +778,6 @@ const JobSearchPage: React.FC = () => {
           });
         } else {
           setHasMore(false);
-          console.log('No more jobs returned from AI search');
         }
       }
     } catch (error) {
@@ -830,14 +791,6 @@ const JobSearchPage: React.FC = () => {
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        console.log('Intersection observed:', {
-          isIntersecting: entries[0].isIntersecting,
-          hasMore,
-          loadingMore,
-          currentPage,
-          totalPages,
-          jobsLength: jobs.length
-        });
         if (entries[0].isIntersecting && hasMore && !loadingMore) {
           loadMoreJobs();
         }
@@ -846,13 +799,6 @@ const JobSearchPage: React.FC = () => {
     );
 
     const sentinel = document.getElementById('scroll-sentinel');
-    console.log('Setting up observer:', { 
-      sentinelExists: !!sentinel, 
-      hasMore, 
-      currentPage, 
-      totalPages,
-      activeTab
-    });
     
     if (sentinel) {
       observer.observe(sentinel);
@@ -1383,14 +1329,6 @@ const JobSearchPage: React.FC = () => {
           </div>
         )}
           
-        {/* Debug Info */}
-        <div className="mt-4 p-4 bg-yellow-100 border border-yellow-300 rounded">
-          <p className="text-sm font-bold">Debug Info:</p>
-          <p className="text-xs">loading: {String(loading)}, initializing: {String(initializing)}</p>
-          <p className="text-xs">jobs.length: {jobs.length}</p>
-          <p className="text-xs">hasMore: {String(hasMore)}, currentPage: {currentPage}, totalPages: {totalPages}</p>
-          <p className="text-xs">sessionId: {sessionId || 'none'}</p>
-        </div>
 
         {/* Infinite Scroll Loading */}
         {!loading && !initializing && jobs.length > 0 && (
@@ -1407,9 +1345,7 @@ const JobSearchPage: React.FC = () => {
             
             {/* Show sentinel when there are more pages to load */}
             {hasMore && (
-              <div id="scroll-sentinel" className="h-20 mt-4 bg-red-100 border-2 border-red-500 flex items-center justify-center">
-                <p className="text-sm text-red-600 font-bold">Scroll sentinel - Debug: hasMore={String(hasMore)}, page={currentPage}/{totalPages}</p>
-              </div>
+              <div id="scroll-sentinel" className="h-10 mt-4" />
             )}
             
             {/* Show end message only when we've loaded all pages */}
