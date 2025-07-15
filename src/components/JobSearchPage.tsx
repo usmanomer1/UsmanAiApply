@@ -296,6 +296,7 @@ const JobSearchPage: React.FC = () => {
                 try {
                   // Use basic search for initial load (no AI token requirement)
                   const response = await joboticApi.searchJobsBasic(request);
+                  console.log('Basic search response:', response.data?.jobs?.[0]); // Log first job to see structure
                   setJobs(response.data?.jobs || []);
                   setInitialLoad(false);
                 } catch (err) {
@@ -413,6 +414,7 @@ const JobSearchPage: React.FC = () => {
         };
 
         const response = await joboticApi.searchJobs(request);
+        console.log('AI search response:', response.data?.jobs?.[0]); // Log first job to see structure
         setJobs(response.data?.jobs || []);
         
         if (!response.data?.jobs || response.data.jobs.length === 0) {
