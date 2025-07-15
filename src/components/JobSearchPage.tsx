@@ -1288,11 +1288,11 @@ const JobSearchPage: React.FC = () => {
                 </div>
               </motion.div>
             ))}
-            
           </div>
+        )}
           
-          {/* Infinite Scroll Loading - Show only for recommended tab */}
-          {jobs.length > 0 && activeTab === 'recommended' && (
+        {/* Infinite Scroll Loading - Show only for recommended tab */}
+        {!loading && !initializing && jobs.length > 0 && activeTab === 'recommended' && (
             <>
               <div id="scroll-sentinel" className="h-32 bg-gradient-to-b from-transparent to-gray-100/50 mt-4">
                 <div className="flex items-center justify-center h-full">
@@ -1314,7 +1314,6 @@ const JobSearchPage: React.FC = () => {
               )}
             </>
           )}
-        )}
 
         {/* Empty State */}
         {!loading && !initializing && jobs.length === 0 && !error && (
