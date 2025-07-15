@@ -310,9 +310,12 @@ const JobSearchPage: React.FC = () => {
                         totalPages: response.data?.totalPages,
                         currentPage: response.data?.currentPage
                       });
-                      setJobs(response.data?.jobs || []);
-                      setTotalPages(response.data?.totalPages || 1);
-                      setHasMore(response.data?.totalPages > 1);
+                      const jobs = response.data?.jobs || [];
+                      setJobs(jobs);
+                      // If we got 10 or more jobs, assume there might be more pages
+                      const mightHaveMore = jobs.length >= 10;
+                      setHasMore(mightHaveMore);
+                      setTotalPages(response.data?.totalPages || (mightHaveMore ? 999 : 1));
                       
                       // Track AI usage
                       if (response.data?.jobs && response.data.jobs.length > 0) {
@@ -333,9 +336,11 @@ const JobSearchPage: React.FC = () => {
                       };
                       const response = await joboticApi.searchJobsBasic(basicRequest);
                       console.log('Basic auto-search response:', response.data?.jobs?.[0]);
-                      setJobs(response.data?.jobs || []);
-                      setTotalPages(response.data?.totalPages || 1);
-                      setHasMore((response.data?.totalPages || 1) > 1);
+                      const jobs = response.data?.jobs || [];
+                      setJobs(jobs);
+                      const mightHaveMore = jobs.length >= 10;
+                      setHasMore(mightHaveMore);
+                      setTotalPages(response.data?.totalPages || (mightHaveMore ? 999 : 1));
                     }
                   } else {
                     // No resume, use basic search
@@ -347,9 +352,11 @@ const JobSearchPage: React.FC = () => {
                     };
                     const response = await joboticApi.searchJobsBasic(basicRequest);
                     console.log('Basic auto-search response:', response.data?.jobs?.[0]);
-                    setJobs(response.data?.jobs || []);
-                    setTotalPages(response.data?.totalPages || 1);
-                    setHasMore((response.data?.totalPages || 1) > 1);
+                    const jobs = response.data?.jobs || [];
+                    setJobs(jobs);
+                    const mightHaveMore = jobs.length >= 10;
+                    setHasMore(mightHaveMore);
+                    setTotalPages(response.data?.totalPages || (mightHaveMore ? 999 : 1));
                   }
                   setInitialLoad(false);
                 } catch (err) {
@@ -443,15 +450,17 @@ const JobSearchPage: React.FC = () => {
         };
 
         const response = await joboticApi.searchJobsBasic(request);
-        setJobs(response.data?.jobs || []);
-        setTotalPages(response.data?.totalPages || 1);
-        setHasMore((response.data?.totalPages || 1) > 1);
+        const jobs = response.data?.jobs || [];
+        setJobs(jobs);
+        const mightHaveMore = jobs.length >= 10;
+        setHasMore(mightHaveMore);
+        setTotalPages(response.data?.totalPages || (mightHaveMore ? 999 : 1));
         
         console.log('Basic search response:', {
-          totalJobs: response.data?.jobs?.length,
+          totalJobs: jobs.length,
           totalPages: response.data?.totalPages,
           currentPage: response.data?.currentPage,
-          hasMore: (response.data?.totalPages || 1) > 1
+          hasMore: mightHaveMore
         });
         
         if (!response.data?.jobs || response.data.jobs.length === 0) {
@@ -481,9 +490,11 @@ const JobSearchPage: React.FC = () => {
 
         const response = await joboticApi.searchJobs(request);
         console.log('AI search response:', response.data?.jobs?.[0]); // Log first job to see structure
-        setJobs(response.data?.jobs || []);
-        setTotalPages(response.data?.totalPages || 1);
-        setHasMore(response.data?.totalPages > 1);
+        const jobs = response.data?.jobs || [];
+        setJobs(jobs);
+        const mightHaveMore = jobs.length >= 10;
+        setHasMore(mightHaveMore);
+        setTotalPages(response.data?.totalPages || (mightHaveMore ? 999 : 1));
         
         if (!response.data?.jobs || response.data.jobs.length === 0) {
           toast.info('No jobs found. Try different keywords or location.');
@@ -750,9 +761,16 @@ const JobSearchPage: React.FC = () => {
         if (response.data?.jobs && response.data.jobs.length > 0) {
           setJobs(prev => [...prev, ...response.data.jobs]);
           setCurrentPage(nextPage);
-          setHasMore(nextPage < (response.data?.totalPages || 1));
+          // If we got less than 10 jobs, we've probably reached the end
+          setHasMore(response.data.jobs.length >= 10);
+          console.log('Loaded more jobs:', {
+            newJobsCount: response.data.jobs.length,
+            totalNow: jobs.length + response.data.jobs.length,
+            hasMore: response.data.jobs.length >= 10
+          });
         } else {
           setHasMore(false);
+          console.log('No more jobs returned from API');
         }
       } else {
         // Use AI-powered search for loading more with session
@@ -781,7 +799,13 @@ const JobSearchPage: React.FC = () => {
         if (response.data?.jobs && response.data.jobs.length > 0) {
           setJobs(prev => [...prev, ...response.data.jobs]);
           setCurrentPage(nextPage);
-          setHasMore(nextPage < (response.data?.totalPages || 1));
+          // If we got less than 10 jobs, we've probably reached the end
+          setHasMore(response.data.jobs.length >= 10);
+          console.log('Loaded more jobs (AI):', {
+            newJobsCount: response.data.jobs.length,
+            totalNow: jobs.length + response.data.jobs.length,
+            hasMore: response.data.jobs.length >= 10
+          });
           
           // Track AI usage for pagination
           await trackAITokens(user.id, 'job_search_match', {
@@ -792,6 +816,7 @@ const JobSearchPage: React.FC = () => {
           });
         } else {
           setHasMore(false);
+          console.log('No more jobs returned from AI search');
         }
       }
     } catch (error) {
