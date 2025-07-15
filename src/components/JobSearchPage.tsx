@@ -709,10 +709,28 @@ const JobSearchPage: React.FC = () => {
 
   // Function to load more jobs for infinite scroll
   const loadMoreJobs = useCallback(async () => {
+    console.log('loadMoreJobs called!', {
+      loadingMore,
+      hasMore,
+      sessionId,
+      currentPage,
+      totalPages,
+      searchQuery,
+      location
+    });
     
-    if (loadingMore || !hasMore || !sessionId) return;
-    if (totalPages > 0 && currentPage >= totalPages) return;
-    if (!searchQuery && !location) return; // Need at least one search parameter
+    if (loadingMore || !hasMore || !sessionId) {
+      console.log('Early return:', { loadingMore, hasMore, sessionId });
+      return;
+    }
+    if (totalPages > 0 && currentPage >= totalPages) {
+      console.log('Already at last page');
+      return;
+    }
+    if (!searchQuery && !location) {
+      console.log('No search params');
+      return;
+    }
 
     setLoadingMore(true);
     const nextPage = currentPage + 1;
@@ -789,9 +807,19 @@ const JobSearchPage: React.FC = () => {
 
   // Infinite scroll observer
   useEffect(() => {
+    console.log('IntersectionObserver setup:', { hasMore, loadingMore, sessionId });
+    
     const observer = new IntersectionObserver(
       (entries) => {
+        console.log('Observer fired:', {
+          isIntersecting: entries[0].isIntersecting,
+          hasMore,
+          loadingMore,
+          willLoad: entries[0].isIntersecting && hasMore && !loadingMore
+        });
+        
         if (entries[0].isIntersecting && hasMore && !loadingMore) {
+          console.log('CALLING loadMoreJobs!');
           loadMoreJobs();
         }
       },
@@ -799,6 +827,7 @@ const JobSearchPage: React.FC = () => {
     );
 
     const sentinel = document.getElementById('scroll-sentinel');
+    console.log('Sentinel found:', !!sentinel);
     
     if (sentinel) {
       observer.observe(sentinel);
@@ -1345,7 +1374,9 @@ const JobSearchPage: React.FC = () => {
             
             {/* Show sentinel when there are more pages to load */}
             {hasMore && (
-              <div id="scroll-sentinel" className="h-10 mt-4" />
+              <div id="scroll-sentinel" className="h-20 mt-4 bg-blue-200 border-2 border-blue-500 flex items-center justify-center">
+                <p className="text-blue-800 font-bold">SCROLL HERE TO LOAD MORE</p>
+              </div>
             )}
             
             {/* Show end message only when we've loaded all pages */}
