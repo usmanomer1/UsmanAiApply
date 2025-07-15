@@ -641,6 +641,7 @@ const JobSearchPage: React.FC = () => {
 
   // Function to load more jobs for infinite scroll
   const loadMoreJobs = async () => {
+    console.log('loadMoreJobs called:', { loadingMore, hasMore, sessionId, currentOffset });
     if (loadingMore || !hasMore || !sessionId) return;
 
     setLoadingMore(true);
@@ -704,6 +705,7 @@ const JobSearchPage: React.FC = () => {
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
+        console.log('Intersection observed:', entries[0].isIntersecting, { hasMore, loadingMore });
         if (entries[0].isIntersecting && hasMore && !loadingMore) {
           loadMoreJobs();
         }
@@ -712,6 +714,7 @@ const JobSearchPage: React.FC = () => {
     );
 
     const sentinel = document.getElementById('scroll-sentinel');
+    console.log('Sentinel element:', sentinel);
     if (sentinel) {
       observer.observe(sentinel);
     }
@@ -1136,36 +1139,38 @@ const JobSearchPage: React.FC = () => {
                     </div>
                     
                     {/* Match Score */}
-                    <div className="text-right">
-                      <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold ${getMatchScoreColor(job.match_score)}`}>
-                        <div className="relative">
-                          <svg className="w-8 h-8 transform -rotate-90">
-                            <circle
-                              cx="16"
-                              cy="16"
-                              r="14"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              fill="none"
-                              opacity="0.2"
-                            />
-                            <circle
-                              cx="16"
-                              cy="16"
-                              r="14"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              fill="none"
-                              strokeDasharray={`${2 * Math.PI * 14}`}
-                              strokeDashoffset={`${2 * Math.PI * 14 * (1 - job.match_score / 100)}`}
-                              className="transition-all duration-500"
-                            />
-                          </svg>
+                    {job.match_score !== undefined && (
+                      <div className="text-right">
+                        <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold ${getMatchScoreColor(job.match_score || 0)}`}>
+                          <div className="relative">
+                            <svg className="w-8 h-8 transform -rotate-90">
+                              <circle
+                                cx="16"
+                                cy="16"
+                                r="14"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                fill="none"
+                                opacity="0.2"
+                              />
+                              <circle
+                                cx="16"
+                                cy="16"
+                                r="14"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                fill="none"
+                                strokeDasharray={`${2 * Math.PI * 14}`}
+                                strokeDashoffset={`${2 * Math.PI * 14 * (1 - (job.match_score || 0) / 100)}`}
+                                className="transition-all duration-500"
+                              />
+                            </svg>
+                          </div>
+                          <span>{job.match_score || 0}%</span>
                         </div>
-                        <span>{job.match_score}%</span>
+                        <p className="text-xs text-gray-500 mt-1">Match Score</p>
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">Match Score</p>
-                    </div>
+                    )}
                   </div>
 
                   {/* Job Description */}
@@ -1237,26 +1242,31 @@ const JobSearchPage: React.FC = () => {
               </motion.div>
             ))}
             
-            {/* Infinite Scroll Loading */}
-            {jobs.length > 0 && (
-              <>
-                <div id="scroll-sentinel" className="h-10" />
-                {loadingMore && (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="flex items-center gap-3">
-                      <Loader2 className="h-5 w-5 animate-spin text-teal-600" />
-                      <span className="text-gray-600">Loading more jobs...</span>
-                    </div>
-                  </div>
-                )}
-                {!hasMore && jobs.length >= 10 && (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500">No more jobs to load</p>
-                  </div>
-                )}
-              </>
-            )}
           </div>
+          
+          {/* Infinite Scroll Loading - Show only for recommended tab */}
+          {jobs.length > 0 && activeTab === 'recommended' && (
+            <>
+              <div id="scroll-sentinel" className="h-32 bg-gradient-to-b from-transparent to-gray-100/50 mt-4">
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-sm text-gray-400">Scroll down to load more jobs</p>
+                </div>
+              </div>
+              {loadingMore && (
+                <div className="flex items-center justify-center py-8 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Loader2 className="h-5 w-5 animate-spin text-teal-600" />
+                    <span className="text-gray-600 font-medium">Loading more jobs...</span>
+                  </div>
+                </div>
+              )}
+              {!hasMore && jobs.length >= 10 && (
+                <div className="text-center py-8 bg-gray-50 rounded-lg">
+                  <p className="text-gray-500">No more jobs to load</p>
+                </div>
+              )}
+            </>
+          )}
         )}
 
         {/* Empty State */}
