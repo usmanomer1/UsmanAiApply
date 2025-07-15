@@ -1258,7 +1258,6 @@ const JobSearchPage: React.FC = () => {
               )}
             </>
           )}
-        )}
 
         {/* Empty State */}
         {!loading && !initializing && jobs.length === 0 && !error && (
