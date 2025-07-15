@@ -334,6 +334,8 @@ const JobSearchPage: React.FC = () => {
                       const response = await joboticApi.searchJobsBasic(basicRequest);
                       console.log('Basic auto-search response:', response.data?.jobs?.[0]);
                       setJobs(response.data?.jobs || []);
+                      setTotalPages(response.data?.totalPages || 1);
+                      setHasMore((response.data?.totalPages || 1) > 1);
                     }
                   } else {
                     // No resume, use basic search
@@ -346,6 +348,8 @@ const JobSearchPage: React.FC = () => {
                     const response = await joboticApi.searchJobsBasic(basicRequest);
                     console.log('Basic auto-search response:', response.data?.jobs?.[0]);
                     setJobs(response.data?.jobs || []);
+                    setTotalPages(response.data?.totalPages || 1);
+                    setHasMore((response.data?.totalPages || 1) > 1);
                   }
                   setInitialLoad(false);
                 } catch (err) {
@@ -440,6 +444,15 @@ const JobSearchPage: React.FC = () => {
 
         const response = await joboticApi.searchJobsBasic(request);
         setJobs(response.data?.jobs || []);
+        setTotalPages(response.data?.totalPages || 1);
+        setHasMore((response.data?.totalPages || 1) > 1);
+        
+        console.log('Basic search response:', {
+          totalJobs: response.data?.jobs?.length,
+          totalPages: response.data?.totalPages,
+          currentPage: response.data?.currentPage,
+          hasMore: (response.data?.totalPages || 1) > 1
+        });
         
         if (!response.data?.jobs || response.data.jobs.length === 0) {
           toast.info('No jobs found. Try different keywords or location.');
@@ -1345,8 +1358,8 @@ const JobSearchPage: React.FC = () => {
           </div>
         )}
           
-        {/* Infinite Scroll Loading - Show only for recommended tab */}
-        {!loading && !initializing && jobs.length > 0 && activeTab === 'recommended' && (
+        {/* Infinite Scroll Loading */}
+        {!loading && !initializing && jobs.length > 0 && (
           <>
             {/* Show loading state when loading more */}
             {loadingMore && (
@@ -1360,7 +1373,9 @@ const JobSearchPage: React.FC = () => {
             
             {/* Show sentinel when there are more pages to load */}
             {hasMore && (
-              <div id="scroll-sentinel" className="h-20 mt-4" />
+              <div id="scroll-sentinel" className="h-20 mt-4 bg-red-100 flex items-center justify-center">
+                <p className="text-sm text-red-600">Scroll sentinel - Debug: hasMore={String(hasMore)}, page={currentPage}/{totalPages}</p>
+              </div>
             )}
             
             {/* Show end message only when we've loaded all pages */}
