@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, MapPin, Briefcase, Clock, Filter, X, Loader2, ExternalLink, ChevronRight, Heart, Users, DollarSign, Building2, Star, Bookmark, ArrowUpRight, Calendar, Shield, TrendingUp } from 'lucide-react';
-import { joboticApi, JobSearchRequest, JobMatchRequest, JobMatchResponse } from '../lib/joboticApi';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Search, MapPin, Briefcase, Filter, X, Loader2, ChevronRight, Heart, Users, DollarSign, Building2, Star, Bookmark, ArrowUpRight, TrendingUp } from 'lucide-react';
+import { joboticApi, JobSearchRequest, JobMatchRequest } from '../lib/joboticApi';
+import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { extractTextFromPDF } from '../lib/pdfExtractor';
 import { ResumeAnalyzerV2 } from './ResumeAnalyzerV2';
-import { handleApiError } from '../lib/apiErrorHandler';
-import toast from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import LoadingTransition from './LoadingTransition';
 import { useLocation } from 'react-router-dom';
 import { canPerformAIOperation, trackAITokens } from '../lib/aiTokenTracking';
@@ -428,7 +427,7 @@ const JobSearchPage: React.FC = () => {
         }
       }
     } catch (err) {
-      const errorMessage = handleApiError(err);
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -565,7 +564,7 @@ const JobSearchPage: React.FC = () => {
             match_score: job.match_score
           }
         })
-        .onConflict('user_id,job_id,interaction_type');
+        .select();
         
       if (interactionError) throw interactionError;
       
@@ -1237,27 +1236,28 @@ const JobSearchPage: React.FC = () => {
                 </div>
               </motion.div>
             ))}
-          </div>
-
-          {/* Infinite Scroll Loading */}
-          {jobs.length > 0 && (
-            <>
-              <div id="scroll-sentinel" className="h-10" />
-              {loadingMore && (
-                <div className="flex items-center justify-center py-8">
-                  <div className="flex items-center gap-3">
-                    <Loader2 className="h-5 w-5 animate-spin text-teal-600" />
-                    <span className="text-gray-600">Loading more jobs...</span>
+            
+            {/* Infinite Scroll Loading */}
+            {jobs.length > 0 && (
+              <>
+                <div id="scroll-sentinel" className="h-10" />
+                {loadingMore && (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="h-5 w-5 animate-spin text-teal-600" />
+                      <span className="text-gray-600">Loading more jobs...</span>
+                    </div>
                   </div>
-                </div>
-              )}
-              {!hasMore && jobs.length >= 10 && (
-                <div className="text-center py-8">
-                  <p className="text-gray-500">No more jobs to load</p>
-                </div>
-              )}
-            </>
-          )}
+                )}
+                {!hasMore && jobs.length >= 10 && (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">No more jobs to load</p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
 
         {/* Empty State */}
         {!loading && !initializing && jobs.length === 0 && !error && (
