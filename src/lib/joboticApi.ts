@@ -116,6 +116,8 @@ interface JobMatchResponse {
     totalMatched: number;
     currentPage: number;
     totalPages: number;
+    hasMore?: boolean; // New field from backend
+    resultsPerPage?: number; // New field from backend
     searchCriteria: {
       query: string;
       jobTitle?: string;
@@ -130,6 +132,11 @@ interface JobMatchResponse {
     search: number;
     matching: string;
     fromCache: boolean;
+  };
+  usage?: { // New usage tracking from backend
+    monthly_limit: number;
+    monthly_used: number;
+    remaining: number | 'unlimited';
   };
 }
 
