@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, MapPin, Briefcase, Clock, Filter, X, Loader2, ExternalLink, ChevronRight, Heart, Users, DollarSign, Building2, Star, Bookmark, ArrowUpRight, Calendar, Shield, TrendingUp } from 'lucide-react';
-import { joboticApi, JobMatchRequest, JobMatchResponse } from '../lib/joboticApi';
+import { joboticApi, JobSearchRequest, JobMatchRequest, JobMatchResponse } from '../lib/joboticApi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -11,6 +11,7 @@ import toast from 'react-hot-toast';
 import LoadingTransition from './LoadingTransition';
 import { useLocation } from 'react-router-dom';
 import { canPerformAIOperation, trackAITokens } from '../lib/aiTokenTracking';
+import { getPlanLimits } from '../stripe-config';
 
 interface Job {
   job_id: string;
@@ -56,11 +57,10 @@ const JobSearchPage: React.FC = () => {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
-    jobType: '',
-    salaryRange: '',
-    datePosted: '',
-    experienceLevel: '',
-    remoteOnly: false
+    employment_types: [] as string[],
+    date_posted: '',
+    job_requirements: [] as string[],
+    remote_jobs_only: false
   });
   const filterDropdownRef = useRef<HTMLDivElement>(null);
   const [showResumeOptimizeModal, setShowResumeOptimizeModal] = useState(false);
@@ -70,13 +70,20 @@ const JobSearchPage: React.FC = () => {
   const [initialLoad, setInitialLoad] = useState(true);
   const [initializing, setInitializing] = useState(true);
   const [showLoadingTransition, setShowLoadingTransition] = useState(false);
+  const [sessionId, setSessionId] = useState<string>('');
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [currentOffset, setCurrentOffset] = useState(0);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [usageStats, setUsageStats] = useState<{ jobsViewed: number; jobLimit: number }>({ jobsViewed: 0, jobLimit: 100 });
 
-  // Load saved job interactions
+  // Load saved job interactions and usage stats
   useEffect(() => {
-    const loadJobInteractions = async () => {
+    const loadJobInteractionsAndUsage = async () => {
       if (!user?.id) return;
       
       try {
+        // Load job interactions
         const { data, error } = await supabase
           .from('job_interactions')
           .select('job_id, interaction_type')
@@ -97,12 +104,43 @@ const JobSearchPage: React.FC = () => {
           setSavedJobs(saved);
           setAppliedJobs(applied);
         }
+
+        // Load usage stats based on user's subscription
+        const { data: subscription } = await supabase
+          .from('stripe_user_subscriptions')
+          .select('price_id')
+          .eq('user_id', user.id)
+          .single();
+
+        if (subscription?.price_id) {
+          const planLimits = getPlanLimits(subscription.price_id);
+          if (planLimits) {
+            // Get current month's job view count
+            const startOfMonth = new Date();
+            startOfMonth.setDate(1);
+            startOfMonth.setHours(0, 0, 0, 0);
+            
+            const { count } = await supabase
+              .from('job_views')
+              .select('*', { count: 'exact', head: true })
+              .eq('user_id', user.id)
+              .gte('created_at', startOfMonth.toISOString());
+            
+            setUsageStats({
+              jobsViewed: count || 0,
+              jobLimit: planLimits.applications || 100
+            });
+          }
+        } else {
+          // Free tier defaults
+          setUsageStats({ jobsViewed: 0, jobLimit: 100 });
+        }
       } catch (error) {
-        console.error('Error loading job interactions:', error);
+        console.error('Error loading job interactions and usage:', error);
       }
     };
     
-    loadJobInteractions();
+    loadJobInteractionsAndUsage();
   }, [user]);
   
   // Handle click outside for filter dropdown
@@ -242,42 +280,25 @@ const JobSearchPage: React.FC = () => {
                   // Check if desired roles contain specific job types
                   const roles = profile.desired_roles.map((r: string) => r.toLowerCase());
                   if (roles.some((r: string) => r.includes('remote'))) {
-                    setFilters(prev => ({ ...prev, remoteOnly: true }));
+                    setFilters(prev => ({ ...prev, remote_jobs_only: true }));
                   }
                 }
                 
-                // Perform auto-search
-                const request: JobMatchRequest = {
-                  resumeText: text,
-                  preferences: {
-                    jobTitle: primaryRole,
-                    location: primaryLocation || undefined
-                  },
-                  page: 1
+                // Perform auto-search using basic search (no filters initially)
+                const request: JobSearchRequest = {
+                  query: primaryRole,
+                  location: primaryLocation || undefined,
+                  page: 1,
+                  num_pages: 1
+                  // No filters on initial load as per requirements
                 };
 
                 setLoading(true);
                 try {
-                  // Check AI token limits for auto-search
-                  const { allowed } = await canPerformAIOperation(user.id);
-                  if (allowed) {
-                    const response = await joboticApi.searchJobs(request);
-                    setJobs(response.data?.jobs || []);
-                    setInitialLoad(false);
-                    
-                    // Track auto-search
-                    if (response.data?.jobs && response.data.jobs.length > 0) {
-                      await trackAITokens(user.id, 'job_search_match', {
-                        jobTitle: primaryRole,
-                        location: primaryLocation || 'Not specified',
-                        resultsCount: response.data.jobs.length,
-                        isAutoSearch: true
-                      });
-                    }
-                  } else {
-                    console.log('Auto-search skipped due to insufficient AI tokens');
-                    setInitialLoad(false);
-                  }
+                  // Use basic search for initial load (no AI token requirement)
+                  const response = await joboticApi.searchJobsBasic(request);
+                  setJobs(response.data?.jobs || []);
+                  setInitialLoad(false);
                 } catch (err) {
                   console.error('Auto-search error:', err);
                 } finally {
@@ -289,38 +310,20 @@ const JobSearchPage: React.FC = () => {
                 setSearchQuery('Software Engineer'); // Default search
                 setLocation('Remote');
                 
-                const request: JobMatchRequest = {
-                  resumeText: text,
-                  preferences: {
-                    jobTitle: 'Software Engineer',
-                    location: 'Remote'
-                  },
-                  page: 1
+                const request: JobSearchRequest = {
+                  query: 'Software Engineer',
+                  location: 'Remote',
+                  page: 1,
+                  num_pages: 1
+                  // No filters on initial load
                 };
 
                 setLoading(true);
                 try {
-                  // Check AI token limits for default search
-                  const { allowed } = await canPerformAIOperation(user.id);
-                  if (allowed) {
-                    const response = await joboticApi.searchJobs(request);
-                    setJobs(response.data?.jobs || []);
-                    setInitialLoad(false);
-                    
-                    // Track default search
-                    if (response.data?.jobs && response.data.jobs.length > 0) {
-                      await trackAITokens(user.id, 'job_search_match', {
-                        jobTitle: 'Software Engineer',
-                        location: 'Remote',
-                        resultsCount: response.data.jobs.length,
-                        isAutoSearch: true,
-                        isDefaultSearch: true
-                      });
-                    }
-                  } else {
-                    console.log('Default search skipped due to insufficient AI tokens');
-                    setInitialLoad(false);
-                  }
+                  // Use basic search for default search (no AI token requirement)
+                  const response = await joboticApi.searchJobsBasic(request);
+                  setJobs(response.data?.jobs || []);
+                  setInitialLoad(false);
                 } catch (err) {
                   console.error('Default search error:', err);
                   setError('Unable to load jobs. Please try searching manually.');
@@ -348,48 +351,81 @@ const JobSearchPage: React.FC = () => {
       return;
     }
 
-    if (!resumeText) {
-      toast.error('Please upload a resume in your profile first');
-      return;
-    }
-
     if (!user?.id) {
       toast.error('Please sign in to search for jobs');
       return;
     }
 
-    // Check AI token limits
-    const { allowed, reason } = await canPerformAIOperation(user.id);
-    if (!allowed) {
-      toast.error(reason || 'Insufficient AI tokens for job search');
-      return;
-    }
-
     setLoading(true);
     setError(null);
+    
+    // Reset infinite scroll state
+    setCurrentOffset(0);
+    setHasMore(true);
+    setSessionId(Date.now().toString()); // Generate new session ID
 
     try {
-      const request: JobMatchRequest = {
-        resumeText: resumeText,
-        preferences: {
-          jobTitle: searchQuery,
-          location: location || undefined
-        },
-        page: 1
-      };
+      // Check if we have any filters applied
+      const hasFilters = filters.employment_types.length > 0 || 
+                        filters.date_posted !== '' || 
+                        filters.job_requirements.length > 0 || 
+                        filters.remote_jobs_only;
 
-      const response = await joboticApi.searchJobs(request);
-      setJobs(response.data?.jobs || []);
-      
-      if (!response.data?.jobs || response.data.jobs.length === 0) {
-        toast.info('No jobs found. Try different keywords or location.');
+      // Use basic search if no resume or when filters are applied from the start
+      if (!resumeText || hasFilters) {
+        const request: JobSearchRequest = {
+          query: searchQuery,
+          location: location || undefined,
+          page: 1,
+          num_pages: 1,
+          // Only include filters if they are set
+          ...(filters.employment_types.length > 0 && { employment_types: filters.employment_types as ('FULLTIME' | 'PARTTIME' | 'INTERN' | 'CONTRACTOR')[] }),
+          ...(filters.date_posted && { date_posted: filters.date_posted as 'all' | 'today' | '3days' | 'week' | 'month' }),
+          ...(filters.remote_jobs_only && { remote_jobs_only: true }),
+          ...(filters.job_requirements.length > 0 && { job_requirements: filters.job_requirements as ('no_exp' | 'under_3_years_exp' | 'more_than_3_years_exp' | 'no_degree' | 'fair_chance')[] })
+        };
+
+        const response = await joboticApi.searchJobsBasic(request);
+        setJobs(response.data?.jobs || []);
+        
+        if (!response.data?.jobs || response.data.jobs.length === 0) {
+          toast.info('No jobs found. Try different keywords or location.');
+        }
       } else {
-        // Track successful search
-        await trackAITokens(user.id, 'job_search_match', {
-          jobTitle: searchQuery,
-          location: location || 'Not specified',
-          resultsCount: response.data.jobs.length
-        });
+        // Use AI-powered search with resume matching
+        // Check AI token limits
+        const { allowed, reason } = await canPerformAIOperation(user.id);
+        if (!allowed) {
+          toast.error(reason || 'Insufficient AI tokens for job search');
+          return;
+        }
+
+        const request: JobMatchRequest = {
+          resumeText: resumeText,
+          query: searchQuery,
+          location: location || undefined,
+          page: 1,
+          num_pages: 1,
+          // Include filters if set
+          ...(filters.employment_types.length > 0 && { employment_types: filters.employment_types as ('FULLTIME' | 'PARTTIME' | 'INTERN' | 'CONTRACTOR')[] }),
+          ...(filters.date_posted && { date_posted: filters.date_posted as 'all' | 'today' | '3days' | 'week' | 'month' }),
+          ...(filters.remote_jobs_only && { remote_jobs_only: true }),
+          ...(filters.job_requirements.length > 0 && { job_requirements: filters.job_requirements as ('no_exp' | 'under_3_years_exp' | 'more_than_3_years_exp' | 'no_degree' | 'fair_chance')[] })
+        };
+
+        const response = await joboticApi.searchJobs(request);
+        setJobs(response.data?.jobs || []);
+        
+        if (!response.data?.jobs || response.data.jobs.length === 0) {
+          toast.info('No jobs found. Try different keywords or location.');
+        } else {
+          // Track successful search
+          await trackAITokens(user.id, 'job_search_match', {
+            jobTitle: searchQuery,
+            location: location || 'Not specified',
+            resultsCount: response.data.jobs.length
+          });
+        }
       }
     } catch (err) {
       const errorMessage = handleApiError(err);
@@ -604,6 +640,90 @@ const JobSearchPage: React.FC = () => {
     setShowResumeOptimizeModal(true);
   };
 
+  // Function to load more jobs for infinite scroll
+  const loadMoreJobs = async () => {
+    if (loadingMore || !hasMore || !sessionId) return;
+
+    setLoadingMore(true);
+    try {
+      const hasFilters = filters.employment_types.length > 0 || 
+                        filters.date_posted !== '' || 
+                        filters.job_requirements.length > 0 || 
+                        filters.remote_jobs_only;
+
+      if (!resumeText || hasFilters) {
+        // Use basic search for loading more
+        const request: JobSearchRequest = {
+          query: searchQuery,
+          location: location || undefined,
+          page: Math.floor(currentOffset / 10) + 2, // Calculate next page
+          num_pages: 1,
+          ...(filters.employment_types.length > 0 && { employment_types: filters.employment_types as ('FULLTIME' | 'PARTTIME' | 'INTERN' | 'CONTRACTOR')[] }),
+          ...(filters.date_posted && { date_posted: filters.date_posted as 'all' | 'today' | '3days' | 'week' | 'month' }),
+          ...(filters.remote_jobs_only && { remote_jobs_only: true }),
+          ...(filters.job_requirements.length > 0 && { job_requirements: filters.job_requirements as ('no_exp' | 'under_3_years_exp' | 'more_than_3_years_exp' | 'no_degree' | 'fair_chance')[] })
+        };
+
+        const response = await joboticApi.searchJobsBasic(request);
+        if (response.data?.jobs && response.data.jobs.length > 0) {
+          setJobs(prev => [...prev, ...response.data.jobs]);
+          setCurrentOffset(prev => prev + response.data.jobs.length);
+        } else {
+          setHasMore(false);
+        }
+      } else {
+        // Use AI-powered search for loading more with session
+        const request: JobMatchRequest = {
+          resumeText: resumeText,
+          query: searchQuery,
+          location: location || undefined,
+          session_id: sessionId,
+          offset: currentOffset + 10,
+          limit: 10,
+          ...(filters.employment_types.length > 0 && { employment_types: filters.employment_types as ('FULLTIME' | 'PARTTIME' | 'INTERN' | 'CONTRACTOR')[] }),
+          ...(filters.date_posted && { date_posted: filters.date_posted as 'all' | 'today' | '3days' | 'week' | 'month' }),
+          ...(filters.remote_jobs_only && { remote_jobs_only: true }),
+          ...(filters.job_requirements.length > 0 && { job_requirements: filters.job_requirements as ('no_exp' | 'under_3_years_exp' | 'more_than_3_years_exp' | 'no_degree' | 'fair_chance')[] })
+        };
+
+        const response = await joboticApi.searchJobs(request);
+        if (response.data?.jobs && response.data.jobs.length > 0) {
+          setJobs(prev => [...prev, ...response.data.jobs]);
+          setCurrentOffset(prev => prev + response.data.jobs.length);
+        } else {
+          setHasMore(false);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading more jobs:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // Infinite scroll observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore) {
+          loadMoreJobs();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const sentinel = document.getElementById('scroll-sentinel');
+    if (sentinel) {
+      observer.observe(sentinel);
+    }
+
+    return () => {
+      if (sentinel) {
+        observer.unobserve(sentinel);
+      }
+    };
+  }, [hasMore, loadingMore, currentOffset, sessionId, searchQuery, location, filters, resumeText]);
+
   return (
     <>
       {/* Loading Transition */}
@@ -709,65 +829,74 @@ const JobSearchPage: React.FC = () => {
             <div className="relative" ref={filterDropdownRef}>
               <button 
                 onClick={() => setShowFilters(!showFilters)}
-                className={`px-4 py-2 bg-white border ${filters.jobType ? 'border-teal-500 text-teal-600' : 'border-gray-200 text-gray-700'} rounded-full text-sm font-medium hover:border-gray-300 transition-colors flex items-center gap-2`}
+                className={`px-4 py-2 bg-white border ${filters.employment_types.length > 0 ? 'border-teal-500 text-teal-600' : 'border-gray-200 text-gray-700'} rounded-full text-sm font-medium hover:border-gray-300 transition-colors flex items-center gap-2`}
               >
                 <Briefcase className="h-4 w-4" />
-                {filters.jobType || 'Job Type'}
+                {filters.employment_types.length > 0 ? `${filters.employment_types.length} selected` : 'Employment Type'}
               </button>
               {showFilters && (
                 <div className="absolute top-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-10 min-w-[200px]">
                   <div className="space-y-2">
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
-                        type="radio"
-                        name="jobType"
-                        value=""
-                        checked={filters.jobType === ''}
-                        onChange={(e) => setFilters(prev => ({ ...prev, jobType: e.target.value }))}
-                        className="text-teal-600"
-                      />
-                      <span className="text-sm">All Types</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="jobType"
+                        type="checkbox"
                         value="FULLTIME"
-                        checked={filters.jobType === 'FULLTIME'}
-                        onChange={(e) => setFilters(prev => ({ ...prev, jobType: e.target.value }))}
+                        checked={filters.employment_types.includes('FULLTIME')}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFilters(prev => ({ ...prev, employment_types: [...prev.employment_types, 'FULLTIME'] }));
+                          } else {
+                            setFilters(prev => ({ ...prev, employment_types: prev.employment_types.filter(t => t !== 'FULLTIME') }));
+                          }
+                        }}
                         className="text-teal-600"
                       />
                       <span className="text-sm">Full-time</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
-                        type="radio"
-                        name="jobType"
+                        type="checkbox"
                         value="PARTTIME"
-                        checked={filters.jobType === 'PARTTIME'}
-                        onChange={(e) => setFilters(prev => ({ ...prev, jobType: e.target.value }))}
+                        checked={filters.employment_types.includes('PARTTIME')}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFilters(prev => ({ ...prev, employment_types: [...prev.employment_types, 'PARTTIME'] }));
+                          } else {
+                            setFilters(prev => ({ ...prev, employment_types: prev.employment_types.filter(t => t !== 'PARTTIME') }));
+                          }
+                        }}
                         className="text-teal-600"
                       />
                       <span className="text-sm">Part-time</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
-                        type="radio"
-                        name="jobType"
-                        value="CONTRACT"
-                        checked={filters.jobType === 'CONTRACT'}
-                        onChange={(e) => setFilters(prev => ({ ...prev, jobType: e.target.value }))}
+                        type="checkbox"
+                        value="CONTRACTOR"
+                        checked={filters.employment_types.includes('CONTRACTOR')}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFilters(prev => ({ ...prev, employment_types: [...prev.employment_types, 'CONTRACTOR'] }));
+                          } else {
+                            setFilters(prev => ({ ...prev, employment_types: prev.employment_types.filter(t => t !== 'CONTRACTOR') }));
+                          }
+                        }}
                         className="text-teal-600"
                       />
                       <span className="text-sm">Contract</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
-                        type="radio"
-                        name="jobType"
+                        type="checkbox"
                         value="INTERN"
-                        checked={filters.jobType === 'INTERN'}
-                        onChange={(e) => setFilters(prev => ({ ...prev, jobType: e.target.value }))}
+                        checked={filters.employment_types.includes('INTERN')}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFilters(prev => ({ ...prev, employment_types: [...prev.employment_types, 'INTERN'] }));
+                          } else {
+                            setFilters(prev => ({ ...prev, employment_types: prev.employment_types.filter(t => t !== 'INTERN') }));
+                          }
+                        }}
                         className="text-teal-600"
                       />
                       <span className="text-sm">Internship</span>
@@ -778,49 +907,50 @@ const JobSearchPage: React.FC = () => {
             </div>
             
             <button 
-              onClick={() => setFilters(prev => ({ ...prev, remoteOnly: !prev.remoteOnly }))}
-              className={`px-4 py-2 bg-white border ${filters.remoteOnly ? 'border-teal-500 text-teal-600' : 'border-gray-200 text-gray-700'} rounded-full text-sm font-medium hover:border-gray-300 transition-colors flex items-center gap-2`}
+              onClick={() => setFilters(prev => ({ ...prev, remote_jobs_only: !prev.remote_jobs_only }))}
+              className={`px-4 py-2 bg-white border ${filters.remote_jobs_only ? 'border-teal-500 text-teal-600' : 'border-gray-200 text-gray-700'} rounded-full text-sm font-medium hover:border-gray-300 transition-colors flex items-center gap-2`}
             >
               <MapPin className="h-4 w-4" />
               Remote Only
             </button>
             
             <select
-              value={filters.datePosted}
-              onChange={(e) => setFilters(prev => ({ ...prev, datePosted: e.target.value }))}
-              className={`px-4 py-2 bg-white border ${filters.datePosted ? 'border-teal-500 text-teal-600' : 'border-gray-200 text-gray-700'} rounded-full text-sm font-medium hover:border-gray-300 transition-colors appearance-none cursor-pointer`}
+              value={filters.date_posted}
+              onChange={(e) => setFilters(prev => ({ ...prev, date_posted: e.target.value }))}
+              className={`px-4 py-2 bg-white border ${filters.date_posted ? 'border-teal-500 text-teal-600' : 'border-gray-200 text-gray-700'} rounded-full text-sm font-medium hover:border-gray-300 transition-colors appearance-none cursor-pointer`}
             >
               <option value="">Date Posted</option>
-              <option value="24h">Last 24 hours</option>
-              <option value="3d">Last 3 days</option>
-              <option value="7d">Last 7 days</option>
-              <option value="14d">Last 14 days</option>
-              <option value="30d">Last 30 days</option>
+              <option value="all">All time</option>
+              <option value="today">Today</option>
+              <option value="3days">Last 3 days</option>
+              <option value="week">Last week</option>
+              <option value="month">Last month</option>
             </select>
             
             <select
-              value={filters.experienceLevel}
-              onChange={(e) => setFilters(prev => ({ ...prev, experienceLevel: e.target.value }))}
-              className={`px-4 py-2 bg-white border ${filters.experienceLevel ? 'border-teal-500 text-teal-600' : 'border-gray-200 text-gray-700'} rounded-full text-sm font-medium hover:border-gray-300 transition-colors appearance-none cursor-pointer`}
+              value={filters.job_requirements.join(',')}
+              onChange={(e) => {
+                const value = e.target.value;
+                setFilters(prev => ({ ...prev, job_requirements: value ? [value] : [] }));
+              }}
+              className={`px-4 py-2 bg-white border ${filters.job_requirements.length > 0 ? 'border-teal-500 text-teal-600' : 'border-gray-200 text-gray-700'} rounded-full text-sm font-medium hover:border-gray-300 transition-colors appearance-none cursor-pointer`}
             >
               <option value="">Experience Level</option>
-              <option value="internship">Internship</option>
-              <option value="entry">Entry Level</option>
-              <option value="mid">Mid Level</option>
-              <option value="senior">Senior Level</option>
-              <option value="lead">Lead/Principal</option>
-              <option value="executive">Executive</option>
+              <option value="no_exp">No Experience Required</option>
+              <option value="under_3_years_exp">Under 3 Years Experience</option>
+              <option value="more_than_3_years_exp">3+ Years Experience</option>
+              <option value="no_degree">No Degree Required</option>
+              <option value="fair_chance">Fair Chance (2nd chance)</option>
             </select>
             
             {/* Clear Filters */}
-            {(filters.jobType || filters.remoteOnly || filters.datePosted || filters.experienceLevel) && (
+            {(filters.employment_types.length > 0 || filters.remote_jobs_only || filters.date_posted || filters.job_requirements.length > 0) && (
               <button
                 onClick={() => setFilters({
-                  jobType: '',
-                  salaryRange: '',
-                  datePosted: '',
-                  experienceLevel: '',
-                  remoteOnly: false
+                  employment_types: [],
+                  date_posted: '',
+                  job_requirements: [],
+                  remote_jobs_only: false
                 })}
                 className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 transition-colors flex items-center gap-1"
               >
@@ -863,12 +993,20 @@ const JobSearchPage: React.FC = () => {
 
       {/* Main Content */}
       <div className="px-8 py-6">
-        {/* Results Count */}
+        {/* Results Count and Usage */}
         {jobs.length > 0 && (
           <div className="mb-6 flex items-center justify-between">
-            <p className="text-sm text-gray-600">
-              Showing <span className="font-medium text-gray-900">{jobs.length}</span> AI-matched opportunities
-            </p>
+            <div className="flex items-center gap-6">
+              <p className="text-sm text-gray-600">
+                Showing <span className="font-medium text-gray-900">{jobs.length}</span> AI-matched opportunities
+              </p>
+              <div className="flex items-center gap-2 px-3 py-1 bg-gray-50 rounded-full">
+                <span className="text-xs text-gray-600">Usage:</span>
+                <span className={`text-xs font-medium ${usageStats.jobsViewed >= usageStats.jobLimit ? 'text-red-600' : 'text-gray-900'}`}>
+                  {usageStats.jobsViewed}/{usageStats.jobLimit === -1 ? '∞' : usageStats.jobLimit} jobs this month
+                </span>
+              </div>
+            </div>
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <TrendingUp className="h-4 w-4" />
               <span>Sorted by match score</span>
@@ -900,34 +1038,19 @@ const JobSearchPage: React.FC = () => {
               return true;
             }).filter(job => {
               // Apply filters
-              if (filters.jobType && job.job_employment_type !== filters.jobType) return false;
-              if (filters.remoteOnly && !job.job_is_remote) return false;
-              if (filters.datePosted) {
+              if (filters.employment_types.length > 0 && !filters.employment_types.includes(job.job_employment_type)) return false;
+              if (filters.remote_jobs_only && !job.job_is_remote) return false;
+              if (filters.date_posted) {
                 const postedDate = new Date(job.job_posted_at_datetime_utc);
                 const now = new Date();
                 const diffDays = Math.floor((now.getTime() - postedDate.getTime()) / (1000 * 60 * 60 * 24));
                 
-                switch(filters.datePosted) {
-                  case '24h': if (diffDays > 1) return false; break;
-                  case '3d': if (diffDays > 3) return false; break;
-                  case '7d': if (diffDays > 7) return false; break;
-                  case '14d': if (diffDays > 14) return false; break;
-                  case '30d': if (diffDays > 30) return false; break;
-                }
-              }
-              
-              // Apply salary filter
-              if (filters.salaryRange) {
-                const [minStr, maxStr] = filters.salaryRange.split('-');
-                const filterMin = parseInt(minStr);
-                const filterMax = parseInt(maxStr);
-                
-                // Check if job has salary data
-                if (job.job_min_salary && job.job_max_salary) {
-                  // Job salary should overlap with user's desired range
-                  if (job.job_max_salary < filterMin || job.job_min_salary > filterMax) {
-                    return false;
-                  }
+                switch(filters.date_posted) {
+                  case 'today': if (diffDays > 1) return false; break;
+                  case '3days': if (diffDays > 3) return false; break;
+                  case 'week': if (diffDays > 7) return false; break;
+                  case 'month': if (diffDays > 30) return false; break;
+                  case 'all': break; // Show all
                 }
               }
               
@@ -939,9 +1062,12 @@ const JobSearchPage: React.FC = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="bg-white rounded-xl border border-gray-100 hover:border-gray-200 hover:shadow-lg transition-all duration-200 overflow-hidden group"
+                className="bg-white rounded-xl border border-gray-100 hover:border-teal-200 hover:shadow-xl hover:scale-[1.02] transition-all duration-300 overflow-hidden group cursor-pointer relative"
               >
-                <div className="p-6">
+                {/* Hover overlay gradient */}
+                <div className="absolute inset-0 bg-gradient-to-br from-teal-50/0 to-teal-50/0 group-hover:from-teal-50/5 group-hover:to-teal-100/5 transition-all duration-300 pointer-events-none" />
+                
+                <div className="p-6 relative">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-start gap-4">
                       {/* Company Logo */}
@@ -967,12 +1093,12 @@ const JobSearchPage: React.FC = () => {
                           </h3>
                           <button
                             onClick={() => toggleSaveJob(job.job_id)}
-                            className="ml-4 p-2 text-gray-400 hover:text-teal-600 transition-colors"
+                            className="ml-4 p-2 text-gray-400 hover:text-teal-600 hover:scale-110 transition-all duration-200"
                           >
                             {savedJobs.has(job.job_id) ? (
                               <Heart className="h-5 w-5 fill-current text-teal-600" />
                             ) : (
-                              <Heart className="h-5 w-5" />
+                              <Heart className="h-5 w-5 hover:fill-current" />
                             )}
                           </button>
                         </div>
@@ -1054,7 +1180,7 @@ const JobSearchPage: React.FC = () => {
                     {job.job_required_skills && job.job_required_skills.length > 0 && (
                       <div className="flex flex-wrap gap-2">
                         {job.job_required_skills.slice(0, 4).map((skill, index) => (
-                          <span key={index} className="px-3 py-1 bg-gray-50 text-gray-700 rounded-full text-xs font-medium border border-gray-100">
+                          <span key={index} className="px-3 py-1 bg-gray-50 text-gray-700 rounded-full text-xs font-medium border border-gray-100 group-hover:bg-teal-50 group-hover:border-teal-200 group-hover:text-teal-700 transition-all duration-200">
                             {skill}
                           </span>
                         ))}
@@ -1086,7 +1212,7 @@ const JobSearchPage: React.FC = () => {
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleOptimizeResume(job)}
-                        className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium flex items-center gap-2"
+                        className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 hover:shadow-lg hover:scale-105 transition-all duration-200 text-sm font-medium flex items-center gap-2"
                       >
                         Optimize Resume
                       </button>
@@ -1112,6 +1238,26 @@ const JobSearchPage: React.FC = () => {
               </motion.div>
             ))}
           </div>
+
+          {/* Infinite Scroll Loading */}
+          {jobs.length > 0 && (
+            <>
+              <div id="scroll-sentinel" className="h-10" />
+              {loadingMore && (
+                <div className="flex items-center justify-center py-8">
+                  <div className="flex items-center gap-3">
+                    <Loader2 className="h-5 w-5 animate-spin text-teal-600" />
+                    <span className="text-gray-600">Loading more jobs...</span>
+                  </div>
+                </div>
+              )}
+              {!hasMore && jobs.length >= 10 && (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No more jobs to load</p>
+                </div>
+              )}
+            </>
+          )}
         )}
 
         {/* Empty State */}

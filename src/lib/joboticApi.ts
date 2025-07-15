@@ -1,18 +1,61 @@
 const API_BASE_URL = import.meta.env.VITE_JOBOTIC_API_URL || 'https://jobotic-backend.vercel.app';
 const USE_NETLIFY_FUNCTION = !import.meta.env.VITE_JOBOTIC_API_KEY; // Use function if no VITE key
 
+// Basic Search Request (No AI Matching)
+interface JobSearchRequest {
+  // Search params (choose one approach)
+  query?: string;
+  // OR structured search
+  jobTitle?: string;
+  location?: string;
+  
+  // Pagination
+  page?: number;
+  num_pages?: number;
+  
+  // Filters (all optional)
+  date_posted?: 'all' | 'today' | '3days' | 'week' | 'month';
+  remote_jobs_only?: boolean;
+  employment_types?: ('FULLTIME' | 'PARTTIME' | 'INTERN' | 'CONTRACTOR')[];
+  job_requirements?: ('no_exp' | 'under_3_years_exp' | 'more_than_3_years_exp' | 'no_degree' | 'fair_chance')[];
+}
+
+// AI-Powered Match Request
 interface JobMatchRequest {
+  // Resume (required)
   resumeText: string;
+  
+  // Search query (choose one approach)
+  query?: string;
+  // OR structured search
+  jobTitle?: string;
+  location?: string;
+  
+  // Pagination for infinite scroll
+  limit?: number;
+  offset?: number;
+  session_id?: string;
+  
+  // Pages to fetch from JSearch
+  page?: number;
+  num_pages?: number;
+  
+  // Filters
+  date_posted?: 'all' | 'today' | '3days' | 'week' | 'month';
+  remote_jobs_only?: boolean;
+  employment_types?: ('FULLTIME' | 'PARTTIME' | 'INTERN' | 'CONTRACTOR')[];
+  job_requirements?: ('no_exp' | 'under_3_years_exp' | 'more_than_3_years_exp' | 'no_degree' | 'fair_chance')[];
+  
+  // AI Filtering
+  min_score?: number;
+  
+  // Legacy preferences support
   preferences?: {
     jobTitle?: string;
     location?: string;
     keywords?: string[];
     datePosted?: string;
   };
-  page?: number;
-  remote_jobs_only?: boolean;
-  employment_types?: string[];
-  job_requirements?: string[];
 }
 
 // PDF Export Types
@@ -103,7 +146,7 @@ class JoboticApiService {
     }
   }
 
-  private async makeRequest<T>(endpoint: string, data: any, options: { method?: string } = {}): Promise<T> {
+  private async makeRequest<T>(endpoint: string, data: any, options: { method?: string; requiresAuth?: boolean } = {}): Promise<T> {
     const isNetlifyFunction = USE_NETLIFY_FUNCTION;
     const url = isNetlifyFunction ? '/.netlify/functions/jobotic-api' : `${API_BASE_URL}${endpoint}`;
     
@@ -114,12 +157,28 @@ class JoboticApiService {
       ? { endpoint, ...data }
       : data;
     
+    // Build headers based on endpoint requirements
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (!isNetlifyFunction) {
+      // Always add X-API-Key for direct API calls
+      headers['X-API-Key'] = this.apiKey;
+      
+      // Add Bearer token for endpoints that require authentication
+      if (options.requiresAuth) {
+        const { supabase } = await import('./supabase');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+      }
+    }
+    
     const response = await fetch(url, {
       method: options.method || 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(isNetlifyFunction ? {} : { 'X-API-Key': this.apiKey }),
-      },
+      headers,
       body: requestBody ? JSON.stringify(requestBody) : undefined,
     });
 
@@ -171,20 +230,24 @@ class JoboticApiService {
     return responseData;
   }
 
+  // AI-powered job matching - requires both Bearer token and X-API-Key
   async searchJobs(request: JobMatchRequest): Promise<JobMatchResponse> {
-    return this.makeRequest<JobMatchResponse>('/api/jobs/match', request);
+    return this.makeRequest<JobMatchResponse>('/api/jobs/match', request, { requiresAuth: true });
   }
   
-  async searchJobsBasic(request: Omit<JobMatchRequest, 'resumeText'>): Promise<JobMatchResponse> {
-    return this.makeRequest<JobMatchResponse>('/api/jobs/search', request);
+  // Basic job search - only requires X-API-Key
+  async searchJobsBasic(request: JobSearchRequest): Promise<JobMatchResponse> {
+    return this.makeRequest<JobMatchResponse>('/api/jobs/search', request, { requiresAuth: false });
   }
   
+  // Get job details - only requires X-API-Key
   async getJobDetails(jobId: string): Promise<any> {
-    return this.makeRequest<any>(`/api/jobs/${jobId}`, null, { method: 'GET' });
+    return this.makeRequest<any>(`/api/jobs/${jobId}`, null, { method: 'GET', requiresAuth: false });
   }
   
+  // Get salary estimate - only requires X-API-Key
   async getSalaryEstimate(request: { jobTitle: string; location: string }): Promise<any> {
-    return this.makeRequest<any>('/api/jobs/salary-estimate', request);
+    return this.makeRequest<any>('/api/jobs/salary-estimate', request, { requiresAuth: false });
   }
 
   // New PDF Export method
@@ -369,4 +432,4 @@ class JoboticApiService {
 }
 
 export const joboticApi = new JoboticApiService();
-export type { JobMatchRequest, JobMatchResponse, ExportPdfRequest, ExportPdfResponse };
+export type { JobSearchRequest, JobMatchRequest, JobMatchResponse, ExportPdfRequest, ExportPdfResponse };
