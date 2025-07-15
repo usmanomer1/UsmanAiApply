@@ -77,6 +77,19 @@ const JobSearchPage: React.FC = () => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [usageStats, setUsageStats] = useState<{ jobsViewed: number; jobLimit: number }>({ jobsViewed: 0, jobLimit: 100 });
 
+  // Debug effect to monitor pagination state changes
+  useEffect(() => {
+    console.log('Pagination state changed:', {
+      hasMore,
+      currentPage,
+      totalPages,
+      searchQuery,
+      location,
+      jobsCount: jobs.length,
+      sessionId
+    });
+  }, [hasMore, currentPage, totalPages, searchQuery, location, jobs.length, sessionId]);
+
   // Load saved job interactions and usage stats
   useEffect(() => {
     const loadJobInteractionsAndUsage = async () => {
@@ -308,14 +321,23 @@ const JobSearchPage: React.FC = () => {
                         hasMore: response.data?.hasMore,
                         totalPages: response.data?.totalPages,
                         currentPage: response.data?.currentPage,
-                        jobsCount: response.data?.jobs?.length
+                        jobsCount: response.data?.jobs?.length,
+                        fullResponse: response
                       });
                       const jobs = response.data?.jobs || [];
                       setJobs(jobs);
-                      // Use hasMore flag from API
-                      setHasMore(response.data?.hasMore || false);
-                      setTotalPages(response.data?.totalPages || 1);
-                      setCurrentPage(response.data?.currentPage || 1);
+                      // Use hasMore flag from API with fallback logic
+                      const apiHasMore = response.data?.hasMore;
+                      const totalPagesValue = response.data?.totalPages || 1;
+                      const currentPageValue = response.data?.currentPage || 1;
+                      
+                      // If API doesn't provide hasMore, calculate it based on totalPages
+                      const calculatedHasMore = apiHasMore !== undefined ? apiHasMore : currentPageValue < totalPagesValue;
+                      
+                      setHasMore(calculatedHasMore);
+                      setTotalPages(totalPagesValue);
+                      setCurrentPage(currentPageValue);
+                      console.log('Set pagination state:', { hasMore: calculatedHasMore, totalPages: totalPagesValue, currentPage: currentPageValue });
                       
                       // Track AI usage
                       if (response.data?.jobs && response.data.jobs.length > 0) {
@@ -343,9 +365,14 @@ const JobSearchPage: React.FC = () => {
                       });
                       const jobs = response.data?.jobs || [];
                       setJobs(jobs);
-                      setHasMore(response.data?.hasMore || false);
-                      setTotalPages(response.data?.totalPages || 1);
-                      setCurrentPage(response.data?.currentPage || 1);
+                      // Use hasMore flag from API with fallback logic
+                      const apiHasMore = response.data?.hasMore;
+                      const totalPagesValue = response.data?.totalPages || 1;
+                      const currentPageValue = response.data?.currentPage || 1;
+                      const calculatedHasMore = apiHasMore !== undefined ? apiHasMore : currentPageValue < totalPagesValue;
+                      setHasMore(calculatedHasMore);
+                      setTotalPages(totalPagesValue);
+                      setCurrentPage(currentPageValue);
                     }
                   } else {
                     // No resume, use basic search
@@ -398,10 +425,14 @@ const JobSearchPage: React.FC = () => {
                     jobsCount: response.data?.jobs?.length
                   });
                   setJobs(response.data?.jobs || []);
-                  // IMPORTANT: Set pagination state from response
-                  setHasMore(response.data?.hasMore || false);
-                  setTotalPages(response.data?.totalPages || 1);
-                  setCurrentPage(response.data?.currentPage || 1);
+                  // IMPORTANT: Set pagination state from response with fallback
+                  const apiHasMore = response.data?.hasMore;
+                  const totalPagesValue = response.data?.totalPages || 1;
+                  const currentPageValue = response.data?.currentPage || 1;
+                  const calculatedHasMore = apiHasMore !== undefined ? apiHasMore : currentPageValue < totalPagesValue;
+                  setHasMore(calculatedHasMore);
+                  setTotalPages(totalPagesValue);
+                  setCurrentPage(currentPageValue);
                   setInitialLoad(false);
                 } catch (err) {
                   console.error('Default search error:', err);
@@ -467,9 +498,14 @@ const JobSearchPage: React.FC = () => {
         const response = await joboticApi.searchJobsBasic(request);
         const jobs = response.data?.jobs || [];
         setJobs(jobs);
-        setHasMore(response.data?.hasMore || false);
-        setTotalPages(response.data?.totalPages || 1);
-        setCurrentPage(response.data?.currentPage || 1);
+        // Set pagination state with fallback
+        const apiHasMore = response.data?.hasMore;
+        const totalPagesValue = response.data?.totalPages || 1;
+        const currentPageValue = response.data?.currentPage || 1;
+        const calculatedHasMore = apiHasMore !== undefined ? apiHasMore : currentPageValue < totalPagesValue;
+        setHasMore(calculatedHasMore);
+        setTotalPages(totalPagesValue);
+        setCurrentPage(currentPageValue);
         
         
         if (!response.data?.jobs || response.data.jobs.length === 0) {
@@ -500,9 +536,14 @@ const JobSearchPage: React.FC = () => {
         const response = await joboticApi.searchJobs(request);
         const jobs = response.data?.jobs || [];
         setJobs(jobs);
-        setHasMore(response.data?.hasMore || false);
-        setTotalPages(response.data?.totalPages || 1);
-        setCurrentPage(response.data?.currentPage || 1);
+        // Set pagination state with fallback
+        const apiHasMore = response.data?.hasMore;
+        const totalPagesValue = response.data?.totalPages || 1;
+        const currentPageValue = response.data?.currentPage || 1;
+        const calculatedHasMore = apiHasMore !== undefined ? apiHasMore : currentPageValue < totalPagesValue;
+        setHasMore(calculatedHasMore);
+        setTotalPages(totalPagesValue);
+        setCurrentPage(currentPageValue);
         
         if (!response.data?.jobs || response.data.jobs.length === 0) {
           toast.info('No jobs found. Try different keywords or location.');
@@ -758,8 +799,9 @@ const JobSearchPage: React.FC = () => {
       console.log(`Already at last page (${currentPage}/${totalPages}), returning...`);
       return;
     }
-    if (!searchQuery && !location) {
-      console.log('No search query or location, returning...');
+    // Check if we have at least some search context
+    if (!searchQuery || searchQuery.trim() === '') {
+      console.log('No search query, returning...');
       return;
     }
 
@@ -798,9 +840,16 @@ const JobSearchPage: React.FC = () => {
         
         if (response.data?.jobs && response.data.jobs.length > 0) {
           setJobs(prev => [...prev, ...response.data.jobs]);
-          setCurrentPage(response.data?.currentPage || nextPage);
-          setHasMore(response.data?.hasMore || false);
-          setTotalPages(response.data?.totalPages || totalPages);
+          // Set pagination state with fallback
+          const apiHasMore = response.data?.hasMore;
+          const totalPagesValue = response.data?.totalPages || totalPages;
+          const currentPageValue = response.data?.currentPage || nextPage;
+          const calculatedHasMore = apiHasMore !== undefined ? apiHasMore : currentPageValue < totalPagesValue;
+          
+          setCurrentPage(currentPageValue);
+          setHasMore(calculatedHasMore);
+          setTotalPages(totalPagesValue);
+          console.log('Updated pagination after load more:', { hasMore: calculatedHasMore, currentPage: currentPageValue, totalPages: totalPagesValue });
         } else {
           console.log('No more jobs in response');
           setHasMore(false);
@@ -1377,6 +1426,15 @@ const JobSearchPage: React.FC = () => {
         {/* Infinite Scroll Loading */}
         {!loading && !initializing && jobs.length > 0 && (
           <>
+            {console.log('Load More section render check:', {
+              hasMore,
+              loadingMore,
+              jobsCount: jobs.length,
+              currentPage,
+              totalPages,
+              searchQuery,
+              location
+            })}
             {/* Show loading state when loading more */}
             {loadingMore && (
               <div className="flex items-center justify-center py-8 mt-4">
