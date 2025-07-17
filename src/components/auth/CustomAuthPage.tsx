@@ -202,24 +202,7 @@ export const CustomAuthPage: React.FC = () => {
       return;
     }
     
-    // Set a flag to show we're in forgot password mode
-    setAuthMode('forgot-password');
-    setMessage({ 
-      type: 'success', 
-      text: 'Please complete the captcha below and click "Send Reset Email"' 
-    });
-    // Clear the captcha token to force a new captcha completion
-    setCaptchaToken('');
-  };
-  
-  const handleSendResetEmail = async () => {
-    const isCaptchaDisabled = import.meta.env.VITE_DISABLE_CAPTCHA === 'true';
-    
-    if (!isCaptchaDisabled && !captchaToken) {
-      setMessage({ type: 'error', text: 'Please complete the CAPTCHA.' });
-      return;
-    }
-    
+    // Directly send reset email without captcha
     setLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
@@ -233,11 +216,6 @@ export const CustomAuthPage: React.FC = () => {
           type: 'success', 
           text: 'Password reset email sent! Check your inbox.' 
         });
-        // Reset form and go back to login
-        setAuthMode('login');
-        setAuthStep('email');
-        setCaptchaToken('');
-        setFormData({ ...formData, password: '' });
       }
     } catch (error: any) {
       setMessage({ type: 'error', text: error.message || 'An error occurred' });
@@ -245,16 +223,15 @@ export const CustomAuthPage: React.FC = () => {
       setLoading(false);
     }
   };
+  
 
   const getFormTitle = () => {
     if (authMode === 'signup') return 'Create your account';
-    if (authMode === 'forgot-password') return 'Reset your password';
     return 'Sign in to Jobotic';
   };
 
   const getFormSubtitle = () => {
     if (authMode === 'signup') return 'Start your journey with AI-powered job search';
-    if (authMode === 'forgot-password') return 'We\'ll send you instructions to reset your password';
     return 'Welcome back! Please sign in to continue.';
   };
 
@@ -301,58 +278,7 @@ export const CustomAuthPage: React.FC = () => {
         )}
 
         {/* Auth Form */}
-        {authMode === 'forgot-password' ? (
-          <div className="space-y-4">
-            {/* Back Link */}
-            <button
-              type="button"
-              onClick={() => {
-                setAuthMode('login');
-                setAuthStep('email');
-                setCaptchaToken('');
-                setMessage(null);
-              }}
-              className="flex items-center gap-1 text-sm text-[#71717a] hover:text-[#18181b] transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Sign In
-            </button>
-
-            {/* Email Display */}
-            <div className="bg-[#f4f4f5] rounded-md p-4">
-              <p className="text-sm text-[#71717a]">Send reset instructions to:</p>
-              <p className="text-sm font-medium text-[#18181b] mt-1">{formData.email}</p>
-            </div>
-
-            {/* Captcha */}
-            {import.meta.env.VITE_DISABLE_CAPTCHA !== 'true' && (
-              <div className="flex justify-center py-2">
-                <Turnstile
-                  key={authMode} // Force re-render when switching modes
-                  sitekey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-                  onSuccess={setCaptchaToken}
-                  onExpire={() => setCaptchaToken('')}
-                />
-              </div>
-            )}
-
-            {/* Send Reset Email Button */}
-            <button
-              onClick={handleSendResetEmail}
-              disabled={loading}
-              className="w-full h-10 px-4 bg-[#18181b] text-white text-sm font-medium rounded-md hover:bg-[#27272a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <div className="flex items-center justify-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Sending...</span>
-                </div>
-              ) : (
-                'Send Reset Email'
-              )}
-            </button>
-          </div>
-        ) : authStep === 'email' ? (
+        {authStep === 'email' ? (
           <form onSubmit={handleEmailSubmit} className="space-y-4">
             {/* Name field for signup */}
             {authMode === 'signup' && (
@@ -468,9 +394,10 @@ export const CustomAuthPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleForgotPassword}
-                  className="text-sm text-[#71717a] hover:text-[#18181b] transition-colors"
+                  disabled={loading}
+                  className="text-sm text-[#71717a] hover:text-[#18181b] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Forgot password?
+                  {loading ? 'Sending...' : 'Forgot password?'}
                 </button>
               </div>
             )}
