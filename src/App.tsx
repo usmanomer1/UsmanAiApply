@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
 import CustomAuthPage from './components/auth/CustomAuthPage';
+import PasswordResetPage from './components/auth/PasswordResetPage';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import Sidebar from './components/layout/Sidebar';
 import ProfilePage from './components/ProfilePage';
@@ -25,6 +26,7 @@ function App() {
           <div className="min-h-screen bg-gray-50">
             <Routes>
               <Route path="/auth" element={<CustomAuthPage />} />
+              <Route path="/reset-password" element={<PasswordResetPage />} />
               <Route path="/success" element={<SuccessPage />} />
               <Route
                 path="/*"
