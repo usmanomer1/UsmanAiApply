@@ -54,6 +54,8 @@ import toast from 'react-hot-toast';
 import { Badge } from '../ui/badge';
 // import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { getUserUsage, getAutomationSessions, UserUsage } from '../../lib/usageTracking';
+import { getJobSearchUsage, JobSearchUsageStats } from '../../lib/jobSearchUsage';
+import { Search } from 'lucide-react';
 
 interface UserSubscription {
   customer_id: string;
@@ -101,6 +103,7 @@ export const BillingPage: React.FC = () => {
   const [loadingUsageData, setLoadingUsageData] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<'7d' | '30d' | '90d'>('30d');
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'automation' | 'ai'>('all');
+  const [jobSearchUsage, setJobSearchUsage] = useState<{ used: number; limit: number; percentage: number } | null>(null);
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -169,6 +172,7 @@ export const BillingPage: React.FC = () => {
       if (!user) {
         setSubscription(null);
         setUsage({ total_steps: 0, total_cost: 0, job_tokens: 0, applications_count: 0, ai_requests_count: 0, ai_tokens_used: 0, job_search_matches: 0, resume_optimizations: 0, cover_letters: 0 });
+        setJobSearchUsage(null);
         return;
       }
 
@@ -183,6 +187,7 @@ export const BillingPage: React.FC = () => {
         console.error('Error fetching subscription:', subError);
         setSubscription(null);
         setUsage({ total_steps: 0, total_cost: 0, job_tokens: 0, applications_count: 0, ai_requests_count: 0, ai_tokens_used: 0, job_search_matches: 0, resume_optimizations: 0, cover_letters: 0 });
+        setJobSearchUsage(null);
         return;
       }
 
@@ -247,11 +252,22 @@ export const BillingPage: React.FC = () => {
         // console.log('Setting usage state with ai_tokens_used:', currentUsage.ai_tokens_used);
         // console.log('Full currentUsage object:', currentUsage);
         setUsage(currentUsage);
+        
+        // Fetch job search usage
+        const jobSearchStats = await getJobSearchUsage(user.id);
+        if (jobSearchStats) {
+          setJobSearchUsage({
+            used: jobSearchStats.monthly_used,
+            limit: jobSearchStats.monthly_limit,
+            percentage: jobSearchStats.percentage_used
+          });
+        }
       }
     } catch (error) {
       console.error('Error fetching billing data:', error);
       setSubscription(null);
       setUsage({ total_steps: 0, total_cost: 0, job_tokens: 0, applications_count: 0, ai_requests_count: 0, ai_tokens_used: 0, job_search_matches: 0, resume_optimizations: 0, cover_letters: 0 });
+      setJobSearchUsage(null);
     } finally {
       setLoading(false);
       setRefreshing(false);
