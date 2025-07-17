@@ -86,7 +86,6 @@ export const AuthPage: React.FC = () => {
       } else if (authMode === 'forgot-password') {
         const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
           redirectTo: `${window.location.origin}/auth?mode=reset-password`,
-          captchaToken,
         });
         
         if (error) {
