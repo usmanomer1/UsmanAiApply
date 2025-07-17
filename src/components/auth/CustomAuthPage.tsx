@@ -202,6 +202,13 @@ export const CustomAuthPage: React.FC = () => {
       return;
     }
     
+    const isCaptchaDisabled = import.meta.env.VITE_DISABLE_CAPTCHA === 'true';
+    
+    if (!isCaptchaDisabled && !captchaToken) {
+      setMessage({ type: 'error', text: 'Please complete the CAPTCHA.' });
+      return;
+    }
+    
     setLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
@@ -215,6 +222,8 @@ export const CustomAuthPage: React.FC = () => {
           type: 'success', 
           text: 'Password reset email sent! Check your inbox.' 
         });
+        // Reset captcha token after successful submission
+        setCaptchaToken('');
       }
     } catch (error: any) {
       setMessage({ type: 'error', text: error.message || 'An error occurred' });
@@ -452,7 +461,7 @@ export const CustomAuthPage: React.FC = () => {
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         @keyframes fadeIn {
           from { opacity: 0; }
           to { opacity: 1; }
