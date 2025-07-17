@@ -184,6 +184,25 @@ export const CustomAuthPage: React.FC = () => {
         });
         setAuthMode('login');
         setAuthStep('email');
+      } else if (authMode === 'forgot-password') {
+        // Handle forgot password with captcha validation
+        const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
+          redirectTo: `${window.location.origin}/auth`,
+          captchaToken: finalCaptchaToken,
+        });
+        
+        if (error) {
+          setMessage({ type: 'error', text: error.message });
+        } else {
+          setMessage({ 
+            type: 'success', 
+            text: 'Password reset email sent! Check your inbox.' 
+          });
+          // Reset back to login mode
+          setAuthMode('login');
+          setAuthStep('email');
+          setCaptchaToken('');
+        }
       }
     } catch (error: any) {
       if (error.message === 'email_not_verified') {
@@ -196,42 +215,25 @@ export const CustomAuthPage: React.FC = () => {
     }
   };
 
-  const handleForgotPassword = async () => {
-    if (!formData.email) {
-      setMessage({ type: 'error', text: 'Please enter your email first' });
-      return;
-    }
-    
-    // Directly send reset email without captcha
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
-        redirectTo: `${window.location.origin}/auth`,
-      });
-      
-      if (error) {
-        setMessage({ type: 'error', text: error.message });
-      } else {
-        setMessage({ 
-          type: 'success', 
-          text: 'Password reset email sent! Check your inbox.' 
-        });
-      }
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error.message || 'An error occurred' });
-    } finally {
-      setLoading(false);
+  const handleForgotPassword = () => {
+    // Switch to forgot password mode - requires captcha in the main form flow
+    setAuthMode('forgot-password');
+    // Stay on password step to show captcha
+    if (authStep === 'email') {
+      setAuthStep('password');
     }
   };
   
 
   const getFormTitle = () => {
     if (authMode === 'signup') return 'Create your account';
+    if (authMode === 'forgot-password') return 'Reset your password';
     return 'Sign in to Jobotic';
   };
 
   const getFormSubtitle = () => {
     if (authMode === 'signup') return 'Start your journey with AI-powered job search';
+    if (authMode === 'forgot-password') return 'We\'ll send you a reset link to your email';
     return 'Welcome back! Please sign in to continue.';
   };
 
@@ -341,6 +343,10 @@ export const CustomAuthPage: React.FC = () => {
                 setAuthStep('email');
                 setFormData({ ...formData, password: '', avatar_url: '' });
                 setCaptchaToken('');
+                // Reset to login mode if we were in forgot-password mode
+                if (authMode === 'forgot-password') {
+                  setAuthMode('login');
+                }
               }}
               className="flex items-center gap-1 text-sm text-[#71717a] hover:text-[#18181b] transition-colors mb-6"
             >
@@ -368,36 +374,37 @@ export const CustomAuthPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Password Input */}
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                required
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                className="w-full h-10 px-3.5 pr-10 text-sm border border-[#e4e4e7] rounded-md focus:outline-none focus:ring-2 focus:ring-[#14b8a6] focus:border-transparent"
-                placeholder="Password"
-                autoFocus
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71717a] hover:text-[#18181b]"
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
+            {/* Password Input - only show for login/signup */}
+            {authMode !== 'forgot-password' && (
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className="w-full h-10 px-3.5 pr-10 text-sm border border-[#e4e4e7] rounded-md focus:outline-none focus:ring-2 focus:ring-[#14b8a6] focus:border-transparent"
+                  placeholder="Password"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71717a] hover:text-[#18181b]"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            )}
 
-            {/* Forgot Password */}
+            {/* Forgot Password - only show for login mode */}
             {authMode === 'login' && (
               <div className="text-right">
                 <button
                   type="button"
                   onClick={handleForgotPassword}
-                  disabled={loading}
-                  className="text-sm text-[#71717a] hover:text-[#18181b] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="text-sm text-[#71717a] hover:text-[#18181b] transition-colors"
                 >
-                  {loading ? 'Sending...' : 'Forgot password?'}
+                  Forgot password?
                 </button>
               </div>
             )}
@@ -426,7 +433,9 @@ export const CustomAuthPage: React.FC = () => {
                   <span>Processing...</span>
                 </div>
               ) : (
-                authMode === 'login' ? 'Continue' : 'Create account'
+                authMode === 'login' ? 'Continue' : 
+                authMode === 'signup' ? 'Create account' : 
+                'Send reset email'
               )}
             </button>
           </form>
