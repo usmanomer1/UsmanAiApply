@@ -1,6 +1,35 @@
 const API_BASE_URL = import.meta.env.VITE_JOBOTIC_API_URL || 'https://jobotic-backend.vercel.app';
 const USE_NETLIFY_FUNCTION = !import.meta.env.VITE_JOBOTIC_API_KEY; // Use function if no VITE key
 
+// Streaming message types
+export type StreamMessageType = 'initial' | 'jobs' | 'progress' | 'complete' | 'error';
+
+export interface StreamCallbacks {
+  initial?: (data: {
+    totalFound: number;
+    searchCriteria: any;
+  }) => void;
+  jobs?: (data: {
+    jobs: any[];
+    batchNumber: number;
+    totalBatches: number;
+  }) => void;
+  progress?: (data: {
+    processed: number;
+    total: number;
+    percentage: number;
+  }) => void;
+  complete?: (data: {
+    totalProcessed: number;
+    usage: any;
+    timing: any;
+  }) => void;
+  error?: (data: {
+    message: string;
+    batchNumber?: number;
+  }) => void;
+}
+
 // Basic Search Request (No AI Matching)
 interface JobSearchRequest {
   // Search params (choose one approach)
@@ -256,6 +285,123 @@ class JoboticApiService {
   async searchJobs(request: JobMatchRequest): Promise<JobMatchResponse> {
     return this.makeRequest<JobMatchResponse>('/api/jobs/match', request, { requiresAuth: true });
   }
+
+  // Streaming version of searchJobs
+  async searchJobsStreaming(
+    request: JobMatchRequest, 
+    callbacks: StreamCallbacks,
+    signal?: AbortSignal
+  ): Promise<void> {
+    const isNetlifyFunction = USE_NETLIFY_FUNCTION;
+    const url = isNetlifyFunction ? '/.netlify/functions/jobotic-api' : `${API_BASE_URL}/api/jobs/match`;
+    
+    // Build headers
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/x-ndjson', // Request streaming response
+    };
+    
+    if (!isNetlifyFunction) {
+      headers['X-API-Key'] = this.apiKey;
+    }
+    
+    // Add Bearer token
+    const { supabase } = await import('./supabase');
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+    } else {
+      throw new Error('No session token available - user must be logged in');
+    }
+    
+    const requestBody = isNetlifyFunction 
+      ? { endpoint: '/api/jobs/match', ...request }
+      : request;
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestBody),
+      signal,
+    });
+
+    if (!response.ok) {
+      let errorDetail = '';
+      try {
+        const errorBody = await response.text();
+        errorDetail = ` - ${errorBody}`;
+      } catch (e) {
+        // Ignore if we can't read the error body
+      }
+      throw new Error(`API request failed: ${response.status}${errorDetail}`);
+    }
+
+    // Check if we got streaming response
+    const contentType = response.headers.get('content-type');
+    if (!contentType?.includes('application/x-ndjson')) {
+      // Fallback to regular JSON response
+      const data = await response.json();
+      // Simulate streaming with single complete message
+      callbacks.initial?.({
+        totalFound: data.data.totalFound,
+        searchCriteria: data.data.searchCriteria,
+      });
+      callbacks.jobs?.({
+        jobs: data.data.jobs,
+        batchNumber: 1,
+        totalBatches: 1,
+      });
+      callbacks.complete?.({
+        totalProcessed: data.data.jobsReturned,
+        usage: data.usage,
+        timing: data.timing,
+      });
+      return;
+    }
+
+    // Process streaming response
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('Response body is not readable');
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep last incomplete line
+
+        for (const line of lines) {
+          if (line.trim()) {
+            try {
+              const message = JSON.parse(line);
+              callbacks[message.type]?.(message.data);
+            } catch (e) {
+              console.error('Failed to parse NDJSON line:', line, e);
+            }
+          }
+        }
+      }
+
+      // Process any remaining buffer
+      if (buffer.trim()) {
+        try {
+          const message = JSON.parse(buffer);
+          callbacks[message.type]?.(message.data);
+        } catch (e) {
+          console.error('Failed to parse final NDJSON line:', buffer, e);
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
   
   // Basic job search - only requires X-API-Key
   async searchJobsBasic(request: JobSearchRequest): Promise<JobMatchResponse> {
@@ -474,4 +620,12 @@ class JoboticApiService {
 }
 
 export const joboticApi = new JoboticApiService();
-export type { JobSearchRequest, JobMatchRequest, JobMatchResponse, ExportPdfRequest, ExportPdfResponse };
+export type { 
+  JobSearchRequest, 
+  JobMatchRequest, 
+  JobMatchResponse, 
+  ExportPdfRequest, 
+  ExportPdfResponse,
+  StreamCallbacks,
+  StreamMessageType 
+};

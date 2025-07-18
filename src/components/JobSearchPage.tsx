@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, MapPin, Briefcase, Filter, X, Loader2, ChevronRight, Heart, Users, DollarSign, Building2, Star, Bookmark, ArrowUpRight, TrendingUp } from 'lucide-react';
-import { joboticApi, JobSearchRequest, JobMatchRequest } from '../lib/joboticApi';
+import { joboticApi, JobSearchRequest, JobMatchRequest, StreamCallbacks } from '../lib/joboticApi';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -11,6 +11,7 @@ import LoadingTransition from './LoadingTransition';
 import { useLocation } from 'react-router-dom';
 import { canPerformAIOperation, trackAITokens } from '../lib/aiTokenTracking';
 import { getPlanLimits } from '../stripe-config';
+import { JobSkeleton } from './JobSkeleton';
 
 interface Job {
   job_id: string;
@@ -76,6 +77,14 @@ const JobSearchPage: React.FC = () => {
   const [totalPages, setTotalPages] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [usageStats, setUsageStats] = useState<{ jobsViewed: number; jobLimit: number }>({ jobsViewed: 0, jobLimit: 100 });
+  
+  // Streaming states
+  const [streamProgress, setStreamProgress] = useState(0);
+  const [totalJobsFound, setTotalJobsFound] = useState(0);
+  const [processedCount, setProcessedCount] = useState(0);
+  const [progressMessage, setProgressMessage] = useState('');
+  const [isStreaming, setIsStreaming] = useState(false);
+  const currentControllerRef = useRef<AbortController | null>(null);
 
   // Filter jobs based on activeTab only (backend handles other filters)
   const displayedJobs = jobs.filter(job => {
@@ -293,11 +302,19 @@ const JobSearchPage: React.FC = () => {
                 
                 // Perform auto-search - use AI search if we have resume for match scores
                 setLoading(true);
+                setIsStreaming(true);
+                setStreamProgress(0);
+                setTotalJobsFound(0);
+                setProcessedCount(0);
+                setProgressMessage('Searching for jobs...');
                 // Set session ID for infinite scroll
                 const newSessionId = Date.now().toString();
                 setSessionId(newSessionId);
                 setHasMore(true);
                 setCurrentPage(1);
+                
+                // Create abort controller for auto-search
+                currentControllerRef.current = new AbortController();
                 
                 try {
                   const aiRequest: JobMatchRequest = {
@@ -311,32 +328,59 @@ const JobSearchPage: React.FC = () => {
                     ...(filters.remote_jobs_only && { remote_jobs_only: true })
                   };
                   
-                  const response = await joboticApi.searchJobs(aiRequest);
-                  const jobs = response.data?.jobs || [];
-                  setJobs(jobs);
+                  // Define streaming callbacks for auto-search
+                  const autoSearchCallbacks: StreamCallbacks = {
+                    initial: (data) => {
+                      setTotalJobsFound(data.totalFound);
+                      setProgressMessage(`Found ${data.totalFound} jobs matching your profile`);
+                    },
+                    jobs: (data) => {
+                      setJobs(prevJobs => [...prevJobs, ...data.jobs]);
+                      setStreamProgress((data.batchNumber / data.totalBatches) * 100);
+                      setProcessedCount(prev => prev + data.jobs.length);
+                    },
+                    progress: (data) => {
+                      setProcessedCount(data.processed);
+                      setProgressMessage(`Processing ${data.processed} of ${data.total} jobs...`);
+                      setStreamProgress(data.percentage);
+                    },
+                    complete: (data) => {
+                      setUsageStats({
+                        jobsViewed: data.usage?.monthly_used || 0,
+                        jobLimit: data.usage?.monthly_limit || 100
+                      });
+                      setLoading(false);
+                      setIsStreaming(false);
+                      setProgressMessage('');
+                      
+                      // Update pagination state
+                      const jobsPerPage = 10;
+                      const totalPages = Math.ceil(data.totalProcessed / jobsPerPage);
+                      setTotalPages(totalPages);
+                      setHasMore(data.totalProcessed > jobsPerPage);
+                      
+                      if (data.totalProcessed === 0) {
+                        toast.info('No jobs found. Try updating your preferences.');
+                      } else {
+                        toast.success(`Found ${data.totalProcessed} jobs matching your profile`);
+                      }
+                    },
+                    error: (data) => {
+                      console.error('Auto-search streaming error:', data);
+                    }
+                  };
                   
-                  // Update pagination state
-                  setHasMore(response.data?.hasMore || false);
-                  setTotalPages(response.data?.totalPages || 1);
-                  setCurrentPage(response.data?.currentPage || 1);
-                  
-                  // Update usage stats from API response
-                  if (response.usage) {
-                    setUsageStats({
-                      jobsViewed: response.usage.monthly_used,
-                      jobLimit: typeof response.usage.monthly_limit === 'number' ? response.usage.monthly_limit : -1
-                    });
-                  }
+                  await joboticApi.searchJobsStreaming(aiRequest, autoSearchCallbacks, currentControllerRef.current.signal);
                   
                   setInitialLoad(false);
-                  
-                  if (response.data?.jobs && response.data.jobs.length > 0) {
-                    toast.success(`Found ${response.data.jobsReturned} jobs matching your profile`);
+                } catch (err: any) {
+                  if (err.name !== 'AbortError') {
+                    console.error('Auto-search error:', err);
                   }
-                } catch (err) {
-                  console.error('Auto-search error:', err);
                 } finally {
                   setLoading(false);
+                  setIsStreaming(false);
+                  currentControllerRef.current = null;
                 }
               } else {
                 // No specific role found, do a general search
@@ -409,8 +453,20 @@ const JobSearchPage: React.FC = () => {
       return;
     }
 
+    // Cancel previous search if any
+    if (currentControllerRef.current) {
+      currentControllerRef.current.abort();
+    }
+
+    // Reset state
+    setJobs([]);
     setLoading(true);
     setError(null);
+    setIsStreaming(true);
+    setStreamProgress(0);
+    setTotalJobsFound(0);
+    setProcessedCount(0);
+    setProgressMessage('Initializing search...');
     
     // Reset infinite scroll state
     setCurrentPage(1);
@@ -418,11 +474,16 @@ const JobSearchPage: React.FC = () => {
     const newSessionId = Date.now().toString();
     setSessionId(newSessionId); // Generate new session ID
 
+    // Create new abort controller
+    currentControllerRef.current = new AbortController();
+
     try {
       // Always use AI-powered search endpoint
       if (!resumeText) {
         toast.warning('Please upload your resume in your profile to get AI-matched job recommendations.');
         setError('Resume required for job matching. Please upload your resume in your profile.');
+        setLoading(false);
+        setIsStreaming(false);
         return;
       }
 
@@ -440,34 +501,56 @@ const JobSearchPage: React.FC = () => {
         ...(filters.job_requirements.length > 0 && { job_requirements: filters.job_requirements as ('no_exp' | 'under_3_years_exp' | 'more_than_3_years_exp' | 'no_degree' | 'fair_chance')[] })
       };
 
-      const response = await joboticApi.searchJobs(request);
-      const jobs = response.data?.jobs || [];
-      setJobs(jobs);
+      // Define streaming callbacks
+      const callbacks: StreamCallbacks = {
+        initial: (data) => {
+          setTotalJobsFound(data.totalFound);
+          setProgressMessage(`Found ${data.totalFound} jobs matching your criteria`);
+        },
+        jobs: (data) => {
+          setJobs(prevJobs => [...prevJobs, ...data.jobs]);
+          setStreamProgress((data.batchNumber / data.totalBatches) * 100);
+          setProcessedCount(prev => prev + data.jobs.length);
+        },
+        progress: (data) => {
+          setProcessedCount(data.processed);
+          setProgressMessage(`Processing ${data.processed} of ${data.total} jobs...`);
+          setStreamProgress(data.percentage);
+        },
+        complete: (data) => {
+          setUsageStats({
+            jobsViewed: data.usage?.monthly_used || 0,
+            jobLimit: data.usage?.monthly_limit || 100
+          });
+          setLoading(false);
+          setIsStreaming(false);
+          setProgressMessage('');
+          
+          // Update pagination state based on total processed
+          const jobsPerPage = 10;
+          const totalPages = Math.ceil(data.totalProcessed / jobsPerPage);
+          setTotalPages(totalPages);
+          setHasMore(data.totalProcessed > jobsPerPage);
+        },
+        error: (data) => {
+          console.error('Streaming error:', data);
+          toast.error(`Error processing batch ${data.batchNumber}: ${data.message}`);
+        }
+      };
+
+      // Use streaming API
+      await joboticApi.searchJobsStreaming(request, callbacks, currentControllerRef.current.signal);
       
-      // Update pagination state
-      setHasMore(response.data?.hasMore || false);
-      setTotalPages(response.data?.totalPages || 1);
-      setCurrentPage(response.data?.currentPage || 1);
-      
-      // Update usage stats from API response
-      if (response.usage) {
-        setUsageStats({
-          jobsViewed: response.usage.monthly_used,
-          jobLimit: typeof response.usage.monthly_limit === 'number' ? response.usage.monthly_limit : -1
-        });
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
+        setError(errorMessage);
+        toast.error(errorMessage);
       }
-      
-      if (!response.data?.jobs || response.data.jobs.length === 0) {
-        toast.info('No jobs found. Try different keywords or location.');
-      } else {
-        toast.success(`Found ${response.data.jobsReturned} jobs matching your profile`);
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
-      setError(errorMessage);
-      toast.error(errorMessage);
     } finally {
       setLoading(false);
+      setIsStreaming(false);
+      currentControllerRef.current = null;
     }
   };
 
@@ -1090,7 +1173,28 @@ const JobSearchPage: React.FC = () => {
           </div>
         )}
 
-        {!loading && !initializing && displayedJobs.length > 0 && (
+        {/* Progress Bar for Streaming */}
+        {isStreaming && (
+          <div className="mb-6 bg-white rounded-lg border border-gray-200 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-700">
+                {progressMessage || 'Loading jobs...'}
+              </span>
+              <span className="text-sm text-gray-500">
+                {processedCount} of {totalJobsFound} jobs
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-teal-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${streamProgress}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Jobs Grid */}
+        {(displayedJobs.length > 0 || isStreaming) && (
           <div className="grid gap-4">
             {displayedJobs.map((job, index) => (
               <motion.div
@@ -1298,6 +1402,15 @@ const JobSearchPage: React.FC = () => {
                 </div>
               </motion.div>
             ))}
+            
+            {/* Skeleton Loaders while streaming */}
+            {isStreaming && (
+              <>
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <JobSkeleton key={`skeleton-${index}`} />
+                ))}
+              </>
+            )}
           </div>
         )}
           
