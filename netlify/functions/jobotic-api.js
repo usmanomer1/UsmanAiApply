@@ -8,6 +8,7 @@ exports.handler = async (event, context) => {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization, Accept',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Expose-Headers': 'Content-Type, X-Stream-Format',
       },
       body: '',
     };
@@ -116,8 +117,15 @@ exports.handler = async (event, context) => {
     const responseHeaders = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, Accept',
+      'Access-Control-Expose-Headers': 'Content-Type, X-Stream-Format',
       'Content-Type': responseContentType,
     };
+    
+    // Forward custom streaming header if present
+    const streamFormat = response.headers.get('x-stream-format');
+    if (streamFormat) {
+      responseHeaders['X-Stream-Format'] = streamFormat;
+    }
     
     // Forward cache control headers if present
     const cacheControl = response.headers.get('cache-control');

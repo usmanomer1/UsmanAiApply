@@ -336,69 +336,24 @@ class JoboticApiService {
       throw new Error(`API request failed: ${response.status}${errorDetail}`);
     }
 
-    // Check if we got streaming response
+    // Check headers to determine response type
     const contentType = response.headers.get('content-type');
-    if (!contentType?.includes('application/x-ndjson')) {
-      // Try to check if response is NDJSON even without proper content-type
-      const responseText = await response.text();
-      
-      // Check if it looks like NDJSON (multiple JSON objects separated by newlines)
-      if (responseText.includes('\n') && responseText.trim().split('\n').length > 1) {
-        console.log('Detected NDJSON response despite content-type');
-        // Process as buffered NDJSON
-        const lines = responseText.trim().split('\n');
-        
-        // Process lines with small delays for visual streaming effect
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          if (line.trim()) {
-            try {
-              const message = JSON.parse(line);
-              callbacks[message.type]?.(message.data);
-              
-              // Add small delay between job batches for visual feedback
-              if (message.type === 'jobs' && i < lines.length - 1) {
-                await new Promise(resolve => setTimeout(resolve, 200));
-              }
-            } catch (e) {
-              console.error('Failed to parse NDJSON line:', line, e);
-            }
-          }
-        }
-        return;
-      } else {
-        // Fallback to single JSON response
-        try {
-          const data = JSON.parse(responseText);
-          // Simulate streaming with single complete message
-          callbacks.initial?.({
-            totalFound: data.data.totalFound,
-            searchCriteria: data.data.searchCriteria,
-          });
-          callbacks.jobs?.({
-            jobs: data.data.jobs,
-            batchNumber: 1,
-            totalBatches: 1,
-          });
-          callbacks.complete?.({
-            totalProcessed: data.data.jobsReturned,
-            usage: data.usage,
-            timing: data.timing,
-          });
-          return;
-        } catch (e) {
-          console.error('Failed to parse response as JSON:', e);
-          throw new Error('Invalid response format from server');
-        }
-      }
-    }
-
-    // Process streaming response (either true streaming or buffered NDJSON)
-    if (response.body) {
-      // For buffered NDJSON from Netlify function
-      const responseText = await response.text();
+    const streamFormat = response.headers.get('x-stream-format');
+    const isNDJSONResponse = contentType?.includes('application/x-ndjson') || streamFormat === 'ndjson';
+    
+    console.log(`Response headers - Content-Type: ${contentType}, X-Stream-Format: ${streamFormat}`);
+    
+    // Read response body once
+    const responseText = await response.text();
+    
+    // Try to detect NDJSON format from content if headers don't indicate it
+    const looksLikeNDJSON = responseText.includes('\n') && responseText.trim().split('\n').length > 1 && 
+                           responseText.trim().split('\n')[0].includes('"type"');
+    
+    if (isNDJSONResponse || looksLikeNDJSON) {
+      // Process as NDJSON
+      console.log('Processing NDJSON response');
       const lines = responseText.trim().split('\n');
-      
       console.log(`Processing ${lines.length} NDJSON lines`);
       
       // Process lines with small delays for visual streaming effect
@@ -407,11 +362,17 @@ class JoboticApiService {
         if (line.trim()) {
           try {
             const message = JSON.parse(line);
-            callbacks[message.type]?.(message.data);
             
-            // Add small delay between job batches for visual feedback
-            if (message.type === 'jobs' && i < lines.length - 1) {
-              await new Promise(resolve => setTimeout(resolve, 200));
+            // Validate message structure
+            if (message.type && message.data) {
+              callbacks[message.type]?.(message.data);
+              
+              // Add small delay between job batches for visual feedback
+              if (message.type === 'jobs' && i < lines.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, 200));
+              }
+            } else {
+              console.warn('Invalid NDJSON message structure:', message);
             }
           } catch (e) {
             console.error('Failed to parse NDJSON line:', line, e);
@@ -419,7 +380,38 @@ class JoboticApiService {
         }
       }
     } else {
-      throw new Error('Response body is not available');
+      // Process as single JSON response
+      console.log('Processing as single JSON response');
+      try {
+        const data = JSON.parse(responseText);
+        
+        // Validate response structure
+        if (!data.data || !data.data.jobs) {
+          throw new Error('Invalid response structure: missing data.jobs');
+        }
+        
+        // Simulate streaming with single complete message
+        callbacks.initial?.({
+          totalFound: data.data.totalFound || data.data.jobs.length,
+          searchCriteria: data.data.searchCriteria || {},
+        });
+        
+        callbacks.jobs?.({
+          jobs: data.data.jobs,
+          batchNumber: 1,
+          totalBatches: 1,
+        });
+        
+        callbacks.complete?.({
+          totalProcessed: data.data.jobsReturned || data.data.jobs.length,
+          usage: data.usage || {},
+          timing: data.timing || {},
+        });
+      } catch (e) {
+        console.error('Failed to parse response:', e);
+        console.error('Response text:', responseText.substring(0, 500));
+        throw new Error('Invalid response format from server');
+      }
     }
   }
   
