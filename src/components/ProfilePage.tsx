@@ -108,6 +108,15 @@ const ProfilePage: React.FC = () => {
     workAuthorization: ''
   });
 
+  // Job preferences state
+  const [jobPreferences, setJobPreferences] = useState({
+    employmentTypes: [] as string[],
+    workArrangements: [] as string[],
+    emailNotifications: true,
+    dataSharing: true,
+    profileVisibility: 'public'
+  });
+
   // Profile completion calculation
   const calculateProfileCompletion = () => {
     const fields = [
@@ -129,6 +138,7 @@ const ProfilePage: React.FC = () => {
     fetchProfile();
     fetchProfileStats();
     fetchSubscription();
+    fetchJobPreferences();
     // Set up autosave
     const autosaveInterval = setInterval(() => {
       if (hasUnsavedChanges) {
@@ -259,6 +269,36 @@ const ProfilePage: React.FC = () => {
     }
   };
 
+  const fetchJobPreferences = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('job_preferences')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+        console.error('Error fetching job preferences:', error);
+        return;
+      }
+
+      if (data) {
+        // Map database fields to our state structure
+        setJobPreferences({
+          employmentTypes: data.employment_types || [],
+          workArrangements: data.work_arrangements || [],
+          emailNotifications: true, // These might not be in the table yet
+          dataSharing: true,
+          profileVisibility: 'public'
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching job preferences:', error);
+    }
+  };
+
   const handleSave = async (isAutosave = false) => {
     setSaving(true);
     try {
@@ -302,6 +342,35 @@ const ProfilePage: React.FC = () => {
           });
           
         if (error) throw error;
+      }
+
+      // Save job preferences
+      const jobPrefsData = {
+        user_id: user!.id,
+        employment_types: jobPreferences.employmentTypes,
+        work_arrangements: jobPreferences.workArrangements,
+        // If location changed, update job_preferences locations array
+        locations: formData.location ? [formData.location] : [],
+        updated_at: new Date().toISOString()
+      };
+
+      // Try to update existing preferences first
+      const { error: prefUpdateError } = await supabase
+        .from('job_preferences')
+        .update(jobPrefsData)
+        .eq('user_id', user!.id);
+
+      // If no rows were updated (preferences don't exist), insert new
+      if (prefUpdateError && prefUpdateError.code === 'PGRST116') {
+        const { error: prefInsertError } = await supabase
+          .from('job_preferences')
+          .insert(jobPrefsData);
+        
+        if (prefInsertError) {
+          console.error('Error inserting job preferences:', prefInsertError);
+        }
+      } else if (prefUpdateError) {
+        console.error('Error updating job preferences:', prefUpdateError);
       }
 
       setHasUnsavedChanges(false);
@@ -1126,24 +1195,122 @@ const ProfilePage: React.FC = () => {
                         {/* Job Types */}
                         <div className="mb-6">
                           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                            Preferred Job Types
+                            Preferred Employment Types
                           </label>
                           <div className="space-y-3">
                             <label className="flex items-center">
-                              <input type="checkbox" className="h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500" />
+                              <input 
+                                type="checkbox" 
+                                checked={jobPreferences.employmentTypes.includes('FULLTIME')}
+                                onChange={(e) => {
+                                  const newTypes = e.target.checked 
+                                    ? [...jobPreferences.employmentTypes, 'FULLTIME']
+                                    : jobPreferences.employmentTypes.filter(t => t !== 'FULLTIME');
+                                  setJobPreferences(prev => ({ ...prev, employmentTypes: newTypes }));
+                                  setHasUnsavedChanges(true);
+                                }}
+                                className="h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500" 
+                              />
                               <span className="ml-3 text-sm text-gray-700 dark:text-gray-300">Full-time</span>
                             </label>
                             <label className="flex items-center">
-                              <input type="checkbox" className="h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500" />
+                              <input 
+                                type="checkbox" 
+                                checked={jobPreferences.employmentTypes.includes('PARTTIME')}
+                                onChange={(e) => {
+                                  const newTypes = e.target.checked 
+                                    ? [...jobPreferences.employmentTypes, 'PARTTIME']
+                                    : jobPreferences.employmentTypes.filter(t => t !== 'PARTTIME');
+                                  setJobPreferences(prev => ({ ...prev, employmentTypes: newTypes }));
+                                  setHasUnsavedChanges(true);
+                                }}
+                                className="h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500" 
+                              />
                               <span className="ml-3 text-sm text-gray-700 dark:text-gray-300">Part-time</span>
                             </label>
                             <label className="flex items-center">
-                              <input type="checkbox" className="h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500" />
+                              <input 
+                                type="checkbox" 
+                                checked={jobPreferences.employmentTypes.includes('CONTRACTOR')}
+                                onChange={(e) => {
+                                  const newTypes = e.target.checked 
+                                    ? [...jobPreferences.employmentTypes, 'CONTRACTOR']
+                                    : jobPreferences.employmentTypes.filter(t => t !== 'CONTRACTOR');
+                                  setJobPreferences(prev => ({ ...prev, employmentTypes: newTypes }));
+                                  setHasUnsavedChanges(true);
+                                }}
+                                className="h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500" 
+                              />
                               <span className="ml-3 text-sm text-gray-700 dark:text-gray-300">Contract</span>
                             </label>
                             <label className="flex items-center">
-                              <input type="checkbox" className="h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500" />
+                              <input 
+                                type="checkbox" 
+                                checked={jobPreferences.employmentTypes.includes('INTERN')}
+                                onChange={(e) => {
+                                  const newTypes = e.target.checked 
+                                    ? [...jobPreferences.employmentTypes, 'INTERN']
+                                    : jobPreferences.employmentTypes.filter(t => t !== 'INTERN');
+                                  setJobPreferences(prev => ({ ...prev, employmentTypes: newTypes }));
+                                  setHasUnsavedChanges(true);
+                                }}
+                                className="h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500" 
+                              />
+                              <span className="ml-3 text-sm text-gray-700 dark:text-gray-300">Internship</span>
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* Work Arrangements */}
+                        <div className="mb-6">
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                            Work Arrangements
+                          </label>
+                          <div className="space-y-3">
+                            <label className="flex items-center">
+                              <input 
+                                type="checkbox" 
+                                checked={jobPreferences.workArrangements.includes('remote')}
+                                onChange={(e) => {
+                                  const newArrangements = e.target.checked 
+                                    ? [...jobPreferences.workArrangements, 'remote']
+                                    : jobPreferences.workArrangements.filter(a => a !== 'remote');
+                                  setJobPreferences(prev => ({ ...prev, workArrangements: newArrangements }));
+                                  setHasUnsavedChanges(true);
+                                }}
+                                className="h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500" 
+                              />
                               <span className="ml-3 text-sm text-gray-700 dark:text-gray-300">Remote</span>
+                            </label>
+                            <label className="flex items-center">
+                              <input 
+                                type="checkbox" 
+                                checked={jobPreferences.workArrangements.includes('hybrid')}
+                                onChange={(e) => {
+                                  const newArrangements = e.target.checked 
+                                    ? [...jobPreferences.workArrangements, 'hybrid']
+                                    : jobPreferences.workArrangements.filter(a => a !== 'hybrid');
+                                  setJobPreferences(prev => ({ ...prev, workArrangements: newArrangements }));
+                                  setHasUnsavedChanges(true);
+                                }}
+                                className="h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500" 
+                              />
+                              <span className="ml-3 text-sm text-gray-700 dark:text-gray-300">Hybrid</span>
+                            </label>
+                            <label className="flex items-center">
+                              <input 
+                                type="checkbox" 
+                                checked={jobPreferences.workArrangements.includes('onsite')}
+                                onChange={(e) => {
+                                  const newArrangements = e.target.checked 
+                                    ? [...jobPreferences.workArrangements, 'onsite']
+                                    : jobPreferences.workArrangements.filter(a => a !== 'onsite');
+                                  setJobPreferences(prev => ({ ...prev, workArrangements: newArrangements }));
+                                  setHasUnsavedChanges(true);
+                                }}
+                                className="h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500" 
+                              />
+                              <span className="ml-3 text-sm text-gray-700 dark:text-gray-300">On-site</span>
                             </label>
                           </div>
                         </div>
@@ -1159,8 +1326,19 @@ const ProfilePage: React.FC = () => {
                                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Receive email notifications</span>
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Get notified about new job matches and application updates</p>
                               </div>
-                              <button className="relative inline-flex h-6 w-11 items-center rounded-full bg-teal-600 transition-colors">
-                                <span className="translate-x-6 inline-block h-4 w-4 transform rounded-full bg-white transition-transform" />
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  setJobPreferences(prev => ({ ...prev, emailNotifications: !prev.emailNotifications }));
+                                  setHasUnsavedChanges(true);
+                                }}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                  jobPreferences.emailNotifications ? 'bg-teal-600' : 'bg-gray-300'
+                                }`}
+                              >
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                  jobPreferences.emailNotifications ? 'translate-x-6' : 'translate-x-1'
+                                }`} />
                               </button>
                             </label>
                           </div>
@@ -1169,12 +1347,14 @@ const ProfilePage: React.FC = () => {
                         {/* Salary Range */}
                         <div className="mb-6">
                           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Expected Salary Range
+                            Expected Salary Range (USD)
                           </label>
                           <div className="flex items-center gap-4">
                             <div className="flex-1">
                               <input
                                 type="number"
+                                value={formData.salaryMin}
+                                onChange={(e) => handleInputChange('salaryMin', parseInt(e.target.value) || 0)}
                                 placeholder="Min"
                                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                               />
@@ -1183,6 +1363,8 @@ const ProfilePage: React.FC = () => {
                             <div className="flex-1">
                               <input
                                 type="number"
+                                value={formData.salaryMax}
+                                onChange={(e) => handleInputChange('salaryMax', parseInt(e.target.value) || 0)}
                                 placeholder="Max"
                                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                               />
@@ -1215,13 +1397,31 @@ const ProfilePage: React.FC = () => {
                           </label>
                           <div className="space-y-3">
                             <label className="flex items-center">
-                              <input type="radio" name="visibility" className="h-4 w-4 text-teal-600 border-gray-300 focus:ring-teal-500" checked />
+                              <input 
+                                type="radio" 
+                                name="visibility" 
+                                checked={jobPreferences.profileVisibility === 'public'}
+                                onChange={() => {
+                                  setJobPreferences(prev => ({ ...prev, profileVisibility: 'public' }));
+                                  setHasUnsavedChanges(true);
+                                }}
+                                className="h-4 w-4 text-teal-600 border-gray-300 focus:ring-teal-500" 
+                              />
                               <span className="ml-3 text-sm text-gray-700 dark:text-gray-300">
                                 <span className="font-medium">Public</span> - Visible to all employers
                               </span>
                             </label>
                             <label className="flex items-center">
-                              <input type="radio" name="visibility" className="h-4 w-4 text-teal-600 border-gray-300 focus:ring-teal-500" />
+                              <input 
+                                type="radio" 
+                                name="visibility" 
+                                checked={jobPreferences.profileVisibility === 'private'}
+                                onChange={() => {
+                                  setJobPreferences(prev => ({ ...prev, profileVisibility: 'private' }));
+                                  setHasUnsavedChanges(true);
+                                }}
+                                className="h-4 w-4 text-teal-600 border-gray-300 focus:ring-teal-500" 
+                              />
                               <span className="ml-3 text-sm text-gray-700 dark:text-gray-300">
                                 <span className="font-medium">Private</span> - Only visible to you
                               </span>
@@ -1240,8 +1440,19 @@ const ProfilePage: React.FC = () => {
                                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Share data with Jobotic</span>
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Help us improve our service by sharing anonymous usage data</p>
                               </div>
-                              <button className="relative inline-flex h-6 w-11 items-center rounded-full bg-teal-600 transition-colors">
-                                <span className="translate-x-6 inline-block h-4 w-4 transform rounded-full bg-white transition-transform" />
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  setJobPreferences(prev => ({ ...prev, dataSharing: !prev.dataSharing }));
+                                  setHasUnsavedChanges(true);
+                                }}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                  jobPreferences.dataSharing ? 'bg-teal-600' : 'bg-gray-300'
+                                }`}
+                              >
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                  jobPreferences.dataSharing ? 'translate-x-6' : 'translate-x-1'
+                                }`} />
                               </button>
                             </label>
                           </div>
