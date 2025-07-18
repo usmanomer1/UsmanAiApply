@@ -336,7 +336,24 @@ const JobSearchPage: React.FC = () => {
                       setProgressMessage(`Found ${data.totalFound} jobs matching your profile`);
                     },
                     jobs: (data) => {
-                      setJobs(prevJobs => [...prevJobs, ...data.jobs]);
+                      // Sanitize job data to prevent NaN issues
+                      const sanitizedJobs = data.jobs.map(job => ({
+                        ...job,
+                        match_score: typeof job.match_score === 'number' && !isNaN(job.match_score) ? job.match_score : null,
+                        job_min_salary: typeof job.job_min_salary === 'number' && !isNaN(job.job_min_salary) ? job.job_min_salary : null,
+                        job_max_salary: typeof job.job_max_salary === 'number' && !isNaN(job.job_max_salary) ? job.job_max_salary : null,
+                        job_apply_quality_score: typeof job.job_apply_quality_score === 'number' && !isNaN(job.job_apply_quality_score) ? job.job_apply_quality_score : null,
+                        // Ensure required string fields have defaults
+                        employer_name: job.employer_name || 'Unknown Company',
+                        job_title: job.job_title || 'Unknown Position',
+                        job_city: job.job_city || '',
+                        job_state: job.job_state || '',
+                        job_description: job.job_description || '',
+                        job_employment_type: job.job_employment_type || 'Full-time',
+                        job_posted_at_datetime_utc: job.job_posted_at_datetime_utc || new Date().toISOString(),
+                      }));
+                      
+                      setJobs(prevJobs => [...prevJobs, ...sanitizedJobs]);
                       setStreamProgress((data.batchNumber / data.totalBatches) * 100);
                       setProcessedCount(prev => prev + data.jobs.length);
                     },
@@ -509,7 +526,24 @@ const JobSearchPage: React.FC = () => {
           setProgressMessage(`Found ${data.totalFound} jobs matching your criteria`);
         },
         jobs: (data) => {
-          setJobs(prevJobs => [...prevJobs, ...data.jobs]);
+          // Sanitize job data to prevent NaN issues
+          const sanitizedJobs = data.jobs.map(job => ({
+            ...job,
+            match_score: typeof job.match_score === 'number' && !isNaN(job.match_score) ? job.match_score : null,
+            job_min_salary: typeof job.job_min_salary === 'number' && !isNaN(job.job_min_salary) ? job.job_min_salary : null,
+            job_max_salary: typeof job.job_max_salary === 'number' && !isNaN(job.job_max_salary) ? job.job_max_salary : null,
+            job_apply_quality_score: typeof job.job_apply_quality_score === 'number' && !isNaN(job.job_apply_quality_score) ? job.job_apply_quality_score : null,
+            // Ensure required string fields have defaults
+            employer_name: job.employer_name || 'Unknown Company',
+            job_title: job.job_title || 'Unknown Position',
+            job_city: job.job_city || '',
+            job_state: job.job_state || '',
+            job_description: job.job_description || '',
+            job_employment_type: job.job_employment_type || 'Full-time',
+            job_posted_at_datetime_utc: job.job_posted_at_datetime_utc || new Date().toISOString(),
+          }));
+          
+          setJobs(prevJobs => [...prevJobs, ...sanitizedJobs]);
           setStreamProgress((data.batchNumber / data.totalBatches) * 100);
           setProcessedCount(prev => prev + data.jobs.length);
         },
@@ -1267,7 +1301,7 @@ const JobSearchPage: React.FC = () => {
                               {formatSalary(job.job_min_salary, job.job_max_salary)}
                             </span>
                           )}
-                          {job.job_apply_quality_score && job.job_apply_quality_score > 7 && (
+                          {job.job_apply_quality_score && !isNaN(job.job_apply_quality_score) && job.job_apply_quality_score > 7 && (
                             <span className="flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full text-xs font-medium">
                               <Star className="h-3 w-3 fill-current" />
                               Featured
@@ -1278,7 +1312,7 @@ const JobSearchPage: React.FC = () => {
                     </div>
                     
                     {/* Match Score */}
-                    {job.match_score !== undefined && (
+                    {job.match_score !== undefined && job.match_score !== null && (
                       <div className="text-right">
                         <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold border ${getMatchScoreColor(job.match_score || 0)}`}>
                           <span className="text-lg">{getMatchIcon(job.match_score)}</span>
@@ -1306,7 +1340,7 @@ const JobSearchPage: React.FC = () => {
                               />
                             </svg>
                           </div>
-                          <span>{job.match_score || 0}%</span>
+                          <span>{Math.round(job.match_score || 0)}%</span>
                         </div>
                         <p className="text-xs text-gray-500 mt-1">{job.match_label || getMatchLabel(job.match_score || 0)}</p>
                       </div>
