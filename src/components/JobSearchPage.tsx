@@ -260,9 +260,13 @@ const JobSearchPage: React.FC = () => {
               
               // Only proceed if we have a role to search for
               if (primaryRole) {
-                // Handle location - check for custom locations first
+                // Handle location - prioritize profile.location first (most recent update)
                 let primaryLocation = '';
-                if (jobPrefs?.locations && jobPrefs.locations.length > 0) {
+                if (profile?.location) {
+                  // Use profile location as primary source
+                  primaryLocation = profile.location;
+                } else if (jobPrefs?.locations && jobPrefs.locations.length > 0) {
+                  // Fall back to job preferences location
                   const firstLocation = jobPrefs.locations[0];
                   if (firstLocation === 'remote') {
                     primaryLocation = 'Remote';
@@ -275,9 +279,6 @@ const JobSearchPage: React.FC = () => {
                     // Custom location - use as is
                     primaryLocation = firstLocation;
                   }
-                } else if (profile?.location) {
-                  // Fall back to profile location if no job preferences location
-                  primaryLocation = profile.location;
                 }
                 
                 setSearchQuery(primaryRole);
