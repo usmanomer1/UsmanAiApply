@@ -6,7 +6,7 @@ exports.handler = async (event, context) => {
       statusCode: 200,
       headers: {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, Accept',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       },
       body: '',
@@ -17,6 +17,10 @@ exports.handler = async (event, context) => {
   if (event.httpMethod !== 'POST' && event.httpMethod !== 'GET') {
     return {
       statusCode: 405,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({ error: 'Method not allowed' }),
     };
   }
@@ -28,6 +32,10 @@ exports.handler = async (event, context) => {
     console.error('JOBOTIC_API_KEY not configured');
     return {
       statusCode: 500,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({ error: 'API key not configured' }),
     };
   }
@@ -50,6 +58,10 @@ exports.handler = async (event, context) => {
     if (!endpoint) {
       return {
         statusCode: 400,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ error: 'Endpoint is required' }),
       };
     }
@@ -57,11 +69,18 @@ exports.handler = async (event, context) => {
     // Keep minimal logging for production debugging
     console.log(`Jobotic API Proxy: ${event.httpMethod} ${endpoint}`);
 
-    // Extract authorization header if present (for endpoints requiring auth)
+    // Build headers - preserve important client headers
     const headers = {
       'Content-Type': 'application/json',
       'X-API-Key': API_KEY,
     };
+    
+    // Forward Accept header for streaming support
+    const acceptHeader = event.headers.accept || event.headers.Accept;
+    if (acceptHeader) {
+      headers['Accept'] = acceptHeader;
+      console.log(`Forwarding Accept header: ${acceptHeader}`);
+    }
     
     // Pass through Authorization header if present
     // Netlify normalizes headers to lowercase
@@ -76,6 +95,9 @@ exports.handler = async (event, context) => {
     }
     
     const fullUrl = `${API_URL}${endpoint}`;
+    const isStreamingRequest = acceptHeader === 'application/x-ndjson';
+    
+    console.log(`Making request to ${fullUrl} with Accept: ${acceptHeader || 'default'}`);
 
     // Make the request to Jobotic API
     const response = await fetch(fullUrl, {
@@ -84,26 +106,77 @@ exports.handler = async (event, context) => {
       body: body ? JSON.stringify(body) : undefined,
     });
 
-    const data = await response.json();
+    // Get response content type
+    const responseContentType = response.headers.get('content-type') || 'application/json';
+    const isStreamingResponse = responseContentType.includes('application/x-ndjson');
+    
+    console.log(`Response content-type: ${responseContentType}, streaming: ${isStreamingResponse}`);
+    
+    // Build response headers
+    const responseHeaders = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, Accept',
+      'Content-Type': responseContentType,
+    };
+    
+    // Forward cache control headers if present
+    const cacheControl = response.headers.get('cache-control');
+    if (cacheControl) {
+      responseHeaders['Cache-Control'] = cacheControl;
+    }
     
     if (!response.ok) {
       console.error(`API Error Response: ${response.status}`);
     }
 
-    return {
-      statusCode: response.status,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      },
-      body: JSON.stringify(data),
-    };
+    // Handle streaming NDJSON response
+    if (isStreamingResponse) {
+      // For Netlify Functions, we can't truly stream, but we can return the raw NDJSON
+      const text = await response.text();
+      
+      return {
+        statusCode: response.status,
+        headers: responseHeaders,
+        body: text, // Return raw NDJSON text
+        isBase64Encoded: false,
+      };
+    } else {
+      // Handle regular JSON response
+      let data;
+      const responseText = await response.text();
+      
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse JSON response:', e);
+        // Return raw text if JSON parsing fails
+        return {
+          statusCode: response.status,
+          headers: responseHeaders,
+          body: responseText,
+          isBase64Encoded: false,
+        };
+      }
+      
+      return {
+        statusCode: response.status,
+        headers: responseHeaders,
+        body: JSON.stringify(data),
+        isBase64Encoded: false,
+      };
+    }
   } catch (error) {
     console.error('Jobotic API proxy error:', error.message || error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'Internal server error' }),
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ 
+        error: 'Internal server error', 
+        details: error.message 
+      }),
     };
   }
 };
