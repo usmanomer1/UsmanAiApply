@@ -173,25 +173,6 @@ const Sidebar: React.FC = () => {
         </div>
       </div>
 
-      {/* Bolt.new Badge */}
-      <div className="px-6 py-4 border-b border-gray-100">
-        <a 
-          href="https://bolt.new/" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="block text-center group"
-        >
-          <img 
-            src="/images/logos/black_circle_360x360.png" 
-            alt="Powered by Bolt.new" 
-            className="h-[60px] w-[60px] mx-auto transition-transform duration-200 group-hover:scale-105"
-          />
-          <p className="text-xs text-gray-500 mt-2 group-hover:text-gray-700 transition-colors">
-            Built with Bolt.new
-          </p>
-        </a>
-      </div>
-
       {/* Main Navigation */}
       <nav className="flex-1 px-3 py-4">
         <ul className="space-y-1">
