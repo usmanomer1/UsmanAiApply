@@ -339,67 +339,87 @@ class JoboticApiService {
     // Check if we got streaming response
     const contentType = response.headers.get('content-type');
     if (!contentType?.includes('application/x-ndjson')) {
-      // Fallback to regular JSON response
-      const data = await response.json();
-      // Simulate streaming with single complete message
-      callbacks.initial?.({
-        totalFound: data.data.totalFound,
-        searchCriteria: data.data.searchCriteria,
-      });
-      callbacks.jobs?.({
-        jobs: data.data.jobs,
-        batchNumber: 1,
-        totalBatches: 1,
-      });
-      callbacks.complete?.({
-        totalProcessed: data.data.jobsReturned,
-        usage: data.usage,
-        timing: data.timing,
-      });
-      return;
-    }
-
-    // Process streaming response
-    const reader = response.body?.getReader();
-    if (!reader) {
-      throw new Error('Response body is not readable');
-    }
-
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // Keep last incomplete line
-
-        for (const line of lines) {
+      // Try to check if response is NDJSON even without proper content-type
+      const responseText = await response.text();
+      
+      // Check if it looks like NDJSON (multiple JSON objects separated by newlines)
+      if (responseText.includes('\n') && responseText.trim().split('\n').length > 1) {
+        console.log('Detected NDJSON response despite content-type');
+        // Process as buffered NDJSON
+        const lines = responseText.trim().split('\n');
+        
+        // Process lines with small delays for visual streaming effect
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
           if (line.trim()) {
             try {
               const message = JSON.parse(line);
               callbacks[message.type]?.(message.data);
+              
+              // Add small delay between job batches for visual feedback
+              if (message.type === 'jobs' && i < lines.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, 200));
+              }
             } catch (e) {
               console.error('Failed to parse NDJSON line:', line, e);
             }
           }
         }
-      }
-
-      // Process any remaining buffer
-      if (buffer.trim()) {
+        return;
+      } else {
+        // Fallback to single JSON response
         try {
-          const message = JSON.parse(buffer);
-          callbacks[message.type]?.(message.data);
+          const data = JSON.parse(responseText);
+          // Simulate streaming with single complete message
+          callbacks.initial?.({
+            totalFound: data.data.totalFound,
+            searchCriteria: data.data.searchCriteria,
+          });
+          callbacks.jobs?.({
+            jobs: data.data.jobs,
+            batchNumber: 1,
+            totalBatches: 1,
+          });
+          callbacks.complete?.({
+            totalProcessed: data.data.jobsReturned,
+            usage: data.usage,
+            timing: data.timing,
+          });
+          return;
         } catch (e) {
-          console.error('Failed to parse final NDJSON line:', buffer, e);
+          console.error('Failed to parse response as JSON:', e);
+          throw new Error('Invalid response format from server');
         }
       }
-    } finally {
-      reader.releaseLock();
+    }
+
+    // Process streaming response (either true streaming or buffered NDJSON)
+    if (response.body) {
+      // For buffered NDJSON from Netlify function
+      const responseText = await response.text();
+      const lines = responseText.trim().split('\n');
+      
+      console.log(`Processing ${lines.length} NDJSON lines`);
+      
+      // Process lines with small delays for visual streaming effect
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.trim()) {
+          try {
+            const message = JSON.parse(line);
+            callbacks[message.type]?.(message.data);
+            
+            // Add small delay between job batches for visual feedback
+            if (message.type === 'jobs' && i < lines.length - 1) {
+              await new Promise(resolve => setTimeout(resolve, 200));
+            }
+          } catch (e) {
+            console.error('Failed to parse NDJSON line:', line, e);
+          }
+        }
+      }
+    } else {
+      throw new Error('Response body is not available');
     }
   }
   
