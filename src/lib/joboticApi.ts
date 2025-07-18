@@ -2,7 +2,7 @@ const API_BASE_URL = import.meta.env.VITE_JOBOTIC_API_URL || 'https://jobotic-ba
 const USE_NETLIFY_FUNCTION = !import.meta.env.VITE_JOBOTIC_API_KEY; // Use function if no VITE key
 
 // Streaming message types
-export type StreamMessageType = 'initial' | 'jobs' | 'progress' | 'complete' | 'error';
+export type StreamMessageType = 'initial' | 'jobs' | 'progress' | 'complete' | 'error' | 'keepalive';
 
 export interface StreamCallbacks {
   initial?: (data: {
@@ -27,6 +27,9 @@ export interface StreamCallbacks {
   error?: (data: {
     message: string;
     batchNumber?: number;
+  }) => void;
+  keepalive?: (data: {
+    timestamp: number;
   }) => void;
 }
 
@@ -339,12 +342,20 @@ class JoboticApiService {
     // Check headers to determine response type
     const contentType = response.headers.get('content-type');
     const streamFormat = response.headers.get('x-stream-format');
+    const responseType = response.headers.get('x-response-type');
     const isNDJSONResponse = contentType?.includes('application/x-ndjson') || streamFormat === 'ndjson';
     
-    console.log(`Response headers - Content-Type: ${contentType}, X-Stream-Format: ${streamFormat}`);
+    // Enhanced debugging
+    console.log('Response headers:', {
+      contentType,
+      streamFormat,
+      responseType,
+      allHeaders: [...response.headers.entries()]
+    });
     
     // Read response body once
     const responseText = await response.text();
+    console.log('Response preview (first 200 chars):', responseText.substring(0, 200));
     
     // Try to detect NDJSON format from content if headers don't indicate it
     const looksLikeNDJSON = responseText.includes('\n') && responseText.trim().split('\n').length > 1 && 
@@ -362,10 +373,23 @@ class JoboticApiService {
         if (line.trim()) {
           try {
             const message = JSON.parse(line);
+            console.log('Received message:', message.type, 'with data keys:', Object.keys(message.data || {}));
             
             // Validate message structure
             if (message.type && message.data) {
-              callbacks[message.type]?.(message.data);
+              // Handle keepalive messages
+              if (message.type === 'keepalive') {
+                console.log('Keepalive received at:', new Date(message.data.timestamp * 1000));
+                callbacks.keepalive?.(message.data);
+                continue; // Skip delay for keepalive
+              }
+              
+              // Process other message types
+              if (callbacks[message.type]) {
+                callbacks[message.type](message.data);
+              } else {
+                console.warn('No callback for message type:', message.type);
+              }
               
               // Add small delay between job batches for visual feedback
               if (message.type === 'jobs' && i < lines.length - 1) {
