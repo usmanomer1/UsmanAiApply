@@ -188,6 +188,7 @@ export const CustomAuthPage: React.FC = () => {
         // Handle forgot password with captcha validation
         const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
           redirectTo: `${window.location.origin}/reset-password`,
+          captchaToken: finalCaptchaToken,
         });
         
         if (error) {
