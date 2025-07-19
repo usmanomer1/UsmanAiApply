@@ -76,8 +76,6 @@ const JobSearchPage: React.FC = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
-  const loadMoreRef = useRef<HTMLDivElement>(null);
-  const observerRef = useRef<IntersectionObserver | null>(null);
   const isLoadingMoreRef = useRef(false);
   const lastLoadTimeRef = useRef(0);
   const [usageStats, setUsageStats] = useState<{ jobsViewed: number; jobLimit: number }>({ jobsViewed: 0, jobLimit: 100 });
@@ -891,11 +889,6 @@ const JobSearchPage: React.FC = () => {
       return;
     }
     
-    // Minimum jobs threshold - only enable infinite scroll after 10 jobs
-    if (jobs.length < 10) {
-      console.log('Blocked: Not enough jobs yet', jobs.length);
-      return;
-    }
     
     // Touch session to update last accessed time
     sessionUtils.touchSession();
@@ -971,49 +964,6 @@ const JobSearchPage: React.FC = () => {
       isLoadingMoreRef.current = false;
     }
   }, [loadingMore, hasMore, sessionId, currentPage, totalPages, searchQuery, location, filters, resumeText, jobs.length, user?.id]);
-
-  // Setup IntersectionObserver for infinite scroll
-  useEffect(() => {
-    // Only set up observer if we have enough jobs and more to load
-    if (!hasMore || jobs.length < 10 || loading || isStreaming) {
-      return;
-    }
-    
-    const options = {
-      root: null,
-      rootMargin: '400px', // Increased from 100px to give more scroll buffer
-      threshold: 0.1
-    };
-
-    const handleIntersection = (entries: IntersectionObserverEntry[]) => {
-      const [entry] = entries;
-      if (entry.isIntersecting && hasMore && !isLoadingMoreRef.current && !loading && !isStreaming) {
-        console.log('IntersectionObserver triggered load more');
-        loadMoreJobs();
-      }
-    };
-
-    // Cleanup previous observer
-    if (observerRef.current) {
-      observerRef.current.disconnect();
-    }
-
-    // Create new observer
-    observerRef.current = new IntersectionObserver(handleIntersection, options);
-
-    // Observe the sentinel element if it exists
-    if (loadMoreRef.current) {
-      console.log('Observing sentinel element');
-      observerRef.current.observe(loadMoreRef.current);
-    }
-
-    // Cleanup
-    return () => {
-      if (observerRef.current) {
-        observerRef.current.disconnect();
-      }
-    };
-  }, [hasMore, loading, isStreaming, loadMoreJobs]); // Removed loadingMore and jobs.length
 
   return (
     <>
@@ -1563,72 +1513,64 @@ const JobSearchPage: React.FC = () => {
         )}
           
 
-        {/* Infinite Scroll Loading */}
+        {/* Load More Section */}
         {!loading && !initializing && jobs.length > 0 && activeTab === 'recommended' && (
-          <>
-            {/* Show manual load more button for first 10 jobs */}
-            {hasMore && jobs.length < 10 && (
-              <div className="mt-6 text-center">
+          <div className="mt-8">
+            {/* Job count indicator */}
+            <div className="text-center mb-4">
+              <p className="text-sm text-gray-600">
+                Showing <span className="font-semibold text-gray-900">{jobs.length}</span>
+                {totalJobsFound > 0 && (
+                  <> of <span className="font-semibold text-gray-900">{totalJobsFound}</span></>
+                )}
+                {' '}jobs
+              </p>
+            </div>
+            
+            {/* Load More Button */}
+            {hasMore && (
+              <div className="text-center">
                 <button
                   onClick={loadMoreJobs}
                   disabled={loadingMore}
-                  className="px-6 py-3 bg-teal-600 text-white font-medium rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mx-auto"
+                  className="px-8 py-3 bg-teal-600 text-white font-medium rounded-lg hover:bg-teal-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mx-auto shadow-sm hover:shadow-md"
                 >
                   {loadingMore ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Loading...
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      <span>Loading more jobs...</span>
                     </>
                   ) : (
                     <>
-                      Load More Jobs
-                      <ChevronRight className="h-4 w-4" />
+                      <span>Load More Jobs</span>
+                      <ChevronRight className="h-5 w-5" />
                     </>
                   )}
                 </button>
+                
+                {/* Progress indicator */}
+                {currentPage > 0 && totalPages > 0 && (
+                  <p className="text-xs text-gray-500 mt-2">
+                    Page {currentPage} of {totalPages}
+                  </p>
+                )}
               </div>
             )}
             
-            {/* Spacer to ensure user scrolls before infinite scroll kicks in */}
-            {hasMore && jobs.length >= 10 && (
-              <div className="mt-8">
-                {/* Visual indicator */}
-                <div className="text-center py-4 text-sm text-gray-500">
-                  Showing {jobs.length} of {totalJobsFound || 'many'} jobs
+            {/* End message */}
+            {!hasMore && (
+              <div className="text-center py-8 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-center gap-2 text-gray-500 mb-2">
+                  <div className="h-px bg-gray-300 w-12" />
+                  <p className="font-medium">You've reached the end</p>
+                  <div className="h-px bg-gray-300 w-12" />
                 </div>
-                
-                {/* Extra spacing to ensure scrolling is needed */}
-                <div className="h-32" />
-                
-                {/* Infinite scroll sentinel - observed by IntersectionObserver */}
-                <div 
-                  ref={loadMoreRef}
-                  className="h-20 flex items-center justify-center"
-                >
-                  {loadingMore ? (
-                    <div className="flex items-center gap-3">
-                      <Loader2 className="h-5 w-5 animate-spin text-teal-600" />
-                      <span className="text-gray-600 font-medium">Loading more jobs...</span>
-                    </div>
-                  ) : (
-                    <div className="text-sm text-gray-400">
-                      Scroll for more
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-            
-            {/* Show end message only when we've loaded all pages */}
-            {!hasMore && jobs.length > 0 && (
-              <div className="text-center py-8 bg-gray-50 rounded-lg mt-4">
-                <p className="text-gray-500 font-medium">You've reached the end</p>
-                <p className="text-sm text-gray-400 mt-1">
-                  Showing all {jobs.length} jobs • No more to load
+                <p className="text-sm text-gray-400">
+                  All {jobs.length} jobs loaded
                 </p>
               </div>
             )}
-          </>
+          </div>
         )}
 
         {/* Empty State */}
