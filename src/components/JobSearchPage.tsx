@@ -78,6 +78,8 @@ const JobSearchPage: React.FC = () => {
   const [totalPages, setTotalPages] = useState(0);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
+  const isLoadingMoreRef = useRef(false);
+  const lastLoadTimeRef = useRef(0);
   const [usageStats, setUsageStats] = useState<{ jobsViewed: number; jobLimit: number }>({ jobsViewed: 0, jobLimit: 100 });
   
   // Streaming states
@@ -839,6 +841,20 @@ const JobSearchPage: React.FC = () => {
 
   // Function to load more jobs for infinite scroll
   const loadMoreJobs = useCallback(async () => {
+    // Debouncing check - prevent calls within 1 second of each other
+    const now = Date.now();
+    const timeSinceLastLoad = now - lastLoadTimeRef.current;
+    if (timeSinceLastLoad < 1000) {
+      console.log('Debounced: Too soon since last load', timeSinceLastLoad);
+      return;
+    }
+    
+    // Check if already loading using ref
+    if (isLoadingMoreRef.current) {
+      console.log('Blocked: Already loading more jobs');
+      return;
+    }
+    
     // Get current session and validate
     const session = sessionUtils.getStoredSession();
     
@@ -850,7 +866,8 @@ const JobSearchPage: React.FC = () => {
       totalPages,
       currentPage,
       searchQuery,
-      location
+      location,
+      jobsCount: jobs.length
     });
     
     if (loadingMore) {
@@ -874,11 +891,20 @@ const JobSearchPage: React.FC = () => {
       return;
     }
     
+    // Minimum jobs threshold - only enable infinite scroll after 10 jobs
+    if (jobs.length < 10) {
+      console.log('Blocked: Not enough jobs yet', jobs.length);
+      return;
+    }
+    
     // Touch session to update last accessed time
     sessionUtils.touchSession();
     
     console.log('All checks passed, making API call...');
 
+    // Set loading state in both ref and state
+    isLoadingMoreRef.current = true;
+    lastLoadTimeRef.current = now;
     setLoadingMore(true);
     const nextPage = currentPage + 1;
     
@@ -942,20 +968,26 @@ const JobSearchPage: React.FC = () => {
       toast.error('Failed to load more jobs. Please try again.');
     } finally {
       setLoadingMore(false);
+      isLoadingMoreRef.current = false;
     }
   }, [loadingMore, hasMore, sessionId, currentPage, totalPages, searchQuery, location, filters, resumeText, jobs.length, user?.id]);
 
   // Setup IntersectionObserver for infinite scroll
   useEffect(() => {
+    // Only set up observer if we have enough jobs and more to load
+    if (!hasMore || jobs.length < 10 || loading || isStreaming) {
+      return;
+    }
+    
     const options = {
       root: null,
-      rootMargin: '100px',
+      rootMargin: '400px', // Increased from 100px to give more scroll buffer
       threshold: 0.1
     };
 
     const handleIntersection = (entries: IntersectionObserverEntry[]) => {
       const [entry] = entries;
-      if (entry.isIntersecting && hasMore && !loadingMore && !loading && !isStreaming) {
+      if (entry.isIntersecting && hasMore && !isLoadingMoreRef.current && !loading && !isStreaming) {
         console.log('IntersectionObserver triggered load more');
         loadMoreJobs();
       }
@@ -970,7 +1002,7 @@ const JobSearchPage: React.FC = () => {
     observerRef.current = new IntersectionObserver(handleIntersection, options);
 
     // Observe the sentinel element if it exists
-    if (loadMoreRef.current && hasMore && jobs.length > 0) {
+    if (loadMoreRef.current) {
       console.log('Observing sentinel element');
       observerRef.current.observe(loadMoreRef.current);
     }
@@ -981,7 +1013,7 @@ const JobSearchPage: React.FC = () => {
         observerRef.current.disconnect();
       }
     };
-  }, [hasMore, loadingMore, loading, isStreaming, jobs.length, loadMoreJobs]);
+  }, [hasMore, loading, isStreaming, loadMoreJobs]); // Removed loadingMore and jobs.length
 
   return (
     <>
@@ -1534,22 +1566,56 @@ const JobSearchPage: React.FC = () => {
         {/* Infinite Scroll Loading */}
         {!loading && !initializing && jobs.length > 0 && activeTab === 'recommended' && (
           <>
-            {/* Infinite scroll sentinel - observed by IntersectionObserver */}
-            {hasMore && (
-              <div 
-                ref={loadMoreRef}
-                className="h-20 flex items-center justify-center"
-              >
-                {loadingMore ? (
-                  <div className="flex items-center gap-3">
-                    <Loader2 className="h-5 w-5 animate-spin text-teal-600" />
-                    <span className="text-gray-600 font-medium">Loading more jobs...</span>
-                  </div>
-                ) : (
-                  <div className="text-sm text-gray-500">
-                    Scroll to load more • Showing {jobs.length} of {totalJobsFound || '?'} jobs
-                  </div>
-                )}
+            {/* Show manual load more button for first 10 jobs */}
+            {hasMore && jobs.length < 10 && (
+              <div className="mt-6 text-center">
+                <button
+                  onClick={loadMoreJobs}
+                  disabled={loadingMore}
+                  className="px-6 py-3 bg-teal-600 text-white font-medium rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mx-auto"
+                >
+                  {loadingMore ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      Load More Jobs
+                      <ChevronRight className="h-4 w-4" />
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+            
+            {/* Spacer to ensure user scrolls before infinite scroll kicks in */}
+            {hasMore && jobs.length >= 10 && (
+              <div className="mt-8">
+                {/* Visual indicator */}
+                <div className="text-center py-4 text-sm text-gray-500">
+                  Showing {jobs.length} of {totalJobsFound || 'many'} jobs
+                </div>
+                
+                {/* Extra spacing to ensure scrolling is needed */}
+                <div className="h-32" />
+                
+                {/* Infinite scroll sentinel - observed by IntersectionObserver */}
+                <div 
+                  ref={loadMoreRef}
+                  className="h-20 flex items-center justify-center"
+                >
+                  {loadingMore ? (
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="h-5 w-5 animate-spin text-teal-600" />
+                      <span className="text-gray-600 font-medium">Loading more jobs...</span>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-400">
+                      Scroll for more
+                    </div>
+                  )}
+                </div>
               </div>
             )}
             
