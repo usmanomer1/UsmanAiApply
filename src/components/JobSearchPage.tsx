@@ -398,11 +398,11 @@ const JobSearchPage: React.FC = () => {
                         jobsLoaded: jobs.length
                       });
                       
+                      // Only show toast if no jobs found (important feedback)
                       if (data.totalProcessed === 0) {
                         toast.info('No jobs found. Try updating your preferences.');
-                      } else {
-                        toast.success(`Found ${data.totalProcessed} jobs matching your profile`);
                       }
+                      // Silent success - jobs are already visible on screen
                     },
                     error: (data) => {
                       console.error('Auto-search streaming error:', data);
@@ -693,7 +693,7 @@ const JobSearchPage: React.FC = () => {
           .eq('interaction_type', 'liked');
           
         if (error) throw error;
-        toast.success('Job removed from saved');
+        // Silent success - UI already shows visual feedback
       } else {
         // Add to saved
         const job = jobs.find(j => j.job_id === jobId);
@@ -715,7 +715,7 @@ const JobSearchPage: React.FC = () => {
           });
           
         if (error) throw error;
-        toast.success('Job saved');
+        // Silent success - UI already shows visual feedback
       }
     } catch (error) {
       console.error('Error toggling saved job:', error);
