@@ -13,11 +13,6 @@ import { useLocation } from 'react-router-dom';
 import { trackAITokens } from '../lib/aiTokenTracking';
 import { getPlanLimits } from '../stripe-config';
 import { JobSkeleton } from './JobSkeleton';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Checkbox } from './ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 interface Job {
   job_id: string;
@@ -1567,11 +1562,11 @@ const JobSearchPage: React.FC = () => {
     </div>
     
     {/* Filters Modal */}
-    <Dialog open={showFilterModal} onOpenChange={setShowFilterModal}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>Search Filters</DialogTitle>
-        </DialogHeader>
+    {showFilterModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 bg-black/50" onClick={() => setShowFilterModal(false)} />
+        <div className="relative bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4 z-50">
+          <h2 className="text-lg font-semibold mb-4">Search Filters</h2>
         
         <div className="space-y-4 py-4">
           {/* Job Title Search */}
@@ -1579,12 +1574,12 @@ const JobSearchPage: React.FC = () => {
             <label className="text-sm font-medium text-gray-700">Job Title</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
+              <input
                 type="text"
                 value={modalFilters.searchQuery}
                 onChange={(e) => setModalFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
                 placeholder="Search job title, company, or keywords..."
-                className="pl-9"
+                className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
             </div>
           </div>
@@ -1594,12 +1589,12 @@ const JobSearchPage: React.FC = () => {
             <label className="text-sm font-medium text-gray-700">Location</label>
             <div className="relative">
               <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
+              <input
                 type="text"
                 value={modalFilters.location}
                 onChange={(e) => setModalFilters(prev => ({ ...prev, location: e.target.value }))}
                 placeholder="San Francisco, CA"
-                className="pl-9"
+                className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
             </div>
           </div>
@@ -1609,54 +1604,62 @@ const JobSearchPage: React.FC = () => {
             <label className="text-sm font-medium text-gray-700">Employment Type</label>
             <div className="space-y-2">
               <label className="flex items-center gap-2 cursor-pointer">
-                <Checkbox
+                <input
+                  type="checkbox"
                   checked={modalFilters.employment_types.includes('FULLTIME')}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
+                  onChange={(e) => {
+                    if (e.target.checked) {
                       setModalFilters(prev => ({ ...prev, employment_types: [...prev.employment_types, 'FULLTIME'] }));
                     } else {
                       setModalFilters(prev => ({ ...prev, employment_types: prev.employment_types.filter(t => t !== 'FULLTIME') }));
                     }
                   }}
+                  className="text-teal-600"
                 />
                 <span className="text-sm">Full-time</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
-                <Checkbox
+                <input
+                  type="checkbox"
                   checked={modalFilters.employment_types.includes('PARTTIME')}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
+                  onChange={(e) => {
+                    if (e.target.checked) {
                       setModalFilters(prev => ({ ...prev, employment_types: [...prev.employment_types, 'PARTTIME'] }));
                     } else {
                       setModalFilters(prev => ({ ...prev, employment_types: prev.employment_types.filter(t => t !== 'PARTTIME') }));
                     }
                   }}
+                  className="text-teal-600"
                 />
                 <span className="text-sm">Part-time</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
-                <Checkbox
+                <input
+                  type="checkbox"
                   checked={modalFilters.employment_types.includes('CONTRACTOR')}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
+                  onChange={(e) => {
+                    if (e.target.checked) {
                       setModalFilters(prev => ({ ...prev, employment_types: [...prev.employment_types, 'CONTRACTOR'] }));
                     } else {
                       setModalFilters(prev => ({ ...prev, employment_types: prev.employment_types.filter(t => t !== 'CONTRACTOR') }));
                     }
                   }}
+                  className="text-teal-600"
                 />
                 <span className="text-sm">Contract</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
-                <Checkbox
+                <input
+                  type="checkbox"
                   checked={modalFilters.employment_types.includes('INTERN')}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
+                  onChange={(e) => {
+                    if (e.target.checked) {
                       setModalFilters(prev => ({ ...prev, employment_types: [...prev.employment_types, 'INTERN'] }));
                     } else {
                       setModalFilters(prev => ({ ...prev, employment_types: prev.employment_types.filter(t => t !== 'INTERN') }));
                     }
                   }}
+                  className="text-teal-600"
                 />
                 <span className="text-sm">Internship</span>
               </label>
@@ -1666,57 +1669,54 @@ const JobSearchPage: React.FC = () => {
           {/* Date Posted */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">Date Posted</label>
-            <Select
-              value={modalFilters.date_posted}
-              onValueChange={(value) => setModalFilters(prev => ({ ...prev, date_posted: value }))}
+            <select
+              value={modalFilters.date_posted || ""}
+              onChange={(e) => setModalFilters(prev => ({ ...prev, date_posted: e.target.value }))}
+              className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Select date range" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All time</SelectItem>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="3days">Last 3 days</SelectItem>
-                <SelectItem value="week">Last week</SelectItem>
-                <SelectItem value="month">Last month</SelectItem>
-              </SelectContent>
-            </Select>
+              <option value="">All time</option>
+              <option value="today">Today</option>
+              <option value="3days">Last 3 days</option>
+              <option value="week">Last week</option>
+              <option value="month">Last month</option>
+            </select>
           </div>
           
           {/* Experience Level */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">Experience Level</label>
-            <Select
-              value={modalFilters.job_requirements.join(',')}
-              onValueChange={(value) => setModalFilters(prev => ({ ...prev, job_requirements: value ? [value] : [] }))}
+            <select
+              value={modalFilters.job_requirements.join(',') || ""}
+              onChange={(e) => {
+                const value = e.target.value;
+                setModalFilters(prev => ({ ...prev, job_requirements: value ? [value] : [] }));
+              }}
+              className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Select experience level" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">Any experience</SelectItem>
-                <SelectItem value="no_exp">No Experience Required</SelectItem>
-                <SelectItem value="under_3_years_exp">Under 3 Years Experience</SelectItem>
-                <SelectItem value="more_than_3_years_exp">3+ Years Experience</SelectItem>
-                <SelectItem value="no_degree">No Degree Required</SelectItem>
-                <SelectItem value="fair_chance">Fair Chance (2nd chance)</SelectItem>
-              </SelectContent>
-            </Select>
+              <option value="">Any experience</option>
+              <option value="no_exp">No Experience Required</option>
+              <option value="under_3_years_exp">Under 3 Years Experience</option>
+              <option value="more_than_3_years_exp">3+ Years Experience</option>
+              <option value="no_degree">No Degree Required</option>
+              <option value="fair_chance">Fair Chance (2nd chance)</option>
+            </select>
           </div>
           
           {/* Remote Only */}
           <label className="flex items-center gap-2 cursor-pointer">
-            <Checkbox
+            <input
+              type="checkbox"
               checked={modalFilters.remote_jobs_only}
-              onCheckedChange={(checked) => setModalFilters(prev => ({ ...prev, remote_jobs_only: !!checked }))}
+              onChange={(e) => setModalFilters(prev => ({ ...prev, remote_jobs_only: e.target.checked }))}
+              className="text-teal-600"
             />
             <span className="text-sm font-medium text-gray-700">Remote jobs only</span>
           </label>
         </div>
         
-        <DialogFooter>
-          <Button
-            variant="outline"
+        
+        <div className="flex justify-end gap-3 mt-6">
+          <button
             onClick={() => {
               // Reset to current values
               setModalFilters({
@@ -1729,10 +1729,11 @@ const JobSearchPage: React.FC = () => {
               });
               setShowFilterModal(false);
             }}
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
           >
             Cancel
-          </Button>
-          <Button
+          </button>
+          <button
             onClick={() => {
               // Apply filters and search
               setSearchQuery(modalFilters.searchQuery);
@@ -1747,13 +1748,14 @@ const JobSearchPage: React.FC = () => {
               // Trigger search after state updates
               setTimeout(() => searchJobs(), 100);
             }}
-            className="bg-teal-600 hover:bg-teal-700 text-white"
+            className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors"
           >
             Update
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </button>
+        </div>
+        </div>
+      </div>
+    )}
     </>
   );
 };
