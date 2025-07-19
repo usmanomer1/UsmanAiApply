@@ -13,6 +13,11 @@ import { useLocation } from 'react-router-dom';
 import { trackAITokens } from '../lib/aiTokenTracking';
 import { getPlanLimits } from '../stripe-config';
 import { JobSkeleton } from './JobSkeleton';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Checkbox } from './ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 interface Job {
   job_id: string;
@@ -87,6 +92,16 @@ const JobSearchPage: React.FC = () => {
   const [progressMessage, setProgressMessage] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const currentControllerRef = useRef<AbortController | null>(null);
+  
+  // Modal state - temporary values while modal is open
+  const [modalFilters, setModalFilters] = useState({
+    searchQuery: '',
+    location: '',
+    employment_types: [] as string[],
+    date_posted: '',
+    job_requirements: [] as string[],
+    remote_jobs_only: false
+  });
 
   // Cleanup abort controller on unmount
   useEffect(() => {
@@ -1050,184 +1065,113 @@ const JobSearchPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Filters Bar */}
+      {/* Quick Filters Section */}
       <div className="bg-gray-50 border-b border-gray-100 px-8 py-4">
-        <div className="flex items-center gap-4">
-          {/* Location Search */}
-          <div className="relative">
-            <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              type="text"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="San Francisco, CA"
-              className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent w-48"
-            />
-          </div>
+        <div className="flex items-center gap-3">
+          {/* Quick Filter Pills */}
+          <button 
+            onClick={() => {
+              setFilters(prev => ({ ...prev, remote_jobs_only: !prev.remote_jobs_only }));
+              // Trigger search after filter change
+              setTimeout(() => searchJobs(), 100);
+            }}
+            className={`px-4 py-2 border ${filters.remote_jobs_only ? 'bg-teal-600 border-teal-600 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'} rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-2`}
+          >
+            <MapPin className="h-4 w-4" />
+            Remote Only
+          </button>
           
-          {/* Filter Chips */}
-          <div className="flex items-center gap-2">
-            <div className="relative" ref={filterDropdownRef}>
-              <button 
-                onClick={() => setShowFilters(!showFilters)}
-                className={`px-4 py-2 bg-white border ${filters.employment_types.length > 0 ? 'border-teal-500 text-teal-600' : 'border-gray-200 text-gray-700'} rounded-full text-sm font-medium hover:border-gray-300 transition-colors flex items-center gap-2`}
-              >
-                <Briefcase className="h-4 w-4" />
-                {filters.employment_types.length > 0 ? `${filters.employment_types.length} selected` : 'Employment Type'}
-              </button>
-              {showFilters && (
-                <div className="absolute top-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-10 min-w-[200px]">
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        value="FULLTIME"
-                        checked={filters.employment_types.includes('FULLTIME')}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setFilters(prev => ({ ...prev, employment_types: [...prev.employment_types, 'FULLTIME'] }));
-                          } else {
-                            setFilters(prev => ({ ...prev, employment_types: prev.employment_types.filter(t => t !== 'FULLTIME') }));
-                          }
-                        }}
-                        className="text-teal-600"
-                      />
-                      <span className="text-sm">Full-time</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        value="PARTTIME"
-                        checked={filters.employment_types.includes('PARTTIME')}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setFilters(prev => ({ ...prev, employment_types: [...prev.employment_types, 'PARTTIME'] }));
-                          } else {
-                            setFilters(prev => ({ ...prev, employment_types: prev.employment_types.filter(t => t !== 'PARTTIME') }));
-                          }
-                        }}
-                        className="text-teal-600"
-                      />
-                      <span className="text-sm">Part-time</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        value="CONTRACTOR"
-                        checked={filters.employment_types.includes('CONTRACTOR')}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setFilters(prev => ({ ...prev, employment_types: [...prev.employment_types, 'CONTRACTOR'] }));
-                          } else {
-                            setFilters(prev => ({ ...prev, employment_types: prev.employment_types.filter(t => t !== 'CONTRACTOR') }));
-                          }
-                        }}
-                        className="text-teal-600"
-                      />
-                      <span className="text-sm">Contract</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        value="INTERN"
-                        checked={filters.employment_types.includes('INTERN')}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setFilters(prev => ({ ...prev, employment_types: [...prev.employment_types, 'INTERN'] }));
-                          } else {
-                            setFilters(prev => ({ ...prev, employment_types: prev.employment_types.filter(t => t !== 'INTERN') }));
-                          }
-                        }}
-                        className="text-teal-600"
-                      />
-                      <span className="text-sm">Internship</span>
-                    </label>
-                  </div>
-                </div>
-              )}
-            </div>
-            
+          <button 
+            onClick={() => {
+              const newTypes = filters.employment_types.includes('FULLTIME') 
+                ? filters.employment_types.filter(t => t !== 'FULLTIME')
+                : [...filters.employment_types, 'FULLTIME'];
+              setFilters(prev => ({ ...prev, employment_types: newTypes }));
+              setTimeout(() => searchJobs(), 100);
+            }}
+            className={`px-4 py-2 border ${filters.employment_types.includes('FULLTIME') ? 'bg-teal-600 border-teal-600 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'} rounded-full text-sm font-medium transition-all duration-200`}
+          >
+            Full-time
+          </button>
+          
+          <button 
+            onClick={() => {
+              const newTypes = filters.employment_types.includes('PARTTIME') 
+                ? filters.employment_types.filter(t => t !== 'PARTTIME')
+                : [...filters.employment_types, 'PARTTIME'];
+              setFilters(prev => ({ ...prev, employment_types: newTypes }));
+              setTimeout(() => searchJobs(), 100);
+            }}
+            className={`px-4 py-2 border ${filters.employment_types.includes('PARTTIME') ? 'bg-teal-600 border-teal-600 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'} rounded-full text-sm font-medium transition-all duration-200`}
+          >
+            Part-time
+          </button>
+          
+          <button 
+            onClick={() => {
+              const newTypes = filters.employment_types.includes('INTERN') 
+                ? filters.employment_types.filter(t => t !== 'INTERN')
+                : [...filters.employment_types, 'INTERN'];
+              setFilters(prev => ({ ...prev, employment_types: newTypes }));
+              setTimeout(() => searchJobs(), 100);
+            }}
+            className={`px-4 py-2 border ${filters.employment_types.includes('INTERN') ? 'bg-teal-600 border-teal-600 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'} rounded-full text-sm font-medium transition-all duration-200`}
+          >
+            Internship
+          </button>
+          
+          <button 
+            onClick={() => {
+              const hasEntryLevel = filters.job_requirements.includes('no_exp') || filters.job_requirements.includes('under_3_years_exp');
+              const newReqs = hasEntryLevel ? [] : ['no_exp'];
+              setFilters(prev => ({ ...prev, job_requirements: newReqs }));
+              setTimeout(() => searchJobs(), 100);
+            }}
+            className={`px-4 py-2 border ${(filters.job_requirements.includes('no_exp') || filters.job_requirements.includes('under_3_years_exp')) ? 'bg-teal-600 border-teal-600 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'} rounded-full text-sm font-medium transition-all duration-200`}
+          >
+            Entry Level
+          </button>
+          
+          <div className="ml-auto flex items-center gap-3">
+            {/* Filters Button */}
             <button 
-              onClick={() => setFilters(prev => ({ ...prev, remote_jobs_only: !prev.remote_jobs_only }))}
-              className={`px-4 py-2 bg-white border ${filters.remote_jobs_only ? 'border-teal-500 text-teal-600' : 'border-gray-200 text-gray-700'} rounded-full text-sm font-medium hover:border-gray-300 transition-colors flex items-center gap-2`}
-            >
-              <MapPin className="h-4 w-4" />
-              Remote Only
-            </button>
-            
-            <select
-              value={filters.date_posted}
-              onChange={(e) => setFilters(prev => ({ ...prev, date_posted: e.target.value }))}
-              className={`px-4 py-2 bg-white border ${filters.date_posted ? 'border-teal-500 text-teal-600' : 'border-gray-200 text-gray-700'} rounded-full text-sm font-medium hover:border-gray-300 transition-colors appearance-none cursor-pointer`}
-            >
-              <option value="">Date Posted</option>
-              <option value="all">All time</option>
-              <option value="today">Today</option>
-              <option value="3days">Last 3 days</option>
-              <option value="week">Last week</option>
-              <option value="month">Last month</option>
-            </select>
-            
-            <select
-              value={filters.job_requirements.join(',')}
-              onChange={(e) => {
-                const value = e.target.value;
-                setFilters(prev => ({ ...prev, job_requirements: value ? [value] : [] }));
+              onClick={() => {
+                // Populate modal with current values
+                setModalFilters({
+                  searchQuery,
+                  location,
+                  employment_types: filters.employment_types,
+                  date_posted: filters.date_posted,
+                  job_requirements: filters.job_requirements,
+                  remote_jobs_only: filters.remote_jobs_only
+                });
+                setShowFilters(true);
               }}
-              className={`px-4 py-2 bg-white border ${filters.job_requirements.length > 0 ? 'border-teal-500 text-teal-600' : 'border-gray-200 text-gray-700'} rounded-full text-sm font-medium hover:border-gray-300 transition-colors appearance-none cursor-pointer`}
+              className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-full text-sm font-medium hover:border-gray-300 transition-colors flex items-center gap-2"
             >
-              <option value="">Experience Level</option>
-              <option value="no_exp">No Experience Required</option>
-              <option value="under_3_years_exp">Under 3 Years Experience</option>
-              <option value="more_than_3_years_exp">3+ Years Experience</option>
-              <option value="no_degree">No Degree Required</option>
-              <option value="fair_chance">Fair Chance (2nd chance)</option>
-            </select>
-            
-            {/* Clear Filters */}
-            {(filters.employment_types.length > 0 || filters.remote_jobs_only || filters.date_posted || filters.job_requirements.length > 0) && (
-              <button
-                onClick={() => setFilters({
-                  employment_types: [],
-                  date_posted: '',
-                  job_requirements: [],
-                  remote_jobs_only: false
-                })}
-                className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 transition-colors flex items-center gap-1"
-              >
-                <X className="h-4 w-4" />
-                Clear
-              </button>
-            )}
-          </div>
-          
-          {/* Search */}
-          <div className="flex-1 flex gap-3">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Search job title, company, or keywords..."
-                className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-              />
-            </div>
-            <button
-              onClick={searchJobs}
-              disabled={loading}
-              className="px-6 py-2 bg-teal-600 text-white rounded-full hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm font-medium"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Searching...
-                </>
-              ) : (
-                'Search'
+              <Filter className="h-4 w-4" />
+              Filters
+              {(filters.employment_types.length > 0 || filters.remote_jobs_only || filters.date_posted || filters.job_requirements.length > 0 || location || searchQuery) && (
+                <span className="bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full text-xs">
+                  {[
+                    filters.employment_types.length,
+                    filters.remote_jobs_only ? 1 : 0,
+                    filters.date_posted ? 1 : 0,
+                    filters.job_requirements.length,
+                    location ? 1 : 0,
+                    searchQuery ? 1 : 0
+                  ].reduce((a, b) => a + b, 0)}
+                </span>
               )}
             </button>
+            
+            {/* Usage Stats */}
+            <div className="flex items-center gap-2 px-3 py-1 bg-gray-50 rounded-full">
+              <span className="text-xs text-gray-600">Usage:</span>
+              <span className={`text-xs font-medium ${usageStats.jobsViewed >= usageStats.jobLimit ? 'text-red-600' : 'text-gray-900'}`}>
+                {usageStats.jobsViewed}/{usageStats.jobLimit === -1 ? '∞' : usageStats.jobLimit}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -1620,6 +1564,195 @@ const JobSearchPage: React.FC = () => {
         />
       )}
     </div>
+    
+    {/* Filters Modal */}
+    <Dialog open={showFilters} onOpenChange={setShowFilters}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>Search Filters</DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-4 py-4">
+          {/* Job Title Search */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">Job Title</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                type="text"
+                value={modalFilters.searchQuery}
+                onChange={(e) => setModalFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
+                placeholder="Search job title, company, or keywords..."
+                className="pl-9"
+              />
+            </div>
+          </div>
+          
+          {/* Location */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">Location</label>
+            <div className="relative">
+              <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                type="text"
+                value={modalFilters.location}
+                onChange={(e) => setModalFilters(prev => ({ ...prev, location: e.target.value }))}
+                placeholder="San Francisco, CA"
+                className="pl-9"
+              />
+            </div>
+          </div>
+          
+          {/* Employment Type */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">Employment Type</label>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={modalFilters.employment_types.includes('FULLTIME')}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setModalFilters(prev => ({ ...prev, employment_types: [...prev.employment_types, 'FULLTIME'] }));
+                    } else {
+                      setModalFilters(prev => ({ ...prev, employment_types: prev.employment_types.filter(t => t !== 'FULLTIME') }));
+                    }
+                  }}
+                />
+                <span className="text-sm">Full-time</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={modalFilters.employment_types.includes('PARTTIME')}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setModalFilters(prev => ({ ...prev, employment_types: [...prev.employment_types, 'PARTTIME'] }));
+                    } else {
+                      setModalFilters(prev => ({ ...prev, employment_types: prev.employment_types.filter(t => t !== 'PARTTIME') }));
+                    }
+                  }}
+                />
+                <span className="text-sm">Part-time</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={modalFilters.employment_types.includes('CONTRACTOR')}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setModalFilters(prev => ({ ...prev, employment_types: [...prev.employment_types, 'CONTRACTOR'] }));
+                    } else {
+                      setModalFilters(prev => ({ ...prev, employment_types: prev.employment_types.filter(t => t !== 'CONTRACTOR') }));
+                    }
+                  }}
+                />
+                <span className="text-sm">Contract</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={modalFilters.employment_types.includes('INTERN')}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setModalFilters(prev => ({ ...prev, employment_types: [...prev.employment_types, 'INTERN'] }));
+                    } else {
+                      setModalFilters(prev => ({ ...prev, employment_types: prev.employment_types.filter(t => t !== 'INTERN') }));
+                    }
+                  }}
+                />
+                <span className="text-sm">Internship</span>
+              </label>
+            </div>
+          </div>
+          
+          {/* Date Posted */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">Date Posted</label>
+            <Select
+              value={modalFilters.date_posted}
+              onValueChange={(value) => setModalFilters(prev => ({ ...prev, date_posted: value }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select date range" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All time</SelectItem>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="3days">Last 3 days</SelectItem>
+                <SelectItem value="week">Last week</SelectItem>
+                <SelectItem value="month">Last month</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* Experience Level */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">Experience Level</label>
+            <Select
+              value={modalFilters.job_requirements.join(',')}
+              onValueChange={(value) => setModalFilters(prev => ({ ...prev, job_requirements: value ? [value] : [] }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select experience level" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Any experience</SelectItem>
+                <SelectItem value="no_exp">No Experience Required</SelectItem>
+                <SelectItem value="under_3_years_exp">Under 3 Years Experience</SelectItem>
+                <SelectItem value="more_than_3_years_exp">3+ Years Experience</SelectItem>
+                <SelectItem value="no_degree">No Degree Required</SelectItem>
+                <SelectItem value="fair_chance">Fair Chance (2nd chance)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* Remote Only */}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <Checkbox
+              checked={modalFilters.remote_jobs_only}
+              onCheckedChange={(checked) => setModalFilters(prev => ({ ...prev, remote_jobs_only: !!checked }))}
+            />
+            <span className="text-sm font-medium text-gray-700">Remote jobs only</span>
+          </label>
+        </div>
+        
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => {
+              // Reset to current values
+              setModalFilters({
+                searchQuery,
+                location,
+                employment_types: filters.employment_types,
+                date_posted: filters.date_posted,
+                job_requirements: filters.job_requirements,
+                remote_jobs_only: filters.remote_jobs_only
+              });
+              setShowFilters(false);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={() => {
+              // Apply filters and search
+              setSearchQuery(modalFilters.searchQuery);
+              setLocation(modalFilters.location);
+              setFilters({
+                employment_types: modalFilters.employment_types,
+                date_posted: modalFilters.date_posted,
+                job_requirements: modalFilters.job_requirements,
+                remote_jobs_only: modalFilters.remote_jobs_only
+              });
+              setShowFilters(false);
+              // Trigger search after state updates
+              setTimeout(() => searchJobs(), 100);
+            }}
+            className="bg-teal-600 hover:bg-teal-700 text-white"
+          >
+            Update
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     </>
   );
 };
