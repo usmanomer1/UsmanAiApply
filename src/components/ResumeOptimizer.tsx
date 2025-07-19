@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Loader2, Download, FileText, CheckCircle, AlertCircle, Eye } from 'lucide-react';
+import { X, Loader2, Download, CheckCircle, AlertCircle, Eye } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, getSignedResumeUrl } from '../lib/supabase';
 import { extractTextFromPDF } from '../lib/pdfExtractor';

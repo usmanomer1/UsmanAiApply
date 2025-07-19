@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   TrendingUp, 
   TrendingDown,
@@ -88,7 +88,7 @@ const Dashboard: React.FC = () => {
     return () => window.removeEventListener('focus', handleFocus);
   }, [user]);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -101,35 +101,62 @@ const Dashboard: React.FC = () => {
 
       if (error) throw error;
 
-      console.log('Dashboard applications data:', applications);
-
       // Calculate stats - handle both uppercase and lowercase status values
       const total = applications?.length || 0;
-      const interviewed = applications?.filter(app => {
-        const status = app.status?.toUpperCase();
-        return status === 'INTERVIEW' || status === 'OA' || status === 'INTERVIEWING' || status === 'OFFERED';
-      }).length || 0;
-      const responded = applications?.filter(app => {
-        const status = app.status?.toUpperCase();
-        return status !== 'SENT' && status !== 'PENDING' && status !== 'APPLIED';
-      }).length || 0;
-      const active = applications?.filter(app => {
-        const status = app.status?.toUpperCase();
-        return status === 'SENT' || status === 'PENDING' || status === 'INTERVIEW' || status === 'OA' || status === 'APPLIED' || status === 'INTERVIEWING';
-      }).length || 0;
+      
+      let interviewed = 0;
+      let responded = 0;
+      let active = 0;
+      let thisWeekApps = 0;
+      let lastWeekApps = 0;
+      
+      const statusCounts = {
+        applied: 0,
+        interviewing: 0,
+        rejected: 0,
+        offered: 0
+      };
 
-      // Calculate weekly change
       const lastWeek = new Date();
       lastWeek.setDate(lastWeek.getDate() - 7);
       const twoWeeksAgo = new Date();
       twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-      
-      const thisWeekApps = applications?.filter(app => 
-        new Date(app.created_at) > lastWeek
-      ).length || 0;
-      const lastWeekApps = applications?.filter(app => 
-        new Date(app.created_at) > twoWeeksAgo && new Date(app.created_at) <= lastWeek
-      ).length || 0;
+
+      applications?.forEach(app => {
+        const status = app.status?.toUpperCase();
+        const appDate = new Date(app.created_at);
+        
+        if (status === 'INTERVIEW' || status === 'OA' || status === 'INTERVIEWING' || status === 'OFFERED') {
+          interviewed++;
+        }
+        
+        if (status !== 'SENT' && status !== 'PENDING' && status !== 'APPLIED') {
+          responded++;
+        }
+        
+        // Count active applications
+        if (status === 'SENT' || status === 'PENDING' || status === 'INTERVIEW' || status === 'OA' || status === 'APPLIED' || status === 'INTERVIEWING') {
+          active++;
+        }
+        
+        // Count weekly applications
+        if (appDate > lastWeek) {
+          thisWeekApps++;
+        } else if (appDate > twoWeeksAgo && appDate <= lastWeek) {
+          lastWeekApps++;
+        }
+        
+        // Count status distribution
+        if (status === 'SENT' || status === 'PENDING' || status === 'APPLIED' || status === 'SUCCESS') {
+          statusCounts.applied++;
+        } else if (status === 'INTERVIEW' || status === 'OA' || status === 'INTERVIEWING') {
+          statusCounts.interviewing++;
+        } else if (status === 'REJECTED' || status === 'FAILED') {
+          statusCounts.rejected++;
+        } else if (status === 'ACCEPTED' || status === 'OFFERED' || status === 'OFFER') {
+          statusCounts.offered++;
+        }
+      });
       
       const weeklyChange = lastWeekApps > 0 
         ? ((thisWeekApps - lastWeekApps) / lastWeekApps) * 100 
@@ -138,38 +165,12 @@ const Dashboard: React.FC = () => {
       // Generate monthly trend data
       const monthlyTrend = generateMonthlyTrend(applications || []);
 
-      // Calculate status distribution - handle various status values
-      const statusCounts = {
-        applied: applications?.filter(app => {
-          const status = app.status?.toUpperCase();
-          return status === 'SENT' || status === 'PENDING' || status === 'APPLIED' || status === 'SUCCESS';
-        }).length || 0,
-        interviewing: applications?.filter(app => {
-          const status = app.status?.toUpperCase();
-          return status === 'INTERVIEW' || status === 'OA' || status === 'INTERVIEWING';
-        }).length || 0,
-        rejected: applications?.filter(app => {
-          const status = app.status?.toUpperCase();
-          return status === 'REJECTED' || status === 'FAILED';
-        }).length || 0,
-        offered: applications?.filter(app => {
-          const status = app.status?.toUpperCase();
-          return status === 'ACCEPTED' || status === 'OFFERED' || status === 'OFFER';
-        }).length || 0
-      };
-      
-      console.log('Raw application statuses:', applications?.map(app => app.status));
-      console.log('Calculated status counts:', statusCounts);
-
       const statusDistribution = [
         { name: 'Applied', value: statusCounts.applied, color: '#14b8a6' },
         { name: 'Interviewing', value: statusCounts.interviewing, color: '#0d9488' },
         { name: 'Rejected', value: statusCounts.rejected, color: '#9ca3af' },
         { name: 'Offered', value: statusCounts.offered, color: '#10b981' }
       ].filter(item => item.value > 0);
-
-      console.log('Status counts:', statusCounts);
-      console.log('Status distribution:', statusDistribution);
 
       setStats({
         totalApplications: total,
@@ -199,9 +200,9 @@ const Dashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
 
-  const generateMonthlyTrend = (applications: any[]) => {
+  const generateMonthlyTrend = useCallback((applications: any[]) => {
     const trend = [];
     const today = new Date();
     
@@ -219,7 +220,7 @@ const Dashboard: React.FC = () => {
     }
     
     return trend;
-  };
+  }, []);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -275,12 +276,14 @@ const Dashboard: React.FC = () => {
     }
   ];
 
-  // Pagination
-  const totalPages = Math.ceil(recentApplications.length / itemsPerPage);
-  const paginatedApplications = recentApplications.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  const { totalPages, paginatedApplications } = useMemo(() => {
+    const totalPages = Math.ceil(recentApplications.length / itemsPerPage);
+    const paginatedApplications = recentApplications.slice(
+      (currentPage - 1) * itemsPerPage,
+      currentPage * itemsPerPage
+    );
+    return { totalPages, paginatedApplications };
+  }, [recentApplications, currentPage, itemsPerPage]);
 
   if (loading) {
     return (
