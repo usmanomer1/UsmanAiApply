@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, MapPin, Briefcase, Filter, X, Loader2, ChevronRight, Heart, Users, DollarSign, Building2, Star, Bookmark, ArrowUpRight, TrendingUp } from 'lucide-react';
-import { joboticApi, JobSearchRequest, JobMatchRequest, StreamCallbacks } from '../lib/joboticApi';
+import { joboticApi, JobMatchRequest, StreamCallbacks } from '../lib/joboticApi';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
+import * as sessionUtils from '../lib/sessionUtils';
 import { useAuth } from '../contexts/AuthContext';
 import { extractTextFromPDF } from '../lib/pdfExtractor';
 import { ResumeAnalyzerV2 } from './ResumeAnalyzerV2';
 import { toast } from 'react-hot-toast';
 import LoadingTransition from './LoadingTransition';
 import { useLocation } from 'react-router-dom';
-import { canPerformAIOperation, trackAITokens } from '../lib/aiTokenTracking';
+import { trackAITokens } from '../lib/aiTokenTracking';
 import { getPlanLimits } from '../stripe-config';
 import { JobSkeleton } from './JobSkeleton';
 
@@ -70,12 +71,13 @@ const JobSearchPage: React.FC = () => {
   const [initialLoad, setInitialLoad] = useState(true);
   const [initializing, setInitializing] = useState(true);
   const [showLoadingTransition, setShowLoadingTransition] = useState(false);
-  const [sessionId, setSessionId] = useState<string>(Date.now().toString());
-  const [hasMore, setHasMore] = useState(true);
+  const [sessionId, setSessionId] = useState<string>('');
+  const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
   const [usageStats, setUsageStats] = useState<{ jobsViewed: number; jobLimit: number }>({ jobsViewed: 0, jobLimit: 100 });
   
   // Streaming states
@@ -85,6 +87,16 @@ const JobSearchPage: React.FC = () => {
   const [progressMessage, setProgressMessage] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const currentControllerRef = useRef<AbortController | null>(null);
+
+  // Cleanup abort controller on unmount
+  useEffect(() => {
+    return () => {
+      if (currentControllerRef.current) {
+        currentControllerRef.current.abort();
+        currentControllerRef.current = null;
+      }
+    };
+  }, []);
 
   // Filter jobs based on activeTab only (backend handles other filters)
   const displayedJobs = jobs.filter(job => {
@@ -308,9 +320,9 @@ const JobSearchPage: React.FC = () => {
                 setTotalJobsFound(0);
                 setProcessedCount(0);
                 setProgressMessage('Searching for jobs...');
-                // Set session ID for infinite scroll
-                const newSessionId = Date.now().toString();
-                setSessionId(newSessionId);
+                // Create new session for infinite scroll
+                const session = sessionUtils.createSession(primaryRole, primaryLocation || '', filters);
+                setSessionId(session.sessionId);
                 setHasMore(true);
                 setCurrentPage(1);
                 
@@ -323,8 +335,8 @@ const JobSearchPage: React.FC = () => {
                     query: primaryRole,
                     location: primaryLocation || undefined,
                     page: 1,
-                    num_pages: 10, // Get 100 jobs by default
-                    session_id: newSessionId,
+                    num_pages: 2, // Get 2 pages (20 jobs) by default - backend limit
+                    session_id: session.sessionId,
                     // Apply saved filters if available
                     ...(filters.remote_jobs_only && { remote_jobs_only: true })
                   };
@@ -334,6 +346,9 @@ const JobSearchPage: React.FC = () => {
                     initial: (data) => {
                       setTotalJobsFound(data.totalFound);
                       setProgressMessage(`Found ${data.totalFound} jobs matching your profile`);
+                    },
+                    keepalive: (data) => {
+                      console.log('Auto-search keepalive received at:', new Date(data.timestamp * 1000));
                     },
                     jobs: (data) => {
                       // Sanitize job data to prevent NaN issues
@@ -377,6 +392,12 @@ const JobSearchPage: React.FC = () => {
                       setTotalPages(totalPages);
                       setHasMore(data.totalProcessed > jobsPerPage);
                       
+                      // Update session with results
+                      sessionUtils.updateSession({
+                        totalJobsFound: data.totalProcessed,
+                        jobsLoaded: jobs.length
+                      });
+                      
                       if (data.totalProcessed === 0) {
                         toast.info('No jobs found. Try updating your preferences.');
                       } else {
@@ -391,7 +412,7 @@ const JobSearchPage: React.FC = () => {
                   await joboticApi.searchJobsStreaming(aiRequest, autoSearchCallbacks, currentControllerRef.current.signal);
                   
                   setInitialLoad(false);
-                } catch (err: any) {
+                } catch (err) {
                   if (err.name !== 'AbortError') {
                     console.error('Auto-search error:', err);
                   }
@@ -406,19 +427,19 @@ const JobSearchPage: React.FC = () => {
                 setSearchQuery('Software Engineer'); // Default search
                 setLocation('Remote');
                 
-                const newSessionId = Date.now().toString();
+                const session = sessionUtils.createSession('Software Engineer', 'Remote', filters);
                 const aiRequest: JobMatchRequest = {
                   resumeText: text,
                   query: 'Software Engineer',
                   location: 'Remote',
                   page: 1,
-                  num_pages: 10, // Get 100 jobs by default
-                  session_id: newSessionId
+                  num_pages: 2, // Get 2 pages (20 jobs) by default - backend limit
+                  session_id: session.sessionId
                 };
 
                 setLoading(true);
                 // Set session ID for infinite scroll
-                setSessionId(newSessionId);
+                setSessionId(session.sessionId);
                 setHasMore(true);
                 setCurrentPage(1);
                 try {
@@ -458,7 +479,7 @@ const JobSearchPage: React.FC = () => {
     };
 
     fetchResumeAndPreferences();
-  }, [user, initialLoad]);
+  }, [user, initialLoad, filters, jobs.length]);
 
   const searchJobs = async () => {
     if (!searchQuery.trim()) {
@@ -486,11 +507,11 @@ const JobSearchPage: React.FC = () => {
     setProcessedCount(0);
     setProgressMessage('Initializing search...');
     
-    // Reset infinite scroll state
+    // Create new session for search
+    const session = sessionUtils.createSession(searchQuery, location || '', filters);
+    setSessionId(session.sessionId);
     setCurrentPage(1);
     setHasMore(true);
-    const newSessionId = Date.now().toString();
-    setSessionId(newSessionId); // Generate new session ID
 
     // Create new abort controller
     currentControllerRef.current = new AbortController();
@@ -510,8 +531,8 @@ const JobSearchPage: React.FC = () => {
         query: searchQuery,
         location: location || undefined,
         page: 1,
-        num_pages: 10, // Default to 10 pages (100 jobs)
-        session_id: newSessionId,
+        num_pages: 2, // Default to 2 pages (20 jobs) - backend limit
+        session_id: session.sessionId,
         // Include filters
         ...(filters.employment_types.length > 0 && { employment_types: filters.employment_types as ('FULLTIME' | 'PARTTIME' | 'INTERN' | 'CONTRACTOR')[] }),
         ...(filters.date_posted && { date_posted: filters.date_posted as 'all' | 'today' | '3days' | 'week' | 'month' }),
@@ -524,6 +545,9 @@ const JobSearchPage: React.FC = () => {
         initial: (data) => {
           setTotalJobsFound(data.totalFound);
           setProgressMessage(`Found ${data.totalFound} jobs matching your criteria`);
+        },
+        keepalive: (data) => {
+          console.log('Search keepalive received at:', new Date(data.timestamp * 1000));
         },
         jobs: (data) => {
           // Sanitize job data to prevent NaN issues
@@ -566,6 +590,12 @@ const JobSearchPage: React.FC = () => {
           const totalPages = Math.ceil(data.totalProcessed / jobsPerPage);
           setTotalPages(totalPages);
           setHasMore(data.totalProcessed > jobsPerPage);
+          
+          // Update session with results
+          sessionUtils.updateSession({
+            totalJobsFound: data.totalProcessed,
+            jobsLoaded: jobs.length
+          });
         },
         error: (data) => {
           console.error('Streaming error:', data);
@@ -576,7 +606,7 @@ const JobSearchPage: React.FC = () => {
       // Use streaming API
       await joboticApi.searchJobsStreaming(request, callbacks, currentControllerRef.current.signal);
       
-    } catch (err: any) {
+    } catch (err) {
       if (err.name !== 'AbortError') {
         const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
         setError(errorMessage);
@@ -809,10 +839,14 @@ const JobSearchPage: React.FC = () => {
 
   // Function to load more jobs for infinite scroll
   const loadMoreJobs = useCallback(async () => {
+    // Get current session and validate
+    const session = sessionUtils.getStoredSession();
+    
     console.log('loadMoreJobs called with state:', {
       loadingMore,
       hasMore,
       sessionId,
+      sessionValid: !!session,
       totalPages,
       currentPage,
       searchQuery,
@@ -827,16 +861,21 @@ const JobSearchPage: React.FC = () => {
       console.log('Blocked: hasMore is false');
       return;
     }
-    if (!sessionId) {
-      console.log('Blocked: no sessionId');
+    if (!session || session.sessionId !== sessionId) {
+      console.log('Blocked: no valid session');
       return;
     }
-    // Remove totalPages check since it can be unreliable
-    // The hasMore flag from API is the authoritative source
-    if (!searchQuery || searchQuery.trim() === '') {
-      console.log('Blocked: no searchQuery');
+    
+    // Validate session hasn't expired
+    if (!sessionUtils.isSessionValid(session, searchQuery, location || '', filters)) {
+      console.log('Session expired or search params changed');
+      toast.warning('Session expired. Please search again.');
+      setHasMore(false);
       return;
     }
+    
+    // Touch session to update last accessed time
+    sessionUtils.touchSession();
     
     console.log('All checks passed, making API call...');
 
@@ -873,6 +912,11 @@ const JobSearchPage: React.FC = () => {
         setHasMore(response.data?.hasMore || false);
         setTotalPages(response.data?.totalPages || totalPages);
         
+        // Update session with new job count
+        sessionUtils.updateSession({
+          jobsLoaded: jobs.length + response.data.jobs.length
+        });
+        
         // Update usage stats from API response
         if (response.usage) {
           setUsageStats({
@@ -901,6 +945,43 @@ const JobSearchPage: React.FC = () => {
     }
   }, [loadingMore, hasMore, sessionId, currentPage, totalPages, searchQuery, location, filters, resumeText, jobs.length, user?.id]);
 
+  // Setup IntersectionObserver for infinite scroll
+  useEffect(() => {
+    const options = {
+      root: null,
+      rootMargin: '100px',
+      threshold: 0.1
+    };
+
+    const handleIntersection = (entries: IntersectionObserverEntry[]) => {
+      const [entry] = entries;
+      if (entry.isIntersecting && hasMore && !loadingMore && !loading && !isStreaming) {
+        console.log('IntersectionObserver triggered load more');
+        loadMoreJobs();
+      }
+    };
+
+    // Cleanup previous observer
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+    }
+
+    // Create new observer
+    observerRef.current = new IntersectionObserver(handleIntersection, options);
+
+    // Observe the sentinel element if it exists
+    if (loadMoreRef.current && hasMore && jobs.length > 0) {
+      console.log('Observing sentinel element');
+      observerRef.current.observe(loadMoreRef.current);
+    }
+
+    // Cleanup
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, [hasMore, loadingMore, loading, isStreaming, jobs.length, loadMoreJobs]);
 
   return (
     <>
@@ -1453,41 +1534,32 @@ const JobSearchPage: React.FC = () => {
         {/* Infinite Scroll Loading */}
         {!loading && !initializing && jobs.length > 0 && activeTab === 'recommended' && (
           <>
-            {/* Show loading state when loading more */}
-            {loadingMore && (
-              <div className="flex items-center justify-center py-8 mt-4">
-                <div className="flex items-center gap-3">
-                  <Loader2 className="h-5 w-5 animate-spin text-teal-600" />
-                  <span className="text-gray-600 font-medium">Loading more jobs...</span>
-                </div>
+            {/* Infinite scroll sentinel - observed by IntersectionObserver */}
+            {hasMore && (
+              <div 
+                ref={loadMoreRef}
+                className="h-20 flex items-center justify-center"
+              >
+                {loadingMore ? (
+                  <div className="flex items-center gap-3">
+                    <Loader2 className="h-5 w-5 animate-spin text-teal-600" />
+                    <span className="text-gray-600 font-medium">Loading more jobs...</span>
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500">
+                    Scroll to load more • Showing {jobs.length} of {totalJobsFound || '?'} jobs
+                  </div>
+                )}
               </div>
             )}
-            
-            {/* Load More Button */}
-            {hasMore && !loadingMore && (
-              <div className="mt-6 text-center">
-                <p className="text-sm text-gray-500 mb-3">
-                  Showing {jobs.length} jobs • Page {currentPage} of {totalPages || '?'}
-                </p>
-                <button
-                  onClick={() => {
-                    console.log('Load More button clicked!');
-                    loadMoreJobs();
-                  }}
-                  className="px-6 py-3 bg-teal-600 text-white font-medium rounded-lg hover:bg-teal-700 transition-colors flex items-center gap-2 mx-auto"
-                >
-                  Load More Jobs
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-            )}
-            
             
             {/* Show end message only when we've loaded all pages */}
-            {!hasMore && totalPages > 1 && (
+            {!hasMore && jobs.length > 0 && (
               <div className="text-center py-8 bg-gray-50 rounded-lg mt-4">
                 <p className="text-gray-500 font-medium">You've reached the end</p>
-                <p className="text-sm text-gray-400 mt-1">No more jobs to load</p>
+                <p className="text-sm text-gray-400 mt-1">
+                  Showing all {jobs.length} jobs • No more to load
+                </p>
               </div>
             )}
           </>
