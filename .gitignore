@@ -105,3 +105,4 @@ netlify.toml
 .analytics/
 stats.html
 bundle-analyzer/
+.envrc
