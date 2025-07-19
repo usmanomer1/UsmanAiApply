@@ -1058,46 +1058,7 @@ This will create the default configuration needed for the billing portal to work
             </div>
 
             {/* New Usage Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-              {/* Job Search Matches */}
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.4 }}
-                className="relative overflow-hidden bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-2xl border border-green-200/50 dark:border-green-700/50 backdrop-blur-xl shadow-xl"
-              >
-                <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-emerald-500/5" />
-                <div className="relative p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg shadow-lg">
-                        <HelpCircle className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Job Search Matches</h3>
-                        <p className="text-xs text-gray-600 dark:text-gray-400">AI-powered job search</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-end justify-between">
-                      <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {usage?.job_search_matches || 0}
-                      </span>
-                      <span className="text-xs text-gray-600 dark:text-gray-400">
-                        ({(usage?.job_search_matches || 0) * 6000} tokens)
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${Math.min(100, ((usage?.job_search_matches || 0) / 100) * 100)}%` }}
-                        className="h-full bg-gradient-to-r from-green-500 to-emerald-600"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
+            <div className="grid grid-cols-1 gap-6 mt-6">
 
               {/* Resume Optimizations */}
               <motion.div 

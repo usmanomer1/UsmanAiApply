@@ -22,14 +22,17 @@ export interface JobSearchUsageStats {
 // Fetch job search usage for the current month
 export async function getJobSearchUsage(userId: string): Promise<JobSearchUsageStats | null> {
   try {
-    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+    // Get current month's start date
+    const currentMonthStart = new Date();
+    currentMonthStart.setDate(1);
+    currentMonthStart.setHours(0, 0, 0, 0);
     
-    // Fetch from job_search_monthly_usage table
+    // Query monthly usage view
     const { data, error } = await supabase
       .from('job_search_monthly_usage')
       .select('*')
       .eq('user_id', userId)
-      .eq('month', currentMonth)
+      .gte('month', currentMonthStart.toISOString())
       .single();
     
     if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
@@ -41,27 +44,31 @@ export async function getJobSearchUsage(userId: string): Promise<JobSearchUsageS
     if (!data) {
       // Get user's subscription to determine plan
       const { data: subscription } = await supabase
-        .from('subscriptions')
-        .select('price_id')
+        .from('stripe_user_subscriptions')
+        .select('plan_name, status')
         .eq('user_id', userId)
-        .eq('subscription_status', 'active')
+        .eq('status', 'active')
         .single();
       
-      // Determine plan limits based on price_id
-      let plan = 'free';
-      let monthly_limit = 100;
+      // Determine plan limits based on plan_name from backend guide
+      let plan = 'default';
+      let monthly_limit = 300; // Free tier default
       
-      if (subscription?.price_id) {
-        // Map price_id to plan name and limits
-        if (subscription.price_id.includes('plus') || subscription.price_id === 'price_1Rf2oQGkowQ7SwlfhDDuOpFk') {
-          plan = 'plus';
-          monthly_limit = 300;
-        } else if (subscription.price_id.includes('pro') || subscription.price_id === 'price_1Rf2nJGkowQ7Swlfwvc3CBO8') {
-          plan = 'pro';
-          monthly_limit = 700;
-        } else if (subscription.price_id.includes('max') || subscription.price_id === 'price_1Rf2owGkowQ7SwlfEG4UKU8c') {
-          plan = 'max';
-          monthly_limit = -1; // Unlimited
+      if (subscription?.plan_name) {
+        plan = subscription.plan_name;
+        // Map plan names to limits per backend guide
+        switch (plan) {
+          case 'Plus':
+            monthly_limit = 600;
+            break;
+          case 'Pro':
+            monthly_limit = 900;
+            break;
+          case 'Max':
+            monthly_limit = -1; // Unlimited
+            break;
+          default:
+            monthly_limit = 300; // Free tier
         }
       }
       
@@ -75,13 +82,46 @@ export async function getJobSearchUsage(userId: string): Promise<JobSearchUsageS
     }
     
     // Calculate stats from fetched data
-    const monthly_used = data.jobs_viewed || 0;
-    const monthly_limit = data.monthly_limit || 100;
+    // The view returns total_jobs and search_count
+    const monthly_used = data.total_jobs || 0;
+    
+    // Get plan limits if not in the data
+    let monthly_limit = 300; // Default
+    let plan = 'default';
+    
+    if (!data || !data.plan_name) {
+      // Fetch subscription to get plan info
+      const { data: subscription } = await supabase
+        .from('stripe_user_subscriptions')
+        .select('plan_name')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .single();
+      
+      if (subscription?.plan_name) {
+        plan = subscription.plan_name;
+        switch (plan) {
+          case 'Plus':
+            monthly_limit = 600;
+            break;
+          case 'Pro':
+            monthly_limit = 900;
+            break;
+          case 'Max':
+            monthly_limit = -1; // Unlimited
+            break;
+        }
+      }
+    } else {
+      plan = data.plan_name || 'default';
+      monthly_limit = data.monthly_limit || 300;
+    }
+    
     const remaining = monthly_limit === -1 ? 'unlimited' : Math.max(0, monthly_limit - monthly_used);
     const percentage_used = monthly_limit === -1 ? 0 : Math.min(100, (monthly_used / monthly_limit) * 100);
     
     return {
-      plan: data.plan || 'free',
+      plan,
       monthly_limit,
       monthly_used,
       remaining,
@@ -95,17 +135,21 @@ export async function getJobSearchUsage(userId: string): Promise<JobSearchUsageS
 
 // Get job search limits by plan
 export function getJobSearchLimitsByPlan(plan: string): number {
-  switch (plan.toLowerCase()) {
+  switch (plan) {
+    case 'default':
     case 'free':
-      return 100;
-    case 'plus':
       return 300;
+    case 'Plus':
+    case 'plus':
+      return 600;
+    case 'Pro':
     case 'pro':
-      return 700;
+      return 900;
+    case 'Max':
     case 'max':
       return -1; // Unlimited
     default:
-      return 100; // Default to free tier
+      return 300; // Default to free tier
   }
 }
 
