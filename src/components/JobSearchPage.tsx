@@ -62,6 +62,7 @@ const JobSearchPage: React.FC = () => {
   const [resumeText, setResumeText] = useState('');
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [showFilterModal, setShowFilterModal] = useState(false);
   const [filters, setFilters] = useState({
     employment_types: [] as string[],
     date_posted: '',
@@ -1145,7 +1146,7 @@ const JobSearchPage: React.FC = () => {
                   job_requirements: filters.job_requirements,
                   remote_jobs_only: filters.remote_jobs_only
                 });
-                setShowFilters(true);
+                setShowFilterModal(true);
               }}
               className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-full text-sm font-medium hover:border-gray-300 transition-colors flex items-center gap-2"
             >
@@ -1566,7 +1567,7 @@ const JobSearchPage: React.FC = () => {
     </div>
     
     {/* Filters Modal */}
-    <Dialog open={showFilters} onOpenChange={setShowFilters}>
+    <Dialog open={showFilterModal} onOpenChange={setShowFilterModal}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Search Filters</DialogTitle>
@@ -1726,7 +1727,7 @@ const JobSearchPage: React.FC = () => {
                 job_requirements: filters.job_requirements,
                 remote_jobs_only: filters.remote_jobs_only
               });
-              setShowFilters(false);
+              setShowFilterModal(false);
             }}
           >
             Cancel
@@ -1742,7 +1743,7 @@ const JobSearchPage: React.FC = () => {
                 job_requirements: modalFilters.job_requirements,
                 remote_jobs_only: modalFilters.remote_jobs_only
               });
-              setShowFilters(false);
+              setShowFilterModal(false);
               // Trigger search after state updates
               setTimeout(() => searchJobs(), 100);
             }}
