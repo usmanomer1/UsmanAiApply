@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, MapPin, Briefcase, Filter, X, Loader2, ChevronRight, Heart, Users, DollarSign, Building2, Star, Bookmark, ArrowUpRight, TrendingUp } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Search, MapPin, Briefcase, Filter, Loader2, Heart, Users, DollarSign, Building2, Star, Bookmark, ArrowUpRight, TrendingUp, ChevronRight } from 'lucide-react';
 import { joboticApi, JobMatchRequest, StreamCallbacks } from '../lib/joboticApi';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
@@ -10,7 +10,6 @@ import { ResumeAnalyzerV2 } from './ResumeAnalyzerV2';
 import { toast } from 'react-hot-toast';
 import LoadingTransition from './LoadingTransition';
 import { useLocation } from 'react-router-dom';
-import { trackAITokens } from '../lib/aiTokenTracking';
 import { getPlanLimits } from '../stripe-config';
 import { JobSkeleton } from './JobSkeleton';
 
@@ -56,7 +55,6 @@ const JobSearchPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [resumeText, setResumeText] = useState('');
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
-  const [showFilters, setShowFilters] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filters, setFilters] = useState({
     employment_types: [] as string[],
@@ -72,13 +70,7 @@ const JobSearchPage: React.FC = () => {
   const [initialLoad, setInitialLoad] = useState(true);
   const [initializing, setInitializing] = useState(true);
   const [showLoadingTransition, setShowLoadingTransition] = useState(false);
-  const [sessionId, setSessionId] = useState<string>('');
   const [hasMore, setHasMore] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(0);
-  const isLoadingMoreRef = useRef(false);
-  const lastLoadTimeRef = useRef(0);
   const [usageStats, setUsageStats] = useState<{ jobsViewed: number; jobLimit: number }>({ jobsViewed: 0, jobLimit: 100 });
   
   // Streaming states
@@ -186,7 +178,7 @@ const JobSearchPage: React.FC = () => {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
-        setShowFilters(false);
+        // Filter dropdown handling removed
       }
     };
     
@@ -257,7 +249,7 @@ const JobSearchPage: React.FC = () => {
           if (downloadError) {
             console.error('Error downloading resume:', downloadError);
           } else if (fileData) {
-            const text = await extractTextFromPDF(fileData);
+            const text = await extractTextFromPDF(fileData as File);
             setResumeText(text);
             console.log('Resume text extracted, length:', text.length);
             
@@ -331,11 +323,7 @@ const JobSearchPage: React.FC = () => {
                 setTotalJobsFound(0);
                 setProcessedCount(0);
                 setProgressMessage('Searching for jobs...');
-                // Create new session for infinite scroll
-                const session = sessionUtils.createSession(primaryRole, primaryLocation || '', filters);
-                setSessionId(session.sessionId);
                 setHasMore(true);
-                setCurrentPage(1);
                 
                 // Create abort controller for auto-search
                 currentControllerRef.current = new AbortController();
@@ -347,7 +335,6 @@ const JobSearchPage: React.FC = () => {
                     location: primaryLocation || undefined,
                     page: 1,
                     num_pages: 2, // Get 2 pages (20 jobs) by default - backend limit
-                    session_id: session.sessionId,
                     // Apply saved filters if available
                     ...(filters.remote_jobs_only && { remote_jobs_only: true })
                   };
@@ -397,11 +384,8 @@ const JobSearchPage: React.FC = () => {
                       setIsStreaming(false);
                       setProgressMessage('');
                       
-                      // Update pagination state
-                      const jobsPerPage = 10;
-                      const totalPages = Math.ceil(data.totalProcessed / jobsPerPage);
-                      setTotalPages(totalPages);
-                      setHasMore(data.totalProcessed > jobsPerPage);
+                      // Update hasMore state based on total processed
+                      setHasMore(false);
                       
                       // Update session with results
                       sessionUtils.updateSession({
@@ -411,7 +395,7 @@ const JobSearchPage: React.FC = () => {
                       
                       // Only show toast if no jobs found (important feedback)
                       if (data.totalProcessed === 0) {
-                        toast.info('No jobs found. Try updating your preferences.');
+                        toast('No jobs found. Try updating your preferences.');
                       }
                       // Silent success - jobs are already visible on screen
                     },
@@ -424,7 +408,7 @@ const JobSearchPage: React.FC = () => {
                   
                   setInitialLoad(false);
                 } catch (err) {
-                  if (err.name !== 'AbortError') {
+                  if (err instanceof Error && err.name !== 'AbortError') {
                     console.error('Auto-search error:', err);
                   }
                 } finally {
@@ -438,29 +422,22 @@ const JobSearchPage: React.FC = () => {
                 setSearchQuery('Software Engineer'); // Default search
                 setLocation('Remote');
                 
-                const session = sessionUtils.createSession('Software Engineer', 'Remote', filters);
                 const aiRequest: JobMatchRequest = {
                   resumeText: text,
                   query: 'Software Engineer',
                   location: 'Remote',
                   page: 1,
                   num_pages: 2, // Get 2 pages (20 jobs) by default - backend limit
-                  session_id: session.sessionId
                 };
 
                 setLoading(true);
-                // Set session ID for infinite scroll
-                setSessionId(session.sessionId);
                 setHasMore(true);
-                setCurrentPage(1);
                 try {
                   // Always use AI-powered search
                   const response = await joboticApi.searchJobs(aiRequest);
                   setJobs(response.data?.jobs || []);
-                  // Set pagination state from response
-                  setHasMore(response.data?.hasMore || false);
-                  setTotalPages(response.data?.totalPages || 1);
-                  setCurrentPage(response.data?.currentPage || 1);
+                  // Set hasMore state from response
+                  setHasMore(false);
                   
                   // Update usage stats from API response
                   if (response.usage) {
@@ -518,10 +495,6 @@ const JobSearchPage: React.FC = () => {
     setProcessedCount(0);
     setProgressMessage('Initializing search...');
     
-    // Create new session for search
-    const session = sessionUtils.createSession(searchQuery, location || '', filters);
-    setSessionId(session.sessionId);
-    setCurrentPage(1);
     setHasMore(true);
 
     // Create new abort controller
@@ -530,7 +503,7 @@ const JobSearchPage: React.FC = () => {
     try {
       // Always use AI-powered search endpoint
       if (!resumeText) {
-        toast.warning('Please upload your resume in your profile to get AI-matched job recommendations.');
+        toast('Please upload your resume in your profile to get AI-matched job recommendations.');
         setError('Resume required for job matching. Please upload your resume in your profile.');
         setLoading(false);
         setIsStreaming(false);
@@ -543,7 +516,6 @@ const JobSearchPage: React.FC = () => {
         location: location || undefined,
         page: 1,
         num_pages: 2, // Default to 2 pages (20 jobs) - backend limit
-        session_id: session.sessionId,
         // Include filters
         ...(filters.employment_types.length > 0 && { employment_types: filters.employment_types as ('FULLTIME' | 'PARTTIME' | 'INTERN' | 'CONTRACTOR')[] }),
         ...(filters.date_posted && { date_posted: filters.date_posted as 'all' | 'today' | '3days' | 'week' | 'month' }),
@@ -596,11 +568,8 @@ const JobSearchPage: React.FC = () => {
           setIsStreaming(false);
           setProgressMessage('');
           
-          // Update pagination state based on total processed
-          const jobsPerPage = 10;
-          const totalPages = Math.ceil(data.totalProcessed / jobsPerPage);
-          setTotalPages(totalPages);
-          setHasMore(data.totalProcessed > jobsPerPage);
+          // Update hasMore state - since streaming loads all jobs, set to false when complete
+          setHasMore(false);
           
           // Update session with results
           sessionUtils.updateSession({
@@ -618,8 +587,8 @@ const JobSearchPage: React.FC = () => {
       await joboticApi.searchJobsStreaming(request, callbacks, currentControllerRef.current.signal);
       
     } catch (err) {
-      if (err.name !== 'AbortError') {
-        const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
+      if (err instanceof Error && err.name !== 'AbortError') {
+        const errorMessage = err.message;
         setError(errorMessage);
         toast.error(errorMessage);
       }
@@ -630,11 +599,6 @@ const JobSearchPage: React.FC = () => {
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      searchJobs();
-    }
-  };
 
   const formatSalary = (min?: number, max?: number) => {
     if (!min && !max) return null;
@@ -805,7 +769,7 @@ const JobSearchPage: React.FC = () => {
           
         if (campaignError) throw campaignError;
         campaignId = campaign.id;
-        sessionStorage.setItem('current_campaign_id', campaignId);
+        sessionStorage.setItem('current_campaign_id', campaignId || '');
       }
       
       // Save to applications table
@@ -848,133 +812,6 @@ const JobSearchPage: React.FC = () => {
     setShowResumeOptimizeModal(true);
   };
 
-  // Function to load more jobs for infinite scroll
-  const loadMoreJobs = useCallback(async () => {
-    // Debouncing check - prevent calls within 1 second of each other
-    const now = Date.now();
-    const timeSinceLastLoad = now - lastLoadTimeRef.current;
-    if (timeSinceLastLoad < 1000) {
-      console.log('Debounced: Too soon since last load', timeSinceLastLoad);
-      return;
-    }
-    
-    // Check if already loading using ref
-    if (isLoadingMoreRef.current) {
-      console.log('Blocked: Already loading more jobs');
-      return;
-    }
-    
-    // Get current session and validate
-    const session = sessionUtils.getStoredSession();
-    
-    console.log('loadMoreJobs called with state:', {
-      loadingMore,
-      hasMore,
-      sessionId,
-      sessionValid: !!session,
-      totalPages,
-      currentPage,
-      searchQuery,
-      location,
-      jobsCount: jobs.length
-    });
-    
-    if (loadingMore) {
-      console.log('Blocked: loadingMore is true');
-      return;
-    }
-    if (!hasMore) {
-      console.log('Blocked: hasMore is false');
-      return;
-    }
-    if (!session || session.sessionId !== sessionId) {
-      console.log('Blocked: no valid session');
-      return;
-    }
-    
-    // Validate session hasn't expired
-    if (!sessionUtils.isSessionValid(session, searchQuery, location || '', filters)) {
-      console.log('Session expired or search params changed');
-      toast.warning('Session expired. Please search again.');
-      setHasMore(false);
-      return;
-    }
-    
-    
-    // Touch session to update last accessed time
-    sessionUtils.touchSession();
-    
-    console.log('All checks passed, making API call...');
-
-    // Set loading state in both ref and state
-    isLoadingMoreRef.current = true;
-    lastLoadTimeRef.current = now;
-    setLoadingMore(true);
-    const nextPage = currentPage + 1;
-    
-    try {
-      if (!resumeText) {
-        toast.warning('Resume required for loading more jobs');
-        setLoadingMore(false);
-        return;
-      }
-      
-      // Always use AI-powered search for loading more with session
-      const request: JobMatchRequest = {
-        resumeText: resumeText,
-        query: searchQuery,
-        location: location || undefined,
-        page: nextPage,
-        num_pages: 1,
-        session_id: sessionId,
-        offset: jobs.length, // Number of jobs already displayed
-        ...(filters.employment_types.length > 0 && { employment_types: filters.employment_types as ('FULLTIME' | 'PARTTIME' | 'INTERN' | 'CONTRACTOR')[] }),
-        ...(filters.date_posted && { date_posted: filters.date_posted as 'all' | 'today' | '3days' | 'week' | 'month' }),
-        ...(filters.remote_jobs_only && { remote_jobs_only: true }),
-        ...(filters.job_requirements.length > 0 && { job_requirements: filters.job_requirements as ('no_exp' | 'under_3_years_exp' | 'more_than_3_years_exp' | 'no_degree' | 'fair_chance')[] })
-      };
-
-      const response = await joboticApi.searchJobs(request);
-      
-      if (response.data?.jobs && response.data.jobs.length > 0) {
-        setJobs(prev => [...prev, ...response.data.jobs]);
-        setCurrentPage(response.data?.currentPage || nextPage);
-        setHasMore(response.data?.hasMore || false);
-        setTotalPages(response.data?.totalPages || totalPages);
-        
-        // Update session with new job count
-        sessionUtils.updateSession({
-          jobsLoaded: jobs.length + response.data.jobs.length
-        });
-        
-        // Update usage stats from API response
-        if (response.usage) {
-          setUsageStats({
-            jobsViewed: response.usage.monthly_used,
-            jobLimit: typeof response.usage.monthly_limit === 'number' ? response.usage.monthly_limit : -1
-          });
-        }
-        
-        // Track AI usage for pagination
-        if (user?.id) {
-          await trackAITokens(user.id, 'job_search_match', {
-              jobTitle: searchQuery,
-              location: location || 'Not specified',
-              resultsCount: response.data.jobs.length,
-              page: nextPage
-            });
-          }
-        } else {
-          setHasMore(false);
-        }
-    } catch (error) {
-      console.error('Error loading more jobs:', error);
-      toast.error('Failed to load more jobs. Please try again.');
-    } finally {
-      setLoadingMore(false);
-      isLoadingMoreRef.current = false;
-    }
-  }, [loadingMore, hasMore, sessionId, currentPage, totalPages, searchQuery, location, filters, resumeText, jobs.length, user?.id]);
 
   return (
     <>
@@ -1453,7 +1290,7 @@ const JobSearchPage: React.FC = () => {
         )}
           
 
-        {/* Load More Section */}
+        {/* Job count and end message */}
         {!loading && !initializing && jobs.length > 0 && activeTab === 'recommended' && (
           <div className="mt-8">
             {/* Job count indicator */}
@@ -1466,36 +1303,6 @@ const JobSearchPage: React.FC = () => {
                 {' '}jobs
               </p>
             </div>
-            
-            {/* Load More Button */}
-            {hasMore && (
-              <div className="text-center">
-                <button
-                  onClick={loadMoreJobs}
-                  disabled={loadingMore}
-                  className="px-8 py-3 bg-teal-600 text-white font-medium rounded-lg hover:bg-teal-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mx-auto shadow-sm hover:shadow-md"
-                >
-                  {loadingMore ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      <span>Loading more jobs...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Load More Jobs</span>
-                      <ChevronRight className="h-5 w-5" />
-                    </>
-                  )}
-                </button>
-                
-                {/* Progress indicator */}
-                {currentPage > 0 && totalPages > 0 && (
-                  <p className="text-xs text-gray-500 mt-2">
-                    Page {currentPage} of {totalPages}
-                  </p>
-                )}
-              </div>
-            )}
             
             {/* End message */}
             {!hasMore && (
