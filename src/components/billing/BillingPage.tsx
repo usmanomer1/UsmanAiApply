@@ -1,20 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { 
-  CreditCard, 
   Crown, 
-  Zap, 
   Check, 
   ExternalLink,
   Calendar,
   RefreshCw,
   Loader2,
-  ArrowUp,
-  ArrowDown,
-  HelpCircle,
-  Star,
-  Shield,
-  ArrowRight,
   Bot,
   Brain,
   Package,
@@ -25,36 +17,29 @@ import {
   Activity,
   AlertCircle,
   CheckCircle,
-  Settings,
   Download,
   FileText,
   Clock,
-  Gauge,
-  Filter,
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { 
-  STRIPE_PRODUCTS, 
   getProductByPriceId, 
   getSubscriptionProducts, 
   getTokenProducts, 
-  formatPrice, 
-  getCurrencySymbol,
   getPlanLimits,
   getPlanNameByPriceId,
-  isStripeConfigured,
   validateStripeConfig
 } from '../../stripe-config';
 import { PricingFAQ } from '../PricingFAQ';
 import toast from 'react-hot-toast';
 import { Badge } from '../ui/badge';
 // import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { getUserUsage, getAutomationSessions, UserUsage } from '../../lib/usageTracking';
-import { getJobSearchUsage, JobSearchUsageStats } from '../../lib/jobSearchUsage';
+import { getUserUsage, getAutomationSessions } from '../../lib/usageTracking';
+import { getJobSearchUsage } from '../../lib/jobSearchUsage';
 import { Search } from 'lucide-react';
 
 interface UserSubscription {
@@ -212,7 +197,7 @@ export const BillingPage: React.FC = () => {
       
       if (subData || true) { // Always process usage data
         // Get job applications count for current month - simplified query
-        const { data: applicationsData, error: applicationsError } = await supabase
+        const { data: applicationsData } = await supabase
           .from('applications')
           .select('id')
           .eq('user_id', user.id)
@@ -446,12 +431,17 @@ This will create the default configuration needed for the billing portal to work
 
   // Get plan limits based on current subscription using the helper function
   const getPlanUsageLimits = () => {
-    if (!subscription) return { applications: 0, aiTokens: 0, isSubscription: false };
+    if (!subscription) return { applications: 0, resumeOptimizations: 10, jobSearches: 100, isSubscription: false };
 
     // 1) try strict priceId match
     if (subscription.price_id) {
       const direct = getPlanLimits(subscription.price_id.trim());
-      if (direct) return direct;
+      if (direct) return {
+        applications: direct.applications || 0,
+        resumeOptimizations: 50,
+        jobSearches: 300,
+        isSubscription: direct.isSubscription || false
+      };
     }
 
     // 2) try derive from product object resolved elsewhere
@@ -459,13 +449,14 @@ This will create the default configuration needed for the billing portal to work
     if (prod) {
       return {
         applications: prod.applicationCount || 0,
-        aiTokens: prod.aiTokenCount || 0,
+        resumeOptimizations: 50,
+        jobSearches: 300,
         isSubscription: prod.mode === 'subscription'
       };
     }
 
     // 3) final default
-    return { applications: 0, aiTokens: 0, isSubscription: false };
+    return { applications: 0, resumeOptimizations: 10, jobSearches: 100, isSubscription: false };
   };
 
   const getUsageProgress = (used: number, limit: number) => {
@@ -875,7 +866,7 @@ This will create the default configuration needed for the billing portal to work
                 </div>
               </motion.div>
 
-              {/* AI Tokens Usage */}
+              {/* Resume Optimization Usage */}
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -898,9 +889,9 @@ This will create the default configuration needed for the billing portal to work
                         />
                       </motion.div>
                       <div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">AI Tokens</h3>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Resume Optimizations</h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400">
-                          Job search & resume optimization
+                          AI-powered resume improvements
                         </p>
                       </div>
                     </div>
@@ -909,29 +900,28 @@ This will create the default configuration needed for the billing portal to work
                   <div className="space-y-4">
                     <div className="flex items-end justify-between">
                       <motion.span 
-                        key={usage?.ai_tokens_used || 0}
+                        key={usage?.resume_optimizations || 0}
                         initial={{ scale: 0.5, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         className="text-5xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent"
                       >
-                        {/* console.log('Rendering AI tokens value:', usage?.ai_tokens_used) */}
-                        {(usage?.ai_tokens_used || 0).toLocaleString()}
+                        {(usage?.resume_optimizations || 0).toLocaleString()}
                       </motion.span>
                       <span className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                        of 120,000 included
+                        of {limits.resumeOptimizations || 'unlimited'} included
                       </span>
                     </div>
                   
-                    {limits.aiTokens > 0 && (
+                    {limits.resumeOptimizations > 0 && (
                       <div className="relative">
                         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
                           <motion.div
                             initial={{ width: 0 }}
-                            animate={{ width: `${aiTokenProgress}%` }}
+                            animate={{ width: `${getUsageProgress(usage?.resume_optimizations || 0, limits.resumeOptimizations)}%` }}
                             transition={{ duration: 1, delay: 0.7, ease: "easeOut" }}
                             className="h-full relative overflow-hidden"
                           >
-                            <div className={`absolute inset-0 bg-gradient-to-r ${getProgressBarColor(aiTokenProgress)}`} />
+                            <div className={`absolute inset-0 bg-gradient-to-r ${getProgressBarColor(getUsageProgress(usage?.resume_optimizations || 0, limits.resumeOptimizations))}`} />
                             <motion.div 
                               className="absolute inset-0 bg-white/30"
                               animate={{ x: ['-100%', '100%'] }}
@@ -944,18 +934,18 @@ This will create the default configuration needed for the billing portal to work
                   
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-gray-600 dark:text-gray-400">
-                        {aiTokenProgress >= 100 ? 
+                        {getUsageProgress(usage?.resume_optimizations || 0, limits.resumeOptimizations) >= 100 ? 
                           <span className="text-orange-600 dark:text-orange-400 font-medium">Limit reached</span> :
-                          <span>{Math.max(0, 120000 - (usage?.ai_tokens_used || 0)).toLocaleString()} remaining</span>
+                          <span>{Math.max(0, (limits.resumeOptimizations || 0) - (usage?.resume_optimizations || 0)).toLocaleString()} remaining</span>
                         }
                       </span>
-                      {limits.aiTokens > 0 && (
+                      {limits.resumeOptimizations > 0 && (
                         <motion.span 
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
-                          className={`text-sm font-bold ${getUsageStatusColor(aiTokenProgress)}`}
+                          className={`text-sm font-bold ${getUsageStatusColor(getUsageProgress(usage?.resume_optimizations || 0, limits.resumeOptimizations))}`}
                         >
-                          {Math.round(aiTokenProgress)}% used
+                          {Math.round(getUsageProgress(usage?.resume_optimizations || 0, limits.resumeOptimizations))}% used
                         </motion.span>
                       )}
                     </div>
@@ -1611,7 +1601,7 @@ This will create the default configuration needed for the billing portal to work
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-300">AI Tokens</p>
                 <div className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-                  {limits.aiTokens > 0 ? `${Math.max(0, limits.aiTokens - (usage?.ai_tokens_used || 0)).toLocaleString()} remaining` : 'No plan limits'}
+                  {limits.resumeOptimizations > 0 ? `${Math.max(0, limits.resumeOptimizations - (usage?.resume_optimizations || 0)).toLocaleString()} remaining` : 'No plan limits'}
                 </div>
               </motion.div>
             </div>

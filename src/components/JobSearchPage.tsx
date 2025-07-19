@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, MapPin, Briefcase, Filter, X, Loader2, ChevronRight, Heart, Users, DollarSign, Building2, Star, Bookmark, ArrowUpRight, TrendingUp } from 'lucide-react';
+import { Search, MapPin, Briefcase, Filter, Loader2, ChevronRight, Heart, Users, DollarSign, Building2, Star, Bookmark, ArrowUpRight, TrendingUp } from 'lucide-react';
 import { joboticApi, JobMatchRequest, StreamCallbacks } from '../lib/joboticApi';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
@@ -10,7 +10,7 @@ import { ResumeAnalyzerV2 } from './ResumeAnalyzerV2';
 import { toast } from 'react-hot-toast';
 import LoadingTransition from './LoadingTransition';
 import { useLocation } from 'react-router-dom';
-import { trackAITokens } from '../lib/aiTokenTracking';
+import { trackJobSearchUsage } from '../lib/jobSearchUsage';
 import { getPlanLimits } from '../stripe-config';
 import { JobSkeleton } from './JobSkeleton';
 
@@ -56,7 +56,6 @@ const JobSearchPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [resumeText, setResumeText] = useState('');
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
-  const [showFilters, setShowFilters] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filters, setFilters] = useState({
     employment_types: [] as string[],
@@ -154,19 +153,8 @@ const JobSearchPage: React.FC = () => {
         if (subscription?.price_id) {
           const planLimits = getPlanLimits(subscription.price_id);
           if (planLimits) {
-            // Get current month's job view count
-            const startOfMonth = new Date();
-            startOfMonth.setDate(1);
-            startOfMonth.setHours(0, 0, 0, 0);
-            
-            const { count } = await supabase
-              .from('job_views')
-              .select('*', { count: 'exact', head: true })
-              .eq('user_id', user.id)
-              .gte('created_at', startOfMonth.toISOString());
-            
             setUsageStats({
-              jobsViewed: count || 0,
+              jobsViewed: 0,
               jobLimit: planLimits.applications || 100
             });
           }
@@ -186,7 +174,7 @@ const JobSearchPage: React.FC = () => {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
-        setShowFilters(false);
+        setShowFilterModal(false);
       }
     };
     
@@ -257,7 +245,7 @@ const JobSearchPage: React.FC = () => {
           if (downloadError) {
             console.error('Error downloading resume:', downloadError);
           } else if (fileData) {
-            const text = await extractTextFromPDF(fileData);
+            const text = await extractTextFromPDF(fileData as File);
             setResumeText(text);
             console.log('Resume text extracted, length:', text.length);
             
@@ -388,7 +376,7 @@ const JobSearchPage: React.FC = () => {
                       setProgressMessage(`Processing ${data.processed} of ${data.total} jobs...`);
                       setStreamProgress(data.percentage);
                     },
-                    complete: (data) => {
+                    complete: async (data) => {
                       setUsageStats({
                         jobsViewed: data.usage?.monthly_used || 0,
                         jobLimit: data.usage?.monthly_limit || 100
@@ -396,6 +384,14 @@ const JobSearchPage: React.FC = () => {
                       setLoading(false);
                       setIsStreaming(false);
                       setProgressMessage('');
+                      
+                      if (user?.id && data.totalProcessed > 0) {
+                        await trackJobSearchUsage(user.id, data.totalProcessed, {
+                          search_type: 'auto_search',
+                          query: primaryRole,
+                          location: primaryLocation
+                        });
+                      }
                       
                       // Update pagination state
                       const jobsPerPage = 10;
@@ -411,7 +407,7 @@ const JobSearchPage: React.FC = () => {
                       
                       // Only show toast if no jobs found (important feedback)
                       if (data.totalProcessed === 0) {
-                        toast.info('No jobs found. Try updating your preferences.');
+                        toast('No jobs found. Try updating your preferences.');
                       }
                       // Silent success - jobs are already visible on screen
                     },
@@ -424,7 +420,7 @@ const JobSearchPage: React.FC = () => {
                   
                   setInitialLoad(false);
                 } catch (err) {
-                  if (err.name !== 'AbortError') {
+                  if (err instanceof Error && err.name !== 'AbortError') {
                     console.error('Auto-search error:', err);
                   }
                 } finally {
@@ -530,7 +526,7 @@ const JobSearchPage: React.FC = () => {
     try {
       // Always use AI-powered search endpoint
       if (!resumeText) {
-        toast.warning('Please upload your resume in your profile to get AI-matched job recommendations.');
+        toast('Please upload your resume in your profile to get AI-matched job recommendations.');
         setError('Resume required for job matching. Please upload your resume in your profile.');
         setLoading(false);
         setIsStreaming(false);
@@ -587,7 +583,7 @@ const JobSearchPage: React.FC = () => {
           setProgressMessage(`Processing ${data.processed} of ${data.total} jobs...`);
           setStreamProgress(data.percentage);
         },
-        complete: (data) => {
+        complete: async (data) => {
           setUsageStats({
             jobsViewed: data.usage?.monthly_used || 0,
             jobLimit: data.usage?.monthly_limit || 100
@@ -595,6 +591,14 @@ const JobSearchPage: React.FC = () => {
           setLoading(false);
           setIsStreaming(false);
           setProgressMessage('');
+          
+          if (user?.id && data.totalProcessed > 0) {
+            await trackJobSearchUsage(user.id, data.totalProcessed, {
+              search_type: 'manual_search',
+              query: searchQuery,
+              location: location
+            });
+          }
           
           // Update pagination state based on total processed
           const jobsPerPage = 10;
@@ -618,8 +622,8 @@ const JobSearchPage: React.FC = () => {
       await joboticApi.searchJobsStreaming(request, callbacks, currentControllerRef.current.signal);
       
     } catch (err) {
-      if (err.name !== 'AbortError') {
-        const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
+      if (err instanceof Error && err.name !== 'AbortError') {
+        const errorMessage = err.message;
         setError(errorMessage);
         toast.error(errorMessage);
       }
@@ -630,11 +634,6 @@ const JobSearchPage: React.FC = () => {
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      searchJobs();
-    }
-  };
 
   const formatSalary = (min?: number, max?: number) => {
     if (!min && !max) return null;
@@ -805,7 +804,7 @@ const JobSearchPage: React.FC = () => {
           
         if (campaignError) throw campaignError;
         campaignId = campaign.id;
-        sessionStorage.setItem('current_campaign_id', campaignId);
+        sessionStorage.setItem('current_campaign_id', campaignId || '');
       }
       
       // Save to applications table
@@ -895,7 +894,7 @@ const JobSearchPage: React.FC = () => {
     // Validate session hasn't expired
     if (!sessionUtils.isSessionValid(session, searchQuery, location || '', filters)) {
       console.log('Session expired or search params changed');
-      toast.warning('Session expired. Please search again.');
+      toast('Session expired. Please search again.');
       setHasMore(false);
       return;
     }
@@ -914,7 +913,7 @@ const JobSearchPage: React.FC = () => {
     
     try {
       if (!resumeText) {
-        toast.warning('Resume required for loading more jobs');
+        toast('Resume required for loading more jobs');
         setLoadingMore(false);
         return;
       }
@@ -955,13 +954,12 @@ const JobSearchPage: React.FC = () => {
           });
         }
         
-        // Track AI usage for pagination
+        // Track job search usage for pagination
         if (user?.id) {
-          await trackAITokens(user.id, 'job_search_match', {
-              jobTitle: searchQuery,
-              location: location || 'Not specified',
-              resultsCount: response.data.jobs.length,
-              page: nextPage
+          await trackJobSearchUsage(user.id, response.data.jobs.length, {
+              search_type: 'load_more',
+              query: searchQuery,
+              location: location || 'Not specified'
             });
           }
         } else {

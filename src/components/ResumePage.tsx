@@ -5,19 +5,14 @@ import {
   FileText,
   Loader2,
   CheckCircle,
-  AlertCircle,
   Download,
   ChevronRight,
   Brain,
-  Target,
   Sparkles,
-  RefreshCw,
   X,
-  Eye,
   Edit3,
   FileCheck,
   BarChart3,
-  Shield,
   Zap,
   Clock,
   TrendingUp,
@@ -25,31 +20,26 @@ import {
   Plus,
   Briefcase,
   Building,
-  Info,
   LightbulbIcon,
   Wand2,
   Bot,
   Copy,
   FileType,
   ChevronDown,
-  ChevronUp,
-  Star,
   ArrowRight,
   Gauge,
   Activity,
-  Layers,
   CheckCircle2,
-  XCircle,
   AlertTriangle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { extractTextFromPDF } from '../lib/pdfExtractor';
-import { analyzeResume, generateOptimizedResume, downloadResume, validateResumeFile, AnalyzeResponse, GenerateResponse, getApiToken } from '../lib/resumeApiClient';
+import { analyzeResume, generateOptimizedResume, downloadResume, validateResumeFile, AnalyzeResponse, getApiToken } from '../lib/resumeApiClient';
 import toast from 'react-hot-toast';
 import { Badge } from './ui/badge';
-import { canPerformAIOperation, trackAITokens } from '../lib/aiTokenTracking';
+import { canPerformAction, trackAITokenUsage } from '../lib/usageTracking';
 
 interface ResumeUpload {
   id: string;
@@ -116,7 +106,6 @@ export const ResumePage: React.FC = () => {
   
   const [expandedSections, setExpandedSections] = useState<string[]>(['keywords', 'skills', 'suggestions']);
   const [score, setScore] = useState(0);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -263,9 +252,9 @@ export const ResumePage: React.FC = () => {
     }
 
     // Check AI token limits before analyzing
-    const { allowed, reason } = await canPerformAIOperation(user.id);
-    if (!allowed) {
-      toast.error(reason || 'Insufficient AI tokens for resume analysis');
+    const canPerform = await canPerformAction(user.id, 'resume_optimizations');
+    if (!canPerform) {
+      toast.error('Insufficient tokens for resume analysis');
       return;
     }
 
@@ -337,7 +326,7 @@ export const ResumePage: React.FC = () => {
       toast.success('Resume analyzed successfully!');
       
       // Track AI token usage
-      await trackAITokens(user.id, 'resume_optimization', {
+      await trackAITokenUsage(user.id, 'resume_optimizations', {
         action: 'analyze',
         analysisId: result.data.analysisId,
         jobTitle: jobTitle,
@@ -363,9 +352,9 @@ export const ResumePage: React.FC = () => {
     }
 
     // Check AI token limits before generating
-    const { allowed, reason } = await canPerformAIOperation(user.id);
-    if (!allowed) {
-      toast.error(reason || 'Insufficient AI tokens for resume generation');
+    const canPerform = await canPerformAction(user.id, 'resume_optimizations');
+    if (!canPerform) {
+      toast.error('Insufficient tokens for resume generation');
       return;
     }
 
@@ -429,7 +418,7 @@ export const ResumePage: React.FC = () => {
       toast.success('Resume generated successfully!');
       
       // Track AI token usage for generation
-      await trackAITokens(user.id, 'resume_optimization', {
+      await trackAITokenUsage(user.id, 'resume_optimizations', {
         action: 'generate',
         generationId: result.data.generationId,
         editType: editType
@@ -478,11 +467,6 @@ export const ResumePage: React.FC = () => {
     return 'text-red-600';
   };
 
-  const getScoreGradient = (score: number) => {
-    if (score >= 70) return 'from-green-500 to-green-600';
-    if (score >= 30) return 'from-amber-500 to-amber-600';
-    return 'from-red-500 to-red-600';
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50/30 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">

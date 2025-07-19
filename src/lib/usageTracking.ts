@@ -4,7 +4,7 @@ import { isSupabaseConfigured } from './supabase';
 export type UsageType = 
   | 'automation_steps'
   | 'job_search_match'
-  | 'resume_optimization'
+  | 'resume_optimizations'
   | 'ai_tokens'
   | 'cover_letter_generation';
 
@@ -18,7 +18,7 @@ export interface UsageLimit {
 export interface UserUsage {
   automation_steps: UsageLimit;
   job_search_match: UsageLimit;
-  resume_optimization: UsageLimit;
+  resume_optimizations: UsageLimit;
   ai_tokens: UsageLimit;
   cover_letter_generation: UsageLimit;
 }
@@ -28,7 +28,7 @@ export interface UserUsage {
  */
 export const TOKEN_COSTS = {
   job_search_match: 6000,
-  resume_optimization: 6000,
+  resume_optimizations: 6000,
   cover_letter_generation: 2000,
 } as const;
 
@@ -148,7 +148,7 @@ export async function trackAutomationSteps(
       upsertData.completed_at = new Date().toISOString();
     }
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('automation_tasks')
       .upsert(upsertData, {
         onConflict: 'task_id', // Only task_id has unique constraint
@@ -176,7 +176,7 @@ export async function getUserUsage(userId: string): Promise<UserUsage> {
   const defaultUsage: UserUsage = {
     automation_steps: { used: 0, limit: 0, remaining: 0, percentage: 0 },
     job_search_match: { used: 0, limit: 100, remaining: 100, percentage: 0 },
-    resume_optimization: { used: 0, limit: 10, remaining: 10, percentage: 0 },
+    resume_optimizations: { used: 0, limit: 10, remaining: 10, percentage: 0 },
     ai_tokens: { used: 0, limit: 120000, remaining: 120000, percentage: 0 },
     cover_letter_generation: { used: 0, limit: 5, remaining: 5, percentage: 0 },
   };
@@ -197,7 +197,7 @@ export async function getUserUsage(userId: string): Promise<UserUsage> {
       .single();
 
     // Get usage from the view
-    const { data: usageData, error } = await supabase
+    const { data: usageSummary, error } = await supabase
       .from('user_usage_summary')
       .select('*')
       .eq('user_id', userId)
@@ -253,8 +253,8 @@ export async function getUserUsage(userId: string): Promise<UserUsage> {
     }
 
     // Update with actual usage if any exists
-    if (usageData && usageData.length > 0) {
-      usageData.forEach(row => {
+    if (usageSummary && usageSummary.length > 0) {
+      usageSummary.forEach((row: any) => {
         const usageType = row.usage_type as UsageType;
         usage[usageType] = {
           used: row.used || 0,
@@ -297,41 +297,29 @@ export async function getUserUsage(userId: string): Promise<UserUsage> {
       // console.log(`No automation tasks found for user ${userId} since ${billingPeriodStart.toISOString()}`);
     }
 
-    // Get AI token usage from ai_token_tracking table (the accurate source)
-    const { data: aiTokenTracking, error: aiTokenError } = await supabase
-      .from('ai_token_tracking')
-      .select('tokens_used, operation_type')
+    // Get usage data from the unified usage table
+    const { data: resumeUsageData, error: usageError } = await supabase
+      .from('usage')
+      .select('operation_type, count')
       .eq('user_id', userId)
       .gte('created_at', billingPeriodStart.toISOString());
-    
-    if (aiTokenError) {
-      console.error('Error fetching AI token tracking:', aiTokenError);
+
+    if (usageError) {
+      console.error('Error fetching usage data:', usageError);
     }
     
-    if (aiTokenTracking && aiTokenTracking.length > 0) {
-      // Sum up all AI token usage for this billing period
-      const totalAITokens = aiTokenTracking.reduce((sum, record) => sum + (record.tokens_used || 0), 0);
-      
+    if (resumeUsageData && resumeUsageData.length > 0) {
       // Count operations by type
-      let jobSearchCount = 0;
       let resumeOptCount = 0;
-      aiTokenTracking.forEach(record => {
-        if (record.operation_type === 'job_search_match') jobSearchCount++;
-        if (record.operation_type === 'resume_optimization') resumeOptCount++;
+      resumeUsageData.forEach(record => {
+        if (record.operation_type === 'resume_optimizations') {
+          resumeOptCount += record.count || 1;
+        }
       });
       
-      // console.log(`AI token tracking for user ${userId}: ${totalAITokens} tokens from ${aiTokenTracking.length} operations (${jobSearchCount} job searches, ${resumeOptCount} resume optimizations)`);
-      usage.ai_tokens.used = totalAITokens;
-      usage.ai_tokens.remaining = Math.max(0, usage.ai_tokens.limit - totalAITokens);
-      usage.ai_tokens.percentage = usage.ai_tokens.limit > 0 
-        ? Math.min(100, (totalAITokens / usage.ai_tokens.limit) * 100) 
-        : 0;
-      
-      // Update operation counts
-      usage.job_search_match.used = jobSearchCount;
-      usage.resume_optimization.used = resumeOptCount;
-    } else {
-      // console.log(`No AI token tracking found for user ${userId} since ${billingPeriodStart.toISOString()}`);
+      usage.resume_optimizations.used = resumeOptCount;
+      usage.resume_optimizations.remaining = Math.max(0, usage.resume_optimizations.limit - resumeOptCount);
+      usage.resume_optimizations.percentage = usage.resume_optimizations.limit > 0 ? (resumeOptCount / usage.resume_optimizations.limit) * 100 : 0;
     }
 
     // Ensure free tier limits are set if no subscription
@@ -391,7 +379,7 @@ export async function canPerformAction(
  */
 export async function trackAITokenUsage(
   userId: string,
-  operation: 'job_search_match' | 'resume_optimization' | 'cover_letter_generation',
+  operation: 'job_search_match' | 'resume_optimizations' | 'cover_letter_generation',
   metadata?: Record<string, any>
 ): Promise<boolean> {
   const tokenCost = TOKEN_COSTS[operation];
