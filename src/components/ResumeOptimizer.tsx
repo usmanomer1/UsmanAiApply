@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase, getSignedResumeUrl } from '../lib/supabase';
 import { extractTextFromPDF } from '../lib/pdfExtractor';
 import toast, { Toaster } from 'react-hot-toast';
-import { canPerformAIOperation, trackAITokens } from '../lib/aiTokenTracking';
+import { canPerformAction, trackAITokenUsage } from '../lib/usageTracking';
 
 interface ResumeOptimizerProps {
   isOpen: boolean;
@@ -54,7 +54,7 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
       }
 
       // Check AI token limits
-      const { allowed, reason } = await canPerformAIOperation(user.id);
+      const { allowed, reason } = await canPerformAction(user.id, 'resume_optimization');
       if (!allowed) {
         throw new Error(reason || 'Insufficient AI tokens for resume optimization');
       }
@@ -173,7 +173,7 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
       }));
 
       // Track successful optimization
-      await trackAITokens(user.id, 'resume_optimization', {
+      await trackAITokenUsage(user.id, 'resume_optimization', {
         jobTitle: job?.job_title || 'Not specified',
         companyName: job?.employer_name || 'Not specified',
         method: 'simple_optimizer'
