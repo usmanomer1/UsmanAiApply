@@ -22,17 +22,16 @@ export interface JobSearchUsageStats {
 // Fetch job search usage for the current month
 export async function getJobSearchUsage(userId: string): Promise<JobSearchUsageStats | null> {
   try {
-    // Get current month's start date
-    const currentMonthStart = new Date();
-    currentMonthStart.setDate(1);
-    currentMonthStart.setHours(0, 0, 0, 0);
+    // Get current month in YYYY-MM format
+    const currentDate = new Date();
+    const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
     
-    // Query monthly usage view
+    // Query job_search_usage table directly
     const { data, error } = await supabase
-      .from('job_search_monthly_usage')
+      .from('job_search_usage')
       .select('*')
       .eq('user_id', userId)
-      .gte('month', currentMonthStart.toISOString())
+      .eq('month', monthKey)
       .single();
     
     if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
@@ -82,8 +81,8 @@ export async function getJobSearchUsage(userId: string): Promise<JobSearchUsageS
     }
     
     // Calculate stats from fetched data
-    // The view returns total_jobs and search_count
-    const monthly_used = data.total_jobs || 0;
+    // The table has jobs_viewed field
+    const monthly_used = data.jobs_viewed || 0;
     
     // Get plan limits if not in the data
     let monthly_limit = 300; // Default
