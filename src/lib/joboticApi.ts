@@ -179,6 +179,39 @@ interface JobMatchResponse {
   };
 }
 
+// Job Usage Response Interface
+interface JobUsageResponse {
+  success: boolean;
+  data: {
+    currentMonth: {
+      month: string;
+      totalJobsViewed: number;
+      searchSessions: number;
+      totalRequests: number;
+      remaining: number | 'unlimited';
+      percentUsed: number;
+      lastSearchAt: string | null;
+    };
+    plan: {
+      name: string;
+      priceId: string;
+      limit: number;
+      isUnlimited: boolean;
+      isActive: boolean;
+    };
+    history: Array<{
+      month: string;
+      totalJobsViewed: number;
+      searchSessions: number;
+    }>;
+    recentSearches: Array<{
+      query: string;
+      jobsViewed: number;
+      searchedAt: string;
+    }>;
+  };
+}
+
 // OLD RESUME INTERFACES - REMOVED
 // All old resume analysis, optimization, and download interfaces have been removed
 
@@ -473,6 +506,47 @@ class JoboticApiService {
   async getSalaryEstimate(request: { jobTitle: string; location: string }): Promise<any> {
     return this.makeRequest<any>('/api/jobs/salary-estimate', request, { requiresAuth: false });
   }
+  
+  // Get job search usage - requires authentication
+  async getJobUsage(): Promise<JobUsageResponse> {
+    const isNetlifyFunction = USE_NETLIFY_FUNCTION;
+    if (isNetlifyFunction) {
+      // For Netlify function with GET method, we need to pass endpoint as query param
+      const url = `/.netlify/functions/jobotic-api?endpoint=/api/jobs/usage`;
+      
+      // Get auth token
+      const { supabase } = await import('./supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      } else {
+        throw new Error('Authentication required to fetch job usage');
+      }
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+      });
+      
+      if (!response.ok) {
+        const error = new Error(`Failed to fetch job usage: ${response.status}`);
+        (error as any).status = response.status;
+        throw error;
+      }
+      
+      return response.json();
+    } else {
+      return this.makeRequest<JobUsageResponse>('/api/jobs/usage', null, { 
+        method: 'GET', 
+        requiresAuth: true 
+      });
+    }
+  }
 
   // New PDF Export method
   async exportPdf(request: ExportPdfRequest): Promise<ExportPdfResponse> {
@@ -663,5 +737,6 @@ export type {
   ExportPdfRequest, 
   ExportPdfResponse,
   StreamCallbacks,
-  StreamMessageType 
+  StreamMessageType,
+  JobUsageResponse 
 };
