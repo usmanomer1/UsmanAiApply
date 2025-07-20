@@ -32,11 +32,18 @@ export async function getJobSearchUsage(userId: string): Promise<JobSearchUsageS
       .select('*')
       .eq('user_id', userId)
       .eq('month', monthKey)
-      .single();
+      .maybeSingle(); // Use maybeSingle to avoid error when no rows exist
     
-    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+    if (error) {
       console.error('Error fetching job search usage:', error);
-      return null;
+      // Return default values on error
+      return {
+        plan: 'default',
+        monthly_limit: 300,
+        monthly_used: 0,
+        remaining: 300,
+        percentage_used: 0
+      };
     }
     
     // If no data exists for current month, return default values based on user's plan
