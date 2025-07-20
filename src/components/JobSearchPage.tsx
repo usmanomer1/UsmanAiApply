@@ -72,6 +72,7 @@ const JobSearchPage: React.FC = () => {
   const [showLoadingTransition, setShowLoadingTransition] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [usageStats, setUsageStats] = useState<{ jobsViewed: number; jobLimit: number }>({ jobsViewed: 0, jobLimit: 100 });
+  const [shouldSearch, setShouldSearch] = useState(false);
   
   // Streaming states
   const [streamProgress, setStreamProgress] = useState(0);
@@ -469,6 +470,15 @@ const JobSearchPage: React.FC = () => {
     fetchResumeAndPreferences();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, initialLoad]); // Intentionally omitting filters to prevent re-triggering on manual filter changes
+
+  // Watch for filter changes when shouldSearch is true
+  useEffect(() => {
+    if (shouldSearch) {
+      searchJobs();
+      setShouldSearch(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, shouldSearch]); // Trigger search when filters change AND shouldSearch is true
 
   const searchJobs = async () => {
     if (!searchQuery.trim()) {
@@ -906,8 +916,7 @@ const JobSearchPage: React.FC = () => {
           <button 
             onClick={() => {
               setFilters(prev => ({ ...prev, remote_jobs_only: !prev.remote_jobs_only }));
-              // Trigger search after filter change
-              setTimeout(() => searchJobs(), 100);
+              setShouldSearch(true);
             }}
             className={`px-4 py-2 border ${filters.remote_jobs_only ? 'bg-teal-600 border-teal-600 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'} rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-2`}
           >
@@ -921,7 +930,7 @@ const JobSearchPage: React.FC = () => {
                 ? filters.employment_types.filter(t => t !== 'FULLTIME')
                 : [...filters.employment_types, 'FULLTIME'];
               setFilters(prev => ({ ...prev, employment_types: newTypes }));
-              setTimeout(() => searchJobs(), 100);
+              setShouldSearch(true);
             }}
             className={`px-4 py-2 border ${filters.employment_types.includes('FULLTIME') ? 'bg-teal-600 border-teal-600 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'} rounded-full text-sm font-medium transition-all duration-200`}
           >
@@ -934,7 +943,7 @@ const JobSearchPage: React.FC = () => {
                 ? filters.employment_types.filter(t => t !== 'PARTTIME')
                 : [...filters.employment_types, 'PARTTIME'];
               setFilters(prev => ({ ...prev, employment_types: newTypes }));
-              setTimeout(() => searchJobs(), 100);
+              setShouldSearch(true);
             }}
             className={`px-4 py-2 border ${filters.employment_types.includes('PARTTIME') ? 'bg-teal-600 border-teal-600 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'} rounded-full text-sm font-medium transition-all duration-200`}
           >
@@ -947,7 +956,7 @@ const JobSearchPage: React.FC = () => {
                 ? filters.employment_types.filter(t => t !== 'INTERN')
                 : [...filters.employment_types, 'INTERN'];
               setFilters(prev => ({ ...prev, employment_types: newTypes }));
-              setTimeout(() => searchJobs(), 100);
+              setShouldSearch(true);
             }}
             className={`px-4 py-2 border ${filters.employment_types.includes('INTERN') ? 'bg-teal-600 border-teal-600 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'} rounded-full text-sm font-medium transition-all duration-200`}
           >
@@ -959,7 +968,7 @@ const JobSearchPage: React.FC = () => {
               const hasEntryLevel = filters.job_requirements.includes('no_exp') || filters.job_requirements.includes('under_3_years_exp');
               const newReqs = hasEntryLevel ? [] : ['no_exp'];
               setFilters(prev => ({ ...prev, job_requirements: newReqs }));
-              setTimeout(() => searchJobs(), 100);
+              setShouldSearch(true);
             }}
             className={`px-4 py-2 border ${(filters.job_requirements.includes('no_exp') || filters.job_requirements.includes('under_3_years_exp')) ? 'bg-teal-600 border-teal-600 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'} rounded-full text-sm font-medium transition-all duration-200`}
           >
@@ -1553,8 +1562,7 @@ const JobSearchPage: React.FC = () => {
                 remote_jobs_only: modalFilters.remote_jobs_only
               });
               setShowFilterModal(false);
-              // Trigger search after state updates
-              setTimeout(() => searchJobs(), 100);
+              setShouldSearch(true);
             }}
             className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors"
           >
