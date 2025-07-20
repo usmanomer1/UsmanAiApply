@@ -10,6 +10,7 @@ import { ResumeAnalyzerV2 } from './ResumeAnalyzerV2';
 import { toast } from 'react-hot-toast';
 import LoadingTransition from './LoadingTransition';
 import { useLocation } from 'react-router-dom';
+import { trackJobSearchUsage } from '../lib/jobSearchUsage';
 import { getPlanLimits } from '../stripe-config';
 import { JobSkeleton } from './JobSkeleton';
 
@@ -376,7 +377,7 @@ const JobSearchPage: React.FC = () => {
                       setProgressMessage(`Processing ${data.processed} of ${data.total} jobs...`);
                       setStreamProgress(data.percentage);
                     },
-                    complete: (data) => {
+                    complete: async (data) => {
                       setUsageStats({
                         jobsViewed: data.usage?.monthly_used || 0,
                         jobLimit: data.usage?.monthly_limit || 100
@@ -384,6 +385,14 @@ const JobSearchPage: React.FC = () => {
                       setLoading(false);
                       setIsStreaming(false);
                       setProgressMessage('');
+                      
+                      if (user?.id && data.totalProcessed > 0) {
+                        await trackJobSearchUsage(user.id, data.totalProcessed, {
+                          search_type: 'auto_search',
+                          query: primaryRole,
+                          location: primaryLocation
+                        });
+                      }
                       
                       // Update hasMore state based on total processed
                       setHasMore(false);
@@ -570,7 +579,7 @@ const JobSearchPage: React.FC = () => {
           setProgressMessage(`Processing ${data.processed} of ${data.total} jobs...`);
           setStreamProgress(data.percentage);
         },
-        complete: (data) => {
+        complete: async (data) => {
           setUsageStats({
             jobsViewed: data.usage?.monthly_used || 0,
             jobLimit: data.usage?.monthly_limit || 100
@@ -578,6 +587,14 @@ const JobSearchPage: React.FC = () => {
           setLoading(false);
           setIsStreaming(false);
           setProgressMessage('');
+          
+          if (user?.id && data.totalProcessed > 0) {
+            await trackJobSearchUsage(user.id, data.totalProcessed, {
+              search_type: 'manual_search',
+              query: searchQuery,
+              location: location
+            });
+          }
           
           // Update hasMore state - since streaming loads all jobs, set to false when complete
           setHasMore(false);

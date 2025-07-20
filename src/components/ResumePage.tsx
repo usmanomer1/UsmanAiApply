@@ -49,7 +49,7 @@ import { extractTextFromPDF } from '../lib/pdfExtractor';
 import { analyzeResume, generateOptimizedResume, downloadResume, validateResumeFile, AnalyzeResponse, GenerateResponse, getApiToken } from '../lib/resumeApiClient';
 import toast from 'react-hot-toast';
 import { Badge } from './ui/badge';
-import { canPerformAIOperation, trackAITokens } from '../lib/aiTokenTracking';
+import { canPerformAction, trackAITokenUsage } from '../lib/usageTracking';
 
 interface ResumeUpload {
   id: string;
@@ -263,9 +263,9 @@ export const ResumePage: React.FC = () => {
     }
 
     // Check AI token limits before analyzing
-    const { allowed, reason } = await canPerformAIOperation(user.id);
-    if (!allowed) {
-      toast.error(reason || 'Insufficient AI tokens for resume analysis');
+    const canPerform = await canPerformAction(user.id, 'resume_optimization');
+    if (!canPerform.allowed) {
+      toast.error(canPerform.reason || 'Insufficient AI tokens for resume analysis');
       return;
     }
 
@@ -337,7 +337,7 @@ export const ResumePage: React.FC = () => {
       toast.success('Resume analyzed successfully!');
       
       // Track AI token usage
-      await trackAITokens(user.id, 'resume_optimization', {
+      await trackAITokenUsage(user.id, 'resume_optimization', {
         action: 'analyze',
         analysisId: result.data.analysisId,
         jobTitle: jobTitle,
@@ -363,9 +363,9 @@ export const ResumePage: React.FC = () => {
     }
 
     // Check AI token limits before generating
-    const { allowed, reason } = await canPerformAIOperation(user.id);
-    if (!allowed) {
-      toast.error(reason || 'Insufficient AI tokens for resume generation');
+    const canPerform = await canPerformAction(user.id, 'resume_optimization');
+    if (!canPerform.allowed) {
+      toast.error(canPerform.reason || 'Insufficient AI tokens for resume generation');
       return;
     }
 
@@ -429,7 +429,7 @@ export const ResumePage: React.FC = () => {
       toast.success('Resume generated successfully!');
       
       // Track AI token usage for generation
-      await trackAITokens(user.id, 'resume_optimization', {
+      await trackAITokenUsage(user.id, 'resume_optimization', {
         action: 'generate',
         generationId: result.data.generationId,
         editType: editType

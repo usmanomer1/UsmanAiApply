@@ -1,5 +1,5 @@
 import { API_CONFIG } from '../config/api';
-import { canPerformAIOperation, trackAITokens } from './aiTokenTracking';
+import { canPerformAction, trackAITokenUsage } from './usageTracking';
 
 const CACHE_DURATION = 23 * 60 * 60 * 1000; // 23 hours in milliseconds
 
@@ -107,7 +107,7 @@ export async function analyzeResume(
   console.log('File:', resumeFile.name, resumeFile.size, resumeFile.type);
   
   // Check AI token limits before making API call
-  const { allowed, reason } = await canPerformAIOperation(userId);
+  const { allowed, reason } = await canPerformAction(userId, 'resume_optimization');
   if (!allowed) {
     throw new Error(reason || 'Insufficient AI tokens for resume optimization');
   }
@@ -169,7 +169,7 @@ export async function analyzeResume(
     console.log('Analysis complete:', result);
     
     // Track successful analysis (deduct tokens on analyze, not generate)
-    await trackAITokens(userId, 'resume_optimization', {
+    await trackAITokenUsage(userId, 'resume_optimization', {
       jobTitle,
       companyName,
       analysisId: result.data?.analysisId,

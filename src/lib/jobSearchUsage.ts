@@ -153,6 +153,50 @@ export function getJobSearchLimitsByPlan(plan: string): number {
   }
 }
 
+// Track job search usage
+export async function trackJobSearchUsage(
+  userId: string,
+  jobsViewed: number,
+  metadata?: Record<string, any>
+): Promise<boolean> {
+  if (!userId || jobsViewed <= 0) {
+    return true;
+  }
+
+  try {
+    // Get current month in YYYY-MM format
+    const currentDate = new Date();
+    const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+    
+    const { error } = await supabase
+      .from('job_search_usage')
+      .upsert({
+        user_id: userId,
+        month: monthKey,
+        searches_count: 1,
+        jobs_viewed: jobsViewed,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        ...metadata
+      }, {
+        onConflict: 'user_id,month',
+        ignoreDuplicates: false
+      });
+
+    if (error) {
+      console.error('Error tracking job search usage:', error);
+      return false;
+    }
+
+    // Emit event to refresh billing page
+    window.dispatchEvent(new Event('billing-refresh-needed'));
+    return true;
+  } catch (error) {
+    console.error('Failed to track job search usage:', error);
+    return false;
+  }
+}
+
 // Format job search usage for display
 export function formatJobSearchUsage(stats: JobSearchUsageStats): {
   used: string;
