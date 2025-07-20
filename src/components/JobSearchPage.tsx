@@ -10,7 +10,7 @@ import { ResumeAnalyzerV2 } from './ResumeAnalyzerV2';
 import { toast } from 'react-hot-toast';
 import LoadingTransition from './LoadingTransition';
 import { useLocation } from 'react-router-dom';
-import { trackJobSearchUsage } from '../lib/jobSearchUsage';
+import { trackJobSearchUsage, updateCachedUsage } from '../lib/jobSearchUsage';
 import { getPlanLimits } from '../stripe-config';
 import { JobSkeleton } from './JobSkeleton';
 
@@ -386,6 +386,11 @@ const JobSearchPage: React.FC = () => {
                       setIsStreaming(false);
                       setProgressMessage('');
                       
+                      // Cache the usage data from API response
+                      if (user?.id && data.usage) {
+                        updateCachedUsage(user.id, data.usage);
+                      }
+                      
                       if (user?.id && data.totalProcessed > 0) {
                         await trackJobSearchUsage(user.id, data.totalProcessed, {
                           search_type: 'auto_search',
@@ -455,6 +460,10 @@ const JobSearchPage: React.FC = () => {
                       jobsViewed: response.usage.monthly_used,
                       jobLimit: typeof response.usage.monthly_limit === 'number' ? response.usage.monthly_limit : -1
                     });
+                    // Cache the usage data
+                    if (user?.id) {
+                      updateCachedUsage(user.id, response.usage);
+                    }
                   }
                   
                   setInitialLoad(false);
@@ -587,6 +596,11 @@ const JobSearchPage: React.FC = () => {
           setLoading(false);
           setIsStreaming(false);
           setProgressMessage('');
+          
+          // Cache the usage data from API response
+          if (user?.id && data.usage) {
+            updateCachedUsage(user.id, data.usage);
+          }
           
           if (user?.id && data.totalProcessed > 0) {
             await trackJobSearchUsage(user.id, data.totalProcessed, {

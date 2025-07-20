@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { joboticApi } from './joboticApi';
 
 export interface JobSearchUsage {
   user_id: string;
@@ -19,147 +20,122 @@ export interface JobSearchUsageStats {
   percentage_used: number;
 }
 
+// Cache for API usage data
+const usageCache = new Map<string, { data: JobSearchUsageStats; timestamp: number }>();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+// Update cached usage data from API response
+export function updateCachedUsage(userId: string, apiUsage: any) {
+  if (!userId || !apiUsage) return;
+  
+  const stats: JobSearchUsageStats = {
+    plan: apiUsage.plan || 'default',
+    monthly_limit: -1, // All plans unlimited
+    monthly_used: apiUsage.monthly_used || 0,
+    remaining: 'unlimited',
+    percentage_used: 0
+  };
+  
+  usageCache.set(userId, {
+    data: stats,
+    timestamp: Date.now()
+  });
+}
+
+// Get cached usage data
+function getCachedUsage(userId: string): JobSearchUsageStats | null {
+  const cached = usageCache.get(userId);
+  if (!cached) return null;
+  
+  // Check if cache is still valid
+  if (Date.now() - cached.timestamp > CACHE_DURATION) {
+    usageCache.delete(userId);
+    return null;
+  }
+  
+  return cached.data;
+}
+
 // Fetch job search usage for the current month
 export async function getJobSearchUsage(userId: string): Promise<JobSearchUsageStats | null> {
   try {
-    // Get current month in YYYY-MM format
-    const currentDate = new Date();
-    const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
-    
-    // Query job_search_usage table directly
-    const { data, error } = await supabase
-      .from('job_search_usage')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('month', monthKey)
-      .maybeSingle(); // Use maybeSingle to avoid error when no rows exist
-    
-    if (error) {
-      console.error('Error fetching job search usage:', error);
-      // Return default values on error
-      return {
-        plan: 'default',
-        monthly_limit: 300,
-        monthly_used: 0,
-        remaining: 300,
-        percentage_used: 0
-      };
+    // Check cache first
+    const cached = getCachedUsage(userId);
+    if (cached) {
+      return cached;
     }
     
-    // If no data exists for current month, return default values based on user's plan
-    if (!data) {
-      // Get user's subscription to determine plan
-      const { data: subscription } = await supabase
-        .from('stripe_user_subscriptions')
-        .select('plan_name, status')
-        .eq('user_id', userId)
-        .eq('status', 'active')
-        .single();
+    // Fetch from new API endpoint
+    const response = await joboticApi.getJobUsage();
+    
+    if (response.success && response.data) {
+      const { currentMonth, plan } = response.data;
       
-      // Determine plan limits based on plan_name from backend guide
-      let plan = 'default';
-      let monthly_limit = 300; // Free tier default
+      const stats: JobSearchUsageStats = {
+        plan: plan.name || 'default',
+        monthly_limit: plan.limit || -1,
+        monthly_used: currentMonth.totalJobsViewed || 0,
+        remaining: currentMonth.remaining || 'unlimited',
+        percentage_used: currentMonth.percentUsed || 0
+      };
       
-      if (subscription?.plan_name) {
-        plan = subscription.plan_name;
-        // Map plan names to limits per backend guide
-        switch (plan) {
-          case 'Plus':
-            monthly_limit = 600;
-            break;
-          case 'Pro':
-            monthly_limit = 900;
-            break;
-          case 'Max':
-            monthly_limit = -1; // Unlimited
-            break;
-          default:
-            monthly_limit = 300; // Free tier
-        }
+      // Cache the result
+      if (userId) {
+        usageCache.set(userId, {
+          data: stats,
+          timestamp: Date.now()
+        });
       }
       
-      return {
-        plan,
-        monthly_limit,
-        monthly_used: 0,
-        remaining: monthly_limit === -1 ? 'unlimited' : monthly_limit,
-        percentage_used: 0
-      };
+      return stats;
     }
     
-    // Calculate stats from fetched data
-    // The table has jobs_viewed field
-    const monthly_used = data.jobs_viewed || 0;
-    
-    // Get plan limits if not in the data
-    let monthly_limit = 300; // Default
-    let plan = 'default';
-    
-    if (!data || !data.plan_name) {
-      // Fetch subscription to get plan info
-      const { data: subscription } = await supabase
-        .from('stripe_user_subscriptions')
-        .select('plan_name')
-        .eq('user_id', userId)
-        .eq('status', 'active')
-        .single();
-      
-      if (subscription?.plan_name) {
-        plan = subscription.plan_name;
-        switch (plan) {
-          case 'Plus':
-            monthly_limit = 600;
-            break;
-          case 'Pro':
-            monthly_limit = 900;
-            break;
-          case 'Max':
-            monthly_limit = -1; // Unlimited
-            break;
-        }
-      }
-    } else {
-      plan = data.plan_name || 'default';
-      monthly_limit = data.monthly_limit || 300;
-    }
-    
-    const remaining = monthly_limit === -1 ? 'unlimited' : Math.max(0, monthly_limit - monthly_used);
-    const percentage_used = monthly_limit === -1 ? 0 : Math.min(100, (monthly_used / monthly_limit) * 100);
-    
+    // Return default values on error
     return {
-      plan,
-      monthly_limit,
-      monthly_used,
-      remaining,
-      percentage_used
+      plan: 'default',
+      monthly_limit: -1, // Unlimited
+      monthly_used: 0,
+      remaining: 'unlimited',
+      percentage_used: 0
     };
   } catch (error) {
     console.error('Error in getJobSearchUsage:', error);
+    // Return default values on error
+    return {
+      plan: 'default',
+      monthly_limit: -1, // Unlimited
+      monthly_used: 0,
+      remaining: 'unlimited',
+      percentage_used: 0
+    };
+  }
+}
+
+// Get full job usage data including history and recent searches
+export async function getFullJobUsageData(userId: string) {
+  try {
+    const response = await joboticApi.getJobUsage();
+    
+    if (response.success && response.data) {
+      return response.data;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error fetching full job usage data:', error);
     return null;
   }
 }
 
 // Get job search limits by plan
 export function getJobSearchLimitsByPlan(plan: string): number {
-  switch (plan) {
-    case 'default':
-    case 'free':
-      return 300;
-    case 'Plus':
-    case 'plus':
-      return 600;
-    case 'Pro':
-    case 'pro':
-      return 900;
-    case 'Max':
-    case 'max':
-      return -1; // Unlimited
-    default:
-      return 300; // Default to free tier
-  }
+  // All plans have unlimited job searches
+  return -1; // Unlimited for all plans
 }
 
 // Track job search usage
+// NOTE: This function is deprecated. The backend now tracks usage automatically through the API.
+// Keeping it for backward compatibility but it will fail silently since job_search_usage table doesn't exist.
 export async function trackJobSearchUsage(
   userId: string,
   jobsViewed: number,
@@ -174,14 +150,25 @@ export async function trackJobSearchUsage(
     const currentDate = new Date();
     const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
     
+    // First, get existing usage for the month
+    const { data: existingUsage } = await supabase
+      .from('job_search_usage')
+      .select('searches_count, jobs_viewed')
+      .eq('user_id', userId)
+      .eq('month', monthKey)
+      .maybeSingle();
+    
+    const currentSearchesCount = existingUsage?.searches_count || 0;
+    const currentJobsViewed = existingUsage?.jobs_viewed || 0;
+    
     const { error } = await supabase
       .from('job_search_usage')
       .upsert({
         user_id: userId,
         month: monthKey,
-        searches_count: 1,
-        jobs_viewed: jobsViewed,
-        created_at: new Date().toISOString(),
+        searches_count: currentSearchesCount + 1,
+        jobs_viewed: currentJobsViewed + jobsViewed,
+        created_at: existingUsage ? undefined : new Date().toISOString(),
         updated_at: new Date().toISOString(),
         ...metadata
       }, {
