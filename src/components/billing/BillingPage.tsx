@@ -1013,7 +1013,7 @@ This will create the default configuration needed for the billing portal to work
             </div>
 
             {/* Usage Warning */}
-            {(applicationProgress >= 80 || aiTokenProgress >= 80) && (
+            {applicationProgress >= 80 && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1653,7 +1653,7 @@ This will create the default configuration needed for the billing portal to work
             </motion.div>
 
             {/* Usage Alerts */}
-            {(applicationProgress >= 80 || aiTokenProgress >= 80) && (
+            {applicationProgress >= 80 && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1669,9 +1669,7 @@ This will create the default configuration needed for the billing portal to work
                       Usage Alert
                     </h3>
                     <p className="text-amber-700 dark:text-amber-300 mb-4">
-                      You've used {applicationProgress >= 80 ? `${Math.round(applicationProgress)}% of your automation steps` : ''} 
-                      {applicationProgress >= 80 && aiTokenProgress >= 80 ? ' and ' : ''}
-                      {aiTokenProgress >= 80 ? `${Math.round(aiTokenProgress)}% of your AI tokens` : ''} this month.
+                      You've used {Math.round(applicationProgress)}% of your automation steps this month.
                     </p>
                     <button
                       onClick={() => setActiveTab('subscriptions')}
