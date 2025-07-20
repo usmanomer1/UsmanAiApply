@@ -44,13 +44,20 @@ export class BrowserUseClient {
   }
 
   /**
-   * Create and run a LinkedIn automation task with automatic session persistence
-   * Browser-use API automatically handles session persistence when save_browser_data=true
+   * Create and run a LinkedIn automation task
+   * 
+   * IMPORTANT SECURITY NOTE:
+   * save_browser_data is set to FALSE to prevent session sharing between users.
+   * Since all users share the same API key, enabling save_browser_data would allow
+   * User B to access User A's LinkedIn session, creating a critical security vulnerability.
+   * 
+   * Until Browser Use supports user-specific profiles under one API key, each user
+   * must login manually for every automation session.
    */
   async createLinkedInTask(config: BrowserUseTaskConfig): Promise<components['schemas']['TaskCreatedResponse']> {
     const taskRequest: components['schemas']['RunTaskRequest'] = {
       task: config.task,
-      save_browser_data: true, // Browser-use API handles session persistence automatically
+      save_browser_data: false, // CRITICAL: Disabled to prevent session sharing between users - all users share one API key
       use_adblock: config.use_adblock ?? true,
       use_proxy: config.use_proxy ?? true,
       proxy_country_code: config.proxy_country_code ?? 'us',
