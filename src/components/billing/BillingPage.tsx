@@ -75,7 +75,6 @@ interface UsageStats {
   job_tokens: number;
   applications_count: number;
   ai_requests_count: number;
-  ai_tokens_used: number;
 }
 
 // Additional state for new usage tracking
@@ -171,7 +170,7 @@ export const BillingPage: React.FC = () => {
 
       if (!user) {
         setSubscription(null);
-        setUsage({ total_steps: 0, total_cost: 0, job_tokens: 0, applications_count: 0, ai_requests_count: 0, ai_tokens_used: 0, job_search_matches: 0, resume_optimizations: 0, cover_letters: 0 });
+        setUsage({ total_steps: 0, total_cost: 0, job_tokens: 0, applications_count: 0, ai_requests_count: 0, job_search_matches: 0, resume_optimizations: 0, cover_letters: 0 });
         setJobSearchUsage(null);
         return;
       }
@@ -186,7 +185,7 @@ export const BillingPage: React.FC = () => {
       if (subError) {
         console.error('Error fetching subscription:', subError);
         setSubscription(null);
-        setUsage({ total_steps: 0, total_cost: 0, job_tokens: 0, applications_count: 0, ai_requests_count: 0, ai_tokens_used: 0, job_search_matches: 0, resume_optimizations: 0, cover_letters: 0 });
+        setUsage({ total_steps: 0, total_cost: 0, job_tokens: 0, applications_count: 0, ai_requests_count: 0, job_search_matches: 0, resume_optimizations: 0, cover_letters: 0 });
         setJobSearchUsage(null);
         return;
       }
@@ -242,7 +241,6 @@ export const BillingPage: React.FC = () => {
           job_tokens: usage.automation_steps.used, // Track total steps
           applications_count: applicationsCount,
           ai_requests_count: usage.job_search_match.used + usage.resume_optimization.used + usage.cover_letter_generation.used,
-          ai_tokens_used: usage.ai_tokens.used,
           // New tracking data
           job_search_matches: usage.job_search_match.used,
           resume_optimizations: usage.resume_optimization.used,
@@ -677,7 +675,6 @@ This will create the default configuration needed for the billing portal to work
   const tokenProducts = getTokenProducts();
   const limits = getPlanUsageLimits();
   const applicationProgress = getUsageProgress(usage?.job_tokens || 0, limits.applications * 10); // Convert application limit to step limit
-  const aiTokenProgress = getUsageProgress(usage?.ai_tokens_used || 0, 120000); // Always use 120k as limit
 
   return (
     <>
@@ -875,93 +872,6 @@ This will create the default configuration needed for the billing portal to work
                 </div>
               </motion.div>
 
-              {/* AI Tokens Usage */}
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.3 }}
-                className="relative overflow-hidden bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-2xl border border-purple-200/50 dark:border-purple-700/50 backdrop-blur-xl shadow-xl"
-              >
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-pink-500/5" />
-                <div className="relative p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center space-x-4">
-                      <motion.div 
-                        whileHover={{ scale: 1.1, rotate: -5 }}
-                        className="relative p-3 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl shadow-lg"
-                      >
-                        <Brain className="w-6 h-6 text-white" />
-                        <motion.div 
-                          className="absolute inset-0 bg-white/30 rounded-xl"
-                          animate={{ scale: [1, 1.2, 1] }}
-                          transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
-                        />
-                      </motion.div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">AI Tokens</h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          Job search & resume optimization
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div className="flex items-end justify-between">
-                      <motion.span 
-                        key={usage?.ai_tokens_used || 0}
-                        initial={{ scale: 0.5, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        className="text-5xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent"
-                      >
-                        {/* console.log('Rendering AI tokens value:', usage?.ai_tokens_used) */}
-                        {(usage?.ai_tokens_used || 0).toLocaleString()}
-                      </motion.span>
-                      <span className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                        of 120,000 included
-                      </span>
-                    </div>
-                  
-                    {limits.aiTokens > 0 && (
-                      <div className="relative">
-                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${aiTokenProgress}%` }}
-                            transition={{ duration: 1, delay: 0.7, ease: "easeOut" }}
-                            className="h-full relative overflow-hidden"
-                          >
-                            <div className={`absolute inset-0 bg-gradient-to-r ${getProgressBarColor(aiTokenProgress)}`} />
-                            <motion.div 
-                              className="absolute inset-0 bg-white/30"
-                              animate={{ x: ['-100%', '100%'] }}
-                              transition={{ duration: 2, repeat: Infinity, ease: "linear", delay: 0.5 }}
-                            />
-                          </motion.div>
-                        </div>
-                      </div>
-                    )}
-                  
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-600 dark:text-gray-400">
-                        {aiTokenProgress >= 100 ? 
-                          <span className="text-orange-600 dark:text-orange-400 font-medium">Limit reached</span> :
-                          <span>{Math.max(0, 120000 - (usage?.ai_tokens_used || 0)).toLocaleString()} remaining</span>
-                        }
-                      </span>
-                      {limits.aiTokens > 0 && (
-                        <motion.span 
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          className={`text-sm font-bold ${getUsageStatusColor(aiTokenProgress)}`}
-                        >
-                          {Math.round(aiTokenProgress)}% used
-                        </motion.span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
               
               {/* Job Search Usage */}
               <motion.div 
@@ -1466,7 +1376,6 @@ This will create the default configuration needed for the billing portal to work
                 >
                   <option value="all">All Usage</option>
                   <option value="automation">Automation</option>
-                  <option value="ai">AI Tokens</option>
                 </select>
               </div>
               
@@ -1516,7 +1425,7 @@ This will create the default configuration needed for the billing portal to work
                   </span>
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-                  {((usage?.job_tokens || 0) + (usage?.ai_tokens_used || 0)).toLocaleString()}
+                  {(usage?.job_tokens || 0).toLocaleString()}
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-300">Total Usage</p>
               </motion.div>
@@ -1568,52 +1477,6 @@ This will create the default configuration needed for the billing portal to work
                 </div>
               </motion.div>
 
-              {/* AI Tokens Card */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="glass-card rounded-2xl p-6"
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl">
-                    <Brain className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="relative w-16 h-16">
-                    <svg className="w-16 h-16 transform -rotate-90">
-                      <circle
-                        cx="32"
-                        cy="32"
-                        r="28"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                        fill="none"
-                        className="text-gray-200 dark:text-gray-700"
-                      />
-                      <circle
-                        cx="32"
-                        cy="32"
-                        r="28"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                        fill="none"
-                        strokeDasharray={`${aiTokenProgress * 1.76} 176`}
-                        className="text-purple-500"
-                      />
-                    </svg>
-                    <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-gray-900 dark:text-white">
-                      {Math.round(aiTokenProgress)}%
-                    </span>
-                  </div>
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-                  {(usage?.ai_tokens_used || 0).toLocaleString()}
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-300">AI Tokens</p>
-                <div className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-                  {limits.aiTokens > 0 ? `${Math.max(0, limits.aiTokens - (usage?.ai_tokens_used || 0)).toLocaleString()} remaining` : 'No plan limits'}
-                </div>
-              </motion.div>
             </div>
 
             {/* Usage Chart */}
@@ -1630,10 +1493,6 @@ This will create the default configuration needed for the billing portal to work
                     <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>
                     <span className="text-gray-600 dark:text-gray-300">Automation</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                    <span className="text-gray-600 dark:text-gray-300">AI Tokens</span>
-                  </div>
                 </div>
               </div>
               
@@ -1648,10 +1507,6 @@ This will create the default configuration needed for the billing portal to work
                       <linearGradient id="colorAutomation" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
                         <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                      </linearGradient>
-                      <linearGradient id="colorAi" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -1676,14 +1531,6 @@ This will create the default configuration needed for the billing portal to work
                       stroke="#10b981" 
                       fill="url(#colorAutomation)"
                       name="Automation Steps"
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey="ai" 
-                      stackId="1"
-                      stroke="#8b5cf6" 
-                      fill="url(#colorAi)"
-                      name="AI Tokens"
                     />
                   </AreaChart>
                 </ResponsiveContainer>
