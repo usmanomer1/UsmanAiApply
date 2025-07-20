@@ -467,7 +467,8 @@ const JobSearchPage: React.FC = () => {
     };
 
     fetchResumeAndPreferences();
-  }, [user, initialLoad, filters, jobs.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, initialLoad]); // Intentionally omitting filters to prevent re-triggering on manual filter changes
 
   const searchJobs = async () => {
     if (!searchQuery.trim()) {
