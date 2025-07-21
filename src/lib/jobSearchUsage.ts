@@ -65,8 +65,31 @@ export async function getJobSearchUsage(userId: string): Promise<JobSearchUsageS
       return cached;
     }
     
-    // Fetch from new API endpoint
-    const response = await joboticApi.getJobUsage();
+    // Fetch from new API endpoint with retry logic for auth failures
+    let response;
+    try {
+      response = await joboticApi.getJobUsage();
+    } catch (error: any) {
+      // If we get an auth error (401 or 500 from auth middleware), retry once after forcing token refresh
+      if (error.status === 401 || (error.status === 500 && error.message?.includes('auth'))) {
+        console.log('Auth error detected, forcing session refresh and retrying...');
+        
+        // Force a session refresh
+        const { supabase } = await import('./supabase');
+        const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+        
+        if (refreshError || !session) {
+          console.error('Failed to refresh session:', refreshError);
+          throw error; // Re-throw original error
+        }
+        
+        // Retry the API call with refreshed token
+        response = await joboticApi.getJobUsage();
+      } else {
+        // Not an auth error, re-throw
+        throw error;
+      }
+    }
     
     if (response.success && response.data) {
       const { currentMonth, plan } = response.data;
@@ -98,8 +121,13 @@ export async function getJobSearchUsage(userId: string): Promise<JobSearchUsageS
       remaining: 'unlimited',
       percentage_used: 0
     };
-  } catch (error) {
-    console.error('Error in getJobSearchUsage:', error);
+  } catch (error: any) {
+    console.error('Error in getJobSearchUsage:', {
+      message: error.message,
+      status: error.status,
+      details: error.details
+    });
+    
     // Return default values on error
     return {
       plan: 'default',
@@ -114,15 +142,43 @@ export async function getJobSearchUsage(userId: string): Promise<JobSearchUsageS
 // Get full job usage data including history and recent searches
 export async function getFullJobUsageData(userId: string) {
   try {
-    const response = await joboticApi.getJobUsage();
+    // Fetch from API with retry logic for auth failures
+    let response;
+    try {
+      response = await joboticApi.getJobUsage();
+    } catch (error: any) {
+      // If we get an auth error (401 or 500 from auth middleware), retry once after forcing token refresh
+      if (error.status === 401 || (error.status === 500 && error.message?.includes('auth'))) {
+        console.log('Auth error detected in getFullJobUsageData, forcing session refresh and retrying...');
+        
+        // Force a session refresh
+        const { supabase } = await import('./supabase');
+        const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+        
+        if (refreshError || !session) {
+          console.error('Failed to refresh session:', refreshError);
+          throw error; // Re-throw original error
+        }
+        
+        // Retry the API call with refreshed token
+        response = await joboticApi.getJobUsage();
+      } else {
+        // Not an auth error, re-throw
+        throw error;
+      }
+    }
     
     if (response.success && response.data) {
       return response.data;
     }
     
     return null;
-  } catch (error) {
-    console.error('Error fetching full job usage data:', error);
+  } catch (error: any) {
+    console.error('Error fetching full job usage data:', {
+      message: error.message,
+      status: error.status,
+      details: error.details
+    });
     return null;
   }
 }
