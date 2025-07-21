@@ -252,11 +252,23 @@ class JoboticApiService {
     // This works for both Netlify function and direct API calls
     if (options.requiresAuth) {
       const { supabase } = await import('./supabase');
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Error getting session for API request:', sessionError);
+        const error = new Error('Failed to get authentication session');
+        (error as any).status = 401;
+        throw error;
+      }
+      
       if (session?.access_token) {
         headers['Authorization'] = `Bearer ${session.access_token}`;
+        console.log(`Auth token present for ${endpoint}`);
       } else {
         console.warn('No session token available - user may not be logged in');
+        const error = new Error('Authentication required for this request');
+        (error as any).status = 401;
+        throw error;
       }
     }
     
@@ -516,7 +528,14 @@ class JoboticApiService {
       
       // Get auth token
       const { supabase } = await import('./supabase');
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Error getting session:', sessionError);
+        const error = new Error('Failed to get authentication session');
+        (error as any).status = 401;
+        throw error;
+      }
       
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
@@ -524,8 +543,12 @@ class JoboticApiService {
       
       if (session?.access_token) {
         headers['Authorization'] = `Bearer ${session.access_token}`;
+        console.log('Using auth token for job usage API call');
       } else {
-        throw new Error('Authentication required to fetch job usage');
+        console.warn('No session token available for job usage API call');
+        const error = new Error('Authentication required to fetch job usage');
+        (error as any).status = 401;
+        throw error;
       }
       
       const response = await fetch(url, {
@@ -534,8 +557,24 @@ class JoboticApiService {
       });
       
       if (!response.ok) {
-        const error = new Error(`Failed to fetch job usage: ${response.status}`);
+        let errorMessage = `Failed to fetch job usage: ${response.status}`;
+        let errorDetails = null;
+        
+        try {
+          const errorBody = await response.text();
+          errorDetails = JSON.parse(errorBody);
+          if (errorDetails.error) {
+            errorMessage = errorDetails.error;
+          }
+        } catch (e) {
+          // Ignore JSON parse errors
+        }
+        
+        console.error('Job usage API error:', { status: response.status, message: errorMessage, details: errorDetails });
+        
+        const error = new Error(errorMessage);
         (error as any).status = response.status;
+        (error as any).details = errorDetails;
         throw error;
       }
       
