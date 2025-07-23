@@ -10,6 +10,7 @@ import Sidebar from './components/layout/Sidebar';
 import ProfilePage from './components/ProfilePage';
 import { ResumePage } from './components/ResumePage';
 import LinkedInAutomationBot from './components/LinkedInAutomationBot';
+import LinkedInAutomationNew from './components/LinkedInAutomationNew';
 import { SuccessPage } from './components/SuccessPage';
 import JobSearchPage from './components/JobSearchPage';
 import { BillingPage } from './components/billing/BillingPage';
@@ -19,6 +20,8 @@ import ApplicationsPage from './components/applications/ApplicationsPage';
 import NotificationsPage from './components/NotificationsPage';
 
 function App() {
+  const enableNewLinkedInUI = import.meta.env.VITE_ENABLE_NEW_LINKEDIN_UI === 'true';
+  
   return (
     <ThemeProvider>
       <AuthProvider>
@@ -41,7 +44,10 @@ function App() {
                             <Route path="/jobs" element={<JobSearchPage />} />
                             <Route path="/applications" element={<ApplicationsPage />} />
                             <Route path="/profile" element={<ProfilePage />} />
-                            <Route path="/auto-apply" element={<LinkedInAutomationBot />} />
+                            <Route 
+                              path="/auto-apply" 
+                              element={enableNewLinkedInUI ? <LinkedInAutomationNew /> : <LinkedInAutomationBot />} 
+                            />
                             <Route path="/resume" element={<ResumePage />} />
                             <Route path="/billing" element={<BillingPage />} />
                             <Route path="/settings" element={<SettingsPage />} />
