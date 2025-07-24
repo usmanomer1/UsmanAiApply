@@ -58,6 +58,31 @@ export default function LinkedInAutomationNew() {
       // Show config modal if no config exists
       setShowConfigModal(true);
     }
+
+    // Check for active session on mount
+    const activeSessionId = localStorage.getItem('activeSessionId');
+    if (activeSessionId) {
+      setSessionId(activeSessionId);
+      // Resume polling for this session
+      linkedinAutomationApi.getStatus(activeSessionId)
+        .then(status => {
+          setSessionStatus(status);
+          if (status.liveViewUrl) {
+            setLiveViewUrl(status.liveViewUrl);
+          }
+          // Resume polling if session is active
+          if (['running', 'intervention_required', 'paused'].includes(status.status)) {
+            stopPollingRef.current = linkedinAutomationApi.pollStatus(
+              activeSessionId,
+              handleStatusUpdate
+            );
+          }
+        })
+        .catch(error => {
+          console.error('Failed to resume session:', error);
+          localStorage.removeItem('activeSessionId');
+        });
+    }
   }, [user]);
 
   useEffect(() => {
@@ -81,12 +106,88 @@ export default function LinkedInAutomationNew() {
     }
   }, [sessionStatus, showIntervention]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (stopPollingRef.current) {
+        stopPollingRef.current();
+      }
+    };
+  }, []);
+
   const addChatMessage = (message: Omit<ChatMessage, 'id' | 'timestamp'>) => {
     setChatMessages(prev => [...prev, {
       ...message,
       id: Date.now().toString(),
       timestamp: new Date()
     }]);
+  };
+
+  // Centralized status update handler
+  const handleStatusUpdate = (status: SessionStatus) => {
+    const prevStatus = sessionStatus?.status;
+    setSessionStatus(status);
+    
+    // Update live view URL if provided
+    if (status.liveViewUrl) {
+      setLiveViewUrl(status.liveViewUrl);
+    }
+    
+    // Add status updates to chat
+    if (prevStatus !== status.status) {
+      if (status.status === 'running') {
+        addChatMessage({
+          type: 'system',
+          message: 'Automation is running...',
+          metadata: { status: status.status }
+        });
+      } else if (status.status === 'completed') {
+        addChatMessage({
+          type: 'bot',
+          message: `Great news! I've completed your job search. Applied to ${status.progress.totalApplications} jobs.`,
+          metadata: { status: status.status, progress: status.progress }
+        });
+        if (sessionId) {
+          loadAppliedJobs(sessionId);
+        }
+        // Clear stored session
+        localStorage.removeItem('activeSessionId');
+      } else if (status.status === 'failed') {
+        addChatMessage({
+          type: 'system',
+          message: 'Automation failed. Please try again.',
+          metadata: { status: status.status }
+        });
+        // Clear stored session
+        localStorage.removeItem('activeSessionId');
+      }
+    }
+    
+    // Add progress updates
+    if (status.progress.totalApplications > 0) {
+      const progressMessage = `Progress: ${status.progress.totalApplications} applications (${status.progress.applicationsToday} today)`;
+      setChatMessages(prev => {
+        const lastMessage = prev[prev.length - 1];
+        if (!lastMessage || !lastMessage.message.startsWith('Progress:')) {
+          return [...prev, {
+            id: Date.now().toString(),
+            type: 'bot' as const,
+            message: progressMessage,
+            timestamp: new Date(),
+            metadata: { progress: status.progress }
+          }];
+        } else if (lastMessage.message !== progressMessage) {
+          // Update the last progress message
+          return [...prev.slice(0, -1), {
+            ...lastMessage,
+            message: progressMessage,
+            timestamp: new Date(),
+            metadata: { progress: status.progress }
+          }];
+        }
+        return prev;
+      });
+    }
   };
 
   const handleStart = async () => {
@@ -125,6 +226,9 @@ export default function LinkedInAutomationNew() {
       setSessionId(result.sessionId);
       setLiveViewUrl(result.liveViewUrl);
       
+      // Store session ID for page refresh handling
+      localStorage.setItem('activeSessionId', result.sessionId);
+      
       addChatMessage({
         type: 'bot',
         message: 'Automation started successfully! I\'ll apply to jobs matching your criteria.'
@@ -133,60 +237,7 @@ export default function LinkedInAutomationNew() {
       // Start polling for status
       stopPollingRef.current = linkedinAutomationApi.pollStatus(
         result.sessionId,
-        (status) => {
-          const prevStatus = sessionStatus?.status;
-          setSessionStatus(status);
-          
-          // Add status updates to chat
-          if (prevStatus !== status.status) {
-            if (status.status === 'running') {
-              addChatMessage({
-                type: 'system',
-                message: 'Automation is running...',
-                metadata: { status: status.status }
-              });
-            } else if (status.status === 'completed') {
-              addChatMessage({
-                type: 'bot',
-                message: `Great news! I've completed your job search. Applied to ${status.progress.totalApplications} jobs.`,
-                metadata: { status: status.status, progress: status.progress }
-              });
-              loadAppliedJobs(result.sessionId);
-            } else if (status.status === 'failed') {
-              addChatMessage({
-                type: 'system',
-                message: 'Automation failed. Please try again.',
-                metadata: { status: status.status }
-              });
-            }
-          }
-          
-          // Add progress updates
-          if (status.progress.totalApplications > 0) {
-            const progressMessage = `Progress: ${status.progress.totalApplications} applications (${status.progress.applicationsToday} today)`;
-            setChatMessages(prev => {
-              const lastMessage = prev[prev.length - 1];
-              if (!lastMessage || !lastMessage.message.startsWith('Progress:')) {
-                return [...prev, {
-                  id: Date.now().toString(),
-                  type: 'bot' as const,
-                  message: progressMessage,
-                  timestamp: new Date(),
-                  metadata: { progress: status.progress }
-                }];
-              } else if (lastMessage.message !== progressMessage) {
-                // Update the last progress message
-                return [...prev.slice(0, -1), {
-                  ...lastMessage,
-                  message: progressMessage,
-                  timestamp: new Date(),
-                  metadata: { progress: status.progress }
-                }];
-              }
-              return prev;
-            });
-          }
-        }
+        handleStatusUpdate
       );
     } catch (error: any) {
       addChatMessage({
@@ -240,6 +291,9 @@ export default function LinkedInAutomationNew() {
         await linkedinAutomationApi.stopSession(sessionId);
         stopPollingRef.current?.();
         
+        // Clear stored session
+        localStorage.removeItem('activeSessionId');
+        
         addChatMessage({
           type: 'system',
           message: 'Automation stopped'
@@ -265,17 +319,43 @@ export default function LinkedInAutomationNew() {
     if (!sessionId) return;
 
     try {
-      await linkedinAutomationApi.continueAfterIntervention(sessionId);
+      const response = await linkedinAutomationApi.continueAfterIntervention(sessionId);
       setShowIntervention(false);
-      addChatMessage({
-        type: 'bot',
-        message: 'Thanks! Continuing with the automation...'
-      });
+      
+      if (response.status === 'running') {
+        addChatMessage({
+          type: 'bot',
+          message: 'Thanks! Continuing with the automation...'
+        });
+      }
+      
+      // The status should update through polling, but we can also update immediately
+      if (sessionStatus) {
+        setSessionStatus({
+          ...sessionStatus,
+          status: 'running',
+          intervention: undefined
+        });
+      }
     } catch (error: any) {
-      addChatMessage({
-        type: 'system',
-        message: `Error: ${error.message || 'Failed to continue automation'}`
-      });
+      // Handle specific error cases
+      if (error.status === 429) {
+        addChatMessage({
+          type: 'system',
+          message: 'Rate limited. Please wait a few minutes before continuing.'
+        });
+      } else if (error.status === 401) {
+        addChatMessage({
+          type: 'system',
+          message: 'Session expired. Please restart the automation.'
+        });
+        localStorage.removeItem('activeSessionId');
+      } else {
+        addChatMessage({
+          type: 'system',
+          message: `Error: ${error.message || 'Failed to continue automation'}`
+        });
+      }
     }
   };
 
@@ -596,10 +676,22 @@ export default function LinkedInAutomationNew() {
               
               <p className="text-gray-700 mb-3">{sessionStatus.intervention.message}</p>
               
-              <div className="bg-blue-50 rounded-lg p-4 mb-6 border border-blue-200">
+              <div className="bg-blue-50 rounded-lg p-4 mb-4 border border-blue-200">
                 <p className="text-sm text-blue-800 font-medium mb-1">Instructions:</p>
                 <p className="text-sm text-blue-700">{sessionStatus.intervention.instructions}</p>
               </div>
+
+              {liveViewUrl && (
+                <a
+                  href={liveViewUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full mb-3 px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  <span>Open Browser View in New Tab</span>
+                </a>
+              )}
               
               <button
                 onClick={handleContinueAfterIntervention}
