@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Sparkles, Pause, Play, Square, ExternalLink, CheckCircle, XCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Settings, Sparkles, Pause, Play, Square, ExternalLink, CheckCircle, XCircle, AlertCircle, Loader2, Send, Bot, User, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { linkedinAutomationApi, SessionStatus, AppliedJob } from '../lib/linkedinAutomationApi';
 import LinkedInConfigModal from './LinkedInConfigModal';
@@ -20,6 +20,18 @@ interface AutomationConfig {
   };
 }
 
+interface ChatMessage {
+  id: string;
+  type: 'user' | 'bot' | 'system' | 'intervention';
+  message: string;
+  timestamp: Date;
+  metadata?: {
+    status?: string;
+    progress?: SessionStatus['progress'];
+    intervention?: SessionStatus['intervention'];
+  };
+}
+
 export default function LinkedInAutomationNew() {
   const { user } = useAuth();
   const [showConfigModal, setShowConfigModal] = useState(false);
@@ -27,13 +39,15 @@ export default function LinkedInAutomationNew() {
   const [searchPrompt, setSearchPrompt] = useState('');
   const [isStarting, setIsStarting] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [sessionStatus, setSessionStatus] = useState<SessionStatus['session'] | null>(null);
+  const [sessionStatus, setSessionStatus] = useState<SessionStatus | null>(null);
   const [appliedJobs, setAppliedJobs] = useState<AppliedJob[]>([]);
   const [showIntervention, setShowIntervention] = useState(false);
   const [liveViewUrl, setLiveViewUrl] = useState<string | null>(null);
-  const [recentLogs, setRecentLogs] = useState<Array<{ timestamp: string; message: string; level: string }>>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [inputMessage, setInputMessage] = useState('');
   const stopPollingRef = useRef<(() => void) | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     // Load saved config
@@ -47,56 +61,138 @@ export default function LinkedInAutomationNew() {
   }, [user]);
 
   useEffect(() => {
-    // Check if intervention is required
-    if (sessionStatus?.interventionRequired && sessionStatus.interventionDetails) {
-      setShowIntervention(true);
+    // Auto-scroll chat to bottom
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
-  }, [sessionStatus]);
+  }, [chatMessages]);
 
   useEffect(() => {
-    // Auto-resize textarea
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    // Check if intervention is required
+    if (sessionStatus?.status === 'intervention_required' && sessionStatus.intervention) {
+      if (!showIntervention) {
+        setShowIntervention(true);
+        addChatMessage({
+          type: 'intervention',
+          message: sessionStatus.intervention.message,
+          metadata: { intervention: sessionStatus.intervention }
+        });
+      }
     }
-  }, [searchPrompt]);
+  }, [sessionStatus, showIntervention]);
+
+  const addChatMessage = (message: Omit<ChatMessage, 'id' | 'timestamp'>) => {
+    setChatMessages(prev => [...prev, {
+      ...message,
+      id: Date.now().toString(),
+      timestamp: new Date()
+    }]);
+  };
 
   const handleStart = async () => {
-    if (!config?.resumeUrl || !searchPrompt.trim()) {
-      alert('Please configure your profile and enter a job search query');
+    if (!searchPrompt.trim()) {
+      alert('Please enter a job search query');
       return;
     }
 
     setIsStarting(true);
+    setChatMessages([]); // Clear previous messages
+    
+    // Add initial messages
+    addChatMessage({
+      type: 'user',
+      message: searchPrompt.trim()
+    });
+    
+    addChatMessage({
+      type: 'bot',
+      message: 'Starting your LinkedIn job search automation...'
+    });
+
     try {
       const result = await linkedinAutomationApi.startAutomation({
         userId: user!.id,
         searchPrompt: searchPrompt.trim(),
-        resumeUrl: config.resumeUrl,
-        resumeMetadata: config.resumeMetadata!,
         config: {
           maxApplications: 50,
-          externalApplicationConfig: config.externalApplicationConfig
+          filters: {
+            easyApplyOnly: true,
+            datePosted: 'week'
+          }
         }
       });
 
       setSessionId(result.sessionId);
       setLiveViewUrl(result.liveViewUrl);
+      
+      addChatMessage({
+        type: 'bot',
+        message: 'Automation started successfully! I\'ll apply to jobs matching your criteria.'
+      });
 
       // Start polling for status
       stopPollingRef.current = linkedinAutomationApi.pollStatus(
         result.sessionId,
         (status) => {
+          const prevStatus = sessionStatus?.status;
           setSessionStatus(status);
           
-          // Load applied jobs when complete
-          if (status.status === 'COMPLETED') {
-            loadAppliedJobs(result.sessionId);
+          // Add status updates to chat
+          if (prevStatus !== status.status) {
+            if (status.status === 'running') {
+              addChatMessage({
+                type: 'system',
+                message: 'Automation is running...',
+                metadata: { status: status.status }
+              });
+            } else if (status.status === 'completed') {
+              addChatMessage({
+                type: 'bot',
+                message: `Great news! I've completed your job search. Applied to ${status.progress.totalApplications} jobs.`,
+                metadata: { status: status.status, progress: status.progress }
+              });
+              loadAppliedJobs(result.sessionId);
+            } else if (status.status === 'failed') {
+              addChatMessage({
+                type: 'system',
+                message: 'Automation failed. Please try again.',
+                metadata: { status: status.status }
+              });
+            }
+          }
+          
+          // Add progress updates
+          if (status.progress.totalApplications > 0) {
+            const progressMessage = `Progress: ${status.progress.totalApplications} applications (${status.progress.applicationsToday} today)`;
+            setChatMessages(prev => {
+              const lastMessage = prev[prev.length - 1];
+              if (!lastMessage || !lastMessage.message.startsWith('Progress:')) {
+                return [...prev, {
+                  id: Date.now().toString(),
+                  type: 'bot' as const,
+                  message: progressMessage,
+                  timestamp: new Date(),
+                  metadata: { progress: status.progress }
+                }];
+              } else if (lastMessage.message !== progressMessage) {
+                // Update the last progress message
+                return [...prev.slice(0, -1), {
+                  ...lastMessage,
+                  message: progressMessage,
+                  timestamp: new Date(),
+                  metadata: { progress: status.progress }
+                }];
+              }
+              return prev;
+            });
           }
         }
       );
     } catch (error: any) {
-      alert(error.message || 'Failed to start automation');
+      addChatMessage({
+        type: 'system',
+        message: `Error: ${error.message || 'Failed to start automation'}`
+      });
     } finally {
       setIsStarting(false);
     }
@@ -115,13 +211,24 @@ export default function LinkedInAutomationNew() {
     if (!sessionId || !sessionStatus) return;
 
     try {
-      if (sessionStatus.status === 'RUNNING') {
+      if (sessionStatus.status === 'running') {
         await linkedinAutomationApi.pauseSession(sessionId);
-      } else if (sessionStatus.status === 'PAUSED') {
+        addChatMessage({
+          type: 'system',
+          message: 'Automation paused'
+        });
+      } else if (sessionStatus.status === 'paused') {
         await linkedinAutomationApi.resumeSession(sessionId);
+        addChatMessage({
+          type: 'system',
+          message: 'Automation resumed'
+        });
       }
     } catch (error: any) {
-      alert(error.message || 'Operation failed');
+      addChatMessage({
+        type: 'system',
+        message: `Error: ${error.message || 'Operation failed'}`
+      });
     }
   };
 
@@ -132,12 +239,24 @@ export default function LinkedInAutomationNew() {
       try {
         await linkedinAutomationApi.stopSession(sessionId);
         stopPollingRef.current?.();
-        setSessionId(null);
-        setSessionStatus(null);
-        setLiveViewUrl(null);
-        setAppliedJobs([]);
+        
+        addChatMessage({
+          type: 'system',
+          message: 'Automation stopped'
+        });
+        
+        // Reset state after a delay to show the message
+        setTimeout(() => {
+          setSessionId(null);
+          setSessionStatus(null);
+          setLiveViewUrl(null);
+          setAppliedJobs([]);
+        }, 2000);
       } catch (error: any) {
-        alert(error.message || 'Failed to stop automation');
+        addChatMessage({
+          type: 'system',
+          message: `Error: ${error.message || 'Failed to stop automation'}`
+        });
       }
     }
   };
@@ -148,251 +267,302 @@ export default function LinkedInAutomationNew() {
     try {
       await linkedinAutomationApi.continueAfterIntervention(sessionId);
       setShowIntervention(false);
+      addChatMessage({
+        type: 'bot',
+        message: 'Thanks! Continuing with the automation...'
+      });
     } catch (error: any) {
-      alert(error.message || 'Failed to continue automation');
+      addChatMessage({
+        type: 'system',
+        message: `Error: ${error.message || 'Failed to continue automation'}`
+      });
+    }
+  };
+
+  const handleSendMessage = () => {
+    if (!inputMessage.trim() || !sessionId) return;
+
+    if (!sessionId) {
+      // Initial prompt
+      setSearchPrompt(inputMessage);
+      handleStart();
+    } else {
+      // During automation - just add to chat
+      addChatMessage({
+        type: 'user',
+        message: inputMessage
+      });
+      
+      // Bot response
+      addChatMessage({
+        type: 'bot',
+        message: 'I\'m currently focused on applying to jobs. You can pause or stop the automation using the controls above.'
+      });
+    }
+    
+    setInputMessage('');
+  };
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit',
+      hour12: true 
+    });
+  };
+
+  const formatDuration = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${secs}s`;
+    } else {
+      return `${secs}s`;
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'RUNNING':
-        return <Loader2 className="w-5 h-5 animate-spin text-blue-400" />;
-      case 'PAUSED':
-        return <Pause className="w-5 h-5 text-yellow-400" />;
-      case 'COMPLETED':
-        return <CheckCircle className="w-5 h-5 text-green-400" />;
-      case 'FAILED':
-        return <XCircle className="w-5 h-5 text-red-400" />;
-      case 'INTERVENTION_REQUIRED':
-        return <AlertCircle className="w-5 h-5 text-orange-400" />;
+      case 'running':
+        return <Loader2 className="w-4 h-4 animate-spin text-blue-500" />;
+      case 'paused':
+        return <Pause className="w-4 h-4 text-yellow-500" />;
+      case 'completed':
+        return <CheckCircle className="w-4 h-4 text-green-500" />;
+      case 'failed':
+        return <XCircle className="w-4 h-4 text-red-500" />;
+      case 'intervention_required':
+        return <AlertCircle className="w-4 h-4 text-orange-500" />;
       default:
         return null;
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'RUNNING': return 'text-blue-400';
-      case 'PAUSED': return 'text-yellow-400';
-      case 'COMPLETED': return 'text-green-400';
-      case 'FAILED': return 'text-red-400';
-      case 'INTERVENTION_REQUIRED': return 'text-orange-400';
-      default: return 'text-gray-400';
-    }
-  };
-
-  const progressPercentage = sessionStatus?.progress.totalJobs 
-    ? (sessionStatus.progress.appliedJobs / sessionStatus.progress.totalJobs) * 100 
-    : 0;
-
   return (
-    <div className="min-h-screen bg-white">
-      {/* Settings Button */}
-      <button
-        onClick={() => setShowConfigModal(true)}
-        className="absolute top-6 right-6 p-3 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl transition-all duration-200 shadow-lg z-40"
-      >
-        <Settings className="w-5 h-5 text-gray-700" />
-      </button>
-
-      {/* Main Content */}
-      <div className="max-w-4xl mx-auto px-6 py-8">
-        {!sessionId ? (
-          // Initial State - Prompt Input
-          <div className="flex flex-col items-center justify-center min-h-[70vh]">
-            <div className="w-full max-w-2xl">
-              <h1 className="text-4xl font-bold text-center mb-2 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                AI Job Search Agent
-              </h1>
-              <p className="text-center text-gray-400 mb-8">
-                Tell me what kind of job you're looking for
-              </p>
-
-              <div className="relative">
-                <textarea
-                  ref={textareaRef}
-                  value={searchPrompt}
-                  onChange={(e) => setSearchPrompt(e.target.value)}
-                  placeholder="e.g., Senior React developer jobs in San Francisco with good benefits and remote options"
-                  className="w-full bg-gray-900 border border-gray-800 rounded-2xl px-6 py-4 pr-14 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none resize-none transition-all duration-200 min-h-[120px]"
-                  disabled={isStarting}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleStart();
-                    }
-                  }}
-                />
-                <button
-                  onClick={handleStart}
-                  disabled={isStarting || !searchPrompt.trim() || !config?.resumeUrl}
-                  className={`absolute bottom-4 right-4 p-3 rounded-xl transition-all duration-200 ${
-                    isStarting || !searchPrompt.trim() || !config?.resumeUrl
-                      ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg'
-                  }`}
-                >
-                  {isStarting ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <Sparkles className="w-5 h-5" />
-                  )}
-                </button>
-              </div>
-
-              {!config?.resumeUrl && (
-                <p className="text-center text-orange-400 text-sm mt-4">
-                  Please configure your profile and upload your resume to get started
-                </p>
-              )}
+    <div className="h-screen bg-gray-50 flex flex-col">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <h1 className="text-xl font-semibold text-gray-900">AI Job Search Agent</h1>
+          {sessionStatus && (
+            <div className="flex items-center space-x-2">
+              {getStatusIcon(sessionStatus.status)}
+              <span className="text-sm text-gray-600">
+                {sessionStatus.status.replace('_', ' ')}
+              </span>
             </div>
-          </div>
-        ) : (
-          // Active Automation State
-          <div className="space-y-6">
-            {/* Status Header */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-3">
-                  {getStatusIcon(sessionStatus?.status || '')}
-                  <h2 className={`text-2xl font-semibold ${getStatusColor(sessionStatus?.status || '')}`}>
-                    {sessionStatus?.status.replace('_', ' ')}
-                  </h2>
-                </div>
-                {liveViewUrl && (
-                  <a
-                    href={liveViewUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 transition-colors"
-                  >
-                    <span>Live View</span>
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
-                )}
-              </div>
-
-              {/* Progress Bar */}
-              <div className="mb-4">
-                <div className="flex justify-between text-sm text-gray-600 mb-2">
-                  <span>Progress</span>
-                  <span>{sessionStatus?.progress.appliedJobs || 0} / {sessionStatus?.progress.totalJobs || 0} jobs</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-500"
-                    style={{ width: `${progressPercentage}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Stats Grid */}
-              <div className="grid grid-cols-4 gap-4">
-                <div className="bg-gray-50 rounded-lg p-3 text-center">
-                  <p className="text-2xl font-bold text-green-600">{sessionStatus?.progress.appliedJobs || 0}</p>
-                  <p className="text-xs text-gray-600">Applied</p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-3 text-center">
-                  <p className="text-2xl font-bold text-yellow-600">{sessionStatus?.progress.skippedJobs || 0}</p>
-                  <p className="text-xs text-gray-600">Skipped</p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-3 text-center">
-                  <p className="text-2xl font-bold text-red-600">{sessionStatus?.progress.failedJobs || 0}</p>
-                  <p className="text-xs text-gray-600">Failed</p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-3 text-center">
-                  <p className="text-2xl font-bold text-blue-600">{sessionStatus?.progress.processedJobs || 0}</p>
-                  <p className="text-xs text-gray-600">Processed</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Current Job */}
-            {sessionStatus?.currentJob && (
-              <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-                <h3 className="text-lg font-semibold mb-3 text-gray-700">Currently Processing</h3>
-                <div className="space-y-2">
-                  <p className="text-xl font-medium text-gray-900">{sessionStatus.currentJob.title}</p>
-                  <p className="text-gray-600">{sessionStatus.currentJob.company}</p>
-                  <p className="text-sm text-gray-500">{sessionStatus.currentJob.location}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Control Buttons */}
-            <div className="flex space-x-4">
+          )}
+        </div>
+        
+        <div className="flex items-center space-x-3">
+          {sessionId && sessionStatus && (
+            <>
               <button
                 onClick={handlePauseResume}
-                disabled={!['RUNNING', 'PAUSED'].includes(sessionStatus?.status || '')}
-                className={`flex-1 flex items-center justify-center space-x-2 py-3 rounded-xl font-medium transition-all duration-200 ${
-                  ['RUNNING', 'PAUSED'].includes(sessionStatus?.status || '')
-                    ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
+                disabled={!['running', 'paused'].includes(sessionStatus.status)}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  ['running', 'paused'].includes(sessionStatus.status)
+                    ? 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 }`}
               >
-                {sessionStatus?.status === 'RUNNING' ? (
+                {sessionStatus.status === 'running' ? (
                   <>
-                    <Pause className="w-5 h-5" />
+                    <Pause className="w-4 h-4" />
                     <span>Pause</span>
                   </>
                 ) : (
                   <>
-                    <Play className="w-5 h-5" />
+                    <Play className="w-4 h-4" />
                     <span>Resume</span>
                   </>
                 )}
               </button>
               <button
                 onClick={handleStop}
-                className="flex-1 flex items-center justify-center space-x-2 py-3 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-xl font-medium transition-all duration-200"
+                className="flex items-center space-x-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-sm font-medium transition-colors"
               >
-                <Square className="w-5 h-5" />
+                <Square className="w-4 h-4" />
                 <span>Stop</span>
               </button>
-            </div>
+            </>
+          )}
+          <button
+            onClick={() => setShowConfigModal(true)}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <Settings className="w-5 h-5 text-gray-600" />
+          </button>
+        </div>
+      </div>
 
-            {/* Applied Jobs */}
-            {sessionStatus?.status === 'COMPLETED' && appliedJobs.length > 0 && (
-              <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-                <h3 className="text-lg font-semibold mb-4 text-gray-700">Applied Jobs</h3>
-                <div className="space-y-3 max-h-96 overflow-y-auto">
+      {/* Main Content - Split View */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Panel - Chat Interface */}
+        <div className="w-1/2 bg-white border-r border-gray-200 flex flex-col">
+          {/* Progress Stats */}
+          {sessionStatus && sessionStatus.progress && (
+            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+              <div className="grid grid-cols-4 gap-4 text-center">
+                <div>
+                  <p className="text-2xl font-bold text-gray-900">{sessionStatus.progress.totalApplications}</p>
+                  <p className="text-xs text-gray-600">Total</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-gray-900">{sessionStatus.progress.applicationsToday}</p>
+                  <p className="text-xs text-gray-600">Today</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-blue-600">{sessionStatus.progress.applicationsThisWeek}</p>
+                  <p className="text-xs text-gray-600">This Week</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-green-600">{sessionStatus.progress.applicationsThisMonth}</p>
+                  <p className="text-xs text-gray-600">This Month</p>
+                </div>
+              </div>
+              <div className="mt-3 text-center text-sm text-gray-500">
+                Session Duration: {formatDuration(sessionStatus.progress.sessionDurationSeconds)}
+              </div>
+            </div>
+          )}
+
+          {/* Chat Messages */}
+          <div 
+            ref={chatContainerRef}
+            className="flex-1 overflow-y-auto px-6 py-4 space-y-4"
+          >
+            {chatMessages.length === 0 && !sessionId && (
+              <div className="text-center py-12">
+                <Bot className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 mb-2">Hi! I'm your AI job search assistant.</p>
+                <p className="text-gray-500 text-sm">Tell me what kind of job you're looking for.</p>
+              </div>
+            )}
+            
+            {chatMessages.map((message) => (
+              <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`flex space-x-3 max-w-[80%] ${message.type === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                  <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                    message.type === 'user' ? 'bg-blue-600' : 
+                    message.type === 'bot' ? 'bg-gradient-to-br from-blue-600 to-purple-600' :
+                    message.type === 'intervention' ? 'bg-orange-500' :
+                    'bg-gray-400'
+                  }`}>
+                    {message.type === 'user' ? (
+                      <User className="w-4 h-4 text-white" />
+                    ) : message.type === 'intervention' ? (
+                      <AlertCircle className="w-4 h-4 text-white" />
+                    ) : (
+                      <Bot className="w-4 h-4 text-white" />
+                    )}
+                  </div>
+                  
+                  <div className={`${
+                    message.type === 'user' ? 'bg-blue-600 text-white' : 
+                    message.type === 'intervention' ? 'bg-orange-50 text-orange-900 border border-orange-200' :
+                    'bg-gray-100 text-gray-900'
+                  } rounded-2xl px-4 py-2`}>
+                    <p className="text-sm">{message.message}</p>
+                    <p className={`text-xs mt-1 ${
+                      message.type === 'user' ? 'text-blue-100' : 'text-gray-500'
+                    }`}>
+                      {formatTime(message.timestamp)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* Applied Jobs Summary */}
+            {sessionStatus?.status === 'completed' && appliedJobs.length > 0 && (
+              <div className="mt-6 bg-green-50 rounded-lg p-4">
+                <h3 className="font-medium text-green-900 mb-3">Applied Jobs Summary</h3>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
                   {appliedJobs.map((job) => (
-                    <div key={job.id} className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h4 className="font-medium text-gray-900">{job.title}</h4>
-                          <p className="text-sm text-gray-600">{job.company} • {job.location}</p>
-                          {job.errorMessage && (
-                            <p className="text-sm text-red-600 mt-1">{job.errorMessage}</p>
-                          )}
-                        </div>
-                        <div className="flex items-center space-x-3">
-                          <span className={`text-sm ${
-                            job.applicationStatus === 'SUCCESS' ? 'text-green-600' :
-                            job.applicationStatus === 'ALREADY_APPLIED' ? 'text-yellow-600' :
-                            'text-red-600'
-                          }`}>
-                            {job.applicationStatus === 'SUCCESS' ? 'Applied' :
-                             job.applicationStatus === 'ALREADY_APPLIED' ? 'Already Applied' :
-                             'Failed'}
-                          </span>
-                          <a
-                            href={job.jobUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-700"
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                          </a>
-                        </div>
+                    <div key={job.id} className="flex items-center justify-between text-sm">
+                      <div>
+                        <p className="font-medium text-gray-900">{job.title}</p>
+                        <p className="text-gray-600">{job.company}</p>
                       </div>
+                      <a
+                        href={job.jobUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-700"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
                     </div>
                   ))}
                 </div>
               </div>
             )}
           </div>
-        )}
+
+          {/* Chat Input */}
+          <div className="border-t border-gray-200 px-6 py-4">
+            <div className="flex space-x-3">
+              <textarea
+                ref={inputRef}
+                value={sessionId ? inputMessage : searchPrompt}
+                onChange={(e) => sessionId ? setInputMessage(e.target.value) : setSearchPrompt(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sessionId ? handleSendMessage() : handleStart();
+                  }
+                }}
+                placeholder={sessionId ? "Type a message..." : "e.g., Senior React developer jobs in San Francisco with good benefits"}
+                className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none resize-none"
+                rows={2}
+                disabled={isStarting}
+              />
+              <button
+                onClick={sessionId ? handleSendMessage : handleStart}
+                disabled={isStarting || (!sessionId && !searchPrompt.trim())}
+                className={`p-3 rounded-lg transition-colors ${
+                  isStarting || (!sessionId && !searchPrompt.trim())
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white'
+                }`}
+              >
+                {isStarting ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : sessionId ? (
+                  <Send className="w-5 h-5" />
+                ) : (
+                  <Sparkles className="w-5 h-5" />
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Panel - Browser Preview */}
+        <div className="w-1/2 bg-gray-100 flex items-center justify-center">
+          {liveViewUrl && sessionId ? (
+            <iframe
+              src={liveViewUrl}
+              className="w-full h-full"
+              title="LinkedIn Automation Browser"
+            />
+          ) : (
+            <div className="text-center">
+              <div className="w-24 h-24 bg-gray-200 rounded-lg mx-auto mb-4 flex items-center justify-center">
+                <ExternalLink className="w-12 h-12 text-gray-400" />
+              </div>
+              <p className="text-gray-600 font-medium">Browser Preview</p>
+              <p className="text-gray-500 text-sm mt-1">
+                Start an automation to see the live browser view
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Configuration Modal */}
@@ -404,24 +574,36 @@ export default function LinkedInAutomationNew() {
       />
 
       {/* Intervention Modal */}
-      {showIntervention && sessionStatus?.interventionDetails && (
+      {showIntervention && sessionStatus?.intervention && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-2xl font-bold text-gray-900">Action Required</h2>
-              <p className="text-gray-600 mt-2">{sessionStatus.interventionDetails.message}</p>
-            </div>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
             <div className="p-6">
-              <iframe
-                src={sessionStatus.interventionDetails.liveViewUrl}
-                className="w-full h-[60vh] rounded-lg border border-gray-200"
-                title="LinkedIn Browser View"
-              />
-            </div>
-            <div className="p-6 border-t border-gray-200 flex justify-end">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                  <AlertCircle className="w-6 h-6 text-orange-600" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">
+                    {sessionStatus.intervention.type === 'login' && 'LinkedIn Login Required'}
+                    {sessionStatus.intervention.type === 'captcha' && 'CAPTCHA Verification'}
+                    {sessionStatus.intervention.type === 'two_fa' && 'Two-Factor Authentication'}
+                    {sessionStatus.intervention.type === 'blocked' && 'Account Access Restricted'}
+                    {sessionStatus.intervention.type === 'rate_limit' && 'Rate Limited'}
+                  </h2>
+                  <p className="text-sm text-gray-600">Your attention is needed</p>
+                </div>
+              </div>
+              
+              <p className="text-gray-700 mb-3">{sessionStatus.intervention.message}</p>
+              
+              <div className="bg-blue-50 rounded-lg p-4 mb-6 border border-blue-200">
+                <p className="text-sm text-blue-800 font-medium mb-1">Instructions:</p>
+                <p className="text-sm text-blue-700">{sessionStatus.intervention.instructions}</p>
+              </div>
+              
               <button
                 onClick={handleContinueAfterIntervention}
-                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
               >
                 I've completed the action - Continue
               </button>
