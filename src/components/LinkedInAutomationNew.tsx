@@ -58,31 +58,6 @@ export default function LinkedInAutomationNew() {
       // Show config modal if no config exists
       setShowConfigModal(true);
     }
-
-    // Check for active session on mount
-    const activeSessionId = localStorage.getItem('activeSessionId');
-    if (activeSessionId) {
-      setSessionId(activeSessionId);
-      // Resume polling for this session
-      linkedinAutomationApi.getStatus(activeSessionId)
-        .then(status => {
-          setSessionStatus(status);
-          if (status.liveViewUrl) {
-            setLiveViewUrl(status.liveViewUrl);
-          }
-          // Resume polling if session is active
-          if (['running', 'intervention_required', 'paused'].includes(status.status)) {
-            stopPollingRef.current = linkedinAutomationApi.pollStatus(
-              activeSessionId,
-              handleStatusUpdate
-            );
-          }
-        })
-        .catch(error => {
-          console.error('Failed to resume session:', error);
-          localStorage.removeItem('activeSessionId');
-        });
-    }
   }, [user]);
 
   useEffect(() => {
@@ -122,6 +97,33 @@ export default function LinkedInAutomationNew() {
       timestamp: new Date()
     }]);
   };
+
+  // Resume active session on mount
+  useEffect(() => {
+    const activeSessionId = localStorage.getItem('activeSessionId');
+    if (activeSessionId && !sessionId) {
+      setSessionId(activeSessionId);
+      // Resume polling for this session
+      linkedinAutomationApi.getStatus(activeSessionId)
+        .then(status => {
+          setSessionStatus(status);
+          if (status.liveViewUrl) {
+            setLiveViewUrl(status.liveViewUrl);
+          }
+          // Resume polling if session is active
+          if (['running', 'intervention_required', 'paused'].includes(status.status)) {
+            stopPollingRef.current = linkedinAutomationApi.pollStatus(
+              activeSessionId,
+              (updatedStatus) => handleStatusUpdate(updatedStatus)
+            );
+          }
+        })
+        .catch(error => {
+          console.error('Failed to resume session:', error);
+          localStorage.removeItem('activeSessionId');
+        });
+    }
+  }, [sessionId]);
 
   // Centralized status update handler
   const handleStatusUpdate = (status: SessionStatus) => {
