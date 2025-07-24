@@ -83,12 +83,10 @@ export default function LinkedInAutomationNew() {
     if (sessionStatus?.status === 'intervention_required' && sessionStatus.intervention) {
       if (!showIntervention) {
         setShowIntervention(true);
-        addChatMessage({
-          type: 'intervention',
-          message: sessionStatus.intervention.message,
-          metadata: { intervention: sessionStatus.intervention }
-        });
+        // Message is already handled in handleStatusUpdate
       }
+    } else if (sessionStatus?.status !== 'intervention_required' && showIntervention) {
+      setShowIntervention(false);
     }
   }, [sessionStatus, showIntervention]);
 
@@ -139,6 +137,7 @@ export default function LinkedInAutomationNew() {
   // Centralized status update handler
   const handleStatusUpdate = (status: SessionStatus) => {
     const prevStatus = sessionStatus?.status;
+    const prevIntervention = sessionStatus?.intervention;
     setSessionStatus(status);
     
     // Update live view URL if provided
@@ -157,21 +156,35 @@ export default function LinkedInAutomationNew() {
       });
     }
     
-    // Add status updates to chat
+    // Only add status messages when status actually changes
     if (prevStatus !== status.status) {
       if (status.status === 'running') {
-        const message = hasLinkedInContext 
-          ? 'Automation is running with your saved LinkedIn session...'
-          : 'Automation is running...';
-        addChatMessage({
-          type: 'system',
-          message,
-          metadata: { status: status.status }
-        });
+        // Different messages based on previous state
+        let message = '';
+        if (!prevStatus) {
+          message = hasLinkedInContext 
+            ? '🚀 Automation started with your saved LinkedIn session!'
+            : '🚀 Automation started! Setting up LinkedIn session...';
+        } else if (prevStatus === 'intervention_required') {
+          message = '✅ Action completed! Resuming automation...';
+        } else if (prevStatus === 'paused') {
+          message = '▶️ Automation resumed';
+        } else {
+          // Don't show generic "running" message for other transitions
+          return;
+        }
+        
+        if (message) {
+          addChatMessage({
+            type: 'system',
+            message,
+            metadata: { status: status.status }
+          });
+        }
       } else if (status.status === 'completed') {
         addChatMessage({
           type: 'bot',
-          message: `Great news! I've completed your job search. Applied to ${status.progress.totalApplications} jobs.`,
+          message: `✅ Completed! Applied to ${status.progress.totalApplications} job${status.progress.totalApplications !== 1 ? 's' : ''}.`,
           metadata: { status: status.status, progress: status.progress }
         });
         if (sessionId) {
@@ -182,38 +195,63 @@ export default function LinkedInAutomationNew() {
       } else if (status.status === 'failed') {
         addChatMessage({
           type: 'system',
-          message: 'Automation failed. Please try again.',
+          message: '❌ Automation failed. Please try again.',
           metadata: { status: status.status }
         });
         // Clear stored session
         localStorage.removeItem('activeSessionId');
+      } else if (status.status === 'paused') {
+        addChatMessage({
+          type: 'system',
+          message: '⏸️ Automation paused',
+          metadata: { status: status.status }
+        });
       }
     }
     
-    // Add progress updates
-    if (status.progress.totalApplications > 0) {
-      const progressMessage = `Progress: ${status.progress.totalApplications} applications (${status.progress.applicationsToday} today)`;
-      setChatMessages(prev => {
-        const lastMessage = prev[prev.length - 1];
-        if (!lastMessage || !lastMessage.message.startsWith('Progress:')) {
-          return [...prev, {
-            id: Date.now().toString(),
-            type: 'bot' as const,
-            message: progressMessage,
-            timestamp: new Date(),
-            metadata: { progress: status.progress }
-          }];
-        } else if (lastMessage.message !== progressMessage) {
-          // Update the last progress message
-          return [...prev.slice(0, -1), {
-            ...lastMessage,
-            message: progressMessage,
-            timestamp: new Date(),
-            metadata: { progress: status.progress }
-          }];
-        }
-        return prev;
+    // Handle intervention changes separately
+    if (status.status === 'intervention_required' && 
+        JSON.stringify(prevIntervention) !== JSON.stringify(status.intervention)) {
+      addChatMessage({
+        type: 'intervention',
+        message: getInterventionMessage(status.intervention),
+        metadata: { intervention: status.intervention }
       });
+    }
+    
+    // Add progress updates only if running and applications have increased
+    if (status.status === 'running' && status.progress.totalApplications > 0) {
+      const currentCount = status.progress.totalApplications;
+      const prevCount = sessionStatus?.progress?.totalApplications || 0;
+      
+      // Only show progress update if count increased
+      if (currentCount > prevCount) {
+        addChatMessage({
+          type: 'bot',
+          message: `📊 Progress update: Applied to ${currentCount} job${currentCount !== 1 ? 's' : ''} (${status.progress.applicationsToday} today)`,
+          metadata: { progress: status.progress }
+        });
+      }
+    }
+  };
+
+  // Helper function to get intervention-specific messages
+  const getInterventionMessage = (intervention?: SessionStatus['intervention']) => {
+    if (!intervention) return '⚠️ Action required';
+    
+    switch (intervention.type) {
+      case 'login':
+        return '🔐 Please log in to LinkedIn in the browser window';
+      case 'captcha':
+        return '🤖 Please complete the security check (CAPTCHA)';
+      case 'two_fa':
+        return '📱 Please complete two-factor authentication';
+      case 'blocked':
+        return '🚫 Your account appears to be restricted. Please check LinkedIn for security notifications.';
+      case 'rate_limit':
+        return '⏰ Rate limit detected. Please wait a few minutes before continuing.';
+      default:
+        return intervention.message || '⚠️ Manual action required';
     }
   };
 
@@ -232,10 +270,7 @@ export default function LinkedInAutomationNew() {
       message: searchPrompt.trim()
     });
     
-    addChatMessage({
-      type: 'bot',
-      message: 'Starting your LinkedIn job search automation...'
-    });
+    // Don't add "starting" message here as handleStatusUpdate will show it
 
     try {
       const result = await linkedinAutomationApi.startAutomation({
@@ -293,21 +328,15 @@ export default function LinkedInAutomationNew() {
     try {
       if (sessionStatus.status === 'running') {
         await linkedinAutomationApi.pauseSession(sessionId);
-        addChatMessage({
-          type: 'system',
-          message: 'Automation paused'
-        });
+        // Status update will handle the message
       } else if (sessionStatus.status === 'paused') {
         await linkedinAutomationApi.resumeSession(sessionId);
-        addChatMessage({
-          type: 'system',
-          message: 'Automation resumed'
-        });
+        // Status update will handle the message
       }
     } catch (error: any) {
       addChatMessage({
         type: 'system',
-        message: `Error: ${error.message || 'Operation failed'}`
+        message: `❌ Error: ${error.message || 'Operation failed'}`
       });
     }
   };
@@ -325,7 +354,7 @@ export default function LinkedInAutomationNew() {
         
         addChatMessage({
           type: 'system',
-          message: 'Automation stopped'
+          message: '🛑 Automation stopped'
         });
         
         // Reset state after a delay to show the message

@@ -11,6 +11,7 @@ import ProfilePage from './components/ProfilePage';
 import { ResumePage } from './components/ResumePage';
 import LinkedInAutomationBot from './components/LinkedInAutomationBot';
 import LinkedInAutomationNew from './components/LinkedInAutomationNew';
+import LinkedInAutomationChat from './components/LinkedInAutomationChat';
 import { SuccessPage } from './components/SuccessPage';
 import JobSearchPage from './components/JobSearchPage';
 import { BillingPage } from './components/billing/BillingPage';
@@ -21,6 +22,7 @@ import NotificationsPage from './components/NotificationsPage';
 
 function App() {
   const enableNewLinkedInUI = import.meta.env.VITE_ENABLE_NEW_LINKEDIN_UI === 'true';
+  const enableChatUI = import.meta.env.VITE_ENABLE_CHAT_LINKEDIN_UI === 'true';
   
   return (
     <ThemeProvider>
@@ -31,6 +33,15 @@ function App() {
               <Route path="/auth" element={<CustomAuthPage />} />
               <Route path="/reset-password" element={<PasswordResetPage />} />
               <Route path="/success" element={<SuccessPage />} />
+              {/* Dedicated route for chat UI without sidebar */}
+              <Route
+                path="/linkedin-chat"
+                element={
+                  <ProtectedRoute>
+                    <LinkedInAutomationChat />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/*"
                 element={
@@ -46,7 +57,11 @@ function App() {
                             <Route path="/profile" element={<ProfilePage />} />
                             <Route 
                               path="/auto-apply" 
-                              element={enableNewLinkedInUI ? <LinkedInAutomationNew /> : <LinkedInAutomationBot />} 
+                              element={
+                                enableChatUI ? <LinkedInAutomationChat /> : 
+                                enableNewLinkedInUI ? <LinkedInAutomationNew /> : 
+                                <LinkedInAutomationBot />
+                              } 
                             />
                             <Route path="/resume" element={<ResumePage />} />
                             <Route path="/billing" element={<BillingPage />} />

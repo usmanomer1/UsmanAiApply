@@ -234,9 +234,12 @@ class LinkedInAutomationAPI {
     return response.json();
   }
 
-  // Helper to poll status with callback
-  pollStatus(sessionId: string, onUpdate: (status: SessionStatus) => void, interval = 3000) {
-    const intervalId = setInterval(async () => {
+  // Helper to poll status with callback and adaptive intervals
+  pollStatus(sessionId: string, onUpdate: (status: SessionStatus) => void, initialInterval = 3000) {
+    let currentInterval = initialInterval;
+    let intervalId: NodeJS.Timeout;
+    
+    const poll = async () => {
       try {
         const data = await this.getStatus(sessionId);
         onUpdate(data);
@@ -244,11 +247,39 @@ class LinkedInAutomationAPI {
         // Stop polling if session is complete or failed
         if (['completed', 'failed'].includes(data.status)) {
           clearInterval(intervalId);
+          return;
+        }
+
+        // Adjust polling interval based on status
+        let newInterval = currentInterval;
+        switch (data.status) {
+          case 'intervention_required':
+            newInterval = 2000; // Check more frequently for user action
+            break;
+          case 'running':
+            newInterval = 5000; // Normal operation
+            break;
+          case 'paused':
+            newInterval = 10000; // Check less frequently when paused
+            break;
+          default:
+            newInterval = 3000;
+        }
+
+        // Update interval if changed
+        if (newInterval !== currentInterval) {
+          currentInterval = newInterval;
+          clearInterval(intervalId);
+          intervalId = setInterval(poll, currentInterval);
         }
       } catch (error) {
         console.error('Status polling error:', error);
       }
-    }, interval);
+    };
+
+    // Start polling
+    poll(); // Initial check immediately
+    intervalId = setInterval(poll, currentInterval);
 
     // Return cleanup function
     return () => clearInterval(intervalId);
