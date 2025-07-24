@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Upload, Github, Linkedin, Globe, Link } from 'lucide-react';
+import { X, Plus, Trash2, Upload, Github, Linkedin, Globe, Link, CheckCircle, RefreshCw, Info } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -295,8 +295,59 @@ export default function LinkedInConfigModal({ isOpen, onClose, onSave, initialCo
             </div>
           </div>
 
+          {/* LinkedIn Authentication Status */}
+          <div className="border-t pt-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">LinkedIn Authentication</h3>
+            <div className="bg-gray-50 rounded-lg p-4">
+              {localStorage.getItem(`linkedin-context-${user?.id}`) === 'true' ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">Authenticated with LinkedIn</p>
+                        <p className="text-sm text-gray-600">Your sessions will start automatically</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (confirm('This will require you to log in again on your next session. Continue?')) {
+                          localStorage.removeItem(`linkedin-context-${user?.id}`);
+                          localStorage.removeItem('activeSessionId');
+                          window.location.reload();
+                        }
+                      }}
+                      className="flex items-center space-x-2 px-3 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <RefreshCw className="w-4 h-4 text-gray-600" />
+                      <span className="text-sm text-gray-700">Reset</span>
+                    </button>
+                  </div>
+                  <div className="bg-blue-50 rounded p-3 flex items-start space-x-2">
+                    <Info className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-blue-800">
+                      Your LinkedIn session is saved securely. You may need to re-authenticate if you change your password or after extended inactivity.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+                    <Info className="w-5 h-5 text-gray-500" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900">Not yet authenticated</p>
+                    <p className="text-sm text-gray-600">You'll need to log in once during your first automation session</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* External Application Settings */}
-          <div>
+          <div className="border-t pt-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">External Job Applications</h3>
             <div className="space-y-4">
               <label className="flex items-center space-x-3">

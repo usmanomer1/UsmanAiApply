@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Sparkles, Pause, Play, Square, ExternalLink, CheckCircle, XCircle, AlertCircle, Loader2, Send, Bot, User, Clock } from 'lucide-react';
+import { Settings, Sparkles, Pause, Play, Square, ExternalLink, CheckCircle, XCircle, AlertCircle, Loader2, Send, Bot, User, Clock, Info, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { linkedinAutomationApi, SessionStatus, AppliedJob } from '../lib/linkedinAutomationApi';
 import LinkedInConfigModal from './LinkedInConfigModal';
@@ -45,6 +45,8 @@ export default function LinkedInAutomationNew() {
   const [liveViewUrl, setLiveViewUrl] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
+  const [hasLinkedInContext, setHasLinkedInContext] = useState<boolean | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const stopPollingRef = useRef<(() => void) | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -57,6 +59,15 @@ export default function LinkedInAutomationNew() {
     } else {
       // Show config modal if no config exists
       setShowConfigModal(true);
+    }
+
+    // Check if user has LinkedIn context
+    const hasContext = localStorage.getItem(`linkedin-context-${user?.id}`);
+    setHasLinkedInContext(hasContext === 'true');
+    
+    // Show onboarding for first-time users
+    if (hasContext === null && user) {
+      setShowOnboarding(true);
     }
   }, [user]);
 
@@ -135,12 +146,26 @@ export default function LinkedInAutomationNew() {
       setLiveViewUrl(status.liveViewUrl);
     }
     
+    // Check if we transitioned from intervention to running (successful login)
+    if (prevStatus === 'intervention_required' && status.status === 'running' && hasLinkedInContext === false) {
+      // First successful login - mark context as created
+      localStorage.setItem(`linkedin-context-${user?.id}`, 'true');
+      setHasLinkedInContext(true);
+      addChatMessage({
+        type: 'bot',
+        message: '🎉 Great! Your LinkedIn account is now connected. Future sessions will start automatically without requiring login.'
+      });
+    }
+    
     // Add status updates to chat
     if (prevStatus !== status.status) {
       if (status.status === 'running') {
+        const message = hasLinkedInContext 
+          ? 'Automation is running with your saved LinkedIn session...'
+          : 'Automation is running...';
         addChatMessage({
           type: 'system',
-          message: 'Automation is running...',
+          message,
           metadata: { status: status.status }
         });
       } else if (status.status === 'completed') {
@@ -233,7 +258,9 @@ export default function LinkedInAutomationNew() {
       
       addChatMessage({
         type: 'bot',
-        message: 'Automation started successfully! I\'ll apply to jobs matching your criteria.'
+        message: hasLinkedInContext 
+          ? 'Starting automation with your saved LinkedIn session. No login required!' 
+          : 'Automation started! You may need to log in to LinkedIn (one-time setup).'
       });
 
       // Start polling for status
@@ -441,6 +468,29 @@ export default function LinkedInAutomationNew() {
         </div>
         
         <div className="flex items-center space-x-3">
+          {/* LinkedIn Context Status */}
+          {hasLinkedInContext !== null && (
+            <div 
+              className="flex items-center space-x-2 px-3 py-1.5 bg-gray-100 rounded-lg cursor-help"
+              title={hasLinkedInContext 
+                ? "Your LinkedIn session is saved. Automation will start immediately." 
+                : "You'll need to log in once on your first session. After that, it's automatic!"
+              }
+            >
+              {hasLinkedInContext ? (
+                <>
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  <span className="text-sm text-gray-700">LinkedIn Connected</span>
+                </>
+              ) : (
+                <>
+                  <Info className="w-4 h-4 text-gray-500" />
+                  <span className="text-sm text-gray-600">Not Connected</span>
+                </>
+              )}
+            </div>
+          )}
+          
           {sessionId && sessionStatus && (
             <>
               <button
@@ -655,6 +705,56 @@ export default function LinkedInAutomationNew() {
         initialConfig={config || undefined}
       />
 
+      {/* Onboarding Modal */}
+      {showOnboarding && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+            <div className="p-6">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Sparkles className="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">One-Time LinkedIn Setup</h2>
+                  <p className="text-sm text-gray-600">Quick setup for automated job applications</p>
+                </div>
+              </div>
+              
+              <div className="mb-6">
+                <p className="text-gray-700 mb-4">To automate LinkedIn job applications, you'll need to:</p>
+                <ol className="space-y-3 text-sm text-gray-600">
+                  <li className="flex items-start">
+                    <span className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-semibold mr-2">1</span>
+                    <span>Start your first automation session</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-semibold mr-2">2</span>
+                    <span>Log in to LinkedIn when prompted (one time only)</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-semibold mr-2">3</span>
+                    <span>Complete any security checks if requested</span>
+                  </li>
+                </ol>
+              </div>
+              
+              <div className="bg-green-50 rounded-lg p-4 mb-6 border border-green-200">
+                <p className="text-sm text-green-800">
+                  <strong>After this initial setup, all future sessions will start automatically!</strong> No more login interruptions.
+                </p>
+              </div>
+              
+              <button
+                onClick={() => setShowOnboarding(false)}
+                className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+              >
+                Got it, let's start!
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Intervention Modal */}
       {showIntervention && sessionStatus?.intervention && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -677,6 +777,14 @@ export default function LinkedInAutomationNew() {
               </div>
               
               <p className="text-gray-700 mb-3">{sessionStatus.intervention.message}</p>
+              
+              {sessionStatus.intervention.type === 'login' && hasLinkedInContext === false && (
+                <div className="bg-green-50 rounded-lg p-4 mb-4 border border-green-200">
+                  <p className="text-sm text-green-800">
+                    <strong>This is a one-time setup!</strong> After you log in, we'll save your session for all future automations.
+                  </p>
+                </div>
+              )}
               
               <div className="bg-blue-50 rounded-lg p-4 mb-4 border border-blue-200">
                 <p className="text-sm text-blue-800 font-medium mb-1">Instructions:</p>
