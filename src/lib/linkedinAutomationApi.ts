@@ -1,7 +1,8 @@
 import { supabase } from './supabase';
 
-const API_BASE_URL = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:3001';
-const API_KEY = import.meta.env.VITE_BACKEND_API_KEY;
+const API_BASE_URL = import.meta.env.VITE_JOBOTIC_API_URL || 'http://localhost:3001';
+const USE_NETLIFY_FUNCTION = !import.meta.env.VITE_JOBOTIC_API_KEY; // Use function if no VITE key
+const API_KEY = import.meta.env.VITE_JOBOTIC_API_KEY || import.meta.env.JOBOTIC_API_KEY || '';
 
 interface LinkedInConfig {
   userId: string;
@@ -98,25 +99,35 @@ interface JobsResponse {
 }
 
 class LinkedInAutomationAPI {
-  private async getHeaders() {
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (!session?.access_token) {
-      throw new Error('Authentication required');
+  private async getHeaders(requiresAuth = true) {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    // Add API key for direct API calls (not Netlify functions)
+    if (!USE_NETLIFY_FUNCTION && API_KEY) {
+      headers['X-API-Key'] = API_KEY;
     }
 
-    return {
-      'Content-Type': 'application/json',
-      'X-API-Key': API_KEY || '',
-      'Authorization': `Bearer ${session.access_token}`
-    };
+    // Add Bearer token for authenticated requests
+    if (requiresAuth) {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        throw new Error('Authentication required');
+      }
+
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+
+    return headers;
   }
 
   async startAutomation(config: LinkedInConfig): Promise<AutomationSession> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/linkedin/start`, {
         method: 'POST',
-        headers: await this.getHeaders(),
+        headers: await this.getHeaders(true),
         body: JSON.stringify(config)
       });
 
@@ -135,7 +146,7 @@ class LinkedInAutomationAPI {
   async getStatus(sessionId: string): Promise<SessionStatus> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/linkedin/status/${sessionId}`, {
-        headers: await this.getHeaders()
+        headers: await this.getHeaders(true)
       });
 
       if (!response.ok) {
@@ -153,7 +164,7 @@ class LinkedInAutomationAPI {
   async pauseSession(sessionId: string): Promise<{ success: boolean }> {
     const response = await fetch(`${API_BASE_URL}/api/linkedin/pause/${sessionId}`, {
       method: 'PUT',
-      headers: await this.getHeaders()
+      headers: await this.getHeaders(true)
     });
 
     if (!response.ok) {
@@ -166,7 +177,7 @@ class LinkedInAutomationAPI {
   async resumeSession(sessionId: string): Promise<{ success: boolean }> {
     const response = await fetch(`${API_BASE_URL}/api/linkedin/resume/${sessionId}`, {
       method: 'PUT',
-      headers: await this.getHeaders()
+      headers: await this.getHeaders(true)
     });
 
     if (!response.ok) {
@@ -179,7 +190,7 @@ class LinkedInAutomationAPI {
   async stopSession(sessionId: string, reason = 'User requested stop'): Promise<{ success: boolean }> {
     const response = await fetch(`${API_BASE_URL}/api/linkedin/stop/${sessionId}`, {
       method: 'DELETE',
-      headers: await this.getHeaders(),
+      headers: await this.getHeaders(true),
       body: JSON.stringify({ reason })
     });
 
@@ -193,7 +204,7 @@ class LinkedInAutomationAPI {
   async continueAfterIntervention(sessionId: string): Promise<{ success: boolean }> {
     const response = await fetch(`${API_BASE_URL}/api/linkedin/continue/${sessionId}`, {
       method: 'POST',
-      headers: await this.getHeaders(),
+      headers: await this.getHeaders(true),
       body: JSON.stringify({ interventionCompleted: true })
     });
 
