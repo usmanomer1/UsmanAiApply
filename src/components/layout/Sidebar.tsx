@@ -13,9 +13,12 @@ import {
   Mail,
   CreditCard,
   FolderOpen,
-  Code
+  Code,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSidebar } from '../../contexts/SidebarContext';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 
@@ -23,6 +26,7 @@ const Sidebar: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
+  const { isExpanded, toggleSidebar } = useSidebar();
   const [notifications, setNotifications] = useState(0);
   const [userProfile, setUserProfile] = useState<{ full_name: string; email: string; resume_url?: string } | null>(null);
   const [hasResume, setHasResume] = useState(false);
@@ -160,18 +164,19 @@ const Sidebar: React.FC = () => {
   ];
 
   return (
-    <div className="fixed left-0 top-0 h-full w-[240px] bg-white border-r border-gray-100 flex flex-col">
-      {/* Logo Area */}
-      <div className="h-16 px-6 flex items-center border-b border-gray-100">
-        <div className="flex items-center space-x-3">
-          <img 
-            src="/images/logos/light.png" 
-            alt="Jobotic" 
-            className="h-7 w-7"
-          />
-          <span className="text-lg font-semibold text-gray-900">Jobotic</span>
+    <>
+      <div className={`fixed left-0 top-0 h-full ${isExpanded ? 'w-[240px]' : 'w-[70px]'} bg-white border-r border-gray-100 flex flex-col transition-all duration-300 z-40`}>
+        {/* Logo Area */}
+        <div className="h-16 px-6 flex items-center justify-between border-b border-gray-100">
+          <div className="flex items-center space-x-3">
+            <img 
+              src="/images/logos/light.png" 
+              alt="Jobotic" 
+              className="h-7 w-7"
+            />
+            {isExpanded && <span className="text-lg font-semibold text-gray-900">Jobotic</span>}
+          </div>
         </div>
-      </div>
 
       {/* Main Navigation */}
       <nav className="flex-1 px-3 py-4">
@@ -185,12 +190,13 @@ const Sidebar: React.FC = () => {
                 <Link
                   to={item.path}
                   className={`
-                    group flex items-center gap-3 px-3 py-2.5 rounded-2xl transition-all duration-200
+                    group flex items-center ${isExpanded ? 'gap-3' : 'justify-center'} px-3 py-2.5 rounded-2xl transition-all duration-200
                     ${isActive 
                       ? 'bg-teal-500 text-white shadow-sm' 
                       : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     }
                   `}
+                  title={!isExpanded ? item.label : ''}
                 >
                   <div className="relative">
                     <Icon className={`h-5 w-5 ${isActive ? 'text-white' : 'text-gray-500 group-hover:text-gray-700'}`} />
@@ -200,14 +206,16 @@ const Sidebar: React.FC = () => {
                       </div>
                     )}
                   </div>
-                  <div className="flex-1">
-                    <p className={`text-sm font-medium ${isActive ? 'text-white' : ''}`}>
-                      {item.label}
-                    </p>
-                    <p className={`text-xs ${isActive ? 'text-teal-100' : 'text-gray-500 group-hover:text-gray-600'}`}>
-                      {item.description}
-                    </p>
-                  </div>
+                  {isExpanded && (
+                    <div className="flex-1">
+                      <p className={`text-sm font-medium ${isActive ? 'text-white' : ''}`}>
+                        {item.label}
+                      </p>
+                      <p className={`text-xs ${isActive ? 'text-teal-100' : 'text-gray-500 group-hover:text-gray-600'}`}>
+                        {item.description}
+                      </p>
+                    </div>
+                  )}
                 </Link>
               </li>
             );
@@ -221,13 +229,21 @@ const Sidebar: React.FC = () => {
         <div className="px-3 py-3">
           <button 
             onClick={() => navigate('/notifications')}
-            className="w-full flex items-center justify-between px-3 py-2.5 rounded-2xl hover:bg-gray-50 transition-all duration-200 group"
+            className={`w-full flex items-center ${isExpanded ? 'justify-between' : 'justify-center'} px-3 py-2.5 rounded-2xl hover:bg-gray-50 transition-all duration-200 group`}
+            title={!isExpanded ? 'Notifications' : ''}
           >
-            <div className="flex items-center gap-3">
-              <Bell className="h-5 w-5 text-gray-500 group-hover:text-gray-700" />
-              <span className="text-sm font-medium text-gray-600 group-hover:text-gray-900">Notifications</span>
+            <div className={`flex items-center ${isExpanded ? 'gap-3' : ''}`}>
+              <div className="relative">
+                <Bell className="h-5 w-5 text-gray-500 group-hover:text-gray-700" />
+                {!isExpanded && notifications > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-teal-500 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">
+                    {notifications > 9 ? '9+' : notifications}
+                  </span>
+                )}
+              </div>
+              {isExpanded && <span className="text-sm font-medium text-gray-600 group-hover:text-gray-900">Notifications</span>}
             </div>
-            {notifications > 0 && (
+            {isExpanded && notifications > 0 && (
               <span className="bg-teal-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full">
                 {notifications}
               </span>
@@ -239,29 +255,32 @@ const Sidebar: React.FC = () => {
         <div className="px-3">
           <Link
             to="/settings"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-gray-50 transition-all duration-200 group"
+            className={`flex items-center ${isExpanded ? 'gap-3' : 'justify-center'} px-3 py-2.5 rounded-2xl hover:bg-gray-50 transition-all duration-200 group`}
+            title={!isExpanded ? 'Settings' : ''}
           >
             <Settings className="h-5 w-5 text-gray-500 group-hover:text-gray-700" />
-            <span className="text-sm font-medium text-gray-600 group-hover:text-gray-900">Settings</span>
+            {isExpanded && <span className="text-sm font-medium text-gray-600 group-hover:text-gray-900">Settings</span>}
           </Link>
         </div>
 
         {/* User Profile */}
         <div className="p-3 border-t border-gray-100">
-          <div className="flex items-center gap-3 px-3 py-2">
+          <div className={`flex items-center ${isExpanded ? 'gap-3' : 'justify-center'} px-3 py-2`}>
             <div className="w-10 h-10 bg-gradient-to-br from-teal-400 to-teal-600 rounded-full flex items-center justify-center shadow-sm">
               <span className="text-white text-sm font-semibold">
                 {userProfile?.full_name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'U'}
               </span>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
-                {userProfile?.full_name || 'User'}
-              </p>
-              <p className="text-xs text-gray-500 truncate">
-                {userProfile?.email || user?.email || ''}
-              </p>
-            </div>
+            {isExpanded && (
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">
+                  {userProfile?.full_name || 'User'}
+                </p>
+                <p className="text-xs text-gray-500 truncate">
+                  {userProfile?.email || user?.email || ''}
+                </p>
+              </div>
+            )}
             <button
               onClick={handleLogout}
               className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-xl transition-all duration-200"
@@ -272,7 +291,20 @@ const Sidebar: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+      
+      {/* Toggle Button */}
+      <button
+        onClick={toggleSidebar}
+        className={`fixed ${isExpanded ? 'left-[240px]' : 'left-[70px]'} top-8 -ml-3 w-6 h-6 bg-white border border-gray-200 rounded-full shadow-sm hover:shadow-md transition-all duration-300 z-50 flex items-center justify-center group`}
+      >
+        {isExpanded ? (
+          <ChevronLeft className="w-3 h-3 text-gray-600 group-hover:text-gray-900" />
+        ) : (
+          <ChevronRight className="w-3 h-3 text-gray-600 group-hover:text-gray-900" />
+        )}
+      </button>
+    </>
   );
 };
 

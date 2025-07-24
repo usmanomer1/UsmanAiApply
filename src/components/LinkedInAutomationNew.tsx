@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Sparkles, Pause, Play, Square, ExternalLink, CheckCircle, XCircle, AlertCircle, Loader2, Send, Bot, User, Clock, Info, RefreshCw } from 'lucide-react';
+import { Settings, Send, Bot, AlertCircle, Loader2, CheckCircle, XCircle, Info, RefreshCw, ExternalLink, Pause, Play, Square, ArrowRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { linkedinAutomationApi, SessionStatus, AppliedJob } from '../lib/linkedinAutomationApi';
 import LinkedInConfigModal from './LinkedInConfigModal';
@@ -22,7 +22,7 @@ interface AutomationConfig {
 
 interface ChatMessage {
   id: string;
-  type: 'user' | 'bot' | 'system' | 'intervention';
+  type: 'user' | 'assistant' | 'system' | 'info' | 'error' | 'success' | 'warning';
   message: string;
   timestamp: Date;
   metadata?: {
@@ -56,9 +56,6 @@ export default function LinkedInAutomationNew() {
     const savedConfig = localStorage.getItem(`linkedin-config-${user?.id}`);
     if (savedConfig) {
       setConfig(JSON.parse(savedConfig));
-    } else {
-      // Show config modal if no config exists
-      setShowConfigModal(true);
     }
 
     // Check if user has LinkedIn context
@@ -83,7 +80,6 @@ export default function LinkedInAutomationNew() {
     if (sessionStatus?.status === 'intervention_required' && sessionStatus.intervention) {
       if (!showIntervention) {
         setShowIntervention(true);
-        // Message is already handled in handleStatusUpdate
       }
     } else if (sessionStatus?.status !== 'intervention_required' && showIntervention) {
       setShowIntervention(false);
@@ -151,8 +147,8 @@ export default function LinkedInAutomationNew() {
       localStorage.setItem(`linkedin-context-${user?.id}`, 'true');
       setHasLinkedInContext(true);
       addChatMessage({
-        type: 'bot',
-        message: '🎉 Great! Your LinkedIn account is now connected. Future sessions will start automatically without requiring login.'
+        type: 'success',
+        message: 'Great! Your LinkedIn account is now connected. Future sessions will start automatically without requiring login.'
       });
     }
     
@@ -161,30 +157,30 @@ export default function LinkedInAutomationNew() {
       if (status.status === 'running') {
         // Different messages based on previous state
         let message = '';
+        let type: ChatMessage['type'] = 'info';
+        
         if (!prevStatus) {
           message = hasLinkedInContext 
-            ? '🚀 Automation started with your saved LinkedIn session!'
-            : '🚀 Automation started! Setting up LinkedIn session...';
+            ? 'Automation started with your saved LinkedIn session!'
+            : 'Automation started! Setting up LinkedIn session...';
+          type = 'info';
         } else if (prevStatus === 'intervention_required') {
-          message = '✅ Action completed! Resuming automation...';
+          message = 'Action completed! Resuming automation...';
+          type = 'success';
         } else if (prevStatus === 'paused') {
-          message = '▶️ Automation resumed';
+          message = 'Automation resumed';
+          type = 'info';
         } else {
-          // Don't show generic "running" message for other transitions
           return;
         }
         
         if (message) {
-          addChatMessage({
-            type: 'system',
-            message,
-            metadata: { status: status.status }
-          });
+          addChatMessage({ type, message, metadata: { status: status.status } });
         }
       } else if (status.status === 'completed') {
         addChatMessage({
-          type: 'bot',
-          message: `✅ Completed! Applied to ${status.progress.totalApplications} job${status.progress.totalApplications !== 1 ? 's' : ''}.`,
+          type: 'success',
+          message: `Completed! Applied to ${status.progress.totalApplications} job${status.progress.totalApplications !== 1 ? 's' : ''}.`,
           metadata: { status: status.status, progress: status.progress }
         });
         if (sessionId) {
@@ -194,16 +190,16 @@ export default function LinkedInAutomationNew() {
         localStorage.removeItem('activeSessionId');
       } else if (status.status === 'failed') {
         addChatMessage({
-          type: 'system',
-          message: '❌ Automation failed. Please try again.',
+          type: 'error',
+          message: 'Automation failed. Please try again.',
           metadata: { status: status.status }
         });
         // Clear stored session
         localStorage.removeItem('activeSessionId');
       } else if (status.status === 'paused') {
         addChatMessage({
-          type: 'system',
-          message: '⏸️ Automation paused',
+          type: 'info',
+          message: 'Automation paused',
           metadata: { status: status.status }
         });
       }
@@ -213,7 +209,7 @@ export default function LinkedInAutomationNew() {
     if (status.status === 'intervention_required' && 
         JSON.stringify(prevIntervention) !== JSON.stringify(status.intervention)) {
       addChatMessage({
-        type: 'intervention',
+        type: 'warning',
         message: getInterventionMessage(status.intervention),
         metadata: { intervention: status.intervention }
       });
@@ -227,8 +223,8 @@ export default function LinkedInAutomationNew() {
       // Only show progress update if count increased
       if (currentCount > prevCount) {
         addChatMessage({
-          type: 'bot',
-          message: `📊 Progress update: Applied to ${currentCount} job${currentCount !== 1 ? 's' : ''} (${status.progress.applicationsToday} today)`,
+          type: 'info',
+          message: `Progress update: Applied to ${currentCount} job${currentCount !== 1 ? 's' : ''} (${status.progress.applicationsToday} today)`,
           metadata: { progress: status.progress }
         });
       }
@@ -237,27 +233,32 @@ export default function LinkedInAutomationNew() {
 
   // Helper function to get intervention-specific messages
   const getInterventionMessage = (intervention?: SessionStatus['intervention']) => {
-    if (!intervention) return '⚠️ Action required';
+    if (!intervention) return 'Action required';
     
     switch (intervention.type) {
       case 'login':
-        return '🔐 Please log in to LinkedIn in the browser window';
+        return 'Please log in to LinkedIn in the browser window';
       case 'captcha':
-        return '🤖 Please complete the security check (CAPTCHA)';
+        return 'Please complete the security check (CAPTCHA)';
       case 'two_fa':
-        return '📱 Please complete two-factor authentication';
+        return 'Please complete two-factor authentication';
       case 'blocked':
-        return '🚫 Your account appears to be restricted. Please check LinkedIn for security notifications.';
+        return 'Your account appears to be restricted. Please check LinkedIn for security notifications.';
       case 'rate_limit':
-        return '⏰ Rate limit detected. Please wait a few minutes before continuing.';
+        return 'Rate limit detected. Please wait a few minutes before continuing.';
       default:
-        return intervention.message || '⚠️ Manual action required';
+        return intervention.message || 'Manual action required';
     }
   };
 
   const handleStart = async () => {
     if (!searchPrompt.trim()) {
       alert('Please enter a job search query');
+      return;
+    }
+
+    if (!config) {
+      setShowConfigModal(true);
       return;
     }
 
@@ -269,8 +270,6 @@ export default function LinkedInAutomationNew() {
       type: 'user',
       message: searchPrompt.trim()
     });
-    
-    // Don't add "starting" message here as handleStatusUpdate will show it
 
     try {
       const result = await linkedinAutomationApi.startAutomation({
@@ -292,7 +291,7 @@ export default function LinkedInAutomationNew() {
       localStorage.setItem('activeSessionId', result.sessionId);
       
       addChatMessage({
-        type: 'bot',
+        type: 'assistant',
         message: hasLinkedInContext 
           ? 'Starting automation with your saved LinkedIn session. No login required!' 
           : 'Automation started! You may need to log in to LinkedIn (one-time setup).'
@@ -305,7 +304,7 @@ export default function LinkedInAutomationNew() {
       );
     } catch (error: any) {
       addChatMessage({
-        type: 'system',
+        type: 'error',
         message: `Error: ${error.message || 'Failed to start automation'}`
       });
     } finally {
@@ -328,15 +327,13 @@ export default function LinkedInAutomationNew() {
     try {
       if (sessionStatus.status === 'running') {
         await linkedinAutomationApi.pauseSession(sessionId);
-        // Status update will handle the message
       } else if (sessionStatus.status === 'paused') {
         await linkedinAutomationApi.resumeSession(sessionId);
-        // Status update will handle the message
       }
     } catch (error: any) {
       addChatMessage({
-        type: 'system',
-        message: `❌ Error: ${error.message || 'Operation failed'}`
+        type: 'error',
+        message: `Error: ${error.message || 'Operation failed'}`
       });
     }
   };
@@ -354,7 +351,7 @@ export default function LinkedInAutomationNew() {
         
         addChatMessage({
           type: 'system',
-          message: '🛑 Automation stopped'
+          message: 'Automation stopped'
         });
         
         // Reset state after a delay to show the message
@@ -366,7 +363,7 @@ export default function LinkedInAutomationNew() {
         }, 2000);
       } catch (error: any) {
         addChatMessage({
-          type: 'system',
+          type: 'error',
           message: `Error: ${error.message || 'Failed to stop automation'}`
         });
       }
@@ -382,7 +379,7 @@ export default function LinkedInAutomationNew() {
       
       if (response.status === 'running') {
         addChatMessage({
-          type: 'bot',
+          type: 'assistant',
           message: 'Thanks! Continuing with the automation...'
         });
       }
@@ -399,18 +396,18 @@ export default function LinkedInAutomationNew() {
       // Handle specific error cases
       if (error.status === 429) {
         addChatMessage({
-          type: 'system',
+          type: 'error',
           message: 'Rate limited. Please wait a few minutes before continuing.'
         });
       } else if (error.status === 401) {
         addChatMessage({
-          type: 'system',
+          type: 'error',
           message: 'Session expired. Please restart the automation.'
         });
         localStorage.removeItem('activeSessionId');
       } else {
         addChatMessage({
-          type: 'system',
+          type: 'error',
           message: `Error: ${error.message || 'Failed to continue automation'}`
         });
       }
@@ -418,27 +415,10 @@ export default function LinkedInAutomationNew() {
   };
 
   const handleSendMessage = () => {
-    if (!inputMessage.trim() || !sessionId) return;
+    if (!searchPrompt.trim()) return;
 
-    if (!sessionId) {
-      // Initial prompt
-      setSearchPrompt(inputMessage);
-      handleStart();
-    } else {
-      // During automation - just add to chat
-      addChatMessage({
-        type: 'user',
-        message: inputMessage
-      });
-      
-      // Bot response
-      addChatMessage({
-        type: 'bot',
-        message: 'I\'m currently focused on applying to jobs. You can pause or stop the automation using the controls above.'
-      });
-    }
-    
-    setInputMessage('');
+    // Initial prompt
+    handleStart();
   };
 
   const formatTime = (date: Date) => {
@@ -449,47 +429,58 @@ export default function LinkedInAutomationNew() {
     });
   };
 
-  const formatDuration = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${secs}s`;
-    } else {
-      return `${secs}s`;
+  const getMessageColor = (type: ChatMessage['type']) => {
+    switch (type) {
+      case 'user':
+        return 'bg-gray-50 text-gray-900';
+      case 'assistant':
+        return 'bg-blue-50 text-blue-900';
+      case 'system':
+        return 'bg-gray-100 text-gray-700';
+      case 'info':
+        return 'bg-teal-50 text-teal-900';
+      case 'error':
+        return 'bg-red-50 text-red-900';
+      case 'success':
+        return 'bg-green-50 text-green-900';
+      case 'warning':
+        return 'bg-orange-50 text-orange-900';
+      default:
+        return 'bg-gray-100 text-gray-900';
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'running':
-        return <Loader2 className="w-4 h-4 animate-spin text-blue-500" />;
-      case 'paused':
-        return <Pause className="w-4 h-4 text-yellow-500" />;
-      case 'completed':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case 'failed':
-        return <XCircle className="w-4 h-4 text-red-500" />;
-      case 'intervention_required':
-        return <AlertCircle className="w-4 h-4 text-orange-500" />;
+  const getMessageIcon = (type: ChatMessage['type']) => {
+    switch (type) {
+      case 'assistant':
+        return <Bot className="w-5 h-5 text-blue-600" />;
+      case 'error':
+        return <XCircle className="w-5 h-5 text-red-600" />;
+      case 'success':
+        return <CheckCircle className="w-5 h-5 text-green-600" />;
+      case 'warning':
+        return <AlertCircle className="w-5 h-5 text-orange-600" />;
+      case 'info':
+        return <Info className="w-5 h-5 text-teal-600" />;
       default:
         return null;
     }
   };
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col">
+    <div className="h-[calc(100vh-4rem)] bg-white flex flex-col">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+      <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <h1 className="text-xl font-semibold text-gray-900">AI Job Search Agent</h1>
+          <h1 className="text-xl font-semibold text-gray-900">LinkedIn Agent</h1>
           {sessionStatus && (
             <div className="flex items-center space-x-2">
-              {getStatusIcon(sessionStatus.status)}
-              <span className="text-sm text-gray-600">
+              {sessionStatus.status === 'running' && <Loader2 className="w-4 h-4 animate-spin text-blue-500" />}
+              {sessionStatus.status === 'paused' && <Pause className="w-4 h-4 text-yellow-500" />}
+              {sessionStatus.status === 'completed' && <CheckCircle className="w-4 h-4 text-green-500" />}
+              {sessionStatus.status === 'failed' && <XCircle className="w-4 h-4 text-red-500" />}
+              {sessionStatus.status === 'intervention_required' && <AlertCircle className="w-4 h-4 text-orange-500" />}
+              <span className="text-sm text-gray-600 capitalize">
                 {sessionStatus.status.replace('_', ' ')}
               </span>
             </div>
@@ -499,13 +490,7 @@ export default function LinkedInAutomationNew() {
         <div className="flex items-center space-x-3">
           {/* LinkedIn Context Status */}
           {hasLinkedInContext !== null && (
-            <div 
-              className="flex items-center space-x-2 px-3 py-1.5 bg-gray-100 rounded-lg cursor-help"
-              title={hasLinkedInContext 
-                ? "Your LinkedIn session is saved. Automation will start immediately." 
-                : "You'll need to log in once on your first session. After that, it's automatic!"
-              }
-            >
+            <div className="flex items-center space-x-2 px-3 py-1.5 bg-gray-100 rounded-lg">
               {hasLinkedInContext ? (
                 <>
                   <CheckCircle className="w-4 h-4 text-green-600" />
@@ -561,79 +546,94 @@ export default function LinkedInAutomationNew() {
         </div>
       </div>
 
-      {/* Main Content - Split View */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Panel - Chat Interface */}
-        <div className="w-1/2 bg-white border-r border-gray-200 flex flex-col">
-          {/* Progress Stats */}
-          {sessionStatus && sessionStatus.progress && (
-            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-              <div className="grid grid-cols-4 gap-4 text-center">
-                <div>
-                  <p className="text-2xl font-bold text-gray-900">{sessionStatus.progress.totalApplications}</p>
-                  <p className="text-xs text-gray-600">Total</p>
+      {/* Chat Container */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Messages */}
+        <div 
+          ref={chatContainerRef}
+          className="flex-1 overflow-y-auto p-6"
+        >
+          {chatMessages.length === 0 && !sessionId && (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center max-w-md">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Bot className="w-8 h-8 text-white" />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold text-gray-900">{sessionStatus.progress.applicationsToday}</p>
-                  <p className="text-xs text-gray-600">Today</p>
+                <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+                  AI Job Search Assistant
+                </h2>
+                <p className="text-gray-600 mb-8">
+                  Tell me what kind of job you're looking for and I'll help you apply automatically on LinkedIn
+                </p>
+                
+                {/* Sample prompts */}
+                <div className="space-y-3">
+                  <button
+                    onClick={() => setSearchPrompt('Senior React developer jobs in San Francisco')}
+                    className="w-full text-left p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-700">Senior React developer jobs in San Francisco</span>
+                      <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setSearchPrompt('Remote Product Manager positions with good benefits')}
+                    className="w-full text-left p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-700">Remote Product Manager positions with good benefits</span>
+                      <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setSearchPrompt('Data Scientist roles at startups')}
+                    className="w-full text-left p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-700">Data Scientist roles at startups</span>
+                      <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />
+                    </div>
+                  </button>
                 </div>
-                <div>
-                  <p className="text-2xl font-bold text-blue-600">{sessionStatus.progress.applicationsThisWeek}</p>
-                  <p className="text-xs text-gray-600">This Week</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-green-600">{sessionStatus.progress.applicationsThisMonth}</p>
-                  <p className="text-xs text-gray-600">This Month</p>
-                </div>
-              </div>
-              <div className="mt-3 text-center text-sm text-gray-500">
-                Session Duration: {formatDuration(sessionStatus.progress.sessionDurationSeconds)}
               </div>
             </div>
           )}
-
-          {/* Chat Messages */}
-          <div 
-            ref={chatContainerRef}
-            className="flex-1 overflow-y-auto px-6 py-4 space-y-4"
-          >
-            {chatMessages.length === 0 && !sessionId && (
-              <div className="text-center py-12">
-                <Bot className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600 mb-2">Hi! I'm your AI job search assistant.</p>
-                <p className="text-gray-500 text-sm">Tell me what kind of job you're looking for.</p>
-              </div>
-            )}
-            
+          
+          <div className="space-y-4 max-w-3xl mx-auto">
             {chatMessages.map((message) => (
               <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`flex space-x-3 max-w-[80%] ${message.type === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                  <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                    message.type === 'user' ? 'bg-blue-600' : 
-                    message.type === 'bot' ? 'bg-gradient-to-br from-blue-600 to-purple-600' :
-                    message.type === 'intervention' ? 'bg-orange-500' :
-                    'bg-gray-400'
-                  }`}>
-                    {message.type === 'user' ? (
-                      <User className="w-4 h-4 text-white" />
-                    ) : message.type === 'intervention' ? (
-                      <AlertCircle className="w-4 h-4 text-white" />
-                    ) : (
-                      <Bot className="w-4 h-4 text-white" />
+                <div className={`max-w-[80%] ${message.type === 'user' ? 'order-2' : 'order-1'}`}>
+                  <div className={`rounded-2xl px-4 py-3 ${getMessageColor(message.type)}`}>
+                    {message.type !== 'user' && getMessageIcon(message.type) && (
+                      <div className="flex items-start space-x-3">
+                        <div className="flex-shrink-0 mt-0.5">
+                          {getMessageIcon(message.type)}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm leading-relaxed">{message.message}</p>
+                          <p className="text-xs mt-1 opacity-60">
+                            {formatTime(message.timestamp)}
+                          </p>
+                        </div>
+                      </div>
                     )}
-                  </div>
-                  
-                  <div className={`${
-                    message.type === 'user' ? 'bg-blue-600 text-white' : 
-                    message.type === 'intervention' ? 'bg-orange-50 text-orange-900 border border-orange-200' :
-                    'bg-gray-100 text-gray-900'
-                  } rounded-2xl px-4 py-2`}>
-                    <p className="text-sm">{message.message}</p>
-                    <p className={`text-xs mt-1 ${
-                      message.type === 'user' ? 'text-blue-100' : 'text-gray-500'
-                    }`}>
-                      {formatTime(message.timestamp)}
-                    </p>
+                    {message.type === 'user' && (
+                      <>
+                        <p className="text-sm leading-relaxed">{message.message}</p>
+                        <p className="text-xs mt-1 opacity-60">
+                          {formatTime(message.timestamp)}
+                        </p>
+                      </>
+                    )}
+                    {!getMessageIcon(message.type) && message.type !== 'user' && (
+                      <>
+                        <p className="text-sm leading-relaxed">{message.message}</p>
+                        <p className="text-xs mt-1 opacity-60">
+                          {formatTime(message.timestamp)}
+                        </p>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -641,7 +641,7 @@ export default function LinkedInAutomationNew() {
 
             {/* Applied Jobs Summary */}
             {sessionStatus?.status === 'completed' && appliedJobs.length > 0 && (
-              <div className="mt-6 bg-green-50 rounded-lg p-4">
+              <div className="bg-green-50 rounded-lg p-4">
                 <h3 className="font-medium text-green-900 mb-3">Applied Jobs Summary</h3>
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {appliedJobs.map((job) => (
@@ -664,65 +664,48 @@ export default function LinkedInAutomationNew() {
               </div>
             )}
           </div>
+        </div>
 
-          {/* Chat Input */}
-          <div className="border-t border-gray-200 px-6 py-4">
+        {/* Input Area */}
+        <div className="border-t border-gray-200 p-4">
+          <div className="max-w-3xl mx-auto">
             <div className="flex space-x-3">
               <textarea
                 ref={inputRef}
-                value={sessionId ? inputMessage : searchPrompt}
-                onChange={(e) => sessionId ? setInputMessage(e.target.value) : setSearchPrompt(e.target.value)}
+                value={searchPrompt}
+                onChange={(e) => setSearchPrompt(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
-                    sessionId ? handleSendMessage() : handleStart();
+                    handleStart();
                   }
                 }}
-                placeholder={sessionId ? "Type a message..." : "e.g., Senior React developer jobs in San Francisco with good benefits"}
-                className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none resize-none"
-                rows={2}
-                disabled={isStarting}
+                placeholder="e.g., Senior React developer jobs in San Francisco with good benefits"
+                className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none resize-none"
+                rows={1}
+                disabled={isStarting || sessionId !== null}
+                style={{
+                  minHeight: '48px',
+                  maxHeight: '120px'
+                }}
               />
               <button
-                onClick={sessionId ? handleSendMessage : handleStart}
-                disabled={isStarting || (!sessionId && !searchPrompt.trim())}
-                className={`p-3 rounded-lg transition-colors ${
-                  isStarting || (!sessionId && !searchPrompt.trim())
+                onClick={handleStart}
+                disabled={isStarting || !searchPrompt.trim() || sessionId !== null}
+                className={`px-4 py-3 rounded-2xl font-medium transition-all ${
+                  isStarting || !searchPrompt.trim() || sessionId !== null
                     ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                     : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white'
                 }`}
               >
                 {isStarting ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
-                ) : sessionId ? (
-                  <Send className="w-5 h-5" />
                 ) : (
-                  <Sparkles className="w-5 h-5" />
+                  <Send className="w-5 h-5" />
                 )}
               </button>
             </div>
           </div>
-        </div>
-
-        {/* Right Panel - Browser Preview */}
-        <div className="w-1/2 bg-gray-100 flex items-center justify-center">
-          {liveViewUrl && sessionId ? (
-            <iframe
-              src={liveViewUrl}
-              className="w-full h-full"
-              title="LinkedIn Automation Browser"
-            />
-          ) : (
-            <div className="text-center">
-              <div className="w-24 h-24 bg-gray-200 rounded-lg mx-auto mb-4 flex items-center justify-center">
-                <ExternalLink className="w-12 h-12 text-gray-400" />
-              </div>
-              <p className="text-gray-600 font-medium">Browser Preview</p>
-              <p className="text-gray-500 text-sm mt-1">
-                Start an automation to see the live browser view
-              </p>
-            </div>
-          )}
         </div>
       </div>
 
@@ -741,7 +724,7 @@ export default function LinkedInAutomationNew() {
             <div className="p-6">
               <div className="flex items-center space-x-3 mb-4">
                 <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                  <Sparkles className="w-6 h-6 text-blue-600" />
+                  <Bot className="w-6 h-6 text-blue-600" />
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-gray-900">One-Time LinkedIn Setup</h2>

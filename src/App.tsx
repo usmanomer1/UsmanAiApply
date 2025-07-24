@@ -3,15 +3,16 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from 'react-hot-toast';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
+import { SidebarProvider } from './contexts/SidebarContext';
 import CustomAuthPage from './components/auth/CustomAuthPage';
 import PasswordResetPage from './components/auth/PasswordResetPage';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import Sidebar from './components/layout/Sidebar';
+import { MainLayout } from './components/layout/MainLayout';
 import ProfilePage from './components/ProfilePage';
 import { ResumePage } from './components/ResumePage';
 import LinkedInAutomationBot from './components/LinkedInAutomationBot';
 import LinkedInAutomationNew from './components/LinkedInAutomationNew';
-import LinkedInAutomationChat from './components/LinkedInAutomationChat';
 import { SuccessPage } from './components/SuccessPage';
 import JobSearchPage from './components/JobSearchPage';
 import { BillingPage } from './components/billing/BillingPage';
@@ -22,33 +23,24 @@ import NotificationsPage from './components/NotificationsPage';
 
 function App() {
   const enableNewLinkedInUI = import.meta.env.VITE_ENABLE_NEW_LINKEDIN_UI === 'true';
-  const enableChatUI = import.meta.env.VITE_ENABLE_CHAT_LINKEDIN_UI === 'true';
   
   return (
     <ThemeProvider>
       <AuthProvider>
-        <Router>
+        <SidebarProvider>
+          <Router>
           <div className="min-h-screen bg-gray-50">
             <Routes>
               <Route path="/auth" element={<CustomAuthPage />} />
               <Route path="/reset-password" element={<PasswordResetPage />} />
               <Route path="/success" element={<SuccessPage />} />
-              {/* Dedicated route for chat UI without sidebar */}
-              <Route
-                path="/linkedin-chat"
-                element={
-                  <ProtectedRoute>
-                    <LinkedInAutomationChat />
-                  </ProtectedRoute>
-                }
-              />
               <Route
                 path="/*"
                 element={
                   <ProtectedRoute>
                     <div className="flex">
                       <Sidebar />
-                      <main className="flex-1 ml-[240px]">
+                      <MainLayout>
                         <div className="p-8 relative z-0">
                           <Routes>
                             <Route path="/dashboard" element={<Dashboard />} />
@@ -57,11 +49,7 @@ function App() {
                             <Route path="/profile" element={<ProfilePage />} />
                             <Route 
                               path="/auto-apply" 
-                              element={
-                                enableChatUI ? <LinkedInAutomationChat /> : 
-                                enableNewLinkedInUI ? <LinkedInAutomationNew /> : 
-                                <LinkedInAutomationBot />
-                              } 
+                              element={enableNewLinkedInUI ? <LinkedInAutomationNew /> : <LinkedInAutomationBot />} 
                             />
                             <Route path="/resume" element={<ResumePage />} />
                             <Route path="/billing" element={<BillingPage />} />
@@ -70,7 +58,7 @@ function App() {
                             <Route path="/" element={<Navigate to="/dashboard" replace />} />
                           </Routes>
                         </div>
-                      </main>
+                      </MainLayout>
                     </div>
                   </ProtectedRoute>
                 }
@@ -90,6 +78,7 @@ function App() {
             />
           </div>
         </Router>
+        </SidebarProvider>
       </AuthProvider>
     </ThemeProvider>
   );
