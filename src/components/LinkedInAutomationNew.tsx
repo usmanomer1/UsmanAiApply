@@ -183,7 +183,7 @@ export default function LinkedInAutomationNew() {
   const addChatMessage = (message: Omit<ChatMessage, 'id' | 'timestamp'>) => {
     setChatMessages(prev => [...prev, {
       ...message,
-      id: Date.now().toString(),
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       timestamp: new Date()
     }]);
   };
