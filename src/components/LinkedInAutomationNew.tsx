@@ -56,6 +56,8 @@ export default function LinkedInAutomationNew() {
   const [isInChatMode, setIsInChatMode] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [debugMode, setDebugModeState] = useState(isDebugMode());
+  const [lastInterventionType, setLastInterventionType] = useState<string | null>(null);
+  const [lastStatusMessage, setLastStatusMessage] = useState<string | null>(null);
   // Filter states
   const [filters, setFilters] = useState({
     easyApplyOnly: false,
@@ -182,11 +184,30 @@ export default function LinkedInAutomationNew() {
   }, []);
 
   const addChatMessage = (message: Omit<ChatMessage, 'id' | 'timestamp'>) => {
-    setChatMessages(prev => [...prev, {
-      ...message,
-      id: `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
-      timestamp: new Date()
-    }]);
+    setChatMessages(prev => {
+      // Check if we just added an identical message (within last 3 seconds)
+      const recentMessages = prev.slice(-5); // Check last 5 messages
+      const now = new Date();
+      
+      for (const recentMsg of recentMessages) {
+        const timeDiff = now.getTime() - recentMsg.timestamp.getTime();
+        
+        // If we find an identical message within the last 3 seconds, skip adding it
+        if (timeDiff < 3000 && 
+            recentMsg.type === message.type && 
+            recentMsg.message === message.message &&
+            recentMsg.status === message.status) {
+          console.log('[FRONTEND] Skipping duplicate message:', message.message);
+          return prev;
+        }
+      }
+      
+      return [...prev, {
+        ...message,
+        id: `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
+        timestamp: now
+      }];
+    });
   };
 
   // Load user profile from Supabase
@@ -480,6 +501,8 @@ export default function LinkedInAutomationNew() {
     setSessionId(null); // Clear any previous session
     setSessionStatus(null);
     setAppliedJobs([]);
+    setLastInterventionType(null); // Reset intervention tracking
+    setLastStatusMessage(null); // Reset status message tracking
     localStorage.removeItem('activeSessionId'); // Clear any stored session
     
     // Add initial messages
@@ -560,15 +583,10 @@ export default function LinkedInAutomationNew() {
       // Don't store session - always start fresh
       
       setCurrentStep(2);
-      addChatMessage({
-        type: 'step',
-        message: contextStatus.hasContext 
-          ? 'Connected to LinkedIn. Starting job search...' 
-          : 'Launching browser and navigating to LinkedIn...',
-        stepNumber: 2,
-        status: 'RUNNING'
-      });
-
+      
+      // Don't add duplicate message here - the status polling will handle it
+      // The handleStatusUpdate function will add the appropriate message based on the actual status
+      
       // Start polling for status updates
       startPollingStatus(result.sessionId);
       
@@ -605,21 +623,31 @@ export default function LinkedInAutomationNew() {
         if (status.intervention && status.intervention.required) {
           setShowIntervention(true);
           
-          // Customize message based on intervention type
-          let interventionMessage = status.intervention.message;
-          if (status.intervention.type === 'LOGIN') {
-            interventionMessage = 'Please log in to your LinkedIn account in the browser window above. Once you\'ve successfully logged in, click the continue button below.';
-          }
-          
-          addChatMessage({
-            type: 'warning',
-            message: interventionMessage,
-            status: 'WAIT',
-            metadata: {
-              intervention: status.intervention,
-              showContinueButton: true
+          // Only add intervention message if it's a new intervention type
+          if (status.intervention.type !== lastInterventionType) {
+            setLastInterventionType(status.intervention.type);
+            
+            // Customize message based on intervention type
+            let interventionMessage = status.intervention.message;
+            if (status.intervention.type === 'LOGIN') {
+              interventionMessage = 'Please log in to your LinkedIn account in the browser window above. Once you\'ve successfully logged in, click the continue button below.';
             }
-          });
+            
+            addChatMessage({
+              type: 'warning',
+              message: interventionMessage,
+              status: 'WAIT',
+              metadata: {
+                intervention: status.intervention,
+                showContinueButton: true
+              }
+            });
+          }
+        } else {
+          // Clear intervention type when no intervention is required
+          if (lastInterventionType) {
+            setLastInterventionType(null);
+          }
         }
         
         // Handle completion
@@ -825,6 +853,8 @@ export default function LinkedInAutomationNew() {
     setJobsFound([]);
     setMetrics({});
     setConfig(null);
+    setLastInterventionType(null);
+    setLastStatusMessage(null);
     setFilters({
       easyApplyOnly: false,
       remote: false,
