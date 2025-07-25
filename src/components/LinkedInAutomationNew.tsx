@@ -249,6 +249,15 @@ export default function LinkedInAutomationNew() {
     setLiveViewUrl(null);
   }, []);
 
+  // Debug logging for session tracking
+  useEffect(() => {
+    console.log('[FRONTEND DEBUG] Session info:', {
+      sessionId,
+      liveViewUrl,
+      timestamp: new Date().toISOString()
+    });
+  }, [sessionId, liveViewUrl]);
+
   // Cleanup polling on unmount
   useEffect(() => {
     return () => {
@@ -490,6 +499,14 @@ export default function LinkedInAutomationNew() {
       console.log(`[${new Date().toISOString()}] Starting job search API call`);
       const result = await linkedInJobSearchApi.startJobSearch(user!.id, jobSearchConfig);
       console.log(`[${new Date().toISOString()}] Session created:`, result.sessionId);
+      console.log('[FRONTEND DEBUG] Full API response:', {
+        sessionId: result.sessionId,
+        liveViewUrl: result.liveViewUrl,
+        browserbaseSessionId: result.browserbaseSessionId,
+        status: result.status,
+        taskId: result.taskId,
+        timestamp: new Date().toISOString()
+      });
 
       setSessionId(result.sessionId);
       setLiveViewUrl(result.liveViewUrl);
@@ -1211,6 +1228,7 @@ export default function LinkedInAutomationNew() {
             src={liveViewUrl}
             className="w-full h-full"
             title="LinkedIn Automation Browser"
+            onLoad={() => console.log('[FRONTEND DEBUG] Iframe loaded:', liveViewUrl)}
           />
         ) : (
           <div className="h-full flex items-center justify-center">
