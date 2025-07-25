@@ -87,21 +87,36 @@ class LinkedInAutomationAPI {
       'Content-Type': 'application/json',
     };
 
-    // Add API key for direct API calls (not Netlify functions)
-    if (!USE_NETLIFY_FUNCTION && API_KEY) {
-      headers['X-API-Key'] = API_KEY;
-    }
-
-    // Add Bearer token for authenticated requests
+    // Always add Bearer token for LinkedIn automation endpoints
     if (requiresAuth) {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session?.access_token) {
-        throw new Error('Authentication required');
+        console.error('No Supabase session found - authentication will fail');
+        throw new Error('Authentication required - please log in');
       }
 
       headers['Authorization'] = `Bearer ${session.access_token}`;
+      console.log('Using Bearer token authentication');
+      
+      // Also add API key if available (some endpoints might check both)
+      if (!USE_NETLIFY_FUNCTION && API_KEY) {
+        headers['X-API-Key'] = API_KEY;
+        console.log('Also including API Key with Bearer token');
+      }
+    } else if (!USE_NETLIFY_FUNCTION && API_KEY) {
+      // For non-auth requests, just use API key
+      headers['X-API-Key'] = API_KEY;
+      console.log('Using API Key authentication only');
     }
+
+    console.log('Request headers prepared:', {
+      hasContentType: !!headers['Content-Type'],
+      hasApiKey: !!headers['X-API-Key'],
+      hasBearer: !!headers['Authorization'],
+      requiresAuth,
+      useNetlifyFunction: USE_NETLIFY_FUNCTION
+    });
 
     return headers;
   }
@@ -208,17 +223,54 @@ class LinkedInAutomationAPI {
   }
 
   async continueAfterIntervention(sessionId: string): Promise<{ success: boolean; status: string; message: string }> {
-    const response = await fetch(`${API_BASE_URL}/api/linkedin/continue/${sessionId}`, {
-      method: 'POST',
-      headers: await this.getHeaders(true),
-      body: JSON.stringify({ interventionCompleted: true })
-    });
+    try {
+      const headers = await this.getHeaders(true);
+      console.log('Continue endpoint - Headers being sent:', headers);
+      console.log('Continue endpoint - URL:', `${API_BASE_URL}/api/linkedin/continue/${sessionId}`);
+      
+      const response = await fetch(`${API_BASE_URL}/api/linkedin/continue/${sessionId}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({}), // Empty body as per the new API spec
+        credentials: 'include', // Include cookies for CORS
+        mode: 'cors' // Explicitly set CORS mode
+      });
 
-    if (!response.ok) {
-      throw new Error('Failed to continue automation');
+      console.log('Continue response status:', response.status);
+      console.log('Continue response headers:', Object.fromEntries(response.headers.entries()));
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to continue automation';
+        let errorData: any = { status: response.status, statusText: response.statusText };
+        
+        try {
+          const errorText = await response.text();
+          console.error('Continue failed - Response body:', errorText);
+          
+          try {
+            const errorJson = JSON.parse(errorText);
+            errorMessage = errorJson.message || errorJson.error || errorMessage;
+            errorData = { ...errorData, ...errorJson };
+          } catch (parseError) {
+            errorData.bodyText = errorText;
+          }
+        } catch (e) {
+          console.error('Failed to read error response:', e);
+        }
+        
+        const err = new Error(errorMessage) as any;
+        err.status = response.status;
+        err.data = errorData;
+        throw err;
+      }
+
+      const result = await response.json();
+      console.log('Continue successful:', result);
+      return result;
+    } catch (error) {
+      console.error('Continue after intervention error:', error);
+      throw error;
     }
-
-    return response.json();
   }
 
   async getAppliedJobs(sessionId: string, page = 1, limit = 50): Promise<JobsResponse> {

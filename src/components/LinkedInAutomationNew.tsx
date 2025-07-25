@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Send, Bot, AlertCircle, Loader2, CheckCircle, XCircle, Info, RefreshCw, ExternalLink, Pause, Play, Square, ArrowRight } from 'lucide-react';
+import { Settings, Send, Bot, AlertCircle, Loader2, CheckCircle, XCircle, Info, RefreshCw, ExternalLink, Pause, Play, Square, ArrowRight, Github, FileSpreadsheet, TrendingUp, Gamepad2, X, Briefcase, MapPin, Building2, Clock, Users } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { linkedinAutomationApi, SessionStatus, AppliedJob } from '../lib/linkedinAutomationApi';
+import { linkedInJobSearchApi, JobSearchConfig, Job, AutomationMetrics, SessionStatus, AppliedJob } from '../lib/linkedInJobSearchApi';
 import LinkedInConfigModal from './LinkedInConfigModal';
+import { supabase } from '../lib/supabase';
 
 interface AutomationConfig {
   socialLinks: Array<{ id: string; title: string; url: string; icon?: string }>;
@@ -22,13 +23,16 @@ interface AutomationConfig {
 
 interface ChatMessage {
   id: string;
-  type: 'user' | 'assistant' | 'system' | 'info' | 'error' | 'success' | 'warning';
+  type: 'user' | 'assistant' | 'system' | 'info' | 'error' | 'success' | 'warning' | 'step';
   message: string;
   timestamp: Date;
+  status?: 'WAIT' | 'MESSAGE' | 'RUNNING' | 'COMPLETE';
+  stepNumber?: number;
   metadata?: {
     status?: string;
     progress?: SessionStatus['progress'];
     intervention?: SessionStatus['intervention'];
+    showContinueButton?: boolean;
   };
 }
 
@@ -47,9 +51,53 @@ export default function LinkedInAutomationNew() {
   const [inputMessage, setInputMessage] = useState('');
   const [hasLinkedInContext, setHasLinkedInContext] = useState<boolean | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
+  const [sessionDuration, setSessionDuration] = useState('00:00');
+  const [isInChatMode, setIsInChatMode] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  // Filter states
+  const [filters, setFilters] = useState({
+    easyApplyOnly: false,
+    remote: false,
+    datePosted: null as 'day' | 'week' | 'month' | null,
+    under10Applicants: false
+  });
+  const [userResume, setUserResume] = useState<{ id: string; url: string; metadata: any } | null>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [jobsFound, setJobsFound] = useState<Job[]>([]);
+  const [metrics, setMetrics] = useState<AutomationMetrics>({});
   const stopPollingRef = useRef<(() => void) | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Preset action cards for job search
+  const actionCards = [
+    {
+      icon: <Briefcase className="w-5 h-5" />,
+      title: "Software Engineering Jobs",
+      description: "Apply to developer positions automatically",
+      prompt: "software engineer jobs in San Francisco"
+    },
+    {
+      icon: <MapPin className="w-5 h-5" />,
+      title: "Remote Tech Roles",
+      description: "Find and apply to remote opportunities",
+      prompt: "remote senior developer positions with React experience"
+    },
+    {
+      icon: <Building2 className="w-5 h-5" />,
+      title: "Startup Positions",
+      description: "Target early-stage startup roles",
+      prompt: "software engineer at startups in Bay Area"
+    },
+    {
+      icon: <Users className="w-5 h-5" />,
+      title: "Tech Lead Roles",
+      description: "Apply to leadership positions",
+      prompt: "tech lead or engineering manager positions"
+    }
+  ];
 
   useEffect(() => {
     // Load saved config
@@ -66,6 +114,12 @@ export default function LinkedInAutomationNew() {
     if (hasContext === null && user) {
       setShowOnboarding(true);
     }
+    
+    // Load user profile and resume
+    if (user) {
+      loadUserProfile();
+      loadUserResume();
+    }
   }, [user]);
 
   useEffect(() => {
@@ -74,6 +128,33 @@ export default function LinkedInAutomationNew() {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [chatMessages]);
+
+  useEffect(() => {
+    // Update session duration
+    if (sessionStartTime && sessionId) {
+      const updateDuration = () => {
+        const now = new Date();
+        const diff = Math.floor((now.getTime() - sessionStartTime.getTime()) / 1000);
+        const minutes = Math.floor(diff / 60);
+        const seconds = diff % 60;
+        setSessionDuration(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+      };
+      
+      updateDuration();
+      durationIntervalRef.current = setInterval(updateDuration, 1000);
+    } else {
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+        durationIntervalRef.current = null;
+      }
+    }
+    
+    return () => {
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+      }
+    };
+  }, [sessionStartTime, sessionId]);
 
   useEffect(() => {
     // Check if intervention is required
@@ -92,6 +173,9 @@ export default function LinkedInAutomationNew() {
       if (stopPollingRef.current) {
         stopPollingRef.current();
       }
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+      }
     };
   }, []);
 
@@ -103,11 +187,64 @@ export default function LinkedInAutomationNew() {
     }]);
   };
 
+  // Load user profile from Supabase
+  const loadUserProfile = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      
+      if (error) throw error;
+      setUserProfile(data);
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+    }
+  };
+
+  // Load user resume from Supabase storage
+  const loadUserResume = async () => {
+    if (!user) return;
+    
+    try {
+      // First get the resume metadata from the profiles table
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('resume_url, resume_text')
+        .eq('id', user.id)
+        .single();
+      
+      if (profileError || !profile?.resume_url) {
+        console.log('No resume found for user');
+        return;
+      }
+      
+      // Get the file metadata
+      const fileName = profile.resume_url.split('/').pop() || 'resume.pdf';
+      
+      setUserResume({
+        id: `resume-${user.id}`,
+        url: profile.resume_url,
+        metadata: {
+          fileName,
+          fileType: 'application/pdf',
+          extractedText: profile.resume_text
+        }
+      });
+    } catch (error) {
+      console.error('Error loading user resume:', error);
+    }
+  };
+
   // Resume active session on mount
   useEffect(() => {
     const activeSessionId = localStorage.getItem('activeSessionId');
     if (activeSessionId && !sessionId) {
       setSessionId(activeSessionId);
+      setIsInChatMode(true);
       // Resume polling for this session
       linkedinAutomationApi.getStatus(activeSessionId)
         .then(status => {
@@ -126,6 +263,7 @@ export default function LinkedInAutomationNew() {
         .catch(error => {
           console.error('Failed to resume session:', error);
           localStorage.removeItem('activeSessionId');
+          setIsInChatMode(false);
         });
     }
   }, [sessionId]);
@@ -148,7 +286,8 @@ export default function LinkedInAutomationNew() {
       setHasLinkedInContext(true);
       addChatMessage({
         type: 'success',
-        message: 'Great! Your LinkedIn account is now connected. Future sessions will start automatically without requiring login.'
+        message: 'Great! Your LinkedIn account is now connected. Future sessions will start automatically without requiring login.',
+        status: 'COMPLETE'
       });
     }
     
@@ -157,30 +296,34 @@ export default function LinkedInAutomationNew() {
       if (status.status === 'running') {
         // Different messages based on previous state
         let message = '';
-        let type: ChatMessage['type'] = 'info';
         
         if (!prevStatus) {
           message = hasLinkedInContext 
-            ? 'Automation started with your saved LinkedIn session!'
-            : 'Automation started! Setting up LinkedIn session...';
-          type = 'info';
+            ? 'LinkedIn session connected. Starting job search...'
+            : 'Setting up LinkedIn session...';
         } else if (prevStatus === 'intervention_required') {
           message = 'Action completed! Resuming automation...';
-          type = 'success';
         } else if (prevStatus === 'paused') {
           message = 'Automation resumed';
-          type = 'info';
         } else {
           return;
         }
         
         if (message) {
-          addChatMessage({ type, message, metadata: { status: status.status } });
+          setCurrentStep(prev => prev + 1);
+          addChatMessage({ 
+            type: 'step', 
+            message, 
+            stepNumber: currentStep + 1,
+            status: 'RUNNING',
+            metadata: { status: status.status }
+          });
         }
       } else if (status.status === 'completed') {
         addChatMessage({
           type: 'success',
           message: `Completed! Applied to ${status.progress.totalApplications} job${status.progress.totalApplications !== 1 ? 's' : ''}.`,
+          status: 'COMPLETE',
           metadata: { status: status.status, progress: status.progress }
         });
         if (sessionId) {
@@ -192,14 +335,16 @@ export default function LinkedInAutomationNew() {
         addChatMessage({
           type: 'error',
           message: 'Automation failed. Please try again.',
+          status: 'COMPLETE',
           metadata: { status: status.status }
         });
         // Clear stored session
         localStorage.removeItem('activeSessionId');
       } else if (status.status === 'paused') {
         addChatMessage({
-          type: 'info',
+          type: 'system',
           message: 'Automation paused',
+          status: 'WAIT',
           metadata: { status: status.status }
         });
       }
@@ -208,11 +353,26 @@ export default function LinkedInAutomationNew() {
     // Handle intervention changes separately
     if (status.status === 'intervention_required' && 
         JSON.stringify(prevIntervention) !== JSON.stringify(status.intervention)) {
+      const interventionMessage = getInterventionMessage(status.intervention);
+      const isLogin = status.intervention?.type === 'login';
+      
       addChatMessage({
         type: 'warning',
-        message: getInterventionMessage(status.intervention),
-        metadata: { intervention: status.intervention }
+        message: interventionMessage,
+        status: 'WAIT',
+        metadata: { 
+          intervention: status.intervention,
+          showContinueButton: true
+        }
       });
+      
+      if (isLogin && hasLinkedInContext === false) {
+        addChatMessage({
+          type: 'info',
+          message: '💡 One-time setup: After you log in, we\'ll save your session for all future automations.',
+          status: 'MESSAGE'
+        });
+      }
     }
     
     // Add progress updates only if running and applications have increased
@@ -222,9 +382,12 @@ export default function LinkedInAutomationNew() {
       
       // Only show progress update if count increased
       if (currentCount > prevCount) {
+        setCurrentStep(prev => prev + 1);
         addChatMessage({
-          type: 'info',
-          message: `Progress update: Applied to ${currentCount} job${currentCount !== 1 ? 's' : ''} (${status.progress.applicationsToday} today)`,
+          type: 'step',
+          message: `Applied to ${currentCount} job${currentCount !== 1 ? 's' : ''} so far...`,
+          stepNumber: currentStep + 1,
+          status: 'MESSAGE',
           metadata: { progress: status.progress }
         });
       }
@@ -257,32 +420,73 @@ export default function LinkedInAutomationNew() {
       return;
     }
 
-    if (!config) {
-      setShowConfigModal(true);
+    if (!config && !userResume) {
+      alert('Please upload your resume in your profile settings first');
       return;
     }
 
     setIsStarting(true);
+    setIsInChatMode(true);
     setChatMessages([]); // Clear previous messages
+    setSessionStartTime(new Date());
+    setCurrentStep(0);
+    setJobsFound([]);
+    setMetrics({});
     
     // Add initial messages
     addChatMessage({
       type: 'user',
-      message: searchPrompt.trim()
+      message: searchPrompt.trim(),
+      status: 'MESSAGE'
+    });
+
+    addChatMessage({
+      type: 'step',
+      message: 'Initializing job search automation...',
+      stepNumber: 1,
+      status: 'WAIT'
     });
 
     try {
-      const result = await linkedinAutomationApi.startAutomation({
-        userId: user!.id,
+      // Check context status first
+      const contextStatus = await linkedInJobSearchApi.checkContextStatus();
+      setHasLinkedInContext(contextStatus.hasContext);
+      
+      if (!contextStatus.hasContext) {
+        addChatMessage({
+          type: 'info',
+          message: 'First time setup: You\'ll need to log in to LinkedIn once. After that, all future sessions will be automatic!',
+          status: 'MESSAGE'
+        });
+      }
+      
+      // Build job search config
+      const jobSearchConfig: JobSearchConfig = {
         searchPrompt: searchPrompt.trim(),
-        config: {
-          maxApplications: 50,
-          filters: {
-            easyApplyOnly: true,
-            datePosted: 'week'
+        maxApplications: 50,
+        // Only include filters that are enabled
+        ...(filters.easyApplyOnly && { easyApplyOnly: true }),
+        ...(filters.remote && { remote: true }),
+        ...(filters.datePosted && { datePosted: filters.datePosted }),
+        ...(filters.under10Applicants && { under10Applicants: true }),
+        // Include resume if available
+        ...(userResume && {
+          resumeId: userResume.id,
+          resumeUrl: userResume.url,
+          resumeMetadata: userResume.metadata
+        }),
+        // Include profile links if available
+        ...(config?.socialLinks && {
+          profileLinks: {
+            github: config.socialLinks.find(l => l.title === 'GitHub')?.url,
+            linkedin: config.socialLinks.find(l => l.title === 'LinkedIn')?.url,
+            portfolio: config.socialLinks.find(l => l.title === 'Portfolio')?.url,
           }
-        }
-      });
+        })
+      };
+      
+      // Start job search
+      const result = await linkedInJobSearchApi.startJobSearch(user!.id, jobSearchConfig);
 
       setSessionId(result.sessionId);
       setLiveViewUrl(result.liveViewUrl);
@@ -290,68 +494,162 @@ export default function LinkedInAutomationNew() {
       // Store session ID for page refresh handling
       localStorage.setItem('activeSessionId', result.sessionId);
       
+      setCurrentStep(2);
       addChatMessage({
-        type: 'assistant',
-        message: hasLinkedInContext 
-          ? 'Starting automation with your saved LinkedIn session. No login required!' 
-          : 'Automation started! You may need to log in to LinkedIn (one-time setup).'
+        type: 'step',
+        message: contextStatus.hasContext 
+          ? 'Connected to LinkedIn. Starting job search...' 
+          : 'Launching browser and navigating to LinkedIn...',
+        stepNumber: 2,
+        status: 'RUNNING'
       });
 
-      // Start polling for status
-      stopPollingRef.current = linkedinAutomationApi.pollStatus(
-        result.sessionId,
-        handleStatusUpdate
-      );
+      // Connect WebSocket for real-time updates
+      linkedInJobSearchApi.connectWebSocket(result.sessionId);
+      setupWebSocketHandlers();
+      
     } catch (error: any) {
       addChatMessage({
         type: 'error',
-        message: `Error: ${error.message || 'Failed to start automation'}`
+        message: `Error: ${error.message || 'Failed to start automation'}`,
+        status: 'COMPLETE'
       });
+      setIsInChatMode(false);
     } finally {
       setIsStarting(false);
     }
   };
 
+  // Setup WebSocket event handlers
+  const setupWebSocketHandlers = () => {
+    // Agent reasoning updates
+    linkedInJobSearchApi.onWebSocketEvent('agent:step:realtime', (data: any) => {
+      setCurrentStep(prev => prev + 1);
+      addChatMessage({
+        type: 'step',
+        message: data.step,
+        stepNumber: currentStep + 1,
+        status: 'RUNNING',
+        metadata: { status: 'running' }
+      });
+    });
+    
+    // Agent reasoning
+    linkedInJobSearchApi.onWebSocketEvent('agent:reasoning', (data: any) => {
+      addChatMessage({
+        type: 'assistant',
+        message: data.reasoning,
+        status: 'MESSAGE'
+      });
+    });
+    
+    // Job found
+    linkedInJobSearchApi.onWebSocketEvent('job:found', (data: any) => {
+      setJobsFound(prev => [...prev, data.job]);
+      addChatMessage({
+        type: 'info',
+        message: `Found job: ${data.job.jobTitle} at ${data.job.company}`,
+        status: 'MESSAGE'
+      });
+    });
+    
+    // Application submitted
+    linkedInJobSearchApi.onWebSocketEvent('application:submitted', (data: any) => {
+      setCurrentStep(prev => prev + 1);
+      addChatMessage({
+        type: 'success',
+        message: `✅ Applied to ${data.job.jobTitle} at ${data.job.company}`,
+        status: 'COMPLETE'
+      });
+    });
+    
+    // Job skipped
+    linkedInJobSearchApi.onWebSocketEvent('job:skipped', (data: any) => {
+      addChatMessage({
+        type: 'system',
+        message: `Skipped: ${data.reason}`,
+        status: 'MESSAGE'
+      });
+    });
+    
+    // Intervention required
+    linkedInJobSearchApi.onWebSocketEvent('intervention:required', (data: any) => {
+      setShowIntervention(true);
+      addChatMessage({
+        type: 'warning',
+        message: data.message,
+        status: 'WAIT',
+        metadata: {
+          intervention: {
+            type: data.interventionType,
+            message: data.message,
+            instructions: data.actionRequired
+          },
+          showContinueButton: true
+        }
+      });
+    });
+    
+    // Metrics update
+    linkedInJobSearchApi.onWebSocketEvent('metrics:updated', (data: any) => {
+      setMetrics(data.metrics);
+    });
+    
+    // Session completed
+    linkedInJobSearchApi.onWebSocketEvent('session:completed', (data: any) => {
+      addChatMessage({
+        type: 'success',
+        message: `Completed! Applied to ${data.totalApplications || metrics.successfulApplications || 0} jobs.`,
+        status: 'COMPLETE'
+      });
+      localStorage.removeItem('activeSessionId');
+      linkedInJobSearchApi.disconnectWebSocket();
+    });
+    
+    // Context events
+    linkedInJobSearchApi.onWebSocketEvent('context:first_login', (data: any) => {
+      addChatMessage({
+        type: 'info',
+        message: 'First time setup: Please log in to LinkedIn in the browser window.',
+        status: 'MESSAGE'
+      });
+    });
+    
+    linkedInJobSearchApi.onWebSocketEvent('context:created', (data: any) => {
+      addChatMessage({
+        type: 'success',
+        message: 'LinkedIn session created successfully!',
+        status: 'COMPLETE'
+      });
+      setHasLinkedInContext(true);
+    });
+  };
+
   const loadAppliedJobs = async (sessionId: string) => {
     try {
-      const response = await linkedinAutomationApi.getAppliedJobs(sessionId);
+      const response = await linkedInJobSearchApi.getAppliedJobs(sessionId);
       setAppliedJobs(response.jobs);
     } catch (error) {
       console.error('Error loading applied jobs:', error);
     }
   };
 
-  const handlePauseResume = async () => {
-    if (!sessionId || !sessionStatus) return;
-
-    try {
-      if (sessionStatus.status === 'running') {
-        await linkedinAutomationApi.pauseSession(sessionId);
-      } else if (sessionStatus.status === 'paused') {
-        await linkedinAutomationApi.resumeSession(sessionId);
-      }
-    } catch (error: any) {
-      addChatMessage({
-        type: 'error',
-        message: `Error: ${error.message || 'Operation failed'}`
-      });
-    }
-  };
 
   const handleStop = async () => {
     if (!sessionId) return;
 
     if (confirm('Are you sure you want to stop the automation?')) {
       try {
-        await linkedinAutomationApi.stopSession(sessionId);
-        stopPollingRef.current?.();
+        await linkedInJobSearchApi.stopAutomation(sessionId);
+        linkedInJobSearchApi.disconnectWebSocket();
         
         // Clear stored session
         localStorage.removeItem('activeSessionId');
         
         addChatMessage({
           type: 'system',
-          message: 'Automation stopped'
+          message: 'Automation stopped',
+          status: 'COMPLETE'
         });
         
         // Reset state after a delay to show the message
@@ -360,11 +658,17 @@ export default function LinkedInAutomationNew() {
           setSessionStatus(null);
           setLiveViewUrl(null);
           setAppliedJobs([]);
+          setJobsFound([]);
+          setMetrics({});
+          setIsInChatMode(false);
+          setSessionStartTime(null);
+          setSessionDuration('00:00');
         }, 2000);
       } catch (error: any) {
         addChatMessage({
           type: 'error',
-          message: `Error: ${error.message || 'Failed to stop automation'}`
+          message: `Error: ${error.message || 'Failed to stop automation'}`,
+          status: 'COMPLETE'
         });
       }
     }
@@ -373,14 +677,38 @@ export default function LinkedInAutomationNew() {
   const handleContinueAfterIntervention = async () => {
     if (!sessionId) return;
 
+    // First, verify we have a valid session
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      addChatMessage({
+        type: 'error',
+        message: 'Your session has expired. Please refresh the page and log in again.',
+        status: 'COMPLETE'
+      });
+      return;
+    }
+
+    console.log('Attempting to continue automation:', {
+      sessionId,
+      hasSupabaseSession: !!session,
+      sessionUser: session.user?.email
+    });
+
+    addChatMessage({
+      type: 'system',
+      message: 'Continuing automation...',
+      status: 'RUNNING'
+    });
+
     try {
-      const response = await linkedinAutomationApi.continueAfterIntervention(sessionId);
+      const response = await linkedInJobSearchApi.resumeAutomation(sessionId);
       setShowIntervention(false);
       
-      if (response.status === 'running') {
+      if (response.success) {
         addChatMessage({
-          type: 'assistant',
-          message: 'Thanks! Continuing with the automation...'
+          type: 'success',
+          message: 'Great! Automation resumed successfully.',
+          status: 'COMPLETE'
         });
       }
       
@@ -393,32 +721,71 @@ export default function LinkedInAutomationNew() {
         });
       }
     } catch (error: any) {
+      console.error('Continue after intervention error:', error);
+      
       // Handle specific error cases
       if (error.status === 429) {
         addChatMessage({
           type: 'error',
-          message: 'Rate limited. Please wait a few minutes before continuing.'
+          message: 'Rate limited. Please wait a few minutes before continuing.',
+          status: 'COMPLETE'
         });
       } else if (error.status === 401) {
         addChatMessage({
           type: 'error',
-          message: 'Session expired. Please restart the automation.'
+          message: 'Authentication error. Please check your login status and try again.',
+          status: 'COMPLETE'
+        });
+        // Check if user is still logged in
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          addChatMessage({
+            type: 'error',
+            message: 'Your session has expired. Please log in again.',
+            status: 'COMPLETE'
+          });
+          // Optionally redirect to login
+        }
+      } else if (error.status === 404) {
+        addChatMessage({
+          type: 'error',
+          message: 'Session not found. The automation may have expired.',
+          status: 'COMPLETE'
         });
         localStorage.removeItem('activeSessionId');
+      } else if (error.status === 500 && error.message?.includes('login page')) {
+        addChatMessage({
+          type: 'error',
+          message: 'Still on login page. Please complete the login process first.',
+          status: 'COMPLETE'
+        });
       } else {
         addChatMessage({
           type: 'error',
-          message: `Error: ${error.message || 'Failed to continue automation'}`
+          message: `Error: ${error.message || 'Failed to continue automation'}`,
+          status: 'COMPLETE'
         });
       }
     }
   };
 
   const handleSendMessage = () => {
-    if (!searchPrompt.trim()) return;
+    if (!inputMessage.trim()) return;
 
-    // Initial prompt
-    handleStart();
+    addChatMessage({
+      type: 'user',
+      message: inputMessage,
+      status: 'MESSAGE'
+    });
+    
+    // Bot response
+    addChatMessage({
+      type: 'assistant',
+      message: 'I\'m currently focused on applying to jobs. You can pause or stop the automation using the controls above.',
+      status: 'MESSAGE'
+    });
+    
+    setInputMessage('');
   };
 
   const formatTime = (date: Date) => {
@@ -429,249 +796,36 @@ export default function LinkedInAutomationNew() {
     });
   };
 
-  const getMessageColor = (type: ChatMessage['type']) => {
-    switch (type) {
-      case 'user':
-        return 'bg-gray-50 text-gray-900';
-      case 'assistant':
-        return 'bg-blue-50 text-blue-900';
-      case 'system':
-        return 'bg-gray-100 text-gray-700';
-      case 'info':
-        return 'bg-teal-50 text-teal-900';
-      case 'error':
-        return 'bg-red-50 text-red-900';
-      case 'success':
-        return 'bg-green-50 text-green-900';
-      case 'warning':
-        return 'bg-orange-50 text-orange-900';
-      default:
-        return 'bg-gray-100 text-gray-900';
-    }
+  const handleClose = () => {
+    handleStop();
   };
 
-  const getMessageIcon = (type: ChatMessage['type']) => {
-    switch (type) {
-      case 'assistant':
-        return <Bot className="w-5 h-5 text-blue-600" />;
-      case 'error':
-        return <XCircle className="w-5 h-5 text-red-600" />;
-      case 'success':
-        return <CheckCircle className="w-5 h-5 text-green-600" />;
-      case 'warning':
-        return <AlertCircle className="w-5 h-5 text-orange-600" />;
-      case 'info':
-        return <Info className="w-5 h-5 text-teal-600" />;
-      default:
-        return null;
-    }
-  };
 
-  return (
-    <div className="h-[calc(100vh-4rem)] bg-white flex flex-col">
-      {/* Header */}
-      <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-xl font-semibold text-gray-900">LinkedIn Agent</h1>
-          {sessionStatus && (
-            <div className="flex items-center space-x-2">
-              {sessionStatus.status === 'running' && <Loader2 className="w-4 h-4 animate-spin text-blue-500" />}
-              {sessionStatus.status === 'paused' && <Pause className="w-4 h-4 text-yellow-500" />}
-              {sessionStatus.status === 'completed' && <CheckCircle className="w-4 h-4 text-green-500" />}
-              {sessionStatus.status === 'failed' && <XCircle className="w-4 h-4 text-red-500" />}
-              {sessionStatus.status === 'intervention_required' && <AlertCircle className="w-4 h-4 text-orange-500" />}
-              <span className="text-sm text-gray-600 capitalize">
-                {sessionStatus.status.replace('_', ' ')}
-              </span>
+  if (!isInChatMode) {
+    // Initial prompt interface
+    return (
+      <div className="h-[calc(100vh-4rem)] bg-white flex flex-col items-center justify-center p-6">
+        <div className="w-full max-w-4xl">
+          {/* macOS Window Chrome */}
+          <div className="bg-gray-100 rounded-t-lg px-4 py-2 flex items-center space-x-2">
+            <div className="flex space-x-2">
+              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+              <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
             </div>
-          )}
-        </div>
-        
-        <div className="flex items-center space-x-3">
-          {/* LinkedIn Context Status */}
-          {hasLinkedInContext !== null && (
-            <div className="flex items-center space-x-2 px-3 py-1.5 bg-gray-100 rounded-lg">
-              {hasLinkedInContext ? (
-                <>
-                  <CheckCircle className="w-4 h-4 text-green-600" />
-                  <span className="text-sm text-gray-700">LinkedIn Connected</span>
-                </>
-              ) : (
-                <>
-                  <Info className="w-4 h-4 text-gray-500" />
-                  <span className="text-sm text-gray-600">Not Connected</span>
-                </>
-              )}
-            </div>
-          )}
-          
-          {sessionId && sessionStatus && (
-            <>
-              <button
-                onClick={handlePauseResume}
-                disabled={!['running', 'paused'].includes(sessionStatus.status)}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  ['running', 'paused'].includes(sessionStatus.status)
-                    ? 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                }`}
-              >
-                {sessionStatus.status === 'running' ? (
-                  <>
-                    <Pause className="w-4 h-4" />
-                    <span>Pause</span>
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-4 h-4" />
-                    <span>Resume</span>
-                  </>
-                )}
-              </button>
-              <button
-                onClick={handleStop}
-                className="flex items-center space-x-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-sm font-medium transition-colors"
-              >
-                <Square className="w-4 h-4" />
-                <span>Stop</span>
-              </button>
-            </>
-          )}
-          <button
-            onClick={() => setShowConfigModal(true)}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <Settings className="w-5 h-5 text-gray-600" />
-          </button>
-        </div>
-      </div>
-
-      {/* Chat Container */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Messages */}
-        <div 
-          ref={chatContainerRef}
-          className="flex-1 overflow-y-auto p-6"
-        >
-          {chatMessages.length === 0 && !sessionId && (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center max-w-md">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <Bot className="w-8 h-8 text-white" />
-                </div>
-                <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-                  AI Job Search Assistant
-                </h2>
-                <p className="text-gray-600 mb-8">
-                  Tell me what kind of job you're looking for and I'll help you apply automatically on LinkedIn
-                </p>
-                
-                {/* Sample prompts */}
-                <div className="space-y-3">
-                  <button
-                    onClick={() => setSearchPrompt('Senior React developer jobs in San Francisco')}
-                    className="w-full text-left p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors group"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-700">Senior React developer jobs in San Francisco</span>
-                      <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setSearchPrompt('Remote Product Manager positions with good benefits')}
-                    className="w-full text-left p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors group"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-700">Remote Product Manager positions with good benefits</span>
-                      <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setSearchPrompt('Data Scientist roles at startups')}
-                    className="w-full text-left p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors group"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-700">Data Scientist roles at startups</span>
-                      <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />
-                    </div>
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          <div className="space-y-4 max-w-3xl mx-auto">
-            {chatMessages.map((message) => (
-              <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] ${message.type === 'user' ? 'order-2' : 'order-1'}`}>
-                  <div className={`rounded-2xl px-4 py-3 ${getMessageColor(message.type)}`}>
-                    {message.type !== 'user' && getMessageIcon(message.type) && (
-                      <div className="flex items-start space-x-3">
-                        <div className="flex-shrink-0 mt-0.5">
-                          {getMessageIcon(message.type)}
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm leading-relaxed">{message.message}</p>
-                          <p className="text-xs mt-1 opacity-60">
-                            {formatTime(message.timestamp)}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                    {message.type === 'user' && (
-                      <>
-                        <p className="text-sm leading-relaxed">{message.message}</p>
-                        <p className="text-xs mt-1 opacity-60">
-                          {formatTime(message.timestamp)}
-                        </p>
-                      </>
-                    )}
-                    {!getMessageIcon(message.type) && message.type !== 'user' && (
-                      <>
-                        <p className="text-sm leading-relaxed">{message.message}</p>
-                        <p className="text-xs mt-1 opacity-60">
-                          {formatTime(message.timestamp)}
-                        </p>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            {/* Applied Jobs Summary */}
-            {sessionStatus?.status === 'completed' && appliedJobs.length > 0 && (
-              <div className="bg-green-50 rounded-lg p-4">
-                <h3 className="font-medium text-green-900 mb-3">Applied Jobs Summary</h3>
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {appliedJobs.map((job) => (
-                    <div key={job.id} className="flex items-center justify-between text-sm">
-                      <div>
-                        <p className="font-medium text-gray-900">{job.title}</p>
-                        <p className="text-gray-600">{job.company}</p>
-                      </div>
-                      <a
-                        href={job.jobUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-700"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </a>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
-        </div>
+          
+          <div className="bg-white border border-gray-200 rounded-b-lg p-8 shadow-sm">
+            {/* Title and subtitle */}
+            <div className="text-center mb-8">
+              <h1 className="text-3xl font-semibold text-gray-900 mb-2">Jobotic AI Agent</h1>
+              <p className="text-gray-600">Hit run to watch AI apply to jobs for you.</p>
+            </div>
 
-        {/* Input Area */}
-        <div className="border-t border-gray-200 p-4">
-          <div className="max-w-3xl mx-auto">
-            <div className="flex space-x-3">
-              <textarea
-                ref={inputRef}
+            {/* Search input */}
+            <div className="flex items-center space-x-3 mb-8">
+              <input
+                type="text"
                 value={searchPrompt}
                 onChange={(e) => setSearchPrompt(e.target.value)}
                 onKeyDown={(e) => {
@@ -680,151 +834,377 @@ export default function LinkedInAutomationNew() {
                     handleStart();
                   }
                 }}
-                placeholder="e.g., Senior React developer jobs in San Francisco with good benefits"
-                className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none resize-none"
-                rows={1}
-                disabled={isStarting || sessionId !== null}
-                style={{
-                  minHeight: '48px',
-                  maxHeight: '120px'
-                }}
+                placeholder="e.g., software engineer vancouver bc"
+                className="flex-1 px-4 py-3 text-lg border border-gray-300 rounded-lg focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none"
+                disabled={isStarting}
               />
               <button
                 onClick={handleStart}
-                disabled={isStarting || !searchPrompt.trim() || sessionId !== null}
-                className={`px-4 py-3 rounded-2xl font-medium transition-all ${
-                  isStarting || !searchPrompt.trim() || sessionId !== null
+                disabled={isStarting || !searchPrompt.trim()}
+                className={`px-6 py-3 rounded-lg font-medium transition-all flex items-center space-x-2 ${
+                  isStarting || !searchPrompt.trim()
                     ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white'
+                    : 'bg-orange-500 hover:bg-orange-600 text-white'
                 }`}
               >
                 {isStarting ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
-                  <Send className="w-5 h-5" />
+                  <>
+                    <span>Run</span>
+                    <span className="text-sm">⌘⏎</span>
+                  </>
                 )}
               </button>
             </div>
+
+            {/* Filter pills */}
+            <div className="flex flex-wrap gap-2 mb-6">
+              <button
+                onClick={() => setFilters(f => ({ ...f, easyApplyOnly: !f.easyApplyOnly }))}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  filters.easyApplyOnly
+                    ? 'bg-orange-500 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Easy Apply Only
+              </button>
+              <button
+                onClick={() => setFilters(f => ({ ...f, remote: !f.remote }))}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  filters.remote
+                    ? 'bg-orange-500 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Remote
+              </button>
+              <button
+                onClick={() => setFilters(f => ({ 
+                  ...f, 
+                  datePosted: f.datePosted === 'day' ? 'week' : 
+                              f.datePosted === 'week' ? 'month' : 
+                              f.datePosted === 'month' ? null : 'day'
+                }))}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  filters.datePosted
+                    ? 'bg-orange-500 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {filters.datePosted ? `Posted: Last ${filters.datePosted}` : 'Date Posted'}
+              </button>
+              <button
+                onClick={() => setFilters(f => ({ ...f, under10Applicants: !f.under10Applicants }))}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  filters.under10Applicants
+                    ? 'bg-orange-500 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Under 10 Applicants
+              </button>
+            </div>
+
+            {/* Action cards grid */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              {actionCards.map((card, index) => (
+                <button
+                  key={index}
+                  onClick={() => setSearchPrompt(card.prompt)}
+                  className="p-4 bg-white border border-gray-200 rounded-lg text-left hover:shadow-md hover:scale-[1.02] transition-all duration-300 group"
+                >
+                  <div className="flex items-start space-x-3">
+                    <div className="flex-shrink-0 w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-gray-600 group-hover:bg-orange-100 group-hover:text-orange-600 transition-colors">
+                      {card.icon}
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-medium text-gray-900 mb-1">{card.title}</h3>
+                      <p className="text-sm text-gray-600">{card.description}</p>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* Footer text */}
+            <p className="text-center text-sm text-gray-500">Or type your own job search</p>
+
+            {/* Settings button in corner */}
+            <button
+              onClick={() => setShowConfigModal(true)}
+              className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <Settings className="w-5 h-5 text-gray-600" />
+            </button>
           </div>
+        </div>
+
+        {/* Configuration Modal */}
+        <LinkedInConfigModal
+          isOpen={showConfigModal}
+          onClose={() => setShowConfigModal(false)}
+          onSave={(newConfig) => setConfig(newConfig)}
+          initialConfig={config || undefined}
+        />
+
+        {/* Onboarding Modal */}
+        {showOnboarding && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+              <div className="p-6">
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                    <Bot className="w-6 h-6 text-orange-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">One-Time LinkedIn Setup</h2>
+                    <p className="text-sm text-gray-600">Quick setup for automated job applications</p>
+                  </div>
+                </div>
+                
+                <div className="mb-6">
+                  <p className="text-gray-700 mb-4">To automate LinkedIn job applications, you'll need to:</p>
+                  <ol className="space-y-3 text-sm text-gray-600">
+                    <li className="flex items-start">
+                      <span className="flex-shrink-0 w-6 h-6 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-xs font-semibold mr-2">1</span>
+                      <span>Start your first automation session</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="flex-shrink-0 w-6 h-6 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-xs font-semibold mr-2">2</span>
+                      <span>Log in to LinkedIn when prompted (one time only)</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="flex-shrink-0 w-6 h-6 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-xs font-semibold mr-2">3</span>
+                      <span>Complete any security checks if requested</span>
+                    </li>
+                  </ol>
+                </div>
+                
+                <div className="bg-green-50 rounded-lg p-4 mb-6 border border-green-200">
+                  <p className="text-sm text-green-800">
+                    <strong>After this initial setup, all future sessions will start automatically!</strong> No more login interruptions.
+                  </p>
+                </div>
+                
+                <button
+                  onClick={() => setShowOnboarding(false)}
+                  className="w-full px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors"
+                >
+                  Got it, let's start!
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Split screen chat view
+  return (
+    <div className="h-[calc(100vh-4rem)] bg-gray-100 flex">
+      {/* Chat interface - 30% width */}
+      <div className="w-[30%] bg-[#2D2D2D] flex flex-col">
+        {/* Chat header */}
+        <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
+              <Bot className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h2 className="text-white text-sm font-medium">AI Agent</h2>
+              {sessionId && (
+                <p className="text-gray-400 text-xs">
+                  {metrics.jobsFound && `Found ${metrics.jobsFound} jobs`}
+                  {metrics.successfulApplications && ` • Applied to ${metrics.successfulApplications}`}
+                </p>
+              )}
+            </div>
+          </div>
+          {sessionId && (
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleStop}
+                className="p-1.5 hover:bg-gray-700 text-gray-400 hover:text-red-400 rounded transition-colors"
+              >
+                <Square className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Chat messages */}
+        <div 
+          ref={chatContainerRef}
+          className="flex-1 overflow-y-auto p-4 space-y-3"
+        >
+          {chatMessages.map((message) => (
+            <div key={message.id}>
+              {message.type === 'step' ? (
+                <div className="flex items-start space-x-3">
+                  <div className="flex-shrink-0 text-gray-500 text-sm font-medium mt-0.5">
+                    Step {message.stepNumber}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2">
+                      {message.status === 'WAIT' && (
+                        <span className="text-xs text-orange-400 font-medium">WAIT</span>
+                      )}
+                      {message.status === 'RUNNING' && (
+                        <Loader2 className="w-3 h-3 text-orange-400 animate-spin" />
+                      )}
+                      {message.status === 'MESSAGE' && (
+                        <span className="text-xs text-blue-400 font-medium">MESSAGE</span>
+                      )}
+                      {message.status === 'COMPLETE' && (
+                        <CheckCircle className="w-3 h-3 text-green-400" />
+                      )}
+                    </div>
+                    <p className="text-gray-300 text-sm mt-1">{message.message}</p>
+                  </div>
+                </div>
+              ) : message.type === 'user' ? (
+                <div className="flex justify-end">
+                  <div className="bg-gray-700 rounded-lg px-3 py-2 max-w-[80%]">
+                    <p className="text-white text-sm">{message.message}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex justify-start">
+                  <div className="max-w-[80%]">
+                    <p className={`text-sm ${
+                      message.type === 'system' || message.type === 'assistant' ? 'text-gray-400' :
+                      message.type === 'error' ? 'text-red-400' :
+                      message.type === 'success' ? 'text-green-400' :
+                      message.type === 'warning' ? 'text-orange-400' :
+                      'text-gray-300'
+                    }`}>{message.message}</p>
+                    {message.metadata?.showContinueButton && sessionStatus?.status === 'intervention_required' && (
+                      <button
+                        onClick={handleContinueAfterIntervention}
+                        className="mt-3 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors"
+                      >
+                        I've completed the action - Continue
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Chat input */}
+        <div className="p-4 border-t border-gray-700">
+          <div className="flex space-x-2">
+            <input
+              type="text"
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+              placeholder="Type a message..."
+              className="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-500 text-sm focus:border-gray-500 focus:outline-none"
+              disabled={!sessionId}
+            />
+            <button
+              onClick={handleSendMessage}
+              disabled={!inputMessage.trim() || !sessionId}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                !inputMessage.trim() || !sessionId
+                  ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                  : 'bg-orange-500 hover:bg-orange-600 text-white'
+              }`}
+            >
+              Send
+            </button>
+          </div>
+          
+          {/* Session timer */}
+          {sessionStartTime && (
+            <div className="mt-3 text-center text-xs text-gray-500">
+              Session time: {sessionDuration}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Configuration Modal */}
-      <LinkedInConfigModal
-        isOpen={showConfigModal}
-        onClose={() => setShowConfigModal(false)}
-        onSave={(newConfig) => setConfig(newConfig)}
-        initialConfig={config || undefined}
-      />
+      {/* Preview/browser area - 70% width */}
+      <div className="flex-1 bg-white relative">
+        {/* Top bar with buttons */}
+        <div className="absolute top-4 right-4 z-10 flex items-center space-x-3">
+          <button
+            onClick={() => window.open(liveViewUrl || '#', '_blank')}
+            disabled={!liveViewUrl}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              !liveViewUrl
+                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                : 'bg-blue-500 hover:bg-blue-600 text-white'
+            }`}
+          >
+            View Browser
+          </button>
+          <button
+            onClick={handleClose}
+            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors"
+          >
+            Close
+          </button>
+        </div>
 
-      {/* Onboarding Modal */}
-      {showOnboarding && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-            <div className="p-6">
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                  <Bot className="w-6 h-6 text-blue-600" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">One-Time LinkedIn Setup</h2>
-                  <p className="text-sm text-gray-600">Quick setup for automated job applications</p>
-                </div>
+        {/* Browser content */}
+        {liveViewUrl ? (
+          <iframe
+            src={liveViewUrl}
+            className="w-full h-full"
+            title="LinkedIn Automation Browser"
+          />
+        ) : (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-gray-100 rounded-lg mx-auto mb-4 flex items-center justify-center">
+                <ExternalLink className="w-8 h-8 text-gray-400" />
               </div>
-              
-              <div className="mb-6">
-                <p className="text-gray-700 mb-4">To automate LinkedIn job applications, you'll need to:</p>
-                <ol className="space-y-3 text-sm text-gray-600">
-                  <li className="flex items-start">
-                    <span className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-semibold mr-2">1</span>
-                    <span>Start your first automation session</span>
-                  </li>
-                  <li className="flex items-start">
-                    <span className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-semibold mr-2">2</span>
-                    <span>Log in to LinkedIn when prompted (one time only)</span>
-                  </li>
-                  <li className="flex items-start">
-                    <span className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-semibold mr-2">3</span>
-                    <span>Complete any security checks if requested</span>
-                  </li>
-                </ol>
-              </div>
-              
-              <div className="bg-green-50 rounded-lg p-4 mb-6 border border-green-200">
-                <p className="text-sm text-green-800">
-                  <strong>After this initial setup, all future sessions will start automatically!</strong> No more login interruptions.
-                </p>
-              </div>
-              
-              <button
-                onClick={() => setShowOnboarding(false)}
-                className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-              >
-                Got it, let's start!
-              </button>
+              <p className="text-gray-600 font-medium">Browser Preview</p>
+              <p className="text-gray-500 text-sm mt-1">
+                Waiting for automation to start...
+              </p>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Intervention Modal */}
-      {showIntervention && sessionStatus?.intervention && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-            <div className="p-6">
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-                  <AlertCircle className="w-6 h-6 text-orange-600" />
+        {/* Applied Jobs Summary - Overlay */}
+        {sessionStatus?.status === 'completed' && appliedJobs.length > 0 && (
+          <div className="absolute bottom-4 left-4 right-4 bg-white rounded-lg shadow-lg border border-gray-200 p-4 max-h-60 overflow-y-auto">
+            <h3 className="font-medium text-gray-900 mb-3">Applied Jobs Summary</h3>
+            <div className="space-y-2">
+              {appliedJobs.map((job) => (
+                <div key={job.id} className="flex items-center justify-between text-sm">
+                  <div>
+                    <p className="font-medium text-gray-900">{job.title}</p>
+                    <p className="text-gray-600">{job.company}</p>
+                  </div>
+                  <a
+                    href={job.jobUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-700"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
                 </div>
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">
-                    {sessionStatus.intervention.type === 'login' && 'LinkedIn Login Required'}
-                    {sessionStatus.intervention.type === 'captcha' && 'CAPTCHA Verification'}
-                    {sessionStatus.intervention.type === 'two_fa' && 'Two-Factor Authentication'}
-                    {sessionStatus.intervention.type === 'blocked' && 'Account Access Restricted'}
-                    {sessionStatus.intervention.type === 'rate_limit' && 'Rate Limited'}
-                  </h2>
-                  <p className="text-sm text-gray-600">Your attention is needed</p>
-                </div>
-              </div>
-              
-              <p className="text-gray-700 mb-3">{sessionStatus.intervention.message}</p>
-              
-              {sessionStatus.intervention.type === 'login' && hasLinkedInContext === false && (
-                <div className="bg-green-50 rounded-lg p-4 mb-4 border border-green-200">
-                  <p className="text-sm text-green-800">
-                    <strong>This is a one-time setup!</strong> After you log in, we'll save your session for all future automations.
-                  </p>
-                </div>
-              )}
-              
-              <div className="bg-blue-50 rounded-lg p-4 mb-4 border border-blue-200">
-                <p className="text-sm text-blue-800 font-medium mb-1">Instructions:</p>
-                <p className="text-sm text-blue-700">{sessionStatus.intervention.instructions}</p>
-              </div>
-
-              {liveViewUrl && (
-                <a
-                  href={liveViewUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full mb-3 px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  <span>Open Browser View in New Tab</span>
-                </a>
-              )}
-              
-              <button
-                onClick={handleContinueAfterIntervention}
-                className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-              >
-                I've completed the action - Continue
-              </button>
+              ))}
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
+
     </div>
   );
 }
