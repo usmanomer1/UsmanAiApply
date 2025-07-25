@@ -49,7 +49,10 @@ interface StartJobSearchResponse {
   success: boolean;
   sessionId: string;
   liveViewUrl: string;
-  message: string;
+  status?: string;
+  taskId?: string;
+  browserbaseSessionId?: string;
+  message?: string;
 }
 
 interface InterventionData {
@@ -79,8 +82,34 @@ interface AutomationMetrics {
 }
 
 export class LinkedInJobSearchAPI {
-  private ws: WebSocket | null = null;
-  private wsHandlers: Map<string, Function> = new Map();
+  
+  private async handleApiError(response: Response, defaultMessage: string): Promise<never> {
+    let errorMessage = defaultMessage;
+    let errorDetails: any = {};
+    
+    try {
+      errorDetails = await response.json();
+      errorMessage = errorDetails.message || errorDetails.error || errorMessage;
+    } catch (e) {
+      console.error('Failed to parse error response:', e);
+    }
+    
+    // Handle specific error codes
+    switch (response.status) {
+      case 401:
+        throw new Error('Authentication required - please log in');
+      case 403:
+        throw new Error('Access denied - userId doesn\'t match authenticated user');
+      case 400:
+        throw new Error(errorMessage || 'Invalid request - check required fields');
+      case 429:
+        throw new Error('Rate limit exceeded - maximum 10 sessions per hour');
+      case 500:
+        throw new Error(errorMessage || 'Server error - please try again later');
+      default:
+        throw new Error(errorMessage);
+    }
+  }
   
   private async getHeaders() {
     const { data: { session } } = await supabase.auth.getSession();
@@ -103,7 +132,7 @@ export class LinkedInJobSearchAPI {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to check context status');
+        await this.handleApiError(response, 'Failed to check context status');
       }
 
       return await response.json();
@@ -168,23 +197,19 @@ export class LinkedInJobSearchAPI {
       });
 
       if (!response.ok) {
-        let errorMessage = 'Failed to start job search';
-        try {
-          const error = await response.json();
-          errorMessage = error.message || error.error || errorMessage;
-        } catch (e) {
-          console.error('Failed to parse error response:', e);
-        }
-        throw new Error(errorMessage);
+        await this.handleApiError(response, 'Failed to start job search');
       }
 
       const result = await response.json();
       
-      // Map response to expected format
+      // Return response in expected format
       return {
         success: true,
-        sessionId: result.sessionId || result.browserbaseSessionId,
+        sessionId: result.sessionId,
         liveViewUrl: result.liveViewUrl,
+        status: result.status || 'running',
+        taskId: result.taskId,
+        browserbaseSessionId: result.browserbaseSessionId || result.sessionId, // For backward compatibility
         message: result.message || 'Job search started successfully'
       };
     } catch (error) {
@@ -205,7 +230,7 @@ export class LinkedInJobSearchAPI {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to resume automation');
+        await this.handleApiError(response, 'Failed to continue/resume automation');
       }
 
       return await response.json();
@@ -224,7 +249,7 @@ export class LinkedInJobSearchAPI {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to stop automation');
+        await this.handleApiError(response, 'Failed to stop automation');
       }
 
       // DELETE might return empty response, handle gracefully
@@ -239,96 +264,58 @@ export class LinkedInJobSearchAPI {
     }
   }
 
-  // Connect to WebSocket for real-time updates
-  connectWebSocket(sessionId?: string): void {
-    const wsUrl = API_BASE_URL.replace(/^http/, 'ws') + '/ws';
-    console.log('Connecting to WebSocket:', wsUrl);
-    
-    this.ws = new WebSocket(wsUrl);
-    
-    this.ws.onopen = async () => {
-      console.log('WebSocket connected');
-      
-      // Subscribe to user's events
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user?.id) {
-        this.ws?.send(JSON.stringify({
-          type: 'subscribe',
-          userId: session.user.id
-        }));
-      }
-      
-      // Subscribe to specific session if provided
-      if (sessionId) {
-        this.ws?.send(JSON.stringify({
-          type: 'subscribe',
-          sessionId
-        }));
-      }
-    };
-    
-    this.ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        console.log('WebSocket message:', data);
-        
-        // Call registered handlers
-        const handler = this.wsHandlers.get(data.type);
-        if (handler) {
-          handler(data.data);
-        }
-        
-        // Also call generic handler if exists
-        const genericHandler = this.wsHandlers.get('*');
-        if (genericHandler) {
-          genericHandler(data);
-        }
-      } catch (error) {
-        console.error('WebSocket message parse error:', error);
-      }
-    };
-    
-    this.ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
-    
-    this.ws.onclose = () => {
-      console.log('WebSocket disconnected');
-      // Implement reconnection logic if needed
-    };
-  }
+  // Pause automation
+  async pauseAutomation(sessionId: string): Promise<{ success: boolean }> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/linkedin/pause/${sessionId}`, {
+        method: 'PUT',
+        headers: await this.getHeaders()
+      });
 
-  // Register WebSocket event handler
-  onWebSocketEvent(eventType: string, handler: Function): void {
-    // Only set one handler per event type to prevent duplicates
-    this.wsHandlers.set(eventType, handler);
-  }
+      if (!response.ok) {
+        await this.handleApiError(response, 'Failed to pause automation');
+      }
 
-  // Disconnect WebSocket
-  disconnectWebSocket(): void {
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
+      return { success: true };
+    } catch (error) {
+      console.error('Pause automation error:', error);
+      throw error;
     }
-    this.wsHandlers.clear();
   }
 
-  // Legacy API compatibility methods
+  // Resume a paused automation
+  async resumePausedAutomation(sessionId: string): Promise<{ success: boolean }> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/linkedin/resume/${sessionId}`, {
+        method: 'PUT',
+        headers: await this.getHeaders()
+      });
+
+      if (!response.ok) {
+        await this.handleApiError(response, 'Failed to continue/resume automation');
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Resume automation error:', error);
+      throw error;
+    }
+  }
+
+
+  // Get session status
   async getStatus(sessionId: string): Promise<SessionStatus> {
     try {
-      // For now, return a mock status - this should be implemented based on WebSocket data
-      // or a new backend endpoint if available
-      return {
-        status: 'running',
-        progress: {
-          totalApplications: 0,
-          applicationsToday: 0,
-          applicationsThisWeek: 0,
-          applicationsThisMonth: 0,
-          totalTimeSeconds: 0,
-          sessionDurationSeconds: 0
-        }
-      };
+      const headers = await this.getHeaders();
+      const response = await fetch(`${API_BASE_URL}/api/linkedin/status/${sessionId}`, {
+        headers
+      });
+
+      if (!response.ok) {
+        await this.handleApiError(response, 'Failed to get status');
+      }
+
+      return await response.json();
     } catch (error) {
       console.error('Get status error:', error);
       throw error;
@@ -394,11 +381,11 @@ interface SessionStatus {
   liveViewUrl?: string;
   intervention?: {
     required: boolean;
-    type: 'login' | 'captcha' | 'two_fa' | 'blocked' | 'rate_limit';
+    type: 'LOGIN' | 'CAPTCHA' | 'TWO_FA' | 'BLOCKED' | 'RATE_LIMIT';
     message: string;
     instructions: string;
-    detectedAt: string;
-    pageUrl?: string;
+    url?: string;
+    liveViewUrl?: string;
   };
 }
 

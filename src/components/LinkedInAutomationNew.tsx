@@ -255,10 +255,7 @@ export default function LinkedInAutomationNew() {
           }
           // Resume polling if session is active
           if (['running', 'intervention_required', 'paused'].includes(status.status)) {
-            stopPollingRef.current = linkedInJobSearchApi.pollStatus(
-              activeSessionId,
-              (updatedStatus) => handleStatusUpdate(updatedStatus)
-            );
+            startPollingStatus(activeSessionId);
           }
         })
         .catch(error => {
@@ -269,10 +266,9 @@ export default function LinkedInAutomationNew() {
     }
   }, [sessionId]);
 
-  // Cleanup WebSocket on unmount
+  // Cleanup polling on unmount
   useEffect(() => {
     return () => {
-      linkedInJobSearchApi.disconnectWebSocket();
       if (stopPollingRef.current) {
         stopPollingRef.current();
       }
@@ -528,9 +524,8 @@ export default function LinkedInAutomationNew() {
         status: 'RUNNING'
       });
 
-      // Connect WebSocket for real-time updates
-      linkedInJobSearchApi.connectWebSocket(result.sessionId);
-      setupWebSocketHandlers();
+      // Start polling for status updates
+      startPollingStatus(result.sessionId);
       
     } catch (error: any) {
       addChatMessage({
@@ -548,7 +543,47 @@ export default function LinkedInAutomationNew() {
     }
   };
 
-  // Setup WebSocket event handlers
+  // Start polling for status updates
+  const startPollingStatus = (sessionId: string) => {
+    // Clear any existing polling
+    if (stopPollingRef.current) {
+      stopPollingRef.current();
+    }
+
+    // Poll every 3 seconds as recommended in the guide
+    stopPollingRef.current = linkedInJobSearchApi.pollStatus(
+      sessionId,
+      (status) => {
+        handleStatusUpdate(status);
+        
+        // Process status-specific updates
+        if (status.intervention && status.intervention.required) {
+          setShowIntervention(true);
+          addChatMessage({
+            type: 'warning',
+            message: status.intervention.message,
+            status: 'WAIT',
+            metadata: {
+              intervention: status.intervention,
+              showContinueButton: true
+            }
+          });
+        }
+        
+        // Handle completion
+        if (status.status === 'completed') {
+          if (stopPollingRef.current) {
+            stopPollingRef.current();
+          }
+          localStorage.removeItem('activeSessionId');
+        }
+      },
+      3000 // Poll every 3 seconds
+    );
+  };
+
+  // Legacy WebSocket handlers (commented out - using polling instead)
+  /*
   const setupWebSocketHandlers = () => {
     // Agent reasoning updates
     linkedInJobSearchApi.onWebSocketEvent('agent:step:realtime', (data: any) => {
@@ -634,7 +669,6 @@ export default function LinkedInAutomationNew() {
         status: 'COMPLETE'
       });
       localStorage.removeItem('activeSessionId');
-      linkedInJobSearchApi.disconnectWebSocket();
     });
     
     // Context events
@@ -655,6 +689,7 @@ export default function LinkedInAutomationNew() {
       setHasLinkedInContext(true);
     });
   };
+  */
 
   const loadAppliedJobs = async (sessionId: string) => {
     try {
@@ -672,7 +707,6 @@ export default function LinkedInAutomationNew() {
     if (confirm('Are you sure you want to stop the automation?')) {
       try {
         await linkedInJobSearchApi.stopAutomation(sessionId);
-        linkedInJobSearchApi.disconnectWebSocket();
         
         // Clear stored session
         localStorage.removeItem('activeSessionId');
