@@ -246,7 +246,7 @@ export default function LinkedInAutomationNew() {
       setSessionId(activeSessionId);
       setIsInChatMode(true);
       // Resume polling for this session
-      linkedinAutomationApi.getStatus(activeSessionId)
+      linkedInJobSearchApi.getStatus(activeSessionId)
         .then(status => {
           setSessionStatus(status);
           if (status.liveViewUrl) {
@@ -254,7 +254,7 @@ export default function LinkedInAutomationNew() {
           }
           // Resume polling if session is active
           if (['running', 'intervention_required', 'paused'].includes(status.status)) {
-            stopPollingRef.current = linkedinAutomationApi.pollStatus(
+            stopPollingRef.current = linkedInJobSearchApi.pollStatus(
               activeSessionId,
               (updatedStatus) => handleStatusUpdate(updatedStatus)
             );
