@@ -162,6 +162,51 @@ if (typeof window !== "undefined") {
   window.Sentry = Sentry;
 }
 
+// Debug mode for fetch interception
+let DEBUG_FETCH = false;
+const originalFetch = window.fetch;
+
+// Enable/disable fetch debugging
+(window as any).enableFetchDebug = (enabled: boolean = true) => {
+  DEBUG_FETCH = enabled;
+  console.log(`[FETCH DEBUG] ${enabled ? 'ENABLED' : 'DISABLED'}`);
+};
+
+// Intercept all fetch calls for debugging
+window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+  if (DEBUG_FETCH) {
+    const url = typeof input === 'string' ? input : input instanceof Request ? input.url : input.toString();
+    const method = init?.method || (input instanceof Request ? input.method : 'GET');
+    const timestamp = new Date().toISOString();
+    
+    console.group(`[FETCH DEBUG] ${method} ${url} at ${timestamp}`);
+    console.log('Request init:', init);
+    
+    if (init?.body) {
+      try {
+        const bodyStr = typeof init.body === 'string' ? init.body : JSON.stringify(init.body);
+        console.log('Request body:', JSON.parse(bodyStr));
+      } catch {
+        console.log('Request body (raw):', init.body);
+      }
+    }
+    
+    try {
+      const response = await originalFetch(input, init);
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+      console.groupEnd();
+      return response;
+    } catch (error) {
+      console.error('Fetch error:', error);
+      console.groupEnd();
+      throw error;
+    }
+  }
+  
+  return originalFetch(input, init);
+};
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     {AppWithSentry}

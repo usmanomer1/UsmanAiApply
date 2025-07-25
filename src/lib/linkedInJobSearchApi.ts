@@ -81,6 +81,25 @@ interface AutomationMetrics {
   averageTimePerApplication?: number;
 }
 
+let requestCounter = 0;
+
+// Debug mode flag
+let DEBUG_MODE = false;
+
+// Track ongoing requests to prevent duplicates
+const activeRequests = new Map<string, Promise<any>>();
+
+// Enable/disable debug mode
+export function setDebugMode(enabled: boolean) {
+  DEBUG_MODE = enabled;
+  console.log(`[DEBUG] Debug mode ${enabled ? 'ENABLED' : 'DISABLED'}`);
+}
+
+// Get current debug mode status
+export function isDebugMode() {
+  return DEBUG_MODE;
+}
+
 export class LinkedInJobSearchAPI {
   
   private async handleApiError(response: Response, defaultMessage: string): Promise<never> {
@@ -144,9 +163,43 @@ export class LinkedInJobSearchAPI {
 
   // Start job search with natural language
   async startJobSearch(userId: string, config: JobSearchConfig): Promise<StartJobSearchResponse> {
-    try {
+    const currentRequestId = ++requestCounter;
+    console.log(`[REQUEST ${currentRequestId}] Starting job search at ${new Date().toISOString()}`);
+    console.log(`[REQUEST ${currentRequestId}] Config:`, config);
+    
+    // Create a stable key for this request based on essential fields only
+    // This prevents issues with property ordering in JSON.stringify
+    const requestKey = [
+      'start',
+      userId,
+      config.searchPrompt || '',
+      config.jobTitle || '',
+      config.location || '',
+      config.resumeUrl || '',
+      config.easyApplyOnly ? '1' : '0',
+      config.remote ? '1' : '0',
+      config.datePosted || 'any',
+      config.under10Applicants ? '1' : '0'
+    ].join('-');
+    
+    console.log(`[REQUEST ${currentRequestId}] Request key: ${requestKey}`);
+    console.log(`[REQUEST ${currentRequestId}] Active requests count: ${activeRequests.size}`);
+    console.log(`[REQUEST ${currentRequestId}] Active request keys:`, Array.from(activeRequests.keys()));
+    
+    // Check if an identical request is already in progress
+    if (activeRequests.has(requestKey)) {
+      console.warn(`[REQUEST ${currentRequestId}] 🚫 DUPLICATE REQUEST PREVENTED! An identical request is already in progress.`);
+      console.warn(`[REQUEST ${currentRequestId}] Request key: ${requestKey}`);
+      console.warn(`[REQUEST ${currentRequestId}] Returning existing promise instead of creating new request.`);
+      
+      // Return the existing promise
+      return activeRequests.get(requestKey)!;
+    }
+    
+    // Create the promise for this request
+    const requestPromise = (async () => {
+      try {
       const headers = await this.getHeaders();
-      console.log('Starting job search with config:', config);
       
       // Build request body according to new API spec
       const body: any = {
@@ -190,32 +243,50 @@ export class LinkedInJobSearchAPI {
         body.config = configObj;
       }
       
+      console.log(`[REQUEST ${currentRequestId}] Sending POST to: ${API_BASE_URL}/api/linkedin/start`);
+      console.log(`[REQUEST ${currentRequestId}] Body:`, body);
+      
       const response = await fetch(`${API_BASE_URL}/api/linkedin/start`, {
         method: 'POST',
         headers,
         body: JSON.stringify(body)
       });
 
+      console.log(`[REQUEST ${currentRequestId}] Response status: ${response.status}`);
+
       if (!response.ok) {
+        console.error(`[REQUEST ${currentRequestId}] Failed with status ${response.status}`);
         await this.handleApiError(response, 'Failed to start job search');
       }
 
       const result = await response.json();
+      console.log(`[REQUEST ${currentRequestId}] Response data:`, result);
       
       // Return response in expected format
-      return {
-        success: true,
-        sessionId: result.sessionId,
-        liveViewUrl: result.liveViewUrl,
-        status: result.status || 'running',
-        taskId: result.taskId,
-        browserbaseSessionId: result.browserbaseSessionId || result.sessionId, // For backward compatibility
-        message: result.message || 'Job search started successfully'
-      };
-    } catch (error) {
-      console.error('Start job search error:', error);
-      throw error;
-    }
+        return {
+          success: true,
+          sessionId: result.sessionId,
+          liveViewUrl: result.liveViewUrl,
+          status: result.status || 'running',
+          taskId: result.taskId,
+          browserbaseSessionId: result.browserbaseSessionId || result.sessionId, // For backward compatibility
+          message: result.message || 'Job search started successfully'
+        };
+      } catch (error) {
+        console.error(`[REQUEST ${currentRequestId}] Start job search error:`, error);
+        throw error;
+      } finally {
+        // Clean up the active request
+        activeRequests.delete(requestKey);
+        console.log(`[REQUEST ${currentRequestId}] Request completed and removed from active requests`);
+      }
+    })();
+    
+    // Store the promise
+    activeRequests.set(requestKey, requestPromise);
+    console.log(`[REQUEST ${currentRequestId}] Request added to active requests map`);
+    
+    return requestPromise;
   }
 
   // Resume automation after intervention

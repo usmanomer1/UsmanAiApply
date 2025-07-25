@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Send, Bot, AlertCircle, Loader2, CheckCircle, XCircle, Info, RefreshCw, ExternalLink, Pause, Play, Square, ArrowRight, Github, FileSpreadsheet, TrendingUp, Gamepad2, X, Briefcase, MapPin, Building2, Clock, Users } from 'lucide-react';
+import { Settings, Send, Bot, AlertCircle, Loader2, CheckCircle, XCircle, Info, RefreshCw, ExternalLink, Pause, Play, Square, ArrowRight, Github, FileSpreadsheet, TrendingUp, Gamepad2, X, Briefcase, MapPin, Building2, Clock, Users, Bug } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { linkedInJobSearchApi, JobSearchConfig, Job, AutomationMetrics, SessionStatus, AppliedJob } from '../lib/linkedInJobSearchApi';
+import { linkedInJobSearchApi, JobSearchConfig, Job, AutomationMetrics, SessionStatus, AppliedJob, setDebugMode, isDebugMode } from '../lib/linkedInJobSearchApi';
 import LinkedInConfigModal from './LinkedInConfigModal';
 import { supabase } from '../lib/supabase';
 
@@ -55,6 +55,7 @@ export default function LinkedInAutomationNew() {
   const [sessionDuration, setSessionDuration] = useState('00:00');
   const [isInChatMode, setIsInChatMode] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
+  const [debugMode, setDebugModeState] = useState(isDebugMode());
   // Filter states
   const [filters, setFilters] = useState({
     easyApplyOnly: false,
@@ -242,11 +243,24 @@ export default function LinkedInAutomationNew() {
 
   // Clear any stored session on mount - always start fresh
   useEffect(() => {
+    console.log('[FRONTEND] Component mounted, clearing any previous state');
     localStorage.removeItem('activeSessionId');
     setSessionId(null);
     setIsInChatMode(false);
     setSessionStatus(null);
     setLiveViewUrl(null);
+    
+    // Reset the starting ref on mount
+    isStartingRef.current = false;
+    
+    // Cleanup function to reset state if component unmounts while starting
+    return () => {
+      console.log('[FRONTEND] Component unmounting');
+      if (isStartingRef.current) {
+        console.log('[FRONTEND] Component unmounting while start in progress, resetting ref');
+        isStartingRef.current = false;
+      }
+    };
   }, []);
 
   // Debug logging for session tracking
@@ -424,14 +438,39 @@ export default function LinkedInAutomationNew() {
       return;
     }
 
-    // Prevent duplicate API calls in React StrictMode
-    if (isStartingRef.current) {
-      console.log('Start already in progress, ignoring duplicate call');
+    // Multiple layers of duplicate prevention
+    console.log(`[FRONTEND] handleStart called at ${new Date().toISOString()}`);
+    console.log(`[FRONTEND] Current state:`, {
+      isStartingRef: isStartingRef.current,
+      isStarting,
+      sessionId,
+      isInChatMode
+    });
+    
+    // 1. Check if we already have an active session
+    if (sessionId) {
+      console.warn('[FRONTEND] Already have an active session, ignoring start request');
       return;
     }
+    
+    // 2. Check the ref (for React StrictMode and rapid clicks)
+    if (isStartingRef.current) {
+      console.warn('[FRONTEND] Start already in progress (ref check), ignoring duplicate call');
+      return;
+    }
+    
+    // 3. Check the state (belt and suspenders)
+    if (isStarting) {
+      console.warn('[FRONTEND] Start already in progress (state check), ignoring duplicate call');
+      return;
+    }
+    
+    // Set both ref and state immediately
     isStartingRef.current = true;
-
     setIsStarting(true);
+    
+    console.log('[FRONTEND] All checks passed, proceeding with start');
+
     setIsInChatMode(true);
     setChatMessages([]); // Clear previous messages
     setSessionStartTime(new Date());
@@ -496,9 +535,16 @@ export default function LinkedInAutomationNew() {
       };
       
       // Start job search
-      console.log(`[${new Date().toISOString()}] Starting job search API call`);
+      const apiCallTimestamp = new Date().toISOString();
+      console.log(`[${apiCallTimestamp}] Starting job search API call`);
+      console.log(`[${apiCallTimestamp}] User ID:`, user!.id);
+      console.log(`[${apiCallTimestamp}] Config:`, jobSearchConfig);
+      
       const result = await linkedInJobSearchApi.startJobSearch(user!.id, jobSearchConfig);
-      console.log(`[${new Date().toISOString()}] Session created:`, result.sessionId);
+      
+      const responseTimestamp = new Date().toISOString();
+      console.log(`[${responseTimestamp}] Session created:`, result.sessionId);
+      console.log(`[${responseTimestamp}] Time taken:`, new Date(responseTimestamp).getTime() - new Date(apiCallTimestamp).getTime(), 'ms');
       console.log('[FRONTEND DEBUG] Full API response:', {
         sessionId: result.sessionId,
         liveViewUrl: result.liveViewUrl,
@@ -743,6 +789,65 @@ export default function LinkedInAutomationNew() {
         });
       }
     }
+  };
+
+  // Nuclear option - complete state reset
+  const handleNuclearReset = () => {
+    console.log('[NUCLEAR RESET] Starting complete state reset...');
+    
+    // Stop any active sessions
+    if (sessionId) {
+      linkedInJobSearchApi.stopAutomation(sessionId).catch(console.error);
+    }
+    
+    // Clear all local storage
+    if (user?.id) {
+      localStorage.removeItem(`linkedin-context-${user.id}`);
+      localStorage.removeItem(`browser-use-last-login`);
+      localStorage.removeItem('activeSessionId');
+    }
+    
+    // Reset all state to initial values
+    setSessionId(null);
+    setSessionStatus(null);
+    setAppliedJobs([]);
+    setShowIntervention(false);
+    setLiveViewUrl(null);
+    setChatMessages([]);
+    setInputMessage('');
+    setHasLinkedInContext(null);
+    setShowOnboarding(false);
+    setSessionStartTime(null);
+    setSessionDuration('00:00');
+    setIsInChatMode(false);
+    setCurrentStep(0);
+    setSearchPrompt('');
+    setJobsFound([]);
+    setMetrics({});
+    setConfig(null);
+    setFilters({
+      easyApplyOnly: false,
+      remote: false,
+      datePosted: null,
+      under10Applicants: false
+    });
+    
+    // Clear any intervals
+    if (durationIntervalRef.current) {
+      clearInterval(durationIntervalRef.current);
+      durationIntervalRef.current = null;
+    }
+    
+    // Clear any polling
+    if (stopPollingRef.current) {
+      stopPollingRef.current();
+      stopPollingRef.current = null;
+    }
+    
+    console.log('[NUCLEAR RESET] Complete. Reloading page...');
+    
+    // Force reload the page to ensure clean state
+    window.location.reload();
   };
 
   const handleContinueAfterIntervention = async () => {
@@ -1087,16 +1192,53 @@ export default function LinkedInAutomationNew() {
               )}
             </div>
           </div>
-          {sessionId && (
-            <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2">
+            {/* Debug toggle */}
+            <button
+              onClick={() => {
+                const newDebugMode = !isDebugMode();
+                setDebugMode(newDebugMode);
+                setDebugModeState(newDebugMode);
+                (window as any).enableFetchDebug?.(newDebugMode);
+                addChatMessage({
+                  type: 'system',
+                  message: `Debug mode ${newDebugMode ? 'enabled' : 'disabled'}. ${newDebugMode ? 'All API requests will be logged to console.' : ''}`
+                });
+              }}
+              className={`p-1.5 rounded transition-colors ${
+                isDebugMode() 
+                  ? 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30' 
+                  : 'hover:bg-gray-700 text-gray-400 hover:text-gray-300'
+              }`}
+              title={`Debug mode is ${isDebugMode() ? 'ON' : 'OFF'}`}
+            >
+              <Bug className="w-4 h-4" />
+            </button>
+            
+            {/* Nuclear reset - only show in debug mode */}
+            {debugMode && (
+              <button
+                onClick={() => {
+                  if (confirm('⚠️ NUCLEAR RESET ⚠️\n\nThis will:\n• Stop all active sessions\n• Clear ALL stored data\n• Reset ALL settings\n• Reload the page\n\nAre you absolutely sure?')) {
+                    handleNuclearReset();
+                  }
+                }}
+                className="p-1.5 hover:bg-red-500/20 text-red-400 hover:text-red-300 rounded transition-colors"
+                title="Nuclear Reset - Clear EVERYTHING"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+            
+            {sessionId && (
               <button
                 onClick={handleStop}
                 className="p-1.5 hover:bg-gray-700 text-gray-400 hover:text-red-400 rounded transition-colors"
               >
                 <Square className="w-4 h-4" />
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Chat messages */}
