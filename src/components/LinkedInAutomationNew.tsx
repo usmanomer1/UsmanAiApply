@@ -240,31 +240,14 @@ export default function LinkedInAutomationNew() {
     }
   };
 
-  // Resume active session on mount
+  // Clear any stored session on mount - always start fresh
   useEffect(() => {
-    const activeSessionId = localStorage.getItem('activeSessionId');
-    if (activeSessionId && !sessionId) {
-      setSessionId(activeSessionId);
-      setIsInChatMode(true);
-      // Resume polling for this session
-      linkedInJobSearchApi.getStatus(activeSessionId)
-        .then(status => {
-          setSessionStatus(status);
-          if (status.liveViewUrl) {
-            setLiveViewUrl(status.liveViewUrl);
-          }
-          // Resume polling if session is active
-          if (['running', 'intervention_required', 'paused'].includes(status.status)) {
-            startPollingStatus(activeSessionId);
-          }
-        })
-        .catch(error => {
-          console.error('Failed to resume session:', error);
-          localStorage.removeItem('activeSessionId');
-          setIsInChatMode(false);
-        });
-    }
-  }, [sessionId]);
+    localStorage.removeItem('activeSessionId');
+    setSessionId(null);
+    setIsInChatMode(false);
+    setSessionStatus(null);
+    setLiveViewUrl(null);
+  }, []);
 
   // Cleanup polling on unmount
   useEffect(() => {
@@ -511,8 +494,7 @@ export default function LinkedInAutomationNew() {
       setSessionId(result.sessionId);
       setLiveViewUrl(result.liveViewUrl);
       
-      // Store session ID for page refresh handling
-      localStorage.setItem('activeSessionId', result.sessionId);
+      // Don't store session - always start fresh
       
       setCurrentStep(2);
       addChatMessage({
@@ -559,9 +541,16 @@ export default function LinkedInAutomationNew() {
         // Process status-specific updates
         if (status.intervention && status.intervention.required) {
           setShowIntervention(true);
+          
+          // Customize message based on intervention type
+          let interventionMessage = status.intervention.message;
+          if (status.intervention.type === 'LOGIN') {
+            interventionMessage = 'Please log in to your LinkedIn account in the browser window above. Once you\'ve successfully logged in, click the continue button below.';
+          }
+          
           addChatMessage({
             type: 'warning',
-            message: status.intervention.message,
+            message: interventionMessage,
             status: 'WAIT',
             metadata: {
               intervention: status.intervention,
