@@ -300,6 +300,7 @@ export class LinkedInJobSearchAPI {
 
   // Register WebSocket event handler
   onWebSocketEvent(eventType: string, handler: Function): void {
+    // Only set one handler per event type to prevent duplicates
     this.wsHandlers.set(eventType, handler);
   }
 

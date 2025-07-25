@@ -268,6 +268,16 @@ export default function LinkedInAutomationNew() {
     }
   }, [sessionId]);
 
+  // Cleanup WebSocket on unmount
+  useEffect(() => {
+    return () => {
+      linkedInJobSearchApi.disconnectWebSocket();
+      if (stopPollingRef.current) {
+        stopPollingRef.current();
+      }
+    };
+  }, []);
+
   // Centralized status update handler
   const handleStatusUpdate = (status: SessionStatus) => {
     const prevStatus = sessionStatus?.status;
@@ -432,6 +442,10 @@ export default function LinkedInAutomationNew() {
     setCurrentStep(0);
     setJobsFound([]);
     setMetrics({});
+    setSessionId(null); // Clear any previous session
+    setSessionStatus(null);
+    setAppliedJobs([]);
+    localStorage.removeItem('activeSessionId'); // Clear any stored session
     
     // Add initial messages
     addChatMessage({
@@ -581,9 +595,12 @@ export default function LinkedInAutomationNew() {
         status: 'WAIT',
         metadata: {
           intervention: {
-            type: data.interventionType,
+            required: true,
+            type: data.interventionType || 'login',
             message: data.message,
-            instructions: data.actionRequired
+            instructions: data.actionRequired || '',
+            detectedAt: new Date().toISOString(),
+            pageUrl: data.pageUrl
           },
           showContinueButton: true
         }
@@ -607,7 +624,7 @@ export default function LinkedInAutomationNew() {
     });
     
     // Context events
-    linkedInJobSearchApi.onWebSocketEvent('context:first_login', (data: any) => {
+    linkedInJobSearchApi.onWebSocketEvent('context:first_login', () => {
       addChatMessage({
         type: 'info',
         message: 'First time setup: Please log in to LinkedIn in the browser window.',
@@ -615,7 +632,7 @@ export default function LinkedInAutomationNew() {
       });
     });
     
-    linkedInJobSearchApi.onWebSocketEvent('context:created', (data: any) => {
+    linkedInJobSearchApi.onWebSocketEvent('context:created', () => {
       addChatMessage({
         type: 'success',
         message: 'LinkedIn session created successfully!',
@@ -788,13 +805,6 @@ export default function LinkedInAutomationNew() {
     setInputMessage('');
   };
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', { 
-      hour: 'numeric', 
-      minute: '2-digit',
-      hour12: true 
-    });
-  };
 
   const handleClose = () => {
     handleStop();
