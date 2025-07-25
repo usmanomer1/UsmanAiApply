@@ -70,6 +70,7 @@ export default function LinkedInAutomationNew() {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isStartingRef = useRef(false); // Prevent double API calls in StrictMode
 
   // Preset action cards for job search
   const actionCards = [
@@ -435,6 +436,13 @@ export default function LinkedInAutomationNew() {
       return;
     }
 
+    // Prevent duplicate API calls in React StrictMode
+    if (isStartingRef.current) {
+      console.log('Start already in progress, ignoring duplicate call');
+      return;
+    }
+    isStartingRef.current = true;
+
     setIsStarting(true);
     setIsInChatMode(true);
     setChatMessages([]); // Clear previous messages
@@ -500,7 +508,9 @@ export default function LinkedInAutomationNew() {
       };
       
       // Start job search
+      console.log(`[${new Date().toISOString()}] Starting job search API call`);
       const result = await linkedInJobSearchApi.startJobSearch(user!.id, jobSearchConfig);
+      console.log(`[${new Date().toISOString()}] Session created:`, result.sessionId);
 
       setSessionId(result.sessionId);
       setLiveViewUrl(result.liveViewUrl);
@@ -531,6 +541,10 @@ export default function LinkedInAutomationNew() {
       setIsInChatMode(false);
     } finally {
       setIsStarting(false);
+      // Reset the ref after a delay to allow legitimate retries
+      setTimeout(() => {
+        isStartingRef.current = false;
+      }, 1000);
     }
   };
 
