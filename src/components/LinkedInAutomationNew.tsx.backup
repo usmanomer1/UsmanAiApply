@@ -890,6 +890,119 @@ export default function LinkedInAutomationNew() {
     // Force reload the page to ensure clean state
     window.location.reload();
   };
+    if (!session) {
+      addChatMessage({
+        type: 'error',
+        message: 'Your session has expired. Please refresh the page and log in again.',
+        status: 'COMPLETE'
+      });
+      return;
+    }
+
+    console.log('Attempting to continue automation:', {
+      sessionId,
+      hasSupabaseSession: !!session,
+      sessionUser: session.user?.email
+    });
+
+    addChatMessage({
+      type: 'system',
+      message: 'Continuing automation...',
+      status: 'RUNNING'
+    });
+
+    try {
+      const response = await linkedInJobSearchApi.resumeAutomation(sessionId);
+      setShowIntervention(false);
+      
+      if (response.success) {
+        addChatMessage({
+          type: 'success',
+          message: 'Great! Automation resumed successfully.',
+          status: 'COMPLETE'
+        });
+      }
+      
+      // The status should update through polling, but we can also update immediately
+      if (sessionStatus) {
+        setSessionStatus({
+          ...sessionStatus,
+          status: 'running',
+          intervention: undefined
+        });
+      }
+    } catch (error: any) {
+      console.error('Continue after intervention error:', error);
+      
+      // Handle specific error cases
+      if (error.status === 429) {
+        addChatMessage({
+          type: 'error',
+          message: 'Rate limited. Please wait a few minutes before continuing.',
+          status: 'COMPLETE'
+        });
+      } else if (error.status === 401) {
+        addChatMessage({
+          type: 'error',
+          message: 'Authentication error. Please check your login status and try again.',
+          status: 'COMPLETE'
+        });
+        // Check if user is still logged in
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          addChatMessage({
+            type: 'error',
+            message: 'Your session has expired. Please log in again.',
+            status: 'COMPLETE'
+          });
+          // Optionally redirect to login
+        }
+      } else if (error.status === 404) {
+        addChatMessage({
+          type: 'error',
+          message: 'Session not found. The automation may have expired.',
+          status: 'COMPLETE'
+        });
+        localStorage.removeItem('activeSessionId');
+      } else if (error.status === 500 && error.message?.includes('login page')) {
+        addChatMessage({
+          type: 'error',
+          message: 'Still on login page. Please complete the login process first.',
+          status: 'COMPLETE'
+        });
+      } else {
+        addChatMessage({
+          type: 'error',
+          message: `Error: ${error.message || 'Failed to continue automation'}`,
+          status: 'COMPLETE'
+        });
+      }
+    }
+  };
+
+  const handleSendMessage = () => {
+    if (!inputMessage.trim()) return;
+
+    addChatMessage({
+      type: 'user',
+      message: inputMessage,
+      status: 'MESSAGE'
+    });
+    
+    // Bot response
+    addChatMessage({
+      type: 'assistant',
+      message: 'I\'m currently focused on applying to jobs. You can pause or stop the automation using the controls above.',
+      status: 'MESSAGE'
+    });
+    
+    setInputMessage('');
+  };
+
+
+  const handleClose = () => {
+    handleStop();
+  };
 
   if (!isInChatMode) {
     // Initial prompt interface
