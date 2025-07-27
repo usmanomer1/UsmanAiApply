@@ -58,6 +58,7 @@ export default function LinkedInAutomationNew() {
   const [debugMode, setDebugModeState] = useState(isDebugMode());
   const [lastInterventionType, setLastInterventionType] = useState<string | null>(null);
   const [lastStatusMessage, setLastStatusMessage] = useState<string | null>(null);
+  const [hasShownInitialRunningMessage, setHasShownInitialRunningMessage] = useState(false);
   // Filter states
   const [filters, setFilters] = useState({
     easyApplyOnly: false,
@@ -331,10 +332,10 @@ export default function LinkedInAutomationNew() {
         // Different messages based on previous state
         let message = '';
         
-        if (!prevStatus) {
-          message = hasLinkedInContext 
-            ? 'LinkedIn session connected. Starting job search...'
-            : 'Setting up LinkedIn session...';
+        if (!prevStatus && !hasShownInitialRunningMessage) {
+          // Skip the initial running message since we already showed it
+          setHasShownInitialRunningMessage(true);
+          return;
         } else if (prevStatus === 'intervention_required') {
           message = 'Action completed! Resuming automation...';
         } else if (prevStatus === 'paused') {
@@ -450,12 +451,12 @@ export default function LinkedInAutomationNew() {
 
   const handleStart = async () => {
     if (!searchPrompt.trim()) {
-      alert('Please enter a job search query');
+      // Show error in UI, not as alert
       return;
     }
 
     if (!config && !userResume) {
-      alert('Please upload your resume in your profile settings first');
+      // Show error in UI, not as alert
       return;
     }
 
@@ -503,6 +504,7 @@ export default function LinkedInAutomationNew() {
     setAppliedJobs([]);
     setLastInterventionType(null); // Reset intervention tracking
     setLastStatusMessage(null); // Reset status message tracking
+    setHasShownInitialRunningMessage(false); // Reset initial message tracking
     localStorage.removeItem('activeSessionId'); // Clear any stored session
     
     // Add initial messages
@@ -583,10 +585,15 @@ export default function LinkedInAutomationNew() {
       // Don't store session - always start fresh
       
       setCurrentStep(2);
-      
-      // Don't add duplicate message here - the status polling will handle it
-      // The handleStatusUpdate function will add the appropriate message based on the actual status
-      
+      addChatMessage({
+        type: 'step',
+        message: contextStatus.hasContext 
+          ? 'Connected to LinkedIn. Starting job search...' 
+          : 'Launching browser and navigating to LinkedIn...',
+        stepNumber: 2,
+        status: 'RUNNING'
+      });
+
       // Start polling for status updates
       startPollingStatus(result.sessionId);
       
@@ -784,9 +791,9 @@ export default function LinkedInAutomationNew() {
   const handleStop = async () => {
     if (!sessionId) return;
 
-    if (confirm('Are you sure you want to stop the automation?')) {
-      try {
-        await linkedInJobSearchApi.stopAutomation(sessionId);
+    // Don't use confirm dialog - just stop immediately
+    try {
+      await linkedInJobSearchApi.stopAutomation(sessionId);
         
         // Clear stored session
         localStorage.removeItem('activeSessionId');
@@ -855,6 +862,7 @@ export default function LinkedInAutomationNew() {
     setConfig(null);
     setLastInterventionType(null);
     setLastStatusMessage(null);
+    setHasShownInitialRunningMessage(false);
     setFilters({
       easyApplyOnly: false,
       remote: false,
