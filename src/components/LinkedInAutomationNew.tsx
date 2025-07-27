@@ -56,7 +56,7 @@ export default function LinkedInAutomationNew() {
   const [isInChatMode, setIsInChatMode] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [debugMode, setDebugModeState] = useState(isDebugMode());
-  const [lastInterventionType, setLastInterventionType] = useState<string | null>(null);
+  const [lastInterventionKey, setLastInterventionKey] = useState<string | null>(null);
   const [lastStatusMessage, setLastStatusMessage] = useState<string | null>(null);
   const [hasShownInitialRunningMessage, setHasShownInitialRunningMessage] = useState(false);
   // Filter states
@@ -502,7 +502,7 @@ export default function LinkedInAutomationNew() {
     setSessionId(null); // Clear any previous session
     setSessionStatus(null);
     setAppliedJobs([]);
-    setLastInterventionType(null); // Reset intervention tracking
+    setLastInterventionKey(null); // Reset intervention tracking
     setLastStatusMessage(null); // Reset status message tracking
     setHasShownInitialRunningMessage(false); // Reset initial message tracking
     localStorage.removeItem('activeSessionId'); // Clear any stored session
@@ -630,9 +630,12 @@ export default function LinkedInAutomationNew() {
         if (status.intervention && status.intervention.required) {
           setShowIntervention(true);
           
-          // Only add intervention message if it's a new intervention type
-          if (status.intervention.type !== lastInterventionType) {
-            setLastInterventionType(status.intervention.type);
+          // Create a unique key for this intervention
+          const interventionKey = `${status.intervention.type}-${status.intervention.message}`;
+          
+          // Only add intervention message if it's different from the last one
+          if (interventionKey !== lastInterventionKey) {
+            setLastInterventionKey(interventionKey);
             
             // Customize message based on intervention type
             let interventionMessage = status.intervention.message;
@@ -651,9 +654,9 @@ export default function LinkedInAutomationNew() {
             });
           }
         } else {
-          // Clear intervention type when no intervention is required
-          if (lastInterventionType) {
-            setLastInterventionType(null);
+          // Clear intervention key when no intervention is required
+          if (lastInterventionKey) {
+            setLastInterventionKey(null);
           }
         }
         
@@ -860,7 +863,7 @@ export default function LinkedInAutomationNew() {
     setJobsFound([]);
     setMetrics({});
     setConfig(null);
-    setLastInterventionType(null);
+    setLastInterventionKey(null);
     setLastStatusMessage(null);
     setHasShownInitialRunningMessage(false);
     setFilters({
