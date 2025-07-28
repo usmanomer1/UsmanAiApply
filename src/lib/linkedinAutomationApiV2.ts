@@ -9,26 +9,41 @@ const WS_URL = API_BASE_URL.replace(/^http/, 'ws');
 export interface LinkedInJobConfig {
   jobTitle?: string;
   location?: string;
-  remote?: boolean;
-  easyApplyOnly?: boolean;
-  datePosted?: string;
+  experience?: Array<'INTERNSHIP' | 'ENTRY_LEVEL' | 'MID_LEVEL' | 'SENIOR_LEVEL' | 'DIRECTOR' | 'EXECUTIVE'>;
+  filters?: {
+    datePosted?: 'day' | 'week' | 'month';
+    jobType?: Array<'FULL_TIME' | 'PART_TIME' | 'CONTRACT' | 'TEMPORARY' | 'INTERNSHIP'>;
+    remote?: boolean;
+    easyApplyOnly?: boolean;
+    keywords?: string[];
+  };
   maxApplications?: number;
+  externalApplicationConfig?: {
+    autoCreateAccount?: boolean;
+    defaultEmail?: string;
+    defaultPassword?: string;
+    pauseOnAccountCreation?: boolean;
+  };
+}
+
+export interface StartSessionRequest {
+  userId: string;
+  searchPrompt?: string;
   resumeUrl?: string;
   resumeMetadata?: {
+    fileName: string;
+    fileType: string;
     extractedText?: string;
-    fileName?: string;
   };
-  externalApplicationConfig?: {
-    defaultEmail?: string;
-  };
-  searchPrompt?: string;
+  config?: LinkedInJobConfig;
 }
 
 export interface StartSessionResponse {
-  success: boolean;
   sessionId: string;
-  debugUrl: string;
-  error?: string;
+  liveViewUrl: string;
+  status: string;
+  taskId: string;
+  browserbaseSessionId: string;
 }
 
 export interface SessionProgress {
@@ -86,20 +101,33 @@ export class LinkedInAutomationAPIV2 {
     };
   }
 
-  async startSession(config: LinkedInJobConfig): Promise<StartSessionResponse> {
+  async startSession(request: StartSessionRequest): Promise<StartSessionResponse> {
     try {
       const headers = await this.getAuthHeaders();
       
       const response = await fetch(`${API_BASE_URL}/api/linkedin/start`, {
         method: 'POST',
         headers,
-        body: JSON.stringify(config)
+        body: JSON.stringify(request)
       });
 
       const data = await response.json();
       
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to start session');
+      if (!response.ok) {
+        // Handle specific error formats
+        if (response.status === 400 && data.details) {
+          const errorMessages = [];
+          if (data.details.fieldErrors) {
+            Object.entries(data.details.fieldErrors).forEach(([field, errors]) => {
+              errorMessages.push(`${field}: ${(errors as string[]).join(', ')}`);
+            });
+          }
+          if (data.details.formErrors) {
+            errorMessages.push(...(data.details.formErrors as string[]));
+          }
+          throw new Error(errorMessages.join('; ') || data.message || 'Failed to start session');
+        }
+        throw new Error(data.message || data.error || 'Failed to start session');
       }
 
       this.currentSessionId = data.sessionId;

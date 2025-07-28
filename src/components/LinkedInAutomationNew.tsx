@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Bot, Loader2, Play, Pause, Square, AlertCircle, CheckCircle, ExternalLink, Info } from 'lucide-react';
-import { linkedInAutomationAPI, LinkedInJobConfig, SessionProgress, JobFound, InterventionRequired } from '../lib/linkedinAutomationApiV2';
+import { linkedInAutomationAPI, LinkedInJobConfig, StartSessionRequest, SessionProgress, JobFound, InterventionRequired } from '../lib/linkedinAutomationApiV2';
 import { Socket } from 'socket.io-client';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -26,7 +26,7 @@ export default function LinkedInAutomationNew() {
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [debugUrl, setDebugUrl] = useState<string | null>(null);
+  const [liveViewUrl, setLiveViewUrl] = useState<string | null>(null);
   
   // UI state
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -74,7 +74,7 @@ export default function LinkedInAutomationNew() {
       
       if (activeSession) {
         setSessionId(activeSession.id);
-        setDebugUrl(activeSession.live_view_url);
+        setLiveViewUrl(activeSession.live_view_url);
         setIsRunning(true);
         setIsPaused(activeSession.status === 'paused');
         
@@ -114,7 +114,10 @@ export default function LinkedInAutomationNew() {
           type: 'success',
           message: 'Session started successfully'
         });
-        setDebugUrl(data.debugUrl);
+        // The liveViewUrl might come in the session_started event
+        if (data.liveViewUrl) {
+          setLiveViewUrl(data.liveViewUrl);
+        }
       });
 
       socket.on('intervention_required', (data) => {
@@ -213,16 +216,26 @@ export default function LinkedInAutomationNew() {
         message: 'Starting LinkedIn job automation...'
       });
 
-      const config: LinkedInJobConfig = {
+      // Get user ID from auth context
+      if (!user?.id) {
+        throw new Error('User ID not available');
+      }
+
+      const request: StartSessionRequest = {
+        userId: user.id,
         searchPrompt: searchQuery,
-        easyApplyOnly: true,
-        maxApplications: 20
+        config: {
+          filters: {
+            easyApplyOnly: true
+          },
+          maxApplications: 20
+        }
       };
 
-      const response = await linkedInAutomationAPI.startSession(config);
+      const response = await linkedInAutomationAPI.startSession(request);
       
       setSessionId(response.sessionId);
-      setDebugUrl(response.debugUrl);
+      setLiveViewUrl(response.liveViewUrl);
       
       // Connect WebSocket for real-time updates
       await connectWebSocket(response.sessionId);
@@ -505,11 +518,11 @@ export default function LinkedInAutomationNew() {
 
       {/* Live View - 70% width */}
       <div className="flex-1 bg-gray-900 relative">
-        {debugUrl ? (
+        {liveViewUrl ? (
           <>
             <iframe
               ref={iframeRef}
-              src={debugUrl}
+              src={liveViewUrl}
               className="w-full h-full"
               title="LinkedIn Automation Browser"
               allow="clipboard-read; clipboard-write"
