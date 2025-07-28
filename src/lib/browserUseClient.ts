@@ -306,6 +306,7 @@ export class BrowserUseClient {
   /**
    * Delete the browser profile for this user account
    * This clears the actual browser session data on browser-use servers
+   * @deprecated Use deleteUserProfile instead
    */
   async clearBrowserProfile(): Promise<void> {
     const response = await fetch(`${this.baseUrl}/delete-browser-profile-for-user`, {
@@ -320,6 +321,114 @@ export class BrowserUseClient {
     }
 
     // Also clear our local tracking
+    this.clearLoginRecord();
+  }
+
+  /**
+   * Detect if login is required based on task output
+   */
+  async detectLoginRequirement(taskId: string): Promise<LoginDetectionResult> {
+    try {
+      const task = await this.getTask(taskId);
+      const output = task.output || '';
+      
+      // Layer 1: Explicit intervention code (highest confidence)
+      if (output.includes('INTERVENTION:LOGIN_REQUIRED')) {
+        const description = output.split('INTERVENTION:LOGIN_REQUIRED')[1]?.split('\n')[0]?.trim() || 'Login required';
+        return {
+          loginRequired: true,
+          confidence: 1.0,
+          detectionMethod: 'intervention_code',
+          description: description.replace(/^[-\s]+/, '')
+        };
+      }
+      
+      // Layer 2: Content analysis (multiple indicators)
+      const loginIndicators = [
+        'sign in', 'log in', 'login', 'password', 'email address',
+        'authentication required', 'please enter your credentials',
+        'create account', 'not signed in', 'access denied',
+        'sign up', 'register', 'join now'
+      ];
+      
+      const lowerOutput = output.toLowerCase();
+      const indicatorCount = loginIndicators.filter(indicator => 
+        lowerOutput.includes(indicator)
+      ).length;
+      
+      if (indicatorCount >= 2) {
+        return {
+          loginRequired: true,
+          confidence: Math.min(0.9, 0.3 + (indicatorCount * 0.15)),
+          detectionMethod: 'content_analysis',
+          description: 'Multiple login indicators detected in output'
+        };
+      }
+      
+      // Layer 3: Agent behavior analysis
+      const stuckPhrases = [
+        'cannot proceed', 'unable to continue', 'need to authenticate',
+        'requires login', 'blocked by', 'waiting for user',
+        'manual intervention', 'please complete'
+      ];
+      
+      if (stuckPhrases.some(phrase => lowerOutput.includes(phrase))) {
+        return {
+          loginRequired: true,
+          confidence: 0.8,
+          detectionMethod: 'agent_behavior',
+          description: 'Agent appears stuck at authentication'
+        };
+      }
+      
+      // Layer 4: Visual/DOM detection via agent
+      if (lowerOutput.includes('email') && lowerOutput.includes('password') && 
+          (lowerOutput.includes('button') || lowerOutput.includes('submit'))) {
+        return {
+          loginRequired: true,
+          confidence: 0.7,
+          detectionMethod: 'visual_detection',
+          description: 'Login form elements detected on page'
+        };
+      }
+      
+      return {
+        loginRequired: false,
+        confidence: 0,
+        detectionMethod: 'content_analysis',
+        description: 'No login requirement detected'
+      };
+    } catch (error) {
+      console.error('Error detecting login requirement:', error);
+      return {
+        loginRequired: false,
+        confidence: 0,
+        detectionMethod: 'content_analysis',
+        description: 'Error during detection'
+      };
+    }
+  }
+
+  /**
+   * Get session health for a user
+   */
+  async getSessionHealth(userId: string) {
+    return this.profileManager.getSessionHealth(userId);
+  }
+
+  /**
+   * Mark successful authentication for a user
+   */
+  async markSuccessfulAuth(userId: string): Promise<void> {
+    await this.profileManager.markSuccessfulAuth(userId);
+    this.markSuccessfulLogin();
+  }
+
+  /**
+   * Delete user profile
+   */
+  async deleteUserProfile(userId: string): Promise<void> {
+    await this.profileManager.deleteUserProfile(userId);
     this.clearLoginRecord();
   }
 } 

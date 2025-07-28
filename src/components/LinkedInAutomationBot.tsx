@@ -60,6 +60,7 @@ interface TaskStatus {
   steps?: any[];
   output?: string;
   error?: string;
+  structured_output?: any;
 }
 
 interface BrowserUseConfig {
@@ -337,6 +338,9 @@ const LinkedInAutomationBot: React.FC = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [logs, setLogs] = useState<{ message: string; type: string; timestamp: string }[]>([]);
+  const [loginDetection, setLoginDetection] = useState<any | null>(null);
+  const [sessionHealth, setSessionHealth] = useState<any | null>(null);
+  const [showResumeButton, setShowResumeButton] = useState(false);
   const [stepCount, setStepCount] = useState(0);
   const [appliedCount, setAppliedCount] = useState(0);
   const [errorCount, setErrorCount] = useState(0);
@@ -355,6 +359,7 @@ const LinkedInAutomationBot: React.FC = () => {
 
   // Add state for dropdown
   const [showImportantInstructions, setShowImportantInstructions] = useState(false);
+  const [currentCampaignId, setCurrentCampaignId] = useState<string | null>(null);
 
   // Time elapsed state
   const [startTime, setStartTime] = useState<Date | null>(null);
@@ -499,6 +504,17 @@ const LinkedInAutomationBot: React.FC = () => {
       });
     }
   }, [appliedCount, errorCount, elapsedTime]);
+  
+  // Check session health on component mount
+  useEffect(() => {
+    const checkSessionHealth = async () => {
+      if (user?.id && browserClient) {
+        const health = await browserClient.getSessionHealth(user.id);
+        setSessionHealth(health);
+      }
+    };
+    checkSessionHealth();
+  }, [user, browserClient]);
 
 
   // Chart data is now loaded from real usage history in fetchUserSubscription
@@ -1019,7 +1035,8 @@ const LinkedInAutomationBot: React.FC = () => {
         steps: fullTask.steps || [],
         output: fullTask.output || undefined,
         error: undefined,
-        live_url: fullTask.live_url || undefined
+        live_url: fullTask.live_url || undefined,
+        structured_output: fullTask.structured_output || undefined
       };
     } catch (error) {
       throw error;
@@ -1038,6 +1055,24 @@ const LinkedInAutomationBot: React.FC = () => {
     } catch (error) {
       addLog(`❌ Error stopping task: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
       throw error;
+    }
+  };
+  
+  const handleResume = async () => {
+    if (!currentTask || !browserClient || !user?.id) return;
+    
+    try {
+      await browserClient.resumeTask(currentTask.id);
+      setIsPaused(false);
+      setShowResumeButton(false);
+      setLoginDetection(null);
+      addLog('✅ Task resumed - Continuing automation', 'success');
+      
+      // Mark successful login
+      await browserClient.markSuccessfulAuth(user.id);
+    } catch (error) {
+      addLog('❌ Failed to resume task', 'error');
+      console.error('Resume error:', error);
     }
   };
 
@@ -1661,7 +1696,12 @@ This is the #1 issue that needs to be fixed immediately.`;
 
     addLog(`🚀 Starting LinkedIn automation with ${AI_MODELS[selectedModel].name} (${AI_MODELS[selectedModel].provider})`, 'success');
 
-    const result = await browserClient.createLinkedInTask(taskConfig);
+    // Pass userId for profile-based task creation
+    if (!user?.id) {
+      throw new Error('User ID is required for automation');
+    }
+    
+    const result = await browserClient.createLinkedInTask(taskConfig, user.id);
     
     console.log('Task creation result:', result);
     
@@ -1676,7 +1716,8 @@ This is the #1 issue that needs to be fixed immediately.`;
       status: taskDetails.status || 'created' as const,
       steps: taskDetails.steps || [],
       output: taskDetails.output || undefined,
-      error: undefined
+      error: undefined,
+      structured_output: taskDetails.structured_output || undefined
     };
     
     console.log('Returning task status:', taskStatus);
@@ -2192,8 +2233,28 @@ This is the #1 issue that needs to be fixed immediately.`;
           steps: fullTaskDetails.steps || [],
           output: fullTaskDetails.output || undefined,
           error: undefined,
-          live_url: fullTaskDetails.live_url || undefined
+          live_url: fullTaskDetails.live_url || undefined,
+          structured_output: fullTaskDetails.structured_output || undefined
         };
+        
+        // Check for login requirement
+        if (!isPaused && updatedTask.status === 'running') {
+          const detection = await browserClient.detectLoginRequirement(taskId);
+          
+          if (detection.loginRequired && detection.confidence >= 0.8) {
+            // Pause the task
+            await browserClient.pauseTask(taskId);
+            
+            setIsPaused(true);
+            setLoginDetection(detection);
+            setShowResumeButton(true);
+            
+            // Add to logs
+            addLog('🔐 Login required - Task paused', 'warning');
+            addLog('Please complete login in the browser window, then click Resume', 'info');
+            addLog(`Detection: ${detection.description} (${(detection.confidence * 100).toFixed(0)}% confidence)`, 'info');
+          }
+        }
         
         console.log('Polling - Updated task:', updatedTask);
         console.log('Polling - Live URL:', updatedTask.live_url);
@@ -2332,6 +2393,32 @@ This is the #1 issue that needs to be fixed immediately.`;
             try {
             const finalTask = await getTaskStatus(taskId);
               setCurrentTask(finalTask);
+              
+              // Extract job application data from structured output
+              if (finalTask.structured_output?.applications && user?.id) {
+                const applications = finalTask.structured_output.applications;
+                addLog(`📊 Processing ${applications.length} job applications...`, 'info');
+                
+                for (const app of applications) {
+                  try {
+                    await supabase.from('applications').insert({
+                      user_id: user.id,
+                      company_name: app.company_name,
+                      job_title: app.job_title,
+                      location: app.location || null,
+                      status: app.application_status === 'applied' ? 'submitted' : app.application_status,
+                      applied_at: app.application_date || new Date().toISOString(),
+                      job_url: app.job_url || null,
+                      source: 'browser_use_automation',
+                      campaign_id: currentCampaignId || null
+                    });
+                  } catch (error) {
+                    console.error('Error saving application:', error);
+                  }
+                }
+                
+                addLog(`✅ Saved ${applications.length} job applications to database`, 'success');
+              }
               
               const finalStepCount = finalTask.steps?.length || 0;
               const finalApplicationCount = finalTask.steps ? finalTask.steps.filter(step => {
@@ -2600,6 +2687,66 @@ This is the #1 issue that needs to be fixed immediately.`;
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Configuration Panel */}
             <div className="lg:col-span-1 space-y-6">
+              {/* Session Status */}
+              {sessionHealth && (
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="bg-white rounded-xl border border-gray-200 shadow-sm"
+                >
+                  <div className="p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <Activity className="h-5 w-5 text-gray-600" />
+                        <h3 className="text-lg font-semibold text-gray-900">LinkedIn Session</h3>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Status</span>
+                        <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${
+                          sessionHealth.sessionHealth === 'fresh' ? 'bg-green-100 text-green-700' :
+                          sessionHealth.sessionHealth === 'active' ? 'bg-yellow-100 text-yellow-700' :
+                          sessionHealth.sessionHealth === 'expired' ? 'bg-red-100 text-red-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          <div className={`w-2 h-2 rounded-full ${
+                            sessionHealth.sessionHealth === 'fresh' ? 'bg-green-500' :
+                            sessionHealth.sessionHealth === 'active' ? 'bg-yellow-500' :
+                            sessionHealth.sessionHealth === 'expired' ? 'bg-red-500' :
+                            'bg-gray-500'
+                          }`} />
+                          {sessionHealth.sessionHealth === 'fresh' ? 'Fresh Session' :
+                           sessionHealth.sessionHealth === 'active' ? 'Active Session' :
+                           sessionHealth.sessionHealth === 'expired' ? 'Session Expired' :
+                           'No Session'}
+                        </div>
+                      </div>
+                      
+                      {sessionHealth.sessionAge !== null && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600">Last Login</span>
+                          <span className="text-sm text-gray-900">
+                            {sessionHealth.sessionAge < 1 ? 'Less than 1 hour ago' :
+                             sessionHealth.sessionAge < 24 ? `${Math.floor(sessionHealth.sessionAge)} hours ago` :
+                             `${Math.floor(sessionHealth.sessionAge / 24)} days ago`}
+                          </span>
+                        </div>
+                      )}
+                      
+                      {sessionHealth.expectedLoginRequired && (
+                        <div className="mt-3 p-3 bg-yellow-50 rounded-lg">
+                          <p className="text-sm text-yellow-700">
+                            ⚠️ You may need to log in again during automation
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+              
               {/* AI Model Selector */}
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
@@ -3096,12 +3243,26 @@ This is the #1 issue that needs to be fixed immediately.`;
                   </button>
                 ) : isPaused ? (
                   <div className="space-y-3">
+                    {loginDetection && showResumeButton && (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-3">
+                        <div className="flex items-start space-x-3">
+                          <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                          <div className="flex-1">
+                            <h4 className="font-medium text-yellow-900">Manual Login Required</h4>
+                            <p className="text-sm text-yellow-700 mt-1">{loginDetection.description}</p>
+                            <p className="text-sm text-yellow-600 mt-2">
+                              Please complete the login process in the browser window below.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     <button
-                      onClick={resumeAutomation}
+                      onClick={showResumeButton ? handleResume : resumeAutomation}
                       className="w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
                     >
                       <Play className="h-6 w-6" />
-                      Resume
+                      {showResumeButton ? "I've Logged In - Resume" : "Resume"}
                     </button>
                     <button
                       onClick={stopAutomation}
