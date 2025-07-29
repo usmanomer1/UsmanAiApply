@@ -420,29 +420,17 @@ const LinkedInAutomationBot: React.FC = () => {
           browserClient.stopTask(currentTask.id).catch(() => {});
           
           // Method 2: Direct API call with keepalive for reliability
-          fetch(`https://api.browseruse.com/tasks/${currentTask.id}/stop`, {
-            method: 'POST',
+          fetch(`https://api.browser-use.com/api/v1/stop-task?task_id=${currentTask.id}`, {
+            method: 'PUT',
             headers: {
               'Authorization': `Bearer ${apiKey}`,
-              'Content-Type': 'application/json',
             },
-            body: JSON.stringify({}),
             keepalive: true // Continues even as page unloads
           }).catch(() => {});
           
           // Method 3: Fallback with sendBeacon (most reliable for page unload)
-          const stopData = JSON.stringify({
-            taskId: currentTask.id,
-            authorization: `Bearer ${apiKey}`,
-            timestamp: Date.now()
-          });
-          
-          if (navigator.sendBeacon) {
-            navigator.sendBeacon(
-              `https://api.browseruse.com/tasks/${currentTask.id}/stop`,
-              stopData
-            );
-          }
+          // Note: sendBeacon doesn't support custom headers, so we need a proxy endpoint
+          // For now, we rely on methods 1 and 2 above
           
           // Clear local state immediately
           clearAutomationState();
@@ -462,8 +450,29 @@ const LinkedInAutomationBot: React.FC = () => {
     // Also handle visibility change (tab switching, minimizing)
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden' && isRunning && currentTask) {
-        // Just save state when tab becomes hidden (don't stop)
+        // Save state when tab becomes hidden
         saveAutomationState(currentTask);
+        
+        // If the page is being unloaded (user closing tab/navigating away)
+        // This helps catch cases where beforeunload might not fire
+        if (document.hidden) {
+          // Set a timer to stop the task if the page doesn't become visible again
+          const stopTimer = setTimeout(() => {
+            if (document.hidden && isRunning && currentTask && browserClient) {
+              console.log('Stopping task due to prolonged page hidden state');
+              browserClient.stopTask(currentTask.id).catch(() => {});
+            }
+          }, 10000); // Wait 10 seconds to see if user comes back
+          
+          // Store the timer so we can clear it if the page becomes visible
+          (window as any).__stopTimer = stopTimer;
+        }
+      } else if (document.visibilityState === 'visible') {
+        // Clear the stop timer if the page becomes visible again
+        if ((window as any).__stopTimer) {
+          clearTimeout((window as any).__stopTimer);
+          delete (window as any).__stopTimer;
+        }
       }
     };
 
@@ -473,6 +482,13 @@ const LinkedInAutomationBot: React.FC = () => {
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      
+      // Also stop task on component unmount (e.g., navigation)
+      if (isRunning && currentTask && browserClient) {
+        browserClient.stopTask(currentTask.id).catch((error) => {
+          console.error('Failed to stop task on unmount:', error);
+        });
+      }
     };
   }, [isRunning, currentTask, user, browserClient, apiKey]);
 
