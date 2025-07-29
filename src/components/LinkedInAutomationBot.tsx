@@ -1164,13 +1164,14 @@ const LinkedInAutomationBot: React.FC = () => {
     return `You are an AI assistant helping with LinkedIn job applications. Your goal is to apply to ${config.targetCount} jobs ${applyToExternalJobs ? '(including both Easy Apply and external job postings)' : 'using LinkedIn\'s "Easy Apply" feature'}.
 
 CRITICAL - MANUAL LOGIN HANDLING:
-- If you see a login page, login modal, or "Sign in" overlay:
-  - Output ONLY this text: "INTERVENTION:LOGIN_REQUIRED - Manual login needed"
-  - DO NOT use done() - this would end the entire automation
-  - DO NOT complete or finish the task
-  - Simply output the intervention text and wait
-  - The system will automatically pause for manual login
-  - After login is complete, you will be resumed to continue
+When you see a login page, login modal, or "Sign in" overlay on LinkedIn:
+1. Take a screenshot of the page
+2. In your next action description or evaluation, include the exact text: "INTERVENTION:LOGIN_REQUIRED - Manual login needed"
+3. Then simply wait (use wait action for 30 seconds)
+4. DO NOT search for this text on Google
+5. DO NOT use done() - this would end the entire automation
+6. The system will detect the intervention text in your output and pause
+7. After manual login, the automation will resume automatically
 
 STEP-BY-STEP PROCESS:
 1. Navigate directly to the job search URL: ${linkedinUrl}
