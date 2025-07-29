@@ -1563,12 +1563,18 @@ This is the #1 issue that needs to be fixed immediately.`;
     // Clear browser profile to prevent session sharing between users
     // This is critical for security - without this, User B could access User A's LinkedIn session
     try {
+      addLog('🧹 Clearing browser profile for security...', 'info');
       await browserClient.clearBrowserProfile();
-      addLog('🔒 Cleared browser profile for security', 'info');
+      addLog('🔒 Successfully cleared browser profile', 'success');
     } catch (error) {
-      // Log but don't fail - the automation can still proceed
+      // Log detailed error for debugging
       console.error('Failed to clear browser profile:', error);
-      addLog('⚠️ Could not clear browser profile, proceeding with caution', 'warning');
+      if (error instanceof Error) {
+        addLog(`⚠️ Could not clear browser profile: ${error.message}`, 'warning');
+      } else {
+        addLog('⚠️ Could not clear browser profile, proceeding with caution', 'warning');
+      }
+      // Don't fail - the automation can still proceed
     }
 
     const linkedinUrl = buildLinkedInJobsURL();

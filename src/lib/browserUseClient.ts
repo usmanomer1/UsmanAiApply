@@ -308,18 +308,27 @@ export class BrowserUseClient {
    * This clears the actual browser session data on browser-use servers
    */
   async clearBrowserProfile(): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/delete-browser-profile-for-user`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.apiKey.trim()}`,
-      },
-    });
+    try {
+      const response = await fetch(`${this.baseUrl}/delete-browser-profile-for-user`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey.trim()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}), // Some APIs require an empty body
+      });
 
-    if (!response.ok) {
-      throw new Error(`Failed to clear browser profile: ${response.statusText}`);
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        console.error(`Browser profile clear failed (${response.status}): ${errorText}`);
+        throw new Error(`Failed to clear browser profile (${response.status}): ${response.statusText}`);
+      }
+
+      // Also clear our local tracking
+      this.clearLoginRecord();
+    } catch (error) {
+      console.error('Error clearing browser profile:', error);
+      throw error;
     }
-
-    // Also clear our local tracking
-    this.clearLoginRecord();
   }
 } 
