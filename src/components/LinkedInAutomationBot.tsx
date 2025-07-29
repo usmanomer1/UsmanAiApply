@@ -1171,8 +1171,9 @@ const LinkedInAutomationBot: React.FC = () => {
 
 STEP-BY-STEP PROCESS:
 1. Navigate directly to the job search URL: ${linkedinUrl}
-2. Proceed to the jobs page // If you encounter a login page, announce "INTERVENTION:LOGIN_REQUIRED - Please log in manually"
-3. After login is complete and you're on the jobs page, look for the left sidebar with job listings - if it's collapsed or missing, try clicking any "expand" or "menu" buttons
+2. Wait 3-5 seconds for the page to fully load before proceeding
+3. Proceed to the jobs page // If you encounter a login page, announce "INTERVENTION:LOGIN_REQUIRED - Please log in manually"
+4. After login is complete and you're on the jobs page, look for the left sidebar with job listings - if it's collapsed or missing, try clicking any "expand" or "menu" buttons
 4. Look for jobs with ${applyToExternalJobs ? '"Easy Apply" buttons OR external application links' : '"Easy Apply" buttons'} in the job listings
 5. For each job (continue until you reach ${config.targetCount} applications):
    a. BEFORE clicking any apply button, clearly state: "APPLYING TO: [EXACT COMPANY NAME] - [EXACT JOB TITLE]"
@@ -1675,7 +1676,7 @@ This is the #1 issue that needs to be fixed immediately.`;
       
       secrets: secrets,
       save_browser_data: false,
-      use_adblock: false,
+      use_adblock: true, // Enable to reduce page load and prevent crashes from heavy scripts
       use_proxy: true,
       
       proxy_country_code: 'us' as const,
