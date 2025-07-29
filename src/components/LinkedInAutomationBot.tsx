@@ -1163,16 +1163,19 @@ const LinkedInAutomationBot: React.FC = () => {
     
     return `You are an AI assistant helping with LinkedIn job applications. Your goal is to apply to ${config.targetCount} jobs ${applyToExternalJobs ? '(including both Easy Apply and external job postings)' : 'using LinkedIn\'s "Easy Apply" feature'}.
 
-// MANUAL LOGIN REQUIRED - TEMPORARILY DISABLED FOR DEBUGGING:
-// - You will encounter a login page when navigating to LinkedIn
-// - When you see the login page, announce: "INTERVENTION:LOGIN_REQUIRED - Manual login needed"
-// - The automation will pause and wait for the user to complete the login manually
-// - Once the user logs in and clicks resume, you will continue with the job applications
+CRITICAL - MANUAL LOGIN HANDLING:
+- If you see a login page, login modal, or "Sign in" overlay:
+  - Output ONLY this text: "INTERVENTION:LOGIN_REQUIRED - Manual login needed"
+  - DO NOT use done() - this would end the entire automation
+  - DO NOT complete or finish the task
+  - Simply output the intervention text and wait
+  - The system will automatically pause for manual login
+  - After login is complete, you will be resumed to continue
 
 STEP-BY-STEP PROCESS:
 1. Navigate directly to the job search URL: ${linkedinUrl}
 2. Wait 3-5 seconds for the page to fully load before proceeding
-3. Proceed to the jobs page // If you encounter a login page, announce "INTERVENTION:LOGIN_REQUIRED - Please log in manually"
+3. Check if login is required - if you see any login modal or sign-in overlay, output "INTERVENTION:LOGIN_REQUIRED - Manual login needed"
 4. After login is complete and you're on the jobs page, look for the left sidebar with job listings - if it's collapsed or missing, try clicking any "expand" or "menu" buttons
 4. Look for jobs with ${applyToExternalJobs ? '"Easy Apply" buttons OR external application links' : '"Easy Apply" buttons'} in the job listings
 5. For each job (continue until you reach ${config.targetCount} applications):
@@ -1290,11 +1293,11 @@ JOB TITLE EXTRACTION REQUIREMENTS:
 - For yes/no questions about skills/experience, err on the side of confidence if it's job-relevant
 - For text fields asking "Why are you interested?", provide a brief, professional response based on the company/role
 
-// LOGIN GUIDANCE - TEMPORARILY DISABLED FOR DEBUGGING:
-// - When you encounter the login page, announce "INTERVENTION:LOGIN_REQUIRED"
-// - The automation will pause for manual login
-// - If already logged in, proceed directly to job applications
-// - Don't get stuck on login verification - focus on the job application task
+LOGIN GUIDANCE:
+- When you encounter a login page or modal, output "INTERVENTION:LOGIN_REQUIRED"
+- The automation will pause for manual login
+- After login, wait for the resume signal before continuing
+- If already logged in, proceed directly to job applications
 
 CONTACT INFORMATION FOR APPLICATIONS:
 - Email: ${config.linkedinEmail}
@@ -1677,7 +1680,7 @@ This is the #1 issue that needs to be fixed immediately.`;
       secrets: secrets,
       save_browser_data: false,
       use_adblock: true, // Enable to reduce page load and prevent crashes from heavy scripts
-      use_proxy: false, // Temporarily disable proxy to see if it helps with crashes
+      use_proxy: true,
       
       proxy_country_code: 'us' as const,
       highlight_elements: true,
