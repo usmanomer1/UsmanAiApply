@@ -1677,7 +1677,7 @@ This is the #1 issue that needs to be fixed immediately.`;
       secrets: secrets,
       save_browser_data: false,
       use_adblock: true, // Enable to reduce page load and prevent crashes from heavy scripts
-      use_proxy: true,
+      use_proxy: false, // Temporarily disable proxy to see if it helps with crashes
       
       proxy_country_code: 'us' as const,
       highlight_elements: true,
