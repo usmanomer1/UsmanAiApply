@@ -1710,7 +1710,18 @@ This is the #1 issue that needs to be fixed immediately.`;
     // Immediately fetch task details to get the live URL
     const taskDetails = await browserClient.getTask(result.id);
     console.log('Task details after creation:', taskDetails);
+    console.log('Initial task status:', taskDetails.status);
     console.log('Initial live_url:', taskDetails.live_url);
+    
+    // If task is already stopped, log why
+    if (taskDetails.status === 'stopped' || taskDetails.status === 'failed') {
+      console.error('Task immediately stopped/failed:', {
+        status: taskDetails.status,
+        error: taskDetails.error,
+        output: taskDetails.output
+      });
+      addLog(`⚠️ Task was ${taskDetails.status}: ${taskDetails.error || taskDetails.output || 'Unknown reason'}`, 'error');
+    }
     
     const taskStatus = {
       id: result.id,
@@ -1718,7 +1729,7 @@ This is the #1 issue that needs to be fixed immediately.`;
       status: taskDetails.status || 'created' as const,
       steps: taskDetails.steps || [],
       output: taskDetails.output || undefined,
-      error: undefined
+      error: taskDetails.error || undefined
     };
     
     console.log('Returning task status:', taskStatus);
@@ -2053,6 +2064,9 @@ This is the #1 issue that needs to be fixed immediately.`;
       // Save initial automation state
       saveAutomationState(task);
       
+      // Wait a moment for the task to fully initialize before polling
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
       // Start polling for status updates
       startPolling(task.id);
 
@@ -2135,7 +2149,7 @@ This is the #1 issue that needs to be fixed immediately.`;
       addLog('✅ Task resumed - Continuing automation', 'success');
       
       // Mark successful login
-      await browserClient.markSuccessfulLogin();
+      browserClient.markSuccessfulLogin();
     } catch (error) {
       addLog('❌ Failed to resume task', 'error');
       console.error('Resume error:', error);
@@ -2383,7 +2397,7 @@ This is the #1 issue that needs to be fixed immediately.`;
             setShowResumeButton(true);
             
             // Add to logs
-            addLog('🔐 Login required - Task paused', 'warning');
+            addLog('🔐 Login required - Task paused', 'info');
             addLog('Please complete login in the browser window, then click Resume', 'info');
             addLog(`Detection: ${detection.description} (${(detection.confidence * 100).toFixed(0)}% confidence)`, 'info');
           }
