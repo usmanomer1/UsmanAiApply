@@ -458,6 +458,7 @@ const LinkedInAutomationBot: React.FC = () => {
         // If the page is being unloaded (user closing tab/navigating away)
         // This helps catch cases where beforeunload might not fire
         if (document.hidden) {
+          console.log('Page became hidden, starting 10 second timer before stopping task');
           // Set a timer to stop the task if the page doesn't become visible again
           const stopTimer = setTimeout(() => {
             if (document.hidden && isRunning && currentTask && browserClient) {
@@ -1703,9 +1704,17 @@ This is the #1 issue that needs to be fixed immediately.`;
 
     addLog(`🚀 Starting LinkedIn automation with ${AI_MODELS[selectedModel].name} (${AI_MODELS[selectedModel].provider})`, 'success');
 
+    console.log('Creating task with config:', {
+      ...taskConfig,
+      task: taskConfig.task.substring(0, 200) + '...' // Just show first 200 chars
+    });
+    
     const result = await browserClient.createLinkedInTask(taskConfig);
     
     console.log('Task creation result:', result);
+    
+    // Wait a bit before fetching details to let task initialize
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
     // Immediately fetch task details to get the live URL
     const taskDetails = await browserClient.getTask(result.id);
@@ -2064,10 +2073,12 @@ This is the #1 issue that needs to be fixed immediately.`;
       // Save initial automation state
       saveAutomationState(task);
       
-      // Wait a moment for the task to fully initialize before polling
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Wait longer for the task to fully initialize before polling
+      addLog('⏳ Waiting for task to initialize...', 'info');
+      await new Promise(resolve => setTimeout(resolve, 5000));
       
       // Start polling for status updates
+      addLog('📊 Starting status monitoring...', 'info');
       startPolling(task.id);
 
     } catch (error) {
