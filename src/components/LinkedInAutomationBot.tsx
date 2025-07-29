@@ -1564,9 +1564,8 @@ This is the #1 issue that needs to be fixed immediately.`;
       }
     }
 
-    // TEMPORARILY DISABLED: Clearing browser profile was causing "Agent session already stopped" error
-    // TODO: Test if save_browser_data: false is sufficient for preventing session sharing
-    /*
+    // Clear browser profile to prevent session sharing between users
+    // This is critical for security - without this, User B could access User A's LinkedIn session
     try {
       addLog('🧹 Clearing browser profile for security...', 'info');
       await browserClient.clearBrowserProfile();
@@ -1581,7 +1580,6 @@ This is the #1 issue that needs to be fixed immediately.`;
       }
       // Don't fail - the automation can still proceed
     }
-    */
 
     const linkedinUrl = buildLinkedInJobsURL();
     
@@ -1661,16 +1659,16 @@ This is the #1 issue that needs to be fixed immediately.`;
     // INSTRUCTION: Use the LinkedIn password from the secret variable ln_password
     const comprehensivePrompt = createComprehensivePrompt(linkedinUrl, resumeContent, uploadedFileNames);
 
-    // Pass any external job password via secrets
-    const secrets: Record<string, string> = {};
-    if (effectiveConfig.applyToExternalJobs && config.externalJobPassword) {
-      secrets.ext_password = config.externalJobPassword;
-    }
+    // Only pass secrets if we have external job password and are applying to external jobs
+    const secrets: Record<string, string> | undefined = 
+      (effectiveConfig.applyToExternalJobs && config.externalJobPassword) 
+        ? { ext_password: config.externalJobPassword }
+        : undefined;
     
     const taskConfig = {
       task: comprehensivePrompt,
       
-      secrets: Object.keys(secrets).length > 0 ? secrets : undefined,
+      secrets: secrets,
       save_browser_data: false,
       use_adblock: false,
       use_proxy: true,
@@ -1678,8 +1676,9 @@ This is the #1 issue that needs to be fixed immediately.`;
       proxy_country_code: 'us' as const,
       highlight_elements: true,
       max_agent_steps: Math.max(100, parseInt(config.targetCount) * 15), // 15 steps per application for external jobs
-      llm_model: selectedModel,  allowed_domains: undefined
-    ,
+      llm_model: selectedModel,
+      // Don't restrict domains when applying to external jobs, otherwise restrict to LinkedIn
+      allowed_domains: effectiveConfig.applyToExternalJobs ? undefined : ['linkedin.com', 'www.linkedin.com'],
       included_file_names: uploadedFileNames.length > 0 ? uploadedFileNames : undefined,
     };
 
