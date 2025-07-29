@@ -1622,7 +1622,7 @@ This is the #1 issue that needs to be fixed immediately.`;
                 const file = new File([blob], fileName, { type: blob.type });
                 
                 // Upload to browser-use
-                addLog('📤 Uploading resume to browser automation service...');
+                addLog(`📤 Uploading resume: ${fileName} (${(file.size / 1024).toFixed(2)}KB)...`);
                 const uploadedFileName = await browserClient.uploadFile(file);
                 uploadedFileNames.push(uploadedFileName);
                 addLog('✅ Resume uploaded successfully for external applications');
@@ -1635,11 +1635,15 @@ This is the #1 issue that needs to be fixed immediately.`;
         }
         
         if (uploadedFileNames.length === 0) {
-          addLog('⚠️ Warning: Could not upload resume. External job applications may be limited.', 'error');
+          addLog('⚠️ Warning: Could not upload resume. External job applications may be limited.', 'warning');
         }
       } catch (error) {
         console.error('Error preparing resume:', error);
-        addLog('⚠️ Warning: Failed to prepare resume for upload. External applications may be limited.', 'error');
+        if (error instanceof Error) {
+          addLog(`⚠️ Resume upload failed: ${error.message}`, 'warning');
+        } else {
+          addLog('⚠️ Warning: Failed to prepare resume for upload. External applications may be limited.', 'warning');
+        }
       }
     }
     

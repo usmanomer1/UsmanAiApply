@@ -116,6 +116,25 @@ export class BrowserUseClient {
    */
   async uploadFile(file: File): Promise<string> {
     try {
+      // Validate file size (max 10MB per Browser Use docs)
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      if (file.size > maxSize) {
+        throw new Error(`File too large: ${(file.size / 1024 / 1024).toFixed(2)}MB (max 10MB)`);
+      }
+
+      // Validate file type
+      const supportedTypes = [
+        '.txt', '.csv', '.json', '.xml', '.html', '.md',
+        '.jpg', '.jpeg', '.png', '.gif', '.webp',
+        '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx'
+      ];
+      const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+      if (!supportedTypes.includes(fileExtension)) {
+        throw new Error(`Unsupported file type: ${fileExtension}`);
+      }
+
+      console.log(`Uploading file: ${file.name} (${(file.size / 1024).toFixed(2)}KB, type: ${file.type})`);
+
       // Step 1: Get presigned URL
       const presignedResponse = await fetch(`${this.baseUrl}/uploads/presigned-url`, {
         method: 'POST',
@@ -131,10 +150,18 @@ export class BrowserUseClient {
 
       if (!presignedResponse.ok) {
         const errorText = await presignedResponse.text();
-        throw new Error(`Failed to get presigned URL: ${errorText}`);
+        console.error(`Presigned URL request failed (${presignedResponse.status}):`, errorText);
+        throw new Error(`Failed to get presigned URL (${presignedResponse.status}): ${errorText}`);
       }
 
-      const { upload_url }: components['schemas']['UploadFileResponse'] = await presignedResponse.json();
+      const presignedData = await presignedResponse.json();
+      const upload_url = presignedData.upload_url || presignedData.url;
+      
+      if (!upload_url) {
+        throw new Error('No upload URL received from server');
+      }
+
+      console.log('Got presigned URL, uploading file...');
 
       // Step 2: Upload file to presigned URL
       const uploadResponse = await fetch(upload_url, {
@@ -146,8 +173,12 @@ export class BrowserUseClient {
       });
 
       if (!uploadResponse.ok) {
-        throw new Error(`Failed to upload file: ${uploadResponse.statusText}`);
+        const errorText = await uploadResponse.text().catch(() => 'Unknown error');
+        console.error(`File upload failed (${uploadResponse.status}):`, errorText);
+        throw new Error(`Failed to upload file (${uploadResponse.status}): ${uploadResponse.statusText}`);
       }
+
+      console.log('File uploaded successfully');
 
       // Return the filename to use in included_file_names
       return file.name;
