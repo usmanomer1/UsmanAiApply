@@ -337,6 +337,8 @@ const LinkedInAutomationBot: React.FC = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [logs, setLogs] = useState<{ message: string; type: string; timestamp: string }[]>([]);
+  const [loginDetection, setLoginDetection] = useState<any | null>(null);
+  const [showResumeButton, setShowResumeButton] = useState(false);
   const [stepCount, setStepCount] = useState(0);
   const [appliedCount, setAppliedCount] = useState(0);
   const [errorCount, setErrorCount] = useState(0);
@@ -1176,10 +1178,16 @@ const LinkedInAutomationBot: React.FC = () => {
     
     return `You are an AI assistant helping with LinkedIn job applications. Your goal is to apply to ${config.targetCount} jobs ${applyToExternalJobs ? '(including both Easy Apply and external job postings)' : 'using LinkedIn\'s "Easy Apply" feature'}.
 
+MANUAL LOGIN REQUIRED:
+- You will encounter a login page when navigating to LinkedIn
+- When you see the login page, announce: "INTERVENTION:LOGIN_REQUIRED - Manual login needed"
+- The automation will pause and wait for the user to complete the login manually
+- Once the user logs in and clicks resume, you will continue with the job applications
+
 STEP-BY-STEP PROCESS:
 1. Navigate directly to the job search URL: ${linkedinUrl}
-2. If you need to login, use the provided credentials (email: ${config.linkedinEmail}, password: (use the value from the secret variable ln_password))
-3. After page loads, look for the left sidebar with job listings - if it's collapsed or missing, try clicking any "expand" or "menu" buttons
+2. If you encounter a login page, announce "INTERVENTION:LOGIN_REQUIRED - Please log in manually"
+3. After login is complete and you're on the jobs page, look for the left sidebar with job listings - if it's collapsed or missing, try clicking any "expand" or "menu" buttons
 4. Look for jobs with ${applyToExternalJobs ? '"Easy Apply" buttons OR external application links' : '"Easy Apply" buttons'} in the job listings
 5. For each job (continue until you reach ${config.targetCount} applications):
    a. BEFORE clicking any apply button, clearly state: "APPLYING TO: [EXACT COMPANY NAME] - [EXACT JOB TITLE]"
@@ -1297,13 +1305,13 @@ JOB TITLE EXTRACTION REQUIREMENTS:
 - For text fields asking "Why are you interested?", provide a brief, professional response based on the company/role
 
 LOGIN GUIDANCE:
-- If prompted to login, enter email: ${config.linkedinEmail} and password: (use the value from the secret variable ln_password)
+- When you encounter the login page, announce "INTERVENTION:LOGIN_REQUIRED"
+- The automation will pause for manual login
 - If already logged in, proceed directly to job applications
 - Don't get stuck on login verification - focus on the job application task
 
-CREDENTIALS:
+CONTACT INFORMATION FOR APPLICATIONS:
 - Email: ${config.linkedinEmail}
-- Password: (use the value from the secret variable ln_password)
 - Country Code: ${config.countryCode.split('-')[0]}
 - Phone Number (without country code): ${config.contactNumber}
 - Resume to Use: ${config.linkedinResume || 'Most recent available'}
@@ -1663,16 +1671,16 @@ This is the #1 issue that needs to be fixed immediately.`;
       }
     }
     
-    // Always use direct credential login (no session management)
-    addLog('🔑 Using direct credential login with provided credentials', 'info');
-    addLog('📋 IMPORTANT: Make sure 2FA is disabled on your LinkedIn account', 'info');
+    // Manual login mode
+    addLog('🔐 Manual login mode enabled', 'info');
+    addLog('📋 You will be prompted to log in manually when the browser opens', 'info');
     
     // Use comprehensive single prompt approach (proven to work better)
     // INSTRUCTION: Use the LinkedIn password from the secret variable ln_password
     const comprehensivePrompt = createComprehensivePrompt(linkedinUrl, resumeContent, uploadedFileNames);
 
-    // Pass the password via secrets, not in the prompt/config
-    const secrets: Record<string, string> = { ln_password: config.linkedinPassword || '' };
+    // Pass any external job password via secrets
+    const secrets: Record<string, string> = {};
     if (effectiveConfig.applyToExternalJobs && config.externalJobPassword) {
       secrets.ext_password = config.externalJobPassword;
     }
@@ -1680,7 +1688,7 @@ This is the #1 issue that needs to be fixed immediately.`;
     const taskConfig = {
       task: comprehensivePrompt,
       
-      secrets: config.linkedinPassword ? secrets : undefined,
+      secrets: Object.keys(secrets).length > 0 ? secrets : undefined,
       save_browser_data: false,
       use_adblock: false,
       use_proxy: true,
@@ -1994,11 +2002,6 @@ This is the #1 issue that needs to be fixed immediately.`;
       return;
     }
 
-    if (!config.linkedinPassword?.trim()) {
-      toast.error('Please enter your LinkedIn password');
-      return;
-    }
-
     if (!config.contactNumber.trim()) {
       toast.error('Please enter your contact number for job applications');
       return;
@@ -2118,6 +2121,24 @@ This is the #1 issue that needs to be fixed immediately.`;
       toast.success('Automation resumed');
     } catch (error) {
       toast.error('Failed to resume automation');
+    }
+  };
+
+  const handleResume = async () => {
+    if (!currentTask || !browserClient) return;
+    
+    try {
+      await browserClient.resumeTask(currentTask.id);
+      setIsPaused(false);
+      setShowResumeButton(false);
+      setLoginDetection(null);
+      addLog('✅ Task resumed - Continuing automation', 'success');
+      
+      // Mark successful login
+      await browserClient.markSuccessfulLogin();
+    } catch (error) {
+      addLog('❌ Failed to resume task', 'error');
+      console.error('Resume error:', error);
     }
   };
 
@@ -2348,6 +2369,25 @@ This is the #1 issue that needs to be fixed immediately.`;
             }
           }
           }
+
+        // Check for login requirement
+        if (!isPaused && updatedTask.status === 'running') {
+          const detection = await browserClient.detectLoginRequirement(taskId);
+          
+          if (detection.loginRequired && detection.confidence >= 0.8) {
+            // Pause the task
+            await browserClient.pauseTask(taskId);
+            
+            setIsPaused(true);
+            setLoginDetection(detection);
+            setShowResumeButton(true);
+            
+            // Add to logs
+            addLog('🔐 Login required - Task paused', 'warning');
+            addLog('Please complete login in the browser window, then click Resume', 'info');
+            addLog(`Detection: ${detection.description} (${(detection.confidence * 100).toFixed(0)}% confidence)`, 'info');
+          }
+        }
 
         // Save current state
         saveAutomationState(updatedTask);
@@ -2736,16 +2776,6 @@ This is the #1 issue that needs to be fixed immediately.`;
                           placeholder="your@email.com"
                         />
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">LinkedIn Password</label>
-                        <input
-                          type="password"
-                          value={config.linkedinPassword || ''}
-                          onChange={(e) => setConfig({ ...config, linkedinPassword: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                          placeholder="••••••••"
-                        />
-                      </div>
 
                       {/* Contact Information */}
                       <div className="grid grid-cols-3 gap-2">
@@ -3122,7 +3152,7 @@ This is the #1 issue that needs to be fixed immediately.`;
                 {!isRunning ? (
                   <button
                     onClick={startAutomation}
-                    disabled={!canStartAutomation() || !config.linkedinEmail || !config.linkedinPassword}
+                    disabled={!canStartAutomation() || !config.linkedinEmail}
                     className="w-full px-6 py-4 bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-xl font-semibold text-lg hover:from-teal-700 hover:to-teal-800 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
                   >
                     <Play className="h-6 w-6" />
@@ -3130,12 +3160,26 @@ This is the #1 issue that needs to be fixed immediately.`;
                   </button>
                 ) : isPaused ? (
                   <div className="space-y-3">
+                    {loginDetection && showResumeButton && (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-3">
+                        <div className="flex items-start space-x-3">
+                          <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                          <div className="flex-1">
+                            <h4 className="font-medium text-yellow-900">Manual Login Required</h4>
+                            <p className="text-sm text-yellow-700 mt-1">{loginDetection.description}</p>
+                            <p className="text-sm text-yellow-600 mt-2">
+                              Please complete the login process in the browser window below.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     <button
-                      onClick={resumeAutomation}
+                      onClick={showResumeButton ? handleResume : resumeAutomation}
                       className="w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
                     >
                       <Play className="h-6 w-6" />
-                      Resume
+                      {showResumeButton ? "I've Logged In - Resume" : "Resume"}
                     </button>
                     <button
                       onClick={stopAutomation}
