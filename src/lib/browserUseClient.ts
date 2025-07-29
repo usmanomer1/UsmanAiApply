@@ -74,7 +74,7 @@ export class BrowserUseClient {
       max_agent_steps: config.max_agent_steps ?? 150,
       llm_model: config.llm_model ?? 'gpt-4o',
       allowed_domains: config.allowed_domains,  // Don't default to LinkedIn-only domains
-      secrets: config.secrets ?? null,
+      secrets: config.secrets || undefined,
       structured_output_json: null,
       included_file_names: config.included_file_names ?? null
     };
