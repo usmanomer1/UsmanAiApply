@@ -1560,8 +1560,16 @@ This is the #1 issue that needs to be fixed immediately.`;
       }
     }
 
-    // Note: clearBrowserProfile endpoint doesn't exist in Browser Use API
-    // The API automatically manages browser sessions with save_browser_data=true
+    // Clear browser profile to prevent session sharing between users
+    // This is critical for security - without this, User B could access User A's LinkedIn session
+    try {
+      await browserClient.clearBrowserProfile();
+      addLog('🔒 Cleared browser profile for security', 'info');
+    } catch (error) {
+      // Log but don't fail - the automation can still proceed
+      console.error('Failed to clear browser profile:', error);
+      addLog('⚠️ Could not clear browser profile, proceeding with caution', 'warning');
+    }
 
     const linkedinUrl = buildLinkedInJobsURL();
     
