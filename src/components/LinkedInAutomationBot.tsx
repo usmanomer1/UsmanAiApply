@@ -1564,8 +1564,9 @@ This is the #1 issue that needs to be fixed immediately.`;
       }
     }
 
-    // Clear browser profile to prevent session sharing between users
-    // This is critical for security - without this, User B could access User A's LinkedIn session
+    // TEMPORARILY DISABLED: Clearing browser profile was causing "Agent session already stopped" error
+    // TODO: Test if save_browser_data: false is sufficient for preventing session sharing
+    /*
     try {
       addLog('🧹 Clearing browser profile for security...', 'info');
       await browserClient.clearBrowserProfile();
@@ -1580,6 +1581,7 @@ This is the #1 issue that needs to be fixed immediately.`;
       }
       // Don't fail - the automation can still proceed
     }
+    */
 
     const linkedinUrl = buildLinkedInJobsURL();
     
