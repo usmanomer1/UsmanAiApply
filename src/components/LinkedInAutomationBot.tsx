@@ -452,30 +452,9 @@ const LinkedInAutomationBot: React.FC = () => {
     // Also handle visibility change (tab switching, minimizing)
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden' && isRunning && currentTask) {
-        // Save state when tab becomes hidden
+        // Just save state when tab becomes hidden, don't stop the task
         saveAutomationState(currentTask);
-        
-        // If the page is being unloaded (user closing tab/navigating away)
-        // This helps catch cases where beforeunload might not fire
-        if (document.hidden) {
-          console.log('Page became hidden, starting 10 second timer before stopping task');
-          // Set a timer to stop the task if the page doesn't become visible again
-          const stopTimer = setTimeout(() => {
-            if (document.hidden && isRunning && currentTask && browserClient) {
-              console.log('Stopping task due to prolonged page hidden state');
-              browserClient.stopTask(currentTask.id).catch(() => {});
-            }
-          }, 10000); // Wait 10 seconds to see if user comes back
-          
-          // Store the timer so we can clear it if the page becomes visible
-          (window as any).__stopTimer = stopTimer;
-        }
-      } else if (document.visibilityState === 'visible') {
-        // Clear the stop timer if the page becomes visible again
-        if ((window as any).__stopTimer) {
-          clearTimeout((window as any).__stopTimer);
-          delete (window as any).__stopTimer;
-        }
+        console.log('Tab hidden - automation continues running in background');
       }
     };
 
