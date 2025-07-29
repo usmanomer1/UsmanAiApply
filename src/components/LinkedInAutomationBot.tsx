@@ -1158,15 +1158,15 @@ const LinkedInAutomationBot: React.FC = () => {
     
     return `You are an AI assistant helping with LinkedIn job applications. Your goal is to apply to ${config.targetCount} jobs ${applyToExternalJobs ? '(including both Easy Apply and external job postings)' : 'using LinkedIn\'s "Easy Apply" feature'}.
 
-MANUAL LOGIN REQUIRED:
-- You will encounter a login page when navigating to LinkedIn
-- When you see the login page, announce: "INTERVENTION:LOGIN_REQUIRED - Manual login needed"
-- The automation will pause and wait for the user to complete the login manually
-- Once the user logs in and clicks resume, you will continue with the job applications
+// MANUAL LOGIN REQUIRED - TEMPORARILY DISABLED FOR DEBUGGING:
+// - You will encounter a login page when navigating to LinkedIn
+// - When you see the login page, announce: "INTERVENTION:LOGIN_REQUIRED - Manual login needed"
+// - The automation will pause and wait for the user to complete the login manually
+// - Once the user logs in and clicks resume, you will continue with the job applications
 
 STEP-BY-STEP PROCESS:
 1. Navigate directly to the job search URL: ${linkedinUrl}
-2. If you encounter a login page, announce "INTERVENTION:LOGIN_REQUIRED - Please log in manually"
+2. Proceed to the jobs page // If you encounter a login page, announce "INTERVENTION:LOGIN_REQUIRED - Please log in manually"
 3. After login is complete and you're on the jobs page, look for the left sidebar with job listings - if it's collapsed or missing, try clicking any "expand" or "menu" buttons
 4. Look for jobs with ${applyToExternalJobs ? '"Easy Apply" buttons OR external application links' : '"Easy Apply" buttons'} in the job listings
 5. For each job (continue until you reach ${config.targetCount} applications):
@@ -1284,11 +1284,11 @@ JOB TITLE EXTRACTION REQUIREMENTS:
 - For yes/no questions about skills/experience, err on the side of confidence if it's job-relevant
 - For text fields asking "Why are you interested?", provide a brief, professional response based on the company/role
 
-LOGIN GUIDANCE:
-- When you encounter the login page, announce "INTERVENTION:LOGIN_REQUIRED"
-- The automation will pause for manual login
-- If already logged in, proceed directly to job applications
-- Don't get stuck on login verification - focus on the job application task
+// LOGIN GUIDANCE - TEMPORARILY DISABLED FOR DEBUGGING:
+// - When you encounter the login page, announce "INTERVENTION:LOGIN_REQUIRED"
+// - The automation will pause for manual login
+// - If already logged in, proceed directly to job applications
+// - Don't get stuck on login verification - focus on the job application task
 
 CONTACT INFORMATION FOR APPLICATIONS:
 - Email: ${config.linkedinEmail}
@@ -1686,12 +1686,16 @@ This is the #1 issue that needs to be fixed immediately.`;
 
     console.log('Creating task with config:', {
       ...taskConfig,
-      task: taskConfig.task.substring(0, 200) + '...' // Just show first 200 chars
+      task: taskConfig.task.substring(0, 200) + '...', // Just show first 200 chars
+      secrets: secrets ? 'PROVIDED' : 'NOT PROVIDED',
+      allowed_domains: taskConfig.allowed_domains
     });
     
     const result = await browserClient.createLinkedInTask(taskConfig);
     
     console.log('Task creation result:', result);
+    console.log('Task ID:', result.id);
+    console.log('Initial status:', result.status);
     
     // Wait a bit before fetching details to let task initialize
     await new Promise(resolve => setTimeout(resolve, 1000));
