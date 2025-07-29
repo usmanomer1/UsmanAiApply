@@ -410,8 +410,12 @@ const LinkedInAutomationBot: React.FC = () => {
     }
   }, [browserClient, user]);
 
-  // Handle page close to automatically stop tasks and prevent backend charges
+  // TEMPORARILY DISABLED - Handle page close to automatically stop tasks and prevent backend charges
   useEffect(() => {
+    console.log('Page unload handler disabled for debugging');
+    
+    // COMMENTED OUT FOR DEBUGGING - This might be causing immediate task termination
+    /*
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       if (isRunning && currentTask && browserClient && apiKey) {
         // Immediately attempt to stop the task to prevent backend charges
@@ -472,6 +476,7 @@ const LinkedInAutomationBot: React.FC = () => {
         });
       }
     };
+    */
   }, [isRunning, currentTask, user, browserClient, apiKey]);
 
   // Timer effect
