@@ -304,30 +304,54 @@ export class BrowserUseClient {
   }
 
   /**
-   * Delete the browser profile for this user account
+   * Delete all browser profiles for this API key
    * This clears the actual browser session data on browser-use servers
    */
   async clearBrowserProfile(): Promise<void> {
     try {
-      const response = await fetch(`${this.baseUrl}/delete-browser-profile-for-user`, {
-        method: 'POST',
+      // First, list all browser profiles
+      const listResponse = await fetch(`${this.baseUrl}/browser-profiles`, {
+        method: 'GET',
         headers: {
           'Authorization': `Bearer ${this.apiKey.trim()}`,
-          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({}), // Some APIs require an empty body
       });
 
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error');
-        console.error(`Browser profile clear failed (${response.status}): ${errorText}`);
-        throw new Error(`Failed to clear browser profile (${response.status}): ${response.statusText}`);
+      if (!listResponse.ok) {
+        const errorText = await listResponse.text().catch(() => 'Unknown error');
+        console.error(`Failed to list browser profiles (${listResponse.status}): ${errorText}`);
+        throw new Error(`Failed to list browser profiles (${listResponse.status}): ${listResponse.statusText}`);
+      }
+
+      const profilesData = await listResponse.json();
+      const profiles = profilesData.profiles || profilesData.data || [];
+      
+      console.log(`Found ${profiles.length} browser profiles to delete`);
+
+      // Delete each profile
+      for (const profile of profiles) {
+        const profileId = profile.id || profile.profile_id;
+        if (!profileId) continue;
+
+        const deleteResponse = await fetch(`${this.baseUrl}/browser-profiles/${profileId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${this.apiKey.trim()}`,
+          },
+        });
+
+        if (!deleteResponse.ok) {
+          console.error(`Failed to delete profile ${profileId}: ${deleteResponse.statusText}`);
+          // Continue trying to delete other profiles
+        } else {
+          console.log(`Deleted browser profile: ${profileId}`);
+        }
       }
 
       // Also clear our local tracking
       this.clearLoginRecord();
     } catch (error) {
-      console.error('Error clearing browser profile:', error);
+      console.error('Error clearing browser profiles:', error);
       throw error;
     }
   }
