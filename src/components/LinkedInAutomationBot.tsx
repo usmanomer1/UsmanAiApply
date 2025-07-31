@@ -2196,13 +2196,10 @@ This is the #1 issue that needs to be fixed immediately.`;
         const finalStepCount = finalTask.steps?.length || 0;
         setStepCount(finalStepCount);
         
-        // Final step count is tracked via markTaskCompleted
-        addLog(`📈 Final step count recorded: ${finalStepCount} steps`);
-        
         // Mark task as stopped in database with final step count
         await markTaskCompleted(currentTask.id, finalStepCount, 'stopped');
         
-        addLog(`📊 Final step count: ${finalStepCount}`);
+        addLog(`📊 Automation stopped - ${finalStepCount} steps completed`);
         
         // Wait for database writes to complete, then refresh usage data
         setTimeout(async () => {
@@ -2283,11 +2280,47 @@ This is the #1 issue that needs to be fixed immediately.`;
           const newStepCount = updatedTask.steps.length;
             
             if (newStepCount > stepCount) {
-              // Log new steps
+              // Process new steps and filter out repetitive updates
               for (let i = stepCount; i < newStepCount; i++) {
                 const step = updatedTask.steps[i];
                 if (step.next_goal) {
-                  addLog(`🤖 Step ${i + 1}: ${step.next_goal}`, 'info');
+                  const goal = step.next_goal;
+                  
+                  // Filter out repetitive or low-value updates
+                  const skipPatterns = [
+                    /waiting/i,
+                    /extracting.*elements/i,
+                    /evaluating page/i,
+                    /thinking/i,
+                    /^navigate to/i,
+                    /^click/i,
+                    /^scroll/i,
+                    /^wait/i
+                  ];
+                  
+                  const isRepetitive = skipPatterns.some(pattern => pattern.test(goal));
+                  
+                  // Show high-value updates
+                  if (!isRepetitive) {
+                    // Extract meaningful information
+                    if (goal.includes('APPLYING TO:')) {
+                      addLog(`🎯 ${goal}`, 'success');
+                    } else if (goal.includes('login') || goal.includes('sign in')) {
+                      addLog(`🔐 Login required - preparing to pause`, 'info');
+                    } else if (goal.includes('job') || goal.includes('application')) {
+                      addLog(`📋 ${goal}`, 'info');
+                    } else if (goal.includes('error') || goal.includes('failed')) {
+                      addLog(`⚠️ ${goal}`, 'error');
+                    } else if (goal.includes('complete') || goal.includes('success')) {
+                      addLog(`✅ ${goal}`, 'success');
+                    } else {
+                      // Only show other updates if they're meaningful
+                      const meaningfulKeywords = ['form', 'submit', 'upload', 'resume', 'question', 'answer'];
+                      if (meaningfulKeywords.some(keyword => goal.toLowerCase().includes(keyword))) {
+                        addLog(`🤖 ${goal}`, 'info');
+                      }
+                    }
+                  }
                 }
               }
               
@@ -2381,10 +2414,19 @@ This is the #1 issue that needs to be fixed immediately.`;
             }
             
             // Update the applied count based on what's actually saved in the database
-            setAppliedCount(sessionProcessedApps.size);
+            const totalApplications = sessionProcessedApps.size;
+            setAppliedCount(totalApplications);
             
             if (newApplicationsCount > 0) {
-              addLog(`💼 Saved ${newApplicationsCount} new application(s) to database`);
+              const targetCount = parseInt(config.targetCount) || 10;
+              addLog(`✅ Progress: ${totalApplications}/${targetCount} applications completed`, 'success');
+              
+              // Show milestone messages
+              if (totalApplications === 5) {
+                addLog(`🎉 Halfway there! Keep going!`, 'info');
+              } else if (totalApplications === targetCount) {
+                addLog(`🎯 Target reached! All ${targetCount} applications completed!`, 'success');
+              }
             }
           }
           }
@@ -2401,10 +2443,14 @@ This is the #1 issue that needs to be fixed immediately.`;
             setLoginDetection(detection);
             setShowResumeButton(true);
             
-            // Add to logs
-            addLog('🔐 Login required - Task paused', 'info');
-            addLog('Please complete login in the browser window, then click Resume', 'info');
-            addLog(`Detection: ${detection.description} (${(detection.confidence * 100).toFixed(0)}% confidence)`, 'info');
+            // Add comprehensive login message
+            addLog('🔐 LOGIN REQUIRED - Automation paused', 'info');
+            addLog('⏱️ You have 30 seconds to complete the login', 'warning');
+            addLog('👉 If you need more time:', 'info');
+            addLog('   1. Click the "Pause" button to stop the timer', 'info');
+            addLog('   2. Complete your login in the browser window', 'info');
+            addLog('   3. Click "Resume" when ready to continue', 'info');
+            addLog(`📊 Detection confidence: ${(detection.confidence * 100).toFixed(0)}%`, 'info');
           }
         }
 
@@ -2437,11 +2483,6 @@ This is the #1 issue that needs to be fixed immediately.`;
               
               setStepCount(finalStepCount);
               setAppliedCount(finalApplicationCount);
-              
-              addLog(`📊 Final Summary: ${finalStepCount} total steps, ${finalApplicationCount} applications submitted`);
-              
-              // Final step count is tracked via markTaskCompleted
-              addLog(`📈 Final step count recorded: ${finalStepCount} steps`);
               
               // Mark task as completed in database with final step count
             await markTaskCompleted(taskId, finalStepCount, 'finished');
@@ -2487,14 +2528,11 @@ This is the #1 issue that needs to be fixed immediately.`;
               const finalStepCount = finalTask.steps?.length || 0;
               setStepCount(finalStepCount);
               
-              // Final step count is tracked via markTaskCompleted
-              addLog(`📈 Final step count recorded: ${finalStepCount} steps`);
-              
               // Mark task as failed in database with final step count
             await markTaskCompleted(taskId, finalStepCount, 'failed', finalTask.error || updatedTask.error);
               
               addLog(`❌ Automation failed: ${finalTask.error || updatedTask.error || 'Unknown error'}`, 'error');
-              addLog(`📊 Final step count: ${finalStepCount}`);
+              addLog(`📊 ${finalStepCount} steps completed before failure`);
               
             } catch (error) {
             await markTaskCompleted(taskId, updatedTask.steps?.length || 0, 'failed', updatedTask.error);
@@ -2529,14 +2567,10 @@ This is the #1 issue that needs to be fixed immediately.`;
                 const finalStepCount = finalTask.steps?.length || 0;
                 setStepCount(finalStepCount);
                 
-                // Final step count is tracked via markTaskCompleted
-                addLog(`📈 Final step count recorded: ${finalStepCount} steps`);
-                
                 // Mark task as stopped in database with final step count
               await markTaskCompleted(taskId, finalStepCount, 'stopped');
                 
-                addLog('⏹️ Automation stopped');
-                addLog(`📊 Final step count: ${finalStepCount}`);
+                addLog(`⏹️ Automation stopped - ${finalStepCount} steps completed`);
                 
               } catch (error) {
               await markTaskCompleted(taskId, updatedTask.steps?.length || 0, 'stopped');
