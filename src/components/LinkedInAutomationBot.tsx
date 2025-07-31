@@ -410,50 +410,20 @@ const LinkedInAutomationBot: React.FC = () => {
     }
   }, [browserClient, user]);
 
-  // TEMPORARILY DISABLED - Handle page close to automatically stop tasks and prevent backend charges
+  // Handle page close/refresh to warn user and stop tasks
   useEffect(() => {
-    console.log('Page unload handler disabled for debugging');
-    
-    // COMMENTED OUT FOR DEBUGGING - This might be causing immediate task termination
-    /*
+    // Only show warning when actually closing/refreshing the page
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (isRunning && currentTask && browserClient && apiKey) {
-        // Immediately attempt to stop the task to prevent backend charges
-        try {
-          // Multiple stop attempts for reliability (browsers limit time for beforeunload)
-          
-          // Method 1: Use browser client (most compatible)
-          browserClient.stopTask(currentTask.id).catch(() => {});
-          
-          // Method 2: Direct API call with keepalive for reliability
-          fetch(`https://api.browser-use.com/api/v1/stop-task?task_id=${currentTask.id}`, {
-            method: 'PUT',
-            headers: {
-              'Authorization': `Bearer ${apiKey}`,
-            },
-            keepalive: true // Continues even as page unloads
-          }).catch(() => {});
-          
-          // Method 3: Fallback with sendBeacon (most reliable for page unload)
-          // Note: sendBeacon doesn't support custom headers, so we need a proxy endpoint
-          // For now, we rely on methods 1 and 2 above
-          
-          // Clear local state immediately
-          clearAutomationState();
-          
-        } catch (error) {
-          // Even if stop fails, clear local state
-          clearAutomationState();
-        }
-        
-        // Show brief message (no confirmation dialog needed)
-        const message = 'Stopping automation to prevent charges...';
+      if (isRunning && currentTask) {
+        // Show warning to user
+        const message = 'Your LinkedIn automation is still running. Leaving this page will stop the automation to prevent charges.';
+        event.preventDefault();
         event.returnValue = message;
         return message;
       }
     };
 
-    // Also handle visibility change (tab switching, minimizing)
+    // Handle visibility change (tab switching, minimizing)
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden' && isRunning && currentTask) {
         // Just save state when tab becomes hidden, don't stop the task
@@ -462,22 +432,83 @@ const LinkedInAutomationBot: React.FC = () => {
       }
     };
 
+    // Handle actual page unload (after warning is dismissed)
+    const handleUnload = () => {
+      if (isRunning && currentTask && browserClient && apiKey) {
+        // Best effort to stop the task before page unloads
+        try {
+          // Use keepalive for reliability during page unload
+          fetch(`https://api.browser-use.com/api/v1/stop-task?task_id=${currentTask.id}`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+            },
+            keepalive: true
+          }).catch(() => {});
+          
+          // Clear local state
+          clearAutomationState();
+        } catch (error) {
+          console.error('Failed to stop task on unload:', error);
+        }
+      }
+    };
+
     window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('unload', handleUnload);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('unload', handleUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isRunning, currentTask, browserClient, apiKey]);
+
+  // Handle navigation within the app
+  useEffect(() => {
+    if (!isRunning || !currentTask) return;
+
+    // Block navigation when task is running
+    const handleNavigation = (e: PopStateEvent) => {
+      e.preventDefault();
       
-      // Also stop task on component unmount (e.g., navigation)
-      if (isRunning && currentTask && browserClient) {
-        browserClient.stopTask(currentTask.id).catch((error) => {
-          console.error('Failed to stop task on unmount:', error);
-        });
+      if (window.confirm('Your LinkedIn automation is still running. Leaving this page will stop the automation. Continue?')) {
+        // User confirmed, stop the task
+        handleStopTask();
+      } else {
+        // User cancelled, stay on page
+        window.history.pushState(null, '', window.location.pathname);
       }
     };
-    */
-  }, [isRunning, currentTask, user, browserClient, apiKey]);
+
+    // Push current state to enable back button blocking
+    window.history.pushState(null, '', window.location.pathname);
+    window.addEventListener('popstate', handleNavigation);
+
+    return () => {
+      window.removeEventListener('popstate', handleNavigation);
+    };
+  }, [isRunning, currentTask]);
+
+  // Component unmount handler for in-app navigation
+  useEffect(() => {
+    return () => {
+      // Stop task on component unmount (navigation within app)
+      if (isRunning && currentTask && browserClient) {
+        // Check if this is an actual navigation vs page refresh
+        // Page refresh will be handled by state restoration
+        const isPageRefresh = window.performance.navigation.type === 1;
+        
+        if (!isPageRefresh) {
+          browserClient.stopTask(currentTask.id).catch((error) => {
+            console.error('Failed to stop task on navigation:', error);
+          });
+          clearAutomationState();
+        }
+      }
+    };
+  }, [isRunning, currentTask, browserClient]);
 
   // Timer effect
   useEffect(() => {
