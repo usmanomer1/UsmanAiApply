@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 // Explicitly import AnimatePresence
 import { AnimatePresence } from 'framer-motion';
@@ -372,6 +372,10 @@ const LinkedInAutomationBot: React.FC = () => {
   // Monthly usage chart data
   const [chartData, setChartData] = useState<any[]>([]);
 
+  // Session ID for heartbeat tracking
+  const sessionId = useRef<string>(crypto.randomUUID());
+  const heartbeatInterval = useRef<number | null>(null);
+
   const isSupabaseConfigured = () => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -434,23 +438,14 @@ const LinkedInAutomationBot: React.FC = () => {
 
     // Handle actual page unload (after warning is dismissed)
     const handleUnload = () => {
-      if (isRunning && currentTask && browserClient && apiKey) {
-        // Best effort to stop the task before page unloads
-        try {
-          // Use keepalive for reliability during page unload
-          fetch(`https://api.browser-use.com/api/v1/stop-task?task_id=${currentTask.id}`, {
-            method: 'PUT',
-            headers: {
-              'Authorization': `Bearer ${apiKey}`,
-            },
-            keepalive: true
-          }).catch(() => {});
-          
-          // Clear local state
-          clearAutomationState();
-        } catch (error) {
-          console.error('Failed to stop task on unload:', error);
-        }
+      if (isRunning && currentTask) {
+        // Stop heartbeat locally - the edge function will detect stale heartbeat and stop the task
+        stopHeartbeat();
+        
+        // Clear local state
+        clearAutomationState();
+        
+        console.log('Page unloading - task will be stopped by edge function after heartbeat timeout');
       }
     };
 
@@ -494,21 +489,21 @@ const LinkedInAutomationBot: React.FC = () => {
   // Component unmount handler for in-app navigation
   useEffect(() => {
     return () => {
-      // Stop task on component unmount (navigation within app)
-      if (isRunning && currentTask && browserClient) {
+      // Stop heartbeat on component unmount (navigation within app)
+      if (isRunning && currentTask) {
         // Check if this is an actual navigation vs page refresh
         // Page refresh will be handled by state restoration
         const isPageRefresh = window.performance.navigation.type === 1;
         
         if (!isPageRefresh) {
-          browserClient.stopTask(currentTask.id).catch((error) => {
-            console.error('Failed to stop task on navigation:', error);
-          });
+          // Stop heartbeat - edge function will detect and stop the task
+          stopHeartbeat();
           clearAutomationState();
+          console.log('Component unmounting - task will be stopped by edge function');
         }
       }
     };
-  }, [isRunning, currentTask, browserClient]);
+  }, [isRunning, currentTask]);
 
   // Timer effect
   useEffect(() => {
@@ -899,6 +894,7 @@ const LinkedInAutomationBot: React.FC = () => {
             // Resume polling if task is running
             if (currentTaskStatus.status === 'running') {
               startPolling(state.taskId);
+              startHeartbeat(state.taskId);
               addLog(`▶️ Resumed monitoring task progress`);
               
               // Force an immediate status update to ensure we have the latest live_url
@@ -961,6 +957,12 @@ const LinkedInAutomationBot: React.FC = () => {
 
   const markTaskCompleted = async (taskId: string, finalSteps: number, status: 'finished' | 'failed' | 'stopped', error?: string) => {
     try {
+      // Stop heartbeat monitoring
+      stopHeartbeat();
+      
+      // Clean up heartbeat record
+      await cleanupHeartbeat(taskId);
+      
       // Update automation session in new tracking system
       await updateAutomationSession(taskId, {
         step_count: finalSteps,
@@ -1019,6 +1021,65 @@ const LinkedInAutomationBot: React.FC = () => {
     }
   };
 
+  // Send heartbeat to indicate the task is still active
+  const sendHeartbeat = async (taskId: string) => {
+    if (!user) return;
+    
+    try {
+      const { error } = await supabase
+        .from('task_heartbeats')
+        .upsert({
+          task_id: taskId,
+          session_id: sessionId.current,
+          last_heartbeat: new Date().toISOString()
+        }, {
+          onConflict: 'task_id'
+        });
+      
+      if (error) {
+        console.error('Error sending heartbeat:', error);
+      }
+    } catch (error) {
+      console.error('Error sending heartbeat:', error);
+    }
+  };
+
+  // Start heartbeat interval
+  const startHeartbeat = (taskId: string) => {
+    // Clear any existing interval
+    if (heartbeatInterval.current) {
+      clearInterval(heartbeatInterval.current);
+    }
+
+    // Send initial heartbeat
+    sendHeartbeat(taskId);
+
+    // Send heartbeat every 10 seconds
+    heartbeatInterval.current = window.setInterval(() => {
+      sendHeartbeat(taskId);
+    }, 10000);
+  };
+
+  // Stop heartbeat interval
+  const stopHeartbeat = () => {
+    if (heartbeatInterval.current) {
+      clearInterval(heartbeatInterval.current);
+      heartbeatInterval.current = null;
+    }
+  };
+
+  // Clean up heartbeat record when task completes
+  const cleanupHeartbeat = async (taskId: string) => {
+    try {
+      await supabase
+        .from('task_heartbeats')
+        .delete()
+        .eq('task_id', taskId);
+    } catch (error) {
+      console.error('Error cleaning up heartbeat:', error);
+    }
+  };
+
   const getTaskStatus = async (taskId: string): Promise<TaskStatus> => {
     if (!browserClient) {
       throw new Error('Browser client not initialized');
@@ -1068,6 +1129,13 @@ const LinkedInAutomationBot: React.FC = () => {
     try {
       addLog(`🛑 Stopping task: ${taskId}`);
       await browserClient.stopTask(taskId);
+      
+      // Stop heartbeat monitoring
+      stopHeartbeat();
+      
+      // Clean up heartbeat record
+      await cleanupHeartbeat(taskId);
+      
       addLog(`✅ Task stopped successfully: ${taskId}`, 'success');
     } catch (error) {
       addLog(`❌ Error stopping task: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
@@ -2105,6 +2173,9 @@ This is the #1 issue that needs to be fixed immediately.`;
       // Start polling for status updates
       addLog('📊 Starting status monitoring...', 'info');
       startPolling(task.id);
+      
+      // Start heartbeat to track active session
+      startHeartbeat(task.id);
 
     } catch (error) {
       setIsRunning(false);
@@ -2153,6 +2224,9 @@ This is the #1 issue that needs to be fixed immediately.`;
       
       // Resume polling
       startPolling(currentTask.id);
+      
+      // Resume heartbeat monitoring
+      startHeartbeat(currentTask.id);
       
       // Force an immediate status update to ensure we have the latest live_url after resuming
       setTimeout(async () => {
