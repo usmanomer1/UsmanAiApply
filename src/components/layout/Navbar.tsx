@@ -77,13 +77,13 @@ export const Navbar: React.FC = () => {
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: BarChart3, description: 'Overview & Analytics' },
-    { name: 'Auto Apply', href: '/auto-apply', icon: Zap, description: 'AI Job Applications', badge: 'New' },
+    { name: 'AI Agent', href: '/auto-apply', icon: Zap, description: 'AI Job Applications', badge: 'New' },
     { name: 'Profile', href: '/profile', icon: User, description: 'Personal Information' },
     { name: 'Billing', href: '/billing', icon: CreditCard, description: 'Plans & Usage' },
   ];
 
   const quickActions = [
-    { name: 'Start Auto Apply', href: '/auto-apply', icon: Zap, description: 'Begin automated job applications' },
+    { name: 'Launch AI Agent', href: '/auto-apply', icon: Zap, description: 'Begin automated job applications' },
     { name: 'Analyze Resume', href: '/resume', icon: FileText, description: 'Get AI resume feedback' },
     { name: 'View Analytics', href: '/dashboard', icon: BarChart3, description: 'Check your job search progress' },
     { name: 'Manage Profile', href: '/profile', icon: User, description: 'Update personal information' },
