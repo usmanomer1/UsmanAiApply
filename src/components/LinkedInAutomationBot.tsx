@@ -1080,6 +1080,33 @@ const LinkedInAutomationBot: React.FC = () => {
     }
   };
 
+  // Clean up all heartbeats for the current user
+  const cleanupUserHeartbeats = async () => {
+    if (!user) return;
+    
+    try {
+      // First get all tasks for this user
+      const { data: userTasks } = await supabase
+        .from('automation_tasks')
+        .select('task_id')
+        .eq('user_id', user.id);
+      
+      if (userTasks && userTasks.length > 0) {
+        const taskIds = userTasks.map(t => t.task_id);
+        
+        // Delete all heartbeats for this user's tasks
+        await supabase
+          .from('task_heartbeats')
+          .delete()
+          .in('task_id', taskIds);
+        
+        console.log(`Cleaned up ${taskIds.length} heartbeats for user`);
+      }
+    } catch (error) {
+      console.error('Error cleaning up user heartbeats:', error);
+    }
+  };
+
   const getTaskStatus = async (taskId: string): Promise<TaskStatus> => {
     if (!browserClient) {
       throw new Error('Browser client not initialized');
@@ -2146,6 +2173,9 @@ This is the #1 issue that needs to be fixed immediately.`;
 
     try {
       addLog('🚀 Starting LinkedIn automation...');
+      
+      // Clean up any stale heartbeats for this user before starting
+      await cleanupUserHeartbeats();
       
       const task = await createLinkedInTask();
       setCurrentTask(task);
