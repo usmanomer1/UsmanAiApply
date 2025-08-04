@@ -5,6 +5,8 @@ import { Bot, Sparkles } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import Onboarding from '../onboarding/Onboarding';
+import { useMobileDetection } from '../../hooks/useMobileDetection';
+import { MobileRedirect } from '../MobileRedirect';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -14,6 +16,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { user, loading } = useAuth();
   const [onboardingCompleted, setOnboardingCompleted] = useState<boolean | null>(null);
   const [checkingOnboarding, setCheckingOnboarding] = useState(true);
+  const isMobile = useMobileDetection();
 
   // Check if Supabase is configured
   const isSupabaseConfigured = () => {
@@ -111,6 +114,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   // If user hasn't completed onboarding, show onboarding flow
   if (onboardingCompleted === false) {
     return <Onboarding onComplete={() => setOnboardingCompleted(true)} />;
+  }
+
+  // Check if user is on mobile after authentication and onboarding
+  if (isMobile) {
+    return <MobileRedirect />;
   }
 
   return <>{children}</>;
