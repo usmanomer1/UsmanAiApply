@@ -143,7 +143,7 @@ const Sidebar: React.FC = () => {
       path: '/auto-apply', 
       label: 'Agent', 
       icon: Sparkles,
-      description: 'Auto-apply bot'
+      description: 'AI Job Applications'
     },
     { 
       path: '/applications', 
