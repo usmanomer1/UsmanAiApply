@@ -35,7 +35,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 // Session management removed
 import { getPlanLimits, getProductByPriceId } from '../stripe-config';
 import { BrowserUseClientProxy } from '../lib/browserUseClientProxy';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { 
   getUserUsage, 
   canPerformAction, 
@@ -3527,11 +3527,30 @@ This is the #1 issue that needs to be fixed immediately.`;
                       />
                       <Line
                         type="monotone"
+                        dataKey="steps"
+                        stroke="#3b82f6"
+                        strokeWidth={2}
+                        dot={{ fill: '#3b82f6', r: 4 }}
+                        activeDot={{ r: 6 }}
+                        name="Steps"
+                      />
+                      <Line
+                        type="monotone"
                         dataKey="applications"
                         stroke="#14b8a6"
                         strokeWidth={2}
                         dot={{ fill: '#14b8a6', r: 4 }}
                         activeDot={{ r: 6 }}
+                        name="Applications"
+                      />
+                      <Legend 
+                        verticalAlign="bottom" 
+                        height={36}
+                        iconType="line"
+                        wrapperStyle={{
+                          paddingTop: '10px',
+                          fontSize: '12px'
+                        }}
                       />
                     </LineChart>
                   </ResponsiveContainer>
