@@ -31,7 +31,9 @@ import {
   ProgressBar,
   Badge,
   Grid,
-  DonutChart,
+  ProgressCircle,
+  List,
+  ListItem,
 } from '@tremor/react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -47,6 +49,12 @@ interface StatusData {
   name: string;
   value: number;
   color?: string;
+  percentage?: number;
+  subStatuses?: {
+    name: string;
+    value: number;
+    formatted: string;
+  }[];
 }
 
 interface CompanyData {
@@ -199,27 +207,57 @@ export default function ModernDashboard() {
 
       setApplicationData(Object.values(dailyData));
 
-      // Process status distribution for donut chart
+      // Process status distribution for nested progress circles
       const statusCounts: Record<string, number> = {};
       applications?.forEach(app => {
         const status = app.status || 'SENT';
         statusCounts[status] = (statusCounts[status] || 0) + 1;
       });
 
-      const statusColors: Record<string, string> = {
-        'SENT': 'blue',
-        'PENDING': 'yellow',
-        'INTERVIEW': 'purple',
-        'OA': 'cyan',
-        'ACCEPTED': 'green',
-        'REJECTED': 'red',
-      };
+      // Group statuses into categories for nested visualization
+      const activeStatuses = ['INTERVIEW', 'OA', 'ACCEPTED'];
+      const pendingStatuses = ['SENT', 'PENDING'];
+      const rejectedStatuses = ['REJECTED'];
 
-      const statusData: StatusData[] = Object.entries(statusCounts).map(([status, count]) => ({
-        name: status,
-        value: count,
-        color: statusColors[status] || 'gray',
-      }));
+      const activeCount = activeStatuses.reduce((sum, status) => sum + (statusCounts[status] || 0), 0);
+      const pendingCount = pendingStatuses.reduce((sum, status) => sum + (statusCounts[status] || 0), 0);
+      const rejectedCount = rejectedStatuses.reduce((sum, status) => sum + (statusCounts[status] || 0), 0);
+
+      const statusData: StatusData[] = [
+        {
+          name: 'Active Process',
+          value: activeCount,
+          color: 'bg-green-500',
+          percentage: totalApps > 0 ? (activeCount / totalApps) * 100 : 0,
+          subStatuses: activeStatuses.map(status => ({
+            name: status === 'OA' ? 'Online Assessment' : status.charAt(0) + status.slice(1).toLowerCase(),
+            value: statusCounts[status] || 0,
+            formatted: `${statusCounts[status] || 0}/${activeCount}`
+          }))
+        },
+        {
+          name: 'Pending Response',
+          value: pendingCount,
+          color: 'bg-amber-500',
+          percentage: totalApps > 0 ? (pendingCount / totalApps) * 100 : 0,
+          subStatuses: pendingStatuses.map(status => ({
+            name: status.charAt(0) + status.slice(1).toLowerCase(),
+            value: statusCounts[status] || 0,
+            formatted: `${statusCounts[status] || 0}/${pendingCount}`
+          }))
+        },
+        {
+          name: 'Rejected',
+          value: rejectedCount,
+          color: 'bg-red-500',
+          percentage: totalApps > 0 ? (rejectedCount / totalApps) * 100 : 0,
+          subStatuses: [{
+            name: 'Rejected',
+            value: rejectedCount,
+            formatted: `${rejectedCount}/${totalApps}`
+          }]
+        }
+      ].filter(category => category.value > 0); // Only show categories with data
 
       setStatusDistribution(statusData);
 
@@ -439,30 +477,124 @@ export default function ModernDashboard() {
           />
         </Card>
 
-        {/* Status Distribution Donut Chart */}
-        <Card>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-tremor-default font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong">
-                Status Distribution
-              </h3>
-              <p className="text-tremor-label text-tremor-content dark:text-dark-tremor-content">
-                Current application statuses
-              </p>
+        {/* Status Distribution with Nested Progress Circles */}
+        <Card className="p-0">
+          <div className="border-b border-tremor-border px-4 py-4 dark:border-dark-tremor-border">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-tremor-default font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong">
+                  Application Status Overview
+                </h3>
+                <p className="text-tremor-label text-tremor-content dark:text-dark-tremor-content mt-1">
+                  Distribution across all statuses
+                </p>
+              </div>
+              <Badge icon={RiPercentLine} color="purple">
+                {metrics.totalApplications} Total
+              </Badge>
             </div>
-            <Badge icon={RiPercentLine} color="purple">
-              All Time
-            </Badge>
           </div>
-          <DonutChart
-            data={statusDistribution}
-            index="name"
-            category="value"
-            colors={['blue', 'yellow', 'purple', 'cyan', 'green', 'red']}
-            valueFormatter={valueFormatter}
-            className="h-72"
-            showAnimation={true}
-          />
+          <div className="items-start p-6 sm:flex sm:space-x-10">
+            <div className="flex items-center justify-center">
+              {statusDistribution.length > 0 ? (
+                <ProgressCircle 
+                  value={statusDistribution[0]?.percentage || 0} 
+                  radius={70} 
+                  strokeWidth={7} 
+                  color="green"
+                >
+                  {statusDistribution.length > 1 ? (
+                    <ProgressCircle
+                      value={statusDistribution[1]?.percentage || 0}
+                      radius={60}
+                      strokeWidth={7}
+                      color="amber"
+                    >
+                      {statusDistribution.length > 2 ? (
+                        <ProgressCircle
+                          value={statusDistribution[2]?.percentage || 0}
+                          radius={50}
+                          strokeWidth={7}
+                          color="red"
+                        >
+                          <div className="text-center">
+                            <p className="text-tremor-metric font-semibold text-tremor-content-strong dark:text-dark-tremor-content-strong">
+                              {metrics.totalApplications}
+                            </p>
+                            <p className="text-tremor-label text-tremor-content dark:text-dark-tremor-content">
+                              Total
+                            </p>
+                          </div>
+                        </ProgressCircle>
+                      ) : (
+                        <div className="text-center">
+                          <p className="text-tremor-metric font-semibold text-tremor-content-strong dark:text-dark-tremor-content-strong">
+                            {metrics.totalApplications}
+                          </p>
+                          <p className="text-tremor-label text-tremor-content dark:text-dark-tremor-content">
+                            Total
+                          </p>
+                        </div>
+                      )}
+                    </ProgressCircle>
+                  ) : (
+                    <div className="text-center">
+                      <p className="text-tremor-metric font-semibold text-tremor-content-strong dark:text-dark-tremor-content-strong">
+                        {metrics.totalApplications}
+                      </p>
+                      <p className="text-tremor-label text-tremor-content dark:text-dark-tremor-content">
+                        Total
+                      </p>
+                    </div>
+                  )}
+                </ProgressCircle>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-tremor-default text-tremor-content dark:text-dark-tremor-content">
+                    No application data available
+                  </p>
+                </div>
+              )}
+            </div>
+            <ul role="list" className="mt-4 w-full sm:mt-0 space-y-2">
+              {statusDistribution.map((category) => (
+                <li
+                  key={category.name}
+                  className="relative rounded-tremor-small px-3 py-2 hover:bg-tremor-background-muted hover:dark:bg-dark-tremor-background-subtle"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center space-x-2">
+                      <span
+                        className={`${category.color} size-2.5 rounded-sm`}
+                        aria-hidden={true}
+                      />
+                      <p className="text-tremor-default font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong">
+                        {category.name}
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <p className="text-tremor-default font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong">
+                        {category.value}
+                      </p>
+                      <p className="text-tremor-label text-tremor-content dark:text-dark-tremor-content">
+                        ({category.percentage?.toFixed(1)}%)
+                      </p>
+                    </div>
+                  </div>
+                  {category.subStatuses && category.subStatuses.length > 0 && (
+                    <List className="mt-2">
+                      {category.subStatuses.map((subStatus) => (
+                        <ListItem key={subStatus.name} className="py-1">
+                          <span className="text-tremor-label">{subStatus.name}</span>
+                          <span className="text-tremor-label">{subStatus.formatted}</span>
+                        </ListItem>
+                      ))}
+                    </List>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
         </Card>
       </div>
 
