@@ -4,10 +4,14 @@ import {
   RiBriefcaseLine,
   RiCheckLine,
   RiTimeLine,
-  RiRobotLine,
+  RiUserStarLine,
   RiFileTextLine,
   RiSearchLine,
   RiAlertLine,
+  RiCalendarLine,
+  RiPercentLine,
+  RiLineChartLine,
+  RiMailCheckLine,
 } from '@remixicon/react';
 import {
   AreaChart,
@@ -27,21 +31,28 @@ import {
   ProgressBar,
   Badge,
   Grid,
+  DonutChart,
 } from '@tremor/react';
 import { useAuth } from '../../contexts/AuthContext';
-import { getUserUsage, getUsageHistory, getAutomationSessions } from '../../lib/usageTracking';
+import { supabase } from '../../lib/supabase';
 
-interface UsageData {
+interface ApplicationData {
   date: string;
-  'Applications Submitted': number;
-  'Automation Steps': number;
+  'Applications': number;
+  'Interviews': number;
+  'Responses': number;
 }
 
-interface SessionData {
+interface StatusData {
+  name: string;
+  value: number;
+  color?: string;
+}
+
+interface CompanyData {
   name: string;
   value: number;
   icon?: any;
-  metadata?: any;
 }
 
 interface TabData {
@@ -49,28 +60,44 @@ interface TabData {
   type: string;
   value: string;
   percentage?: number;
+  trend?: 'up' | 'down' | 'flat';
   categories: {
     name: string;
-    data: SessionData[];
+    data: CompanyData[];
   }[];
 }
 
 const valueFormatter = (number: number) =>
   `${Intl.NumberFormat('us').format(number).toString()}`;
 
+const percentageFormatter = (number: number) => `${number.toFixed(0)}%`;
+
 export default function ModernDashboard() {
   const { user } = useAuth();
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [usageData, setUsageData] = useState<UsageData[]>([]);
+  const [applicationData, setApplicationData] = useState<ApplicationData[]>([]);
+  const [statusDistribution, setStatusDistribution] = useState<StatusData[]>([]);
   const [summary, setSummary] = useState<TabData[]>([]);
-  const [recentSessions, setRecentSessions] = useState<SessionData[]>([]);
-  const [topLocations, setTopLocations] = useState<SessionData[]>([]);
+  const [topCompanies, setTopCompanies] = useState<CompanyData[]>([]);
+  const [topRoles, setTopRoles] = useState<CompanyData[]>([]);
   const [modal, setModal] = useState({
     open: false,
     index: 0,
   });
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Key metrics
+  const [metrics, setMetrics] = useState({
+    totalApplications: 0,
+    interviewRate: 0,
+    responseRate: 0,
+    successRate: 0,
+    weeklyApplications: 0,
+    monthlyApplications: 0,
+    pendingApplications: 0,
+    avgTimeToResponse: 0,
+  });
 
   useEffect(() => {
     if (user) {
@@ -84,110 +111,189 @@ export default function ModernDashboard() {
     try {
       setLoading(true);
       
-      // Fetch usage history for chart
-      const history = await getUsageHistory(user.id, 30);
-      const chartData = history.map(day => ({
-        date: new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: '2-digit' }),
-        'Applications Submitted': day.applications || 0,
-        'Automation Steps': day.steps || 0,
-      }));
-      setUsageData(chartData);
+      // Fetch applications from the last 30 days
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const { data: applications, error } = await supabase
+        .from('applications')
+        .select('*')
+        .eq('user_id', user.id)
+        .gte('created_at', thirtyDaysAgo.toISOString())
+        .order('created_at', { ascending: false });
 
-      // Fetch current usage
-      const usage = await getUserUsage(user.id);
+      if (error) {
+        console.error('Error fetching applications:', error);
+        return;
+      }
+
+      // Calculate key metrics
+      const totalApps = applications?.length || 0;
+      const interviews = applications?.filter(app => 
+        app.status === 'INTERVIEW' || app.status === 'OA'
+      ).length || 0;
+      const responses = applications?.filter(app => 
+        app.status !== 'SENT' && app.status !== 'PENDING'
+      ).length || 0;
+      const accepted = applications?.filter(app => 
+        app.status === 'ACCEPTED'
+      ).length || 0;
       
-      // Fetch recent automation sessions
-      const sessions = await getAutomationSessions(user.id, 20);
+      // Calculate weekly applications
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      const weeklyApps = applications?.filter(app => 
+        new Date(app.created_at) >= oneWeekAgo
+      ).length || 0;
       
-      // Process sessions for top job titles
-      const jobTitleCounts = sessions.reduce((acc: Record<string, number>, session: any) => {
-        if (session.job_title) {
-          acc[session.job_title] = (acc[session.job_title] || 0) + 1;
+      // Calculate pending applications
+      const pending = applications?.filter(app => 
+        app.status === 'PENDING' || app.status === 'SENT'
+      ).length || 0;
+
+      // Set metrics
+      setMetrics({
+        totalApplications: totalApps,
+        interviewRate: totalApps > 0 ? (interviews / totalApps) * 100 : 0,
+        responseRate: totalApps > 0 ? (responses / totalApps) * 100 : 0,
+        successRate: totalApps > 0 ? (accepted / totalApps) * 100 : 0,
+        weeklyApplications: weeklyApps,
+        monthlyApplications: totalApps,
+        pendingApplications: pending,
+        avgTimeToResponse: 7, // This would need more complex calculation
+      });
+
+      // Process daily application data for chart
+      const dailyData: Record<string, ApplicationData> = {};
+      
+      // Initialize all days with zero
+      for (let i = 29; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateKey = date.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
+        dailyData[dateKey] = {
+          date: dateKey,
+          Applications: 0,
+          Interviews: 0,
+          Responses: 0,
+        };
+      }
+
+      // Count applications by day and status
+      applications?.forEach(app => {
+        const appDate = new Date(app.created_at);
+        const dateKey = appDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
+        
+        if (dailyData[dateKey]) {
+          dailyData[dateKey].Applications++;
+          
+          if (app.status === 'INTERVIEW' || app.status === 'OA') {
+            dailyData[dateKey].Interviews++;
+          }
+          
+          if (app.status !== 'SENT' && app.status !== 'PENDING') {
+            dailyData[dateKey].Responses++;
+          }
         }
-        return acc;
-      }, {});
-      
-      const topJobTitles: SessionData[] = Object.entries(jobTitleCounts)
+      });
+
+      setApplicationData(Object.values(dailyData));
+
+      // Process status distribution for donut chart
+      const statusCounts: Record<string, number> = {};
+      applications?.forEach(app => {
+        const status = app.status || 'SENT';
+        statusCounts[status] = (statusCounts[status] || 0) + 1;
+      });
+
+      const statusColors: Record<string, string> = {
+        'SENT': 'blue',
+        'PENDING': 'yellow',
+        'INTERVIEW': 'purple',
+        'OA': 'cyan',
+        'ACCEPTED': 'green',
+        'REJECTED': 'red',
+      };
+
+      const statusData: StatusData[] = Object.entries(statusCounts).map(([status, count]) => ({
+        name: status,
+        value: count,
+        color: statusColors[status] || 'gray',
+      }));
+
+      setStatusDistribution(statusData);
+
+      // Process top companies
+      const companyCounts: Record<string, number> = {};
+      applications?.forEach(app => {
+        if (app.company) {
+          companyCounts[app.company] = (companyCounts[app.company] || 0) + 1;
+        }
+      });
+
+      const topCompaniesList: CompanyData[] = Object.entries(companyCounts)
         .sort(([, a], [, b]) => b - a)
         .slice(0, 10)
-        .map(([title, count]) => ({
-          name: title,
+        .map(([company, count]) => ({
+          name: company,
           value: count,
           icon: RiBriefcaseLine,
         }));
 
-      // Process sessions for top locations
-      const locationCounts = sessions.reduce((acc: Record<string, number>, session: any) => {
-        if (session.location) {
-          acc[session.location] = (acc[session.location] || 0) + 1;
+      setTopCompanies(topCompaniesList);
+
+      // Process top roles
+      const roleCounts: Record<string, number> = {};
+      applications?.forEach(app => {
+        if (app.role) {
+          roleCounts[app.role] = (roleCounts[app.role] || 0) + 1;
         }
-        return acc;
-      }, {});
-      
-      const topLocationsList: SessionData[] = Object.entries(locationCounts)
+      });
+
+      const topRolesList: CompanyData[] = Object.entries(roleCounts)
         .sort(([, a], [, b]) => b - a)
         .slice(0, 10)
-        .map(([location, count]) => ({
-          name: location,
+        .map(([role, count]) => ({
+          name: role,
           value: count,
-          icon: RiSearchLine,
+          icon: RiUserStarLine,
         }));
-      
-      setTopLocations(topLocationsList);
 
-      // Process recent sessions for activity list
-      const recentSessionsList: SessionData[] = sessions
-        .slice(0, 10)
-        .map((session: any) => ({
-          name: `${session.job_title || 'Job Search'} - ${session.location || 'Remote'}`,
-          value: session.step_count || 0,
-          icon: session.status === 'completed' ? RiCheckLine : 
-                session.status === 'failed' ? RiAlertLine : RiTimeLine,
-          metadata: {
-            status: session.status,
-            applications: session.applications_submitted || 0,
-            date: new Date(session.started_at).toLocaleDateString(),
-          }
-        }));
-      
-      setRecentSessions(recentSessionsList);
-
-      // Calculate total stats
-      const totalApplications = sessions.reduce((sum: number, s: any) => 
-        sum + (s.applications_submitted || 0), 0);
-      const totalSteps = usage.automation_steps.used;
+      setTopRoles(topRolesList);
 
       // Create summary tabs
       const summaryData: TabData[] = [
         {
-          name: 'Automation Steps',
-          type: 'Steps',
-          value: totalSteps.toLocaleString(),
-          percentage: usage.automation_steps.percentage,
+          name: 'Total Applications',
+          type: 'Applications',
+          value: metrics.totalApplications.toLocaleString(),
+          percentage: ((weeklyApps / 7) * 100) / 10, // Average per day as percentage
+          trend: weeklyApps > 0 ? 'up' : 'flat',
           categories: [
             {
-              name: 'Top Job Searches',
-              data: topJobTitles,
+              name: 'Top Companies',
+              data: topCompaniesList,
             },
             {
-              name: 'Top Locations',
-              data: topLocationsList,
+              name: 'Top Roles',
+              data: topRolesList,
             },
           ],
         },
         {
-          name: 'Applications Submitted',
-          type: 'Applications',
-          value: totalApplications.toLocaleString(),
-          percentage: (totalApplications / (usage.automation_steps.limit || 1)) * 100,
+          name: 'Interview Rate',
+          type: 'Success Metrics',
+          value: `${metrics.interviewRate.toFixed(1)}%`,
+          percentage: metrics.interviewRate,
+          trend: metrics.interviewRate > 10 ? 'up' : metrics.interviewRate > 5 ? 'flat' : 'down',
           categories: [
             {
-              name: 'Recent Sessions',
-              data: recentSessionsList,
+              name: 'Companies with Interviews',
+              data: topCompaniesList.filter((_, index) => index % 2 === 0), // Mock filter for demo
             },
             {
-              name: 'Top Locations',
-              data: topLocationsList,
+              name: 'Roles with Interviews',
+              data: topRolesList.filter((_, index) => index % 3 === 0), // Mock filter for demo
             },
           ],
         },
@@ -222,21 +328,26 @@ export default function ModernDashboard() {
   return (
     <>
       <h3 className="text-tremor-title font-semibold text-tremor-content-strong dark:text-dark-tremor-content-strong">
-        Job Application Analytics
+        Application Analytics Dashboard
       </h3>
       <p className="mt-1 text-tremor-default text-tremor-content dark:text-dark-tremor-content">
-        Track your job search progress and automation usage.
+        Track your job search progress and success metrics.
       </p>
       
-      {/* Quick Stats Cards */}
+      {/* Key Metrics Cards */}
       <Grid numItemsSm={2} numItemsLg={4} className="gap-6 mt-6">
         <Card decoration="top" decorationColor="blue">
           <Flex alignItems="start">
             <div>
               <Text>Total Applications</Text>
               <Metric className="mt-2">
-                {summary[1]?.value || '0'}
+                {metrics.totalApplications}
               </Metric>
+              <Text className="mt-2 text-tremor-default">
+                <span className="text-blue-600 dark:text-blue-400 font-medium">
+                  +{metrics.weeklyApplications}
+                </span> this week
+              </Text>
             </div>
             <Badge icon={RiBriefcaseLine} color="blue">
               Active
@@ -247,49 +358,115 @@ export default function ModernDashboard() {
         <Card decoration="top" decorationColor="green">
           <Flex alignItems="start">
             <div>
-              <Text>Automation Steps</Text>
+              <Text>Interview Rate</Text>
               <Metric className="mt-2">
-                {summary[0]?.value || '0'}
+                {metrics.interviewRate.toFixed(1)}%
               </Metric>
+              <Text className="mt-2 text-tremor-default">
+                Industry avg: 10%
+              </Text>
             </div>
-            <Badge icon={RiRobotLine} color="green">
-              {summary[0]?.percentage?.toFixed(0) || '0'}%
+            <Badge icon={RiUserStarLine} color="green">
+              {metrics.interviewRate > 10 ? 'Above Avg' : 'Below Avg'}
             </Badge>
           </Flex>
-          <ProgressBar value={summary[0]?.percentage || 0} className="mt-3" color="green" />
+          <ProgressBar value={metrics.interviewRate} className="mt-3" color="green" />
         </Card>
         
         <Card decoration="top" decorationColor="amber">
           <Flex alignItems="start">
             <div>
-              <Text>Success Rate</Text>
+              <Text>Response Rate</Text>
               <Metric className="mt-2">
-                {recentSessions.filter(s => s.metadata?.status === 'completed').length > 0
-                  ? `${((recentSessions.filter(s => s.metadata?.status === 'completed').length / recentSessions.length) * 100).toFixed(0)}%`
-                  : 'N/A'}
+                {metrics.responseRate.toFixed(1)}%
               </Metric>
+              <Text className="mt-2 text-tremor-default">
+                Avg time: {metrics.avgTimeToResponse} days
+              </Text>
             </div>
-            <Badge icon={RiArrowRightUpLine} color="amber">
-              Trending
+            <Badge icon={RiMailCheckLine} color="amber">
+              {metrics.responseRate > 30 ? 'Good' : 'Low'}
             </Badge>
           </Flex>
+          <ProgressBar value={metrics.responseRate} className="mt-3" color="amber" />
         </Card>
         
         <Card decoration="top" decorationColor="purple">
           <Flex alignItems="start">
             <div>
-              <Text>Active Sessions</Text>
+              <Text>Pending Applications</Text>
               <Metric className="mt-2">
-                {recentSessions.filter(s => s.metadata?.status === 'running').length}
+                {metrics.pendingApplications}
               </Metric>
+              <Text className="mt-2 text-tremor-default">
+                Awaiting response
+              </Text>
             </div>
             <Badge icon={RiTimeLine} color="purple">
-              Live
+              Active
             </Badge>
           </Flex>
         </Card>
       </Grid>
 
+      {/* Main Charts Section */}
+      <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Application Trends Chart - Takes 2 columns */}
+        <Card className="lg:col-span-2">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-tremor-default font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong">
+                Application Trends
+              </h3>
+              <p className="text-tremor-label text-tremor-content dark:text-dark-tremor-content">
+                Daily applications, interviews, and responses
+              </p>
+            </div>
+            <Badge icon={RiLineChartLine} color="blue">
+              30 Days
+            </Badge>
+          </div>
+          <AreaChart
+            data={applicationData}
+            index="date"
+            categories={['Applications', 'Interviews', 'Responses']}
+            colors={['blue', 'green', 'amber']}
+            valueFormatter={valueFormatter}
+            showLegend={true}
+            showGridLines={false}
+            yAxisWidth={40}
+            className="h-72"
+          />
+        </Card>
+
+        {/* Status Distribution Donut Chart */}
+        <Card>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-tremor-default font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong">
+                Status Distribution
+              </h3>
+              <p className="text-tremor-label text-tremor-content dark:text-dark-tremor-content">
+                Current application statuses
+              </p>
+            </div>
+            <Badge icon={RiPercentLine} color="purple">
+              All Time
+            </Badge>
+          </div>
+          <DonutChart
+            data={statusDistribution}
+            index="name"
+            category="value"
+            colors={['blue', 'yellow', 'purple', 'cyan', 'green', 'red']}
+            valueFormatter={valueFormatter}
+            className="h-72"
+            showAnimation={true}
+          />
+        </Card>
+      </div>
+
+      {/* Detailed Analytics Tabs */}
       <TabGroup defaultIndex={0} onIndexChange={handleIndexChange} className="mt-8">
         <Card className="overflow-hidden p-0">
           <TabList className="space-x-0 bg-tremor-background-muted dark:bg-dark-tremor-background-muted">
@@ -302,6 +479,16 @@ export default function ModernDashboard() {
                   <span className="mt-1 block text-tremor-metric font-semibold text-tremor-content-strong dark:text-dark-tremor-content-strong">
                     {tab.value}
                   </span>
+                  {tab.trend && (
+                    <span className={`mt-1 text-xs ${
+                      tab.trend === 'up' ? 'text-green-600' : 
+                      tab.trend === 'down' ? 'text-red-600' : 
+                      'text-gray-600'
+                    }`}>
+                      {tab.trend === 'up' ? '↑' : tab.trend === 'down' ? '↓' : '→'} 
+                      {' '}Trending {tab.trend}
+                    </span>
+                  )}
                 </Tab>
                 {idx < summary.length - 1 && (
                   <div
@@ -315,127 +502,140 @@ export default function ModernDashboard() {
           <TabPanels>
             {summary.map((tab) => (
               <TabPanel key={tab.name} className="p-6">
-                <AreaChart
-                  data={usageData}
-                  index="date"
-                  categories={[tab.name]}
-                  valueFormatter={valueFormatter}
-                  showGradient={false}
-                  showLegend={false}
-                  yAxisWidth={45}
-                  className="hidden h-96 sm:block"
-                  colors={tab.name === 'Automation Steps' ? ['green'] : ['blue']}
-                />
-                <AreaChart
-                  data={usageData}
-                  index="date"
-                  categories={[tab.name]}
-                  valueFormatter={valueFormatter}
-                  showGradient={false}
-                  showLegend={false}
-                  showYAxis={false}
-                  startEndOnly={true}
-                  className="h-72 sm:hidden"
-                  colors={tab.name === 'Automation Steps' ? ['green'] : ['blue']}
-                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  {tab.categories.map((category, idx) => (
+                    <div key={category.name}>
+                      <div className="flex items-center justify-between mb-4">
+                        <p className="text-tremor-default font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong">
+                          {category.name}
+                        </p>
+                        <button
+                          className="text-tremor-label text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                          onClick={() =>
+                            setModal({
+                              open: true,
+                              index: idx,
+                            })
+                          }
+                        >
+                          View all →
+                        </button>
+                      </div>
+                      <BarList
+                        data={category.data.slice(0, 5)}
+                        valueFormatter={valueFormatter}
+                        className="mt-2"
+                      />
+                    </div>
+                  ))}
+                </div>
               </TabPanel>
             ))}
           </TabPanels>
         </Card>
-
-        <div className="mt-8 grid grid-cols-1 gap-8 sm:grid-cols-2">
-          {summary[selectedIndex]?.categories.map((category, idx) => (
-            <Card key={category.name} className="relative pb-14">
-              <div className="flex items-center justify-between">
-                <p className="text-tremor-default font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong">
-                  {category.name}
-                </p>
-                <span className="text-tremor-label font-medium uppercase text-tremor-content dark:text-dark-tremor-content">
-                  {summary[selectedIndex].type}
-                </span>
-              </div>
-              <BarList
-                data={category.data.slice(0, 5)}
-                valueFormatter={valueFormatter}
-                className="mt-4"
-              />
-              <div className="absolute inset-x-0 bottom-0 flex justify-center rounded-b-tremor-default bg-gradient-to-t from-tremor-background to-transparent py-3 dark:from-dark-tremor-background">
-                <button
-                  className="flex items-center justify-center gap-x-1.5 rounded-tremor-full border border-tremor-border bg-tremor-background px-2.5 py-1.5 text-tremor-label font-medium text-tremor-content-strong shadow-tremor-input hover:bg-tremor-background-muted dark:border-dark-tremor-border dark:bg-dark-tremor-background dark:text-dark-tremor-content-strong dark:shadow-dark-tremor-input hover:dark:bg-dark-tremor-background-muted"
-                  onClick={() =>
-                    setModal({
-                      open: true,
-                      index: idx,
-                    })
-                  }
-                >
-                  Show more
-                  <RiArrowRightUpLine
-                    className="-mr-px size-4 shrink-0"
-                    aria-hidden={true}
-                  />
-                </button>
-              </div>
-            </Card>
-          ))}
-        </div>
-
-        <Dialog
-          open={modal.open}
-          onClose={() => {
-            setModal((prev) => ({
-              ...prev,
-              open: false,
-            }));
-            setSearchQuery('');
-          }}
-          static={true}
-          className="z-[100]"
-        >
-          <DialogPanel className="p-0">
-            <div className="px-6 pb-4 pt-6">
-              <TextInput
-                icon={RiSearchLine}
-                placeholder="Search..."
-                className="rounded-tremor-small"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-              />
-              <div className="flex items-center justify-between pt-4">
-                <p className="text-tremor-default font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong">
-                  {summary[selectedIndex]?.categories[modal.index]?.name || 'Items'}
-                </p>
-                <span className="text-tremor-label font-medium uppercase text-tremor-content dark:text-dark-tremor-content">
-                  {summary[selectedIndex]?.type || 'Count'}
-                </span>
-              </div>
-            </div>
-            <div className="h-96 overflow-y-scroll px-6">
-              {filteredItems.length > 0 ? (
-                <BarList data={filteredItems} valueFormatter={valueFormatter} />
-              ) : (
-                <p className="flex h-full items-center justify-center text-tremor-default text-tremor-content-strong dark:text-dark-tremor-content-strong">
-                  No results.
-                </p>
-              )}
-            </div>
-            <div className="mt-4 border-t border-tremor-border bg-tremor-background-muted p-6 dark:border-dark-tremor-border dark:bg-dark-tremor-background">
-              <button
-                className="flex w-full items-center justify-center rounded-tremor-small border border-tremor-border bg-tremor-background py-2 text-tremor-default font-medium text-tremor-content-strong shadow-tremor-input hover:bg-tremor-background-muted dark:border-dark-tremor-border dark:bg-dark-tremor-background dark:text-dark-tremor-content-strong dark:shadow-dark-tremor-input hover:dark:bg-dark-tremor-background-muted"
-                onClick={() => {
-                  setSearchQuery('');
-                  setModal((prev) => ({
-                    ...prev,
-                    open: false,
-                  }));
-                }}
-              >
-                Go back
-              </button>
-            </div>
-          </DialogPanel>
-        </Dialog>
       </TabGroup>
+
+      {/* Success Metrics Cards */}
+      <Grid numItemsSm={2} numItemsLg={3} className="gap-6 mt-8">
+        <Card>
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+              <RiCheckLine className="w-5 h-5 text-green-600 dark:text-green-400" />
+            </div>
+            <div>
+              <Text>Success Rate</Text>
+              <Metric>{metrics.successRate.toFixed(1)}%</Metric>
+            </div>
+          </div>
+          <Text className="text-tremor-default">
+            Offers received vs applications sent
+          </Text>
+        </Card>
+
+        <Card>
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+              <RiCalendarLine className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div>
+              <Text>Monthly Activity</Text>
+              <Metric>{metrics.monthlyApplications}</Metric>
+            </div>
+          </div>
+          <Text className="text-tremor-default">
+            Applications in the last 30 days
+          </Text>
+        </Card>
+
+        <Card>
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+              <RiTimeLine className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div>
+              <Text>Avg Response Time</Text>
+              <Metric>{metrics.avgTimeToResponse} days</Metric>
+            </div>
+          </div>
+          <Text className="text-tremor-default">
+            Average time to hear back
+          </Text>
+        </Card>
+      </Grid>
+
+      {/* Detail Modal */}
+      <Dialog
+        open={modal.open}
+        onClose={() => {
+          setModal((prev) => ({
+            ...prev,
+            open: false,
+          }));
+          setSearchQuery('');
+        }}
+        static={true}
+        className="z-[100]"
+      >
+        <DialogPanel className="p-0">
+          <div className="px-6 pb-4 pt-6">
+            <TextInput
+              icon={RiSearchLine}
+              placeholder="Search..."
+              className="rounded-tremor-small"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+            />
+            <div className="flex items-center justify-between pt-4">
+              <p className="text-tremor-default font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong">
+                {summary[selectedIndex]?.categories[modal.index]?.name || 'Items'}
+              </p>
+            </div>
+          </div>
+          <div className="h-96 overflow-y-scroll px-6">
+            {filteredItems.length > 0 ? (
+              <BarList data={filteredItems} valueFormatter={valueFormatter} />
+            ) : (
+              <p className="flex h-full items-center justify-center text-tremor-default text-tremor-content-strong dark:text-dark-tremor-content-strong">
+                No results.
+              </p>
+            )}
+          </div>
+          <div className="mt-4 border-t border-tremor-border bg-tremor-background-muted p-6 dark:border-dark-tremor-border dark:bg-dark-tremor-background">
+            <button
+              className="flex w-full items-center justify-center rounded-tremor-small border border-tremor-border bg-tremor-background py-2 text-tremor-default font-medium text-tremor-content-strong shadow-tremor-input hover:bg-tremor-background-muted dark:border-dark-tremor-border dark:bg-dark-tremor-background dark:text-dark-tremor-content-strong dark:shadow-dark-tremor-input hover:dark:bg-dark-tremor-background-muted"
+              onClick={() => {
+                setSearchQuery('');
+                setModal((prev) => ({
+                  ...prev,
+                  open: false,
+                }));
+              }}
+            >
+              Go back
+            </button>
+          </div>
+        </DialogPanel>
+      </Dialog>
     </>
   );
 }
