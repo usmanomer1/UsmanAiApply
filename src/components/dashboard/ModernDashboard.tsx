@@ -494,60 +494,51 @@ export default function ModernDashboard() {
               </Badge>
             </div>
           </div>
-          <div className="items-start p-6 sm:flex sm:space-x-10">
-            <div className="flex items-center justify-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 p-6">
+            <div className="flex flex-col items-center justify-center space-y-4">
               {statusDistribution.length > 0 ? (
-                <ProgressCircle 
-                  value={statusDistribution[0]?.percentage || 0} 
-                  radius={70} 
-                  strokeWidth={7} 
-                  color="green"
-                >
-                  {statusDistribution.length > 1 ? (
-                    <ProgressCircle
-                      value={statusDistribution[1]?.percentage || 0}
-                      radius={60}
-                      strokeWidth={7}
-                      color="amber"
-                    >
-                      {statusDistribution.length > 2 ? (
-                        <ProgressCircle
-                          value={statusDistribution[2]?.percentage || 0}
-                          radius={50}
-                          strokeWidth={7}
-                          color="red"
-                        >
-                          <div className="text-center">
-                            <p className="text-tremor-metric font-semibold text-tremor-content-strong dark:text-dark-tremor-content-strong">
-                              {metrics.totalApplications}
-                            </p>
-                            <p className="text-tremor-label text-tremor-content dark:text-dark-tremor-content">
-                              Total
-                            </p>
-                          </div>
-                        </ProgressCircle>
-                      ) : (
-                        <div className="text-center">
-                          <p className="text-tremor-metric font-semibold text-tremor-content-strong dark:text-dark-tremor-content-strong">
-                            {metrics.totalApplications}
-                          </p>
-                          <p className="text-tremor-label text-tremor-content dark:text-dark-tremor-content">
-                            Total
-                          </p>
-                        </div>
-                      )}
-                    </ProgressCircle>
-                  ) : (
+                <>
+                  {/* Single progress circle showing overall completion */}
+                  <ProgressCircle
+                    value={metrics.responseRate}
+                    radius={80}
+                    strokeWidth={12}
+                    color="blue"
+                  >
                     <div className="text-center">
-                      <p className="text-tremor-metric font-semibold text-tremor-content-strong dark:text-dark-tremor-content-strong">
+                      <p className="text-3xl font-bold text-tremor-content-strong dark:text-dark-tremor-content-strong">
                         {metrics.totalApplications}
                       </p>
-                      <p className="text-tremor-label text-tremor-content dark:text-dark-tremor-content">
+                      <p className="text-tremor-default text-tremor-content dark:text-dark-tremor-content">
                         Total
                       </p>
+                      <p className="text-tremor-label text-blue-600 dark:text-blue-400 mt-1">
+                        {metrics.responseRate.toFixed(0)}% Response
+                      </p>
                     </div>
-                  )}
-                </ProgressCircle>
+                  </ProgressCircle>
+                  
+                  {/* Status breakdown bars */}
+                  <div className="w-full max-w-xs space-y-2">
+                    {statusDistribution.map((category) => (
+                      <div key={category.name} className="w-full">
+                        <div className="flex justify-between text-tremor-label mb-1">
+                          <span>{category.name}</span>
+                          <span>{category.value}</span>
+                        </div>
+                        <ProgressBar
+                          value={category.percentage || 0}
+                          color={
+                            category.name === 'Active Process' ? 'green' :
+                            category.name === 'Pending Response' ? 'amber' :
+                            'red'
+                          }
+                          className="h-2"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </>
               ) : (
                 <div className="text-center py-8">
                   <p className="text-tremor-default text-tremor-content dark:text-dark-tremor-content">
