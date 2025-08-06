@@ -7,7 +7,6 @@ import {
   RiRobotLine,
   RiFileTextLine,
   RiSearchLine,
-  RiTrendingUpLine,
   RiAlertLine,
 } from '@remixicon/react';
 import {
@@ -31,7 +30,6 @@ import {
 } from '@tremor/react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getUserUsage, getUsageHistory, getAutomationSessions } from '../../lib/usageTracking';
-import { supabase } from '../../lib/supabase';
 
 interface UsageData {
   date: string;
@@ -271,7 +269,7 @@ export default function ModernDashboard() {
                   : 'N/A'}
               </Metric>
             </div>
-            <Badge icon={RiTrendingUpLine} color="amber">
+            <Badge icon={RiArrowRightUpLine} color="amber">
               Trending
             </Badge>
           </Flex>
