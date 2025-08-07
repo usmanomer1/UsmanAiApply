@@ -334,6 +334,38 @@ class JoboticApiService {
     return this.makeRequest<JobMatchResponse>('/api/jobs/match', request, { requiresAuth: true });
   }
 
+  // Progressive job matching with session support
+  async searchJobsProgressive(request: JobMatchRequest & { 
+    sessionId?: string;
+    offset?: number;
+    limit?: number;
+  }): Promise<JobMatchResponse & { 
+    sessionId: string;
+    hasMore: boolean;
+    nextOffset: number;
+  }> {
+    // Set default limit to 10 for progressive loading
+    const progressiveRequest = {
+      ...request,
+      limit: request.limit || 10,
+      offset: request.offset || 0
+    };
+    
+    const response = await this.makeRequest<JobMatchResponse & { 
+      sessionId: string;
+      hasMore: boolean;
+      nextOffset: number;
+    }>('/api/jobs/match', progressiveRequest, { requiresAuth: true });
+    
+    // Ensure response has progressive loading fields
+    return {
+      ...response,
+      sessionId: response.sessionId || response.session_id || '',
+      hasMore: response.hasMore ?? (response.data?.hasMore ?? false),
+      nextOffset: response.nextOffset ?? ((progressiveRequest.offset || 0) + (response.data?.jobsReturned || 0))
+    };
+  }
+
   // Streaming version of searchJobs
   async searchJobsStreaming(
     request: JobMatchRequest, 
@@ -769,10 +801,18 @@ class JoboticApiService {
 }
 
 export const joboticApi = new JoboticApiService();
+// Progressive loading response type
+export interface JobMatchProgressiveResponse extends JobMatchResponse {
+  sessionId: string;
+  hasMore: boolean;
+  nextOffset: number;
+}
+
 export type { 
   JobSearchRequest, 
   JobMatchRequest, 
-  JobMatchResponse, 
+  JobMatchResponse,
+  JobMatchProgressiveResponse,
   ExportPdfRequest, 
   ExportPdfResponse,
   StreamCallbacks,

@@ -11,7 +11,7 @@ import ProfilePage from './components/ProfilePage';
 import ModernResumePage from './components/ModernResumePage';
 import ModernLinkedInAutomationBot from './components/ModernLinkedInAutomationBot';
 import { SuccessPage } from './components/SuccessPage';
-import JobSearchPage from './components/JobSearchPage';
+import JobSearchPageProgressive from './components/JobSearchPageProgressive';
 import { BillingPage } from './components/billing/BillingPage';
 import SettingsPage from './components/SettingsPage';
 import Dashboard from './components/dashboard/Dashboard';
@@ -38,7 +38,7 @@ function App() {
                         <div className="p-8 relative z-0">
                           <Routes>
                             <Route path="/dashboard" element={<Dashboard />} />
-                            <Route path="/jobs" element={<JobSearchPage />} />
+                            <Route path="/jobs" element={<JobSearchPageProgressive />} />
                             <Route path="/applications" element={<ApplicationsPage />} />
                             <Route path="/profile" element={<ProfilePage />} />
                             <Route path="/auto-apply" element={<ModernLinkedInAutomationBot />} />
