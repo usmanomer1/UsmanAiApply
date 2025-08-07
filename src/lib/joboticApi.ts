@@ -346,7 +346,32 @@ class JoboticApiService {
     isDone?: boolean;
     cursor?: string | null;
   }> {
-    return this.makeRequest('/api/v2/jobs/match', request, { requiresAuth: true });
+    try {
+      return await this.makeRequest('/api/v2/jobs/match', request, { requiresAuth: true });
+    } catch (err: any) {
+      // Fallback for backends without v2 route: call legacy /api/jobs/match once
+      if (err && err.status === 404) {
+        const legacy = await this.makeRequest<JobMatchResponse>('/api/jobs/match', {
+          resumeText: request.resumeText,
+          query: request.query,
+          location: request.location,
+          page: 1,
+          num_pages: Math.ceil((request.limit ?? 10) / 10),
+        }, { requiresAuth: true });
+        const jobs = legacy?.data?.jobs ?? [];
+        const total = legacy?.data?.totalFound ?? jobs.length;
+        return {
+          success: true,
+          jobs,
+          total,
+          sessionId: '',
+          hasMore: false,
+          isDone: true,
+          cursor: null,
+        } as any;
+      }
+      throw err;
+    }
   }
 
   // Fetch additional jobs for an existing progressive session (cursor-based)
