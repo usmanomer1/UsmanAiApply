@@ -396,7 +396,7 @@ const JobSearchPage: React.FC = () => {
                   setSessionId(res.sessionId || null);
                   setCursor((res as any).cursor ?? null);
                   setIsDone(!!(res as any).isDone);
-                  setHasMore(!(res as any).isDone && (!!(res as any).cursor || (res as any).hasMore ?? false));
+                  setHasMore(!(res as any).isDone && (!!(res as any).cursor || (((res as any).hasMore) ?? false)));
                   setTotalJobsFound((res as any).total || sanitized.length);
                   setInitialLoad(false);
                 } catch (err) {
