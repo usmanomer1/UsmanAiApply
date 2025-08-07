@@ -227,7 +227,6 @@ class JoboticApiService {
   }
 
   private async makeRequest<T>(endpoint: string, data: any, options: { method?: string; requiresAuth?: boolean } = {}): Promise<T> {
-    const isNetlifyFunction = USE_NETLIFY_FUNCTION;
     const url = `${API_BASE_URL}${endpoint}`;
     
     // Only log in development
@@ -330,13 +329,32 @@ class JoboticApiService {
     return this.makeRequest<JobMatchResponse>('/api/jobs/match', request, { requiresAuth: true });
   }
 
+  // Progressive job matching (v2) - session-based, cursor pagination
+  async searchJobsProgressive(request: {
+    resumeText: string;
+    query: string;
+    location?: string;
+    limit?: number;
+    sessionId?: string;
+    cursor?: string;
+  }): Promise<{
+    success: boolean;
+    jobs: any[];
+    total?: number;
+    sessionId: string;
+    hasMore?: boolean;
+    isDone?: boolean;
+    cursor?: string | null;
+  }> {
+    return this.makeRequest('/api/v2/jobs/match', request, { requiresAuth: true });
+  }
+
   // Streaming version of searchJobs
   async searchJobsStreaming(
     request: JobMatchRequest, 
     callbacks: StreamCallbacks,
     signal?: AbortSignal
   ): Promise<void> {
-    const isNetlifyFunction = USE_NETLIFY_FUNCTION;
     const url = `${API_BASE_URL}/api/jobs/match`;
     
     // Build headers
@@ -422,8 +440,10 @@ class JoboticApiService {
               }
               
               // Process other message types
-              if (callbacks[message.type]) {
-                callbacks[message.type](message.data);
+              const anyCallbacks = callbacks as unknown as Record<string, (d: any) => void>;
+              const handler = anyCallbacks[message.type];
+              if (typeof handler === 'function') {
+                handler(message.data);
               } else {
                 console.warn('No callback for message type:', message.type);
               }
@@ -767,7 +787,5 @@ export type {
   JobMatchResponse, 
   ExportPdfRequest, 
   ExportPdfResponse,
-  StreamCallbacks,
-  StreamMessageType,
   JobUsageResponse 
 };

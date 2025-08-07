@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, MapPin, Briefcase, Filter, Loader2, Heart, Users, DollarSign, Building2, Star, Bookmark, ArrowUpRight, TrendingUp, ChevronRight } from 'lucide-react';
-import { joboticApi, JobMatchRequest, StreamCallbacks } from '../lib/joboticApi';
+import { joboticApi, JobMatchRequest } from '../lib/joboticApi';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import * as sessionUtils from '../lib/sessionUtils';
