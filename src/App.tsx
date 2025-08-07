@@ -1,6 +1,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import { ConvexProvider } from 'convex/react';
+import { convex } from './lib/convex';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
 import CustomAuthPage from './components/auth/CustomAuthPage';
@@ -11,7 +13,7 @@ import ProfilePage from './components/ProfilePage';
 import ModernResumePage from './components/ModernResumePage';
 import ModernLinkedInAutomationBot from './components/ModernLinkedInAutomationBot';
 import { SuccessPage } from './components/SuccessPage';
-import JobSearchPageProgressive from './components/JobSearchPageProgressive';
+import JobSearchPageConvex from './components/JobSearchPageConvex';
 import { BillingPage } from './components/billing/BillingPage';
 import SettingsPage from './components/SettingsPage';
 import Dashboard from './components/dashboard/Dashboard';
@@ -20,8 +22,9 @@ import NotificationsPage from './components/NotificationsPage';
 
 function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
+    <ConvexProvider client={convex}>
+      <ThemeProvider>
+        <AuthProvider>
         <Router>
           <div className="min-h-screen bg-gray-50">
             <Routes>
@@ -38,7 +41,7 @@ function App() {
                         <div className="p-8 relative z-0">
                           <Routes>
                             <Route path="/dashboard" element={<Dashboard />} />
-                            <Route path="/jobs" element={<JobSearchPageProgressive />} />
+                            <Route path="/jobs" element={<JobSearchPageConvex />} />
                             <Route path="/applications" element={<ApplicationsPage />} />
                             <Route path="/profile" element={<ProfilePage />} />
                             <Route path="/auto-apply" element={<ModernLinkedInAutomationBot />} />
@@ -71,6 +74,7 @@ function App() {
         </Router>
       </AuthProvider>
     </ThemeProvider>
+    </ConvexProvider>
   );
 }
 
