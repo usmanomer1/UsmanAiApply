@@ -12,6 +12,7 @@ import { useLocation } from 'react-router-dom';
 // import { updateCachedUsage } from '../lib/jobSearchUsage';
 import { getPlanLimits } from '../stripe-config';
 import { usePaginatedQuery, useMutation, useAction } from 'convex/react';
+import { convex } from '../lib/convex';
 
 interface Job {
   job_id: string;
@@ -81,18 +82,29 @@ const JobSearchPage: React.FC = () => {
   const [isDone, setIsDone] = useState(false);
   const currentControllerRef = useRef<AbortController | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-  // Convex paginated feed for processed jobs
+  // Convex functions
   const startSession = useMutation('jobs:startSession' as any);
   const runSearch = useAction('jobs:runSearch' as any);
-  const {
-    results: pagedJobs = [],
-    status: pagedStatus,
-    loadMore,
-  } = usePaginatedQuery(
-    'jobs:getProcessedJobs' as any,
-    sessionId ? ({ sessionId } as any) : (undefined as any),
-    { initialNumItems: 10 }
-  );
+
+  const ensureConvexAuth = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token ?? null;
+    await convex.setAuth(async () => token);
+    return token;
+  };
+
+  // Child component to avoid passing undefined args to Convex hooks
+  const ProcessedJobsSubscription: React.FC<{ sid: string; onUpdate: (jobs: any[], status: string, loadMoreFn: (n: number) => void) => void } > = ({ sid, onUpdate }) => {
+    const { results = [], status, loadMore } = usePaginatedQuery(
+      'jobs:getProcessedJobs' as any,
+      { sessionId: sid } as any,
+      { initialNumItems: 10 }
+    );
+    useEffect(() => {
+      onUpdate(results as any[], status as any, loadMore as any);
+    }, [results, status, loadMore, onUpdate]);
+    return null;
+  };
   
   // Modal state - temporary values while modal is open
   const [modalFilters, setModalFilters] = useState({
@@ -208,36 +220,21 @@ const JobSearchPage: React.FC = () => {
 
   // Sync Convex paginated results into local jobs state
   useEffect(() => {
-    if (!sessionId) return;
-    const sanitized = (pagedJobs as any[]).map((job: any) => ({
-      ...job,
-      match_score: typeof job.match_score === 'number' && !isNaN(job.match_score) ? job.match_score : null,
-      job_min_salary: typeof job.job_min_salary === 'number' && !isNaN(job.job_min_salary) ? job.job_min_salary : null,
-      job_max_salary: typeof job.job_max_salary === 'number' && !isNaN(job.job_max_salary) ? job.job_max_salary : null,
-      job_apply_quality_score: typeof job.job_apply_quality_score === 'number' && !isNaN(job.job_apply_quality_score) ? job.job_apply_quality_score : null,
-      employer_name: job.employer_name || 'Unknown Company',
-      job_title: job.job_title || 'Unknown Position',
-      job_city: job.job_city || '',
-      job_state: job.job_state || '',
-      job_description: job.job_description || '',
-      job_employment_type: job.job_employment_type || 'Full-time',
-      job_posted_at_datetime_utc: job.job_posted_at_datetime_utc || new Date().toISOString(),
-    }));
-    setJobs(sanitized);
-    setHasMore(pagedStatus === 'CanLoadMore');
-    setIsDone(pagedStatus === 'Exhausted');
-  }, [sessionId, JSON.stringify(pagedJobs), pagedStatus]);
+    // no-op: handled by ProcessedJobsSubscription
+  }, []);
 
   // Infinite scroll: observe sentinel and fetch next page when visible (Convex loadMore)
+  const latestStatusRef = useRef<string>('');
+  const latestLoadMoreRef = useRef<((n: number) => void) | null>(null);
   useEffect(() => {
     if (!sentinelRef.current) return;
     if (!sessionId || isDone || !hasMore) return;
 
     const observer = new IntersectionObserver(async (entries) => {
-      if (entries[0].isIntersecting && sessionId && hasMore && !loading && pagedStatus === 'CanLoadMore') {
+      if (entries[0].isIntersecting && sessionId && hasMore && !loading && latestStatusRef.current === 'CanLoadMore') {
         try {
           setLoading(true);
-          await loadMore(10);
+          if (latestLoadMoreRef.current) await latestLoadMoreRef.current(10 as any);
         } catch (e) {
           console.error('Load more failed:', e);
         } finally {
@@ -248,7 +245,7 @@ const JobSearchPage: React.FC = () => {
 
     observer.observe(sentinelRef.current);
     return () => observer.disconnect();
-  }, [sentinelRef.current, sessionId, hasMore, isDone, loading, pagedStatus, loadMore]);
+  }, [sentinelRef.current, sessionId, hasMore, isDone, loading]);
 
   // Fetch user's resume and preferences, then auto-search
   useEffect(() => {
@@ -383,11 +380,10 @@ const JobSearchPage: React.FC = () => {
                 setHasMore(true);
 
                 try {
-                  const newSessionId = await startSession({
-                    query: primaryRole,
-                    location: primaryLocation || undefined,
-                    resumeText: text,
-                  } as any);
+                  await ensureConvexAuth();
+                  const startArgs: any = { query: primaryRole, resumeText: text };
+                  if (primaryLocation) startArgs.location = primaryLocation;
+                  const newSessionId = await startSession(startArgs);
                   setSessionId(newSessionId as string);
                   await runSearch({ sessionId: newSessionId as string } as any);
                   setInitialLoad(false);
@@ -406,11 +402,10 @@ const JobSearchPage: React.FC = () => {
                 setLoading(true);
                 setHasMore(true);
                 try {
-                  const newSessionId = await startSession({
-                    query: 'Software Engineer',
-                    location: 'Remote',
-                    resumeText: text,
-                  } as any);
+                  await ensureConvexAuth();
+                  const startArgs2: any = { query: 'Software Engineer', resumeText: text };
+                  startArgs2.location = 'Remote';
+                  const newSessionId = await startSession(startArgs2);
                   setSessionId(newSessionId as string);
                   await runSearch({ sessionId: newSessionId as string } as any);
                   setInitialLoad(false);
@@ -483,11 +478,10 @@ const JobSearchPage: React.FC = () => {
         return;
       }
 
-      const newSessionId = await startSession({
-        query: searchQuery,
-        location: location || undefined,
-        resumeText: resumeText,
-      } as any);
+      await ensureConvexAuth();
+      const startArgs3: any = { query: searchQuery, resumeText };
+      if (location && location.trim()) startArgs3.location = location;
+      const newSessionId = await startSession(startArgs3);
       setSessionId(newSessionId as string);
       await runSearch({ sessionId: newSessionId as string } as any);
       
@@ -933,6 +927,33 @@ const JobSearchPage: React.FC = () => {
               <span>Sorted by match score</span>
             </div>
           </div>
+        )}
+
+        {sessionId && (
+          <ProcessedJobsSubscription
+            sid={sessionId}
+            onUpdate={(rows, status, loadMoreFn) => {
+              const sanitized = (rows as any[]).map((job: any) => ({
+                ...job,
+                match_score: typeof job.match_score === 'number' && !isNaN(job.match_score) ? job.match_score : null,
+                job_min_salary: typeof job.job_min_salary === 'number' && !isNaN(job.job_min_salary) ? job.job_min_salary : null,
+                job_max_salary: typeof job.job_max_salary === 'number' && !isNaN(job.job_max_salary) ? job.job_max_salary : null,
+                job_apply_quality_score: typeof job.job_apply_quality_score === 'number' && !isNaN(job.job_apply_quality_score) ? job.job_apply_quality_score : null,
+                employer_name: job.employer_name || 'Unknown Company',
+                job_title: job.job_title || 'Unknown Position',
+                job_city: job.job_city || '',
+                job_state: job.job_state || '',
+                job_description: job.job_description || '',
+                job_employment_type: job.job_employment_type || 'Full-time',
+                job_posted_at_datetime_utc: job.job_posted_at_datetime_utc || new Date().toISOString(),
+              }));
+              setJobs(sanitized as any);
+              setHasMore(status === 'CanLoadMore');
+              setIsDone(status === 'Exhausted');
+              latestStatusRef.current = status;
+              latestLoadMoreRef.current = loadMoreFn as any;
+            }}
+          />
         )}
 
         {error && (
