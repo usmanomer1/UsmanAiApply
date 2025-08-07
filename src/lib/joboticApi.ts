@@ -1,5 +1,6 @@
 const API_BASE_URL = import.meta.env.VITE_JOBOTIC_API_URL || 'https://jobotic-backend.vercel.app';
-const USE_NETLIFY_FUNCTION = !import.meta.env.VITE_JOBOTIC_API_KEY; // Use function if no VITE key
+// Always call backend directly; Netlify proxy disabled
+const USE_NETLIFY_FUNCTION = false;
 
 // Streaming message types
 export type StreamMessageType = 'initial' | 'jobs' | 'progress' | 'complete' | 'error' | 'keepalive';
@@ -227,26 +228,21 @@ class JoboticApiService {
 
   private async makeRequest<T>(endpoint: string, data: any, options: { method?: string; requiresAuth?: boolean } = {}): Promise<T> {
     const isNetlifyFunction = USE_NETLIFY_FUNCTION;
-    const url = isNetlifyFunction ? '/.netlify/functions/jobotic-api' : `${API_BASE_URL}${endpoint}`;
+    const url = `${API_BASE_URL}${endpoint}`;
     
     // Only log in development
     if (import.meta.env.DEV) {
       console.log(`Making request to: ${url}`);
     }
     
-    const requestBody = isNetlifyFunction 
-      ? { endpoint, ...data }
-      : data;
+    const requestBody = data;
     
     // Build headers based on endpoint requirements
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
     };
     
-    if (!isNetlifyFunction) {
-      // Always add X-API-Key for direct API calls
-      headers['X-API-Key'] = this.apiKey;
-    }
+    // Supabase bearer only; no API key
     
     // Add Bearer token for endpoints that require authentication
     // This works for both Netlify function and direct API calls
@@ -341,7 +337,7 @@ class JoboticApiService {
     signal?: AbortSignal
   ): Promise<void> {
     const isNetlifyFunction = USE_NETLIFY_FUNCTION;
-    const url = isNetlifyFunction ? '/.netlify/functions/jobotic-api' : `${API_BASE_URL}/api/jobs/match`;
+    const url = `${API_BASE_URL}/api/jobs/match`;
     
     // Build headers
     const headers: HeadersInit = {
@@ -349,9 +345,7 @@ class JoboticApiService {
       'Accept': 'application/x-ndjson', // Request streaming response
     };
     
-    if (!isNetlifyFunction) {
-      headers['X-API-Key'] = this.apiKey;
-    }
+    // Supabase bearer only; no API key
     
     // Add Bearer token
     const { supabase } = await import('./supabase');
@@ -362,9 +356,7 @@ class JoboticApiService {
       throw new Error('No session token available - user must be logged in');
     }
     
-    const requestBody = isNetlifyFunction 
-      ? { endpoint: '/api/jobs/match', ...request }
-      : request;
+    const requestBody = request;
     
     const response = await fetch(url, {
       method: 'POST',

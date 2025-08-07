@@ -2,6 +2,8 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { ConvexProvider } from 'convex/react';
+import { convex } from './lib/convex';
 import { AuthProvider } from './contexts/AuthContext';
 import CustomAuthPage from './components/auth/CustomAuthPage';
 import PasswordResetPage from './components/auth/PasswordResetPage';
@@ -20,9 +22,10 @@ import NotificationsPage from './components/NotificationsPage';
 
 function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <Router>
+    <ConvexProvider client={convex}>
+      <ThemeProvider>
+        <AuthProvider>
+          <Router>
           <div className="min-h-screen bg-gray-50">
             <Routes>
               <Route path="/auth" element={<CustomAuthPage />} />
@@ -68,9 +71,10 @@ function App() {
               }}
             />
           </div>
-        </Router>
-      </AuthProvider>
-    </ThemeProvider>
+          </Router>
+        </AuthProvider>
+      </ThemeProvider>
+    </ConvexProvider>
   );
 }
 
