@@ -678,6 +678,139 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                   </div>
                 </div>
               </Card>
+
+              {/* External Job Applications - Only show if feature flag is enabled */}
+              {FEATURE_FLAGS.ENABLE_EXTERNAL_APPLICATIONS && (
+                <Card className="lg:col-span-2">
+                  <div className="mb-4">
+                    <Title>External Job Applications</Title>
+                    <Text className="mt-1">Settings for non-Easy Apply jobs</Text>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="applyToExternal"
+                        checked={config.applyToExternalJobs}
+                        onChange={(e) => setConfig({...config, applyToExternalJobs: e.target.checked})}
+                        className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                      />
+                      <label htmlFor="applyToExternal" className="text-tremor-default font-medium">
+                        Apply to external jobs (non-Easy Apply)
+                      </label>
+                    </div>
+
+                    {config.applyToExternalJobs && (
+                      <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                        <div>
+                          <Text className="mb-2">External Job Email</Text>
+                          <TextInput
+                            type="email"
+                            placeholder="email@example.com"
+                            value={config.externalJobEmail}
+                            onChange={(e) => setConfig({...config, externalJobEmail: e.target.value})}
+                          />
+                        </div>
+
+                        <div>
+                          <Text className="mb-2">External Job Password</Text>
+                          <TextInput
+                            type="password"
+                            placeholder="Password for external sites"
+                            value={config.externalJobPassword}
+                            onChange={(e) => setConfig({...config, externalJobPassword: e.target.value})}
+                          />
+                        </div>
+
+                        <div>
+                          <Text className="mb-2">First Name</Text>
+                          <TextInput
+                            placeholder="John"
+                            value={config.firstName}
+                            onChange={(e) => setConfig({...config, firstName: e.target.value})}
+                          />
+                        </div>
+
+                        <div>
+                          <Text className="mb-2">Last Name</Text>
+                          <TextInput
+                            placeholder="Doe"
+                            value={config.lastName}
+                            onChange={(e) => setConfig({...config, lastName: e.target.value})}
+                          />
+                        </div>
+
+                        <div>
+                          <Text className="mb-2">LinkedIn Profile URL</Text>
+                          <TextInput
+                            type="url"
+                            placeholder="https://linkedin.com/in/johndoe"
+                            value={config.linkedInProfileUrl}
+                            onChange={(e) => setConfig({...config, linkedInProfileUrl: e.target.value})}
+                          />
+                        </div>
+
+                        <div>
+                          <Text className="mb-2">Portfolio URL (Optional)</Text>
+                          <TextInput
+                            type="url"
+                            placeholder="https://yourportfolio.com"
+                            value={config.portfolioUrl}
+                            onChange={(e) => setConfig({...config, portfolioUrl: e.target.value})}
+                          />
+                        </div>
+
+                        <div>
+                          <Text className="mb-2">GitHub URL (Optional)</Text>
+                          <TextInput
+                            type="url"
+                            placeholder="https://github.com/yourusername"
+                            value={config.githubUrl}
+                            onChange={(e) => setConfig({...config, githubUrl: e.target.value})}
+                          />
+                        </div>
+
+                        <div>
+                          <Text className="mb-2">Street Address</Text>
+                          <TextInput
+                            placeholder="123 Main St"
+                            value={config.address}
+                            onChange={(e) => setConfig({...config, address: e.target.value})}
+                          />
+                        </div>
+
+                        <div>
+                          <Text className="mb-2">City</Text>
+                          <TextInput
+                            placeholder="San Francisco"
+                            value={config.city}
+                            onChange={(e) => setConfig({...config, city: e.target.value})}
+                          />
+                        </div>
+
+                        <div>
+                          <Text className="mb-2">State</Text>
+                          <TextInput
+                            placeholder="CA"
+                            value={config.state}
+                            onChange={(e) => setConfig({...config, state: e.target.value})}
+                          />
+                        </div>
+
+                        <div>
+                          <Text className="mb-2">ZIP Code</Text>
+                          <TextInput
+                            placeholder="94105"
+                            value={config.zipCode}
+                            onChange={(e) => setConfig({...config, zipCode: e.target.value})}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
             </Grid>
           </TabPanel>
 
