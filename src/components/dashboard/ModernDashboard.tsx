@@ -448,9 +448,9 @@ export default function ModernDashboard() {
       </Grid>
 
       {/* Main Charts Section */}
-      <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Application Trends Chart - Takes 2 columns */}
-        <Card className="lg:col-span-2">
+      <div className="mt-8">
+        {/* Application Trends Chart - Full Width */}
+        <Card>
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-tremor-default font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong">
@@ -476,117 +476,91 @@ export default function ModernDashboard() {
             className="h-72"
           />
         </Card>
+      </div>
 
-        {/* Status Distribution with Nested Progress Circles */}
-        <Card className="p-0">
-          <div className="border-b border-tremor-border px-4 py-4 dark:border-dark-tremor-border">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-tremor-default font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong">
-                  Application Status Overview
-                </h3>
-                <p className="text-tremor-label text-tremor-content dark:text-dark-tremor-content mt-1">
-                  Distribution across all statuses
-                </p>
-              </div>
-              <Badge icon={RiPercentLine} color="purple">
-                {metrics.totalApplications} Total
-              </Badge>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 p-6">
-            <div className="flex flex-col items-center justify-center space-y-4">
-              {statusDistribution.length > 0 ? (
-                <>
-                  {/* Single progress circle showing overall completion */}
-                  <ProgressCircle
-                    value={metrics.responseRate}
-                    radius={80}
-                    strokeWidth={12}
-                    color="blue"
-                  >
-                    <div className="text-center">
-                      <p className="text-3xl font-bold text-tremor-content-strong dark:text-dark-tremor-content-strong">
-                        {metrics.totalApplications}
-                      </p>
-                      <p className="text-tremor-default text-tremor-content dark:text-dark-tremor-content">
-                        Total
-                      </p>
-                      <p className="text-tremor-label text-blue-600 dark:text-blue-400 mt-1">
-                        {metrics.responseRate.toFixed(0)}% Response
-                      </p>
+      {/* Status Distribution Cards */}
+      <div className="mt-8">
+        <h3 className="text-tremor-default font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong mb-4">
+          Application Status Breakdown
+        </h3>
+        <div className="space-y-4">
+          {statusDistribution.map((category) => {
+            const getIcon = () => {
+              if (category.name === 'Active Process') return RiCheckLine;
+              if (category.name === 'Pending Response') return RiTimeLine;
+              return RiAlertLine;
+            };
+            const Icon = getIcon();
+            
+            const getColorClasses = () => {
+              if (category.name === 'Active Process') return 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400';
+              if (category.name === 'Pending Response') return 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400';
+              return 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400';
+            };
+            
+            const getProgressColor = () => {
+              if (category.name === 'Active Process') return 'green';
+              if (category.name === 'Pending Response') return 'amber';
+              return 'red';
+            };
+            
+            return (
+              <Card key={category.name} className="p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className={`p-2 rounded-lg ${getColorClasses()}`}>
+                      <Icon className="w-5 h-5" />
                     </div>
-                  </ProgressCircle>
-                  
-                  {/* Status breakdown bars */}
-                  <div className="w-full max-w-xs space-y-2">
-                    {statusDistribution.map((category) => (
-                      <div key={category.name} className="w-full">
-                        <div className="flex justify-between text-tremor-label mb-1">
-                          <span>{category.name}</span>
-                          <span>{category.value}</span>
-                        </div>
-                        <ProgressBar
-                          value={category.percentage || 0}
-                          color={
-                            category.name === 'Active Process' ? 'green' :
-                            category.name === 'Pending Response' ? 'amber' :
-                            'red'
-                          }
-                          className="h-2"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-tremor-default text-tremor-content dark:text-dark-tremor-content">
-                    No application data available
-                  </p>
-                </div>
-              )}
-            </div>
-            <ul role="list" className="mt-4 w-full sm:mt-0 space-y-2">
-              {statusDistribution.map((category) => (
-                <li
-                  key={category.name}
-                  className="relative rounded-tremor-small px-3 py-2 hover:bg-tremor-background-muted hover:dark:bg-dark-tremor-background-subtle"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center space-x-2">
-                      <span
-                        className={`${category.color} size-2.5 rounded-sm`}
-                        aria-hidden={true}
-                      />
+                    <div>
                       <p className="text-tremor-default font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong">
                         {category.name}
                       </p>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <p className="text-tremor-default font-medium text-tremor-content-strong dark:text-dark-tremor-content-strong">
-                        {category.value}
-                      </p>
-                      <p className="text-tremor-label text-tremor-content dark:text-dark-tremor-content">
-                        ({category.percentage?.toFixed(1)}%)
+                      <p className="text-tremor-label text-tremor-content dark:text-dark-tremor-content mt-1">
+                        {category.value} applications ({category.percentage?.toFixed(1)}% of total)
                       </p>
                     </div>
                   </div>
-                  {category.subStatuses && category.subStatuses.length > 0 && (
-                    <List className="mt-2">
+                  <div className="text-right">
+                    <Metric className="text-2xl">{category.value}</Metric>
+                  </div>
+                </div>
+                
+                <div className="mt-4">
+                  <ProgressBar 
+                    value={category.percentage || 0} 
+                    color={getProgressColor()}
+                    className="h-2"
+                  />
+                </div>
+                
+                {category.subStatuses && category.subStatuses.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-tremor-border dark:border-dark-tremor-border">
+                    <div className="flex flex-wrap gap-2">
                       {category.subStatuses.map((subStatus) => (
-                        <ListItem key={subStatus.name} className="py-1">
-                          <span className="text-tremor-label">{subStatus.name}</span>
-                          <span className="text-tremor-label">{subStatus.formatted}</span>
-                        </ListItem>
+                        <Badge 
+                          key={subStatus.name} 
+                          color={getProgressColor()}
+                          className="px-3 py-1"
+                        >
+                          <span className="font-medium">{subStatus.name}:</span>
+                          <span className="ml-1">{subStatus.value}</span>
+                        </Badge>
                       ))}
-                    </List>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </Card>
+                    </div>
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+          
+          {statusDistribution.length === 0 && (
+            <Card className="p-8 text-center">
+              <p className="text-tremor-default text-tremor-content dark:text-dark-tremor-content">
+                No application data available. Start applying to see your status distribution.
+              </p>
+            </Card>
+          )}
+        </div>
       </div>
 
       {/* Detailed Analytics Tabs */}
