@@ -160,6 +160,7 @@ interface BrowserUseConfig {
   linkedInProfileUrl?: string;
   portfolioUrl?: string;
   githubUrl?: string;
+  aiModel?: string;
 }
 
 const ModernLinkedInAutomationBot: React.FC = () => {
@@ -177,7 +178,6 @@ const ModernLinkedInAutomationBot: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showPaywall, setShowPaywall] = useState(false);
   const [selectedTab, setSelectedTab] = useState(0);
-  const [showBrowserPreview, setShowBrowserPreview] = useState(true); // Browser preview toggle state
   
   // Automation metrics
   const [appliedCount, setAppliedCount] = useState(0);
@@ -213,7 +213,8 @@ const ModernLinkedInAutomationBot: React.FC = () => {
     zipCode: '',
     linkedInProfileUrl: '',
     portfolioUrl: '',
-    githubUrl: ''
+    githubUrl: '',
+    aiModel: 'gpt-4o-mini'
   });
 
   // Chart data
@@ -420,27 +421,6 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                 </Button>
               </>
             )}
-            {currentTask?.live_url && showBrowserPreview && (
-              <Button
-                size="lg"
-                icon={RiEyeLine}
-                variant="secondary"
-                onClick={() => {
-                  // Open in a new window with specific dimensions for browser preview
-                  const width = 1280;
-                  const height = 800;
-                  const left = (window.screen.width - width) / 2;
-                  const top = (window.screen.height - height) / 2;
-                  window.open(
-                    currentTask.live_url, 
-                    'browser_preview',
-                    `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
-                  );
-                }}
-              >
-                View Live
-              </Button>
-            )}
           </div>
         </Flex>
       </Card>
@@ -525,6 +505,7 @@ const ModernLinkedInAutomationBot: React.FC = () => {
       <TabGroup defaultIndex={0} onIndexChange={setSelectedTab}>
         <TabList className="mb-6">
           <Tab icon={RiSettings3Line}>Configuration</Tab>
+          <Tab icon={RiEyeLine}>Browser Preview</Tab>
           <Tab icon={RiBarChartLine}>Analytics</Tab>
           <Tab icon={RiFileTextLine}>Activity Log</Tab>
           <Tab icon={RiInformationLine}>Help & Tips</Tab>
@@ -683,6 +664,20 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                   </div>
 
                   <div>
+                    <Text className="mb-2">AI Model</Text>
+                    <Select
+                      value={config.aiModel || 'gpt-4o-mini'}
+                      onValueChange={(value) => setConfig(prev => ({...prev, aiModel: value}))}
+                    >
+                      {Object.entries(AI_MODELS).map(([key, model]) => (
+                        <SelectItem key={key} value={key}>
+                          {model.name} - {model.description}
+                        </SelectItem>
+                      ))}
+                    </Select>
+                  </div>
+
+                  <div>
                     <Text className="mb-2">Custom Instructions (Optional)</Text>
                     <textarea
                       className="w-full px-3 py-2 text-tremor-default border border-tremor-border rounded-tremor-default focus:outline-none focus:ring-2 focus:ring-tremor-brand dark:bg-dark-tremor-background dark:border-dark-tremor-border"
@@ -691,40 +686,6 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                       value={config.customInstructions}
                       onChange={(e) => setConfig(prev => ({...prev, customInstructions: e.target.value}))}
                     />
-                  </div>
-                  
-                  <Divider />
-                  
-                  <div>
-                    <Text className="mb-3 font-medium">System Preferences</Text>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <RiEyeLine className="w-4 h-4 text-tremor-content dark:text-dark-tremor-content" />
-                          <Text>Show Browser Preview</Text>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setShowBrowserPreview(prev => !prev)}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            showBrowserPreview 
-                              ? 'bg-tremor-brand dark:bg-dark-tremor-brand' 
-                              : 'bg-tremor-border dark:bg-dark-tremor-border'
-                          }`}
-                          aria-pressed={showBrowserPreview}
-                        >
-                          <span className="sr-only">Show browser preview</span>
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              showBrowserPreview ? 'translate-x-6' : 'translate-x-1'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                      <Text className="text-tremor-label text-tremor-content-subtle dark:text-dark-tremor-content-subtle">
-                        When enabled, opens a preview window to watch the automation in real-time
-                      </Text>
-                    </div>
                   </div>
                 </div>
               </Card>
@@ -862,6 +823,82 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                 </Card>
               )}
             </Grid>
+          </TabPanel>
+
+          {/* Browser Preview Tab */}
+          <TabPanel>
+            <Card>
+              <div className="mb-4">
+                <Title>Live Browser Preview</Title>
+                <Text className="mt-1">Watch the automation in real-time</Text>
+              </div>
+              
+              {currentTask?.live_url ? (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-tremor-background-subtle dark:bg-dark-tremor-background-subtle rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                        <RiEyeLine className="w-5 h-5 text-green-600 dark:text-green-400" />
+                      </div>
+                      <div>
+                        <Text className="font-semibold">Browser Session Active</Text>
+                        <Text className="text-tremor-label">Automation is running</Text>
+                      </div>
+                    </div>
+                    <Button
+                      size="lg"
+                      icon={RiExternalLinkLine}
+                      onClick={() => {
+                        const width = 1280;
+                        const height = 800;
+                        const left = (window.screen.width - width) / 2;
+                        const top = (window.screen.height - height) / 2;
+                        window.open(
+                          currentTask.live_url, 
+                          'browser_preview',
+                          `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+                        );
+                      }}
+                    >
+                      Open Preview Window
+                    </Button>
+                  </div>
+                  
+                  <Callout title="Browser Control" icon={RiInformationLine} color="blue">
+                    The browser preview opens in a separate window where you can watch the AI agent navigate LinkedIn and apply to jobs in real-time. 
+                    The agent will pause if manual intervention is needed (e.g., login or captcha).
+                  </Callout>
+                  
+                  <div className="mt-6">
+                    <Text className="font-semibold mb-3">Current Activity</Text>
+                    <div className="space-y-2">
+                      {logs.slice(-5).map((log, idx) => (
+                        <div key={idx} className="flex items-start space-x-2">
+                          <div className={`mt-1 w-2 h-2 rounded-full ${
+                            log.type === 'success' ? 'bg-green-500' : 
+                            log.type === 'error' ? 'bg-red-500' : 
+                            log.type === 'warning' ? 'bg-amber-500' : 
+                            'bg-blue-500'
+                          }`} />
+                          <div className="flex-1">
+                            <Text className="text-tremor-default">{log.message}</Text>
+                            <Text className="text-tremor-label">{log.timestamp.toLocaleTimeString()}</Text>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <div className="mx-auto w-12 h-12 mb-4 text-tremor-content-subtle dark:text-dark-tremor-content-subtle">
+                    <RiEyeLine className="w-full h-full" />
+                  </div>
+                  <Text className="text-tremor-default font-medium mb-2">No Active Browser Session</Text>
+                  <Text className="text-tremor-label">Start the automation to see the browser preview</Text>
+                </div>
+              )}
+            </Card>
           </TabPanel>
 
           {/* Analytics Tab */}

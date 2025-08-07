@@ -8,7 +8,7 @@ import PasswordResetPage from './components/auth/PasswordResetPage';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import Sidebar from './components/layout/Sidebar';
 import ProfilePage from './components/ProfilePage';
-import { ResumePage } from './components/ResumePage';
+import ModernResumePage from './components/ModernResumePage';
 import ModernLinkedInAutomationBot from './components/ModernLinkedInAutomationBot';
 import { SuccessPage } from './components/SuccessPage';
 import JobSearchPage from './components/JobSearchPage';
@@ -42,7 +42,7 @@ function App() {
                             <Route path="/applications" element={<ApplicationsPage />} />
                             <Route path="/profile" element={<ProfilePage />} />
                             <Route path="/auto-apply" element={<ModernLinkedInAutomationBot />} />
-                            <Route path="/resume" element={<ResumePage />} />
+                            <Route path="/resume" element={<ModernResumePage />} />
                             <Route path="/billing" element={<BillingPage />} />
                             <Route path="/settings" element={<SettingsPage />} />
                             <Route path="/notifications" element={<NotificationsPage />} />
