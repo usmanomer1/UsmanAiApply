@@ -349,6 +349,38 @@ class JoboticApiService {
     return this.makeRequest('/api/v2/jobs/match', request, { requiresAuth: true });
   }
 
+  // Fetch additional jobs for an existing progressive session (cursor-based)
+  async getSessionJobs(sessionId: string, params: { limit?: number; cursor?: string | null }): Promise<{
+    success: boolean;
+    jobs: any[];
+    cursor?: string | null;
+    isDone?: boolean;
+    total?: number;
+  }> {
+    const searchParams = new URLSearchParams();
+    if (params.limit) searchParams.set('limit', String(params.limit));
+    if (params.cursor) searchParams.set('cursor', params.cursor);
+
+    // Supabase bearer auth
+    const { supabase } = await import('./supabase');
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) throw new Error('No session token available - user must be logged in');
+
+    const response = await fetch(`${API_BASE_URL}/api/v2/jobs/session/${encodeURIComponent(sessionId)}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      throw new Error(`Session fetch failed: ${response.status}${text ? ` - ${text}` : ''}`);
+    }
+
+    return response.json();
+  }
+
   // Streaming version of searchJobs
   async searchJobsStreaming(
     request: JobMatchRequest, 

@@ -75,13 +75,13 @@ const JobSearchPage: React.FC = () => {
   const [usageStats, setUsageStats] = useState<{ jobsViewed: number; jobLimit: number }>({ jobsViewed: 0, jobLimit: 100 });
   const [shouldSearch, setShouldSearch] = useState(false);
   
-  // Streaming states
-  const [streamProgress, setStreamProgress] = useState(0);
+  // Progressive loading (v2)
   const [totalJobsFound, setTotalJobsFound] = useState(0);
-  const [processedCount, setProcessedCount] = useState(0);
-  const [progressMessage, setProgressMessage] = useState('');
-  const [isStreaming, setIsStreaming] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [isDone, setIsDone] = useState(false);
   const currentControllerRef = useRef<AbortController | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
   
   // Modal state - temporary values while modal is open
   const [modalFilters, setModalFilters] = useState({
@@ -194,6 +194,48 @@ const JobSearchPage: React.FC = () => {
       setShowLoadingTransition(true);
     }
   }, [routeLocation]);
+
+  // Infinite scroll: observe sentinel and fetch next page when visible
+  useEffect(() => {
+    if (!sentinelRef.current) return;
+    if (!sessionId || isDone || !hasMore) return;
+
+    const observer = new IntersectionObserver(async (entries) => {
+      if (entries[0].isIntersecting && sessionId && hasMore && !loading) {
+        try {
+          setLoading(true);
+          const res = await joboticApi.getSessionJobs(sessionId, { limit: 10, cursor });
+          const sanitized = (res.jobs || []).map((job: any) => ({
+            ...job,
+            match_score: typeof job.match_score === 'number' && !isNaN(job.match_score) ? job.match_score : null,
+            job_min_salary: typeof job.job_min_salary === 'number' && !isNaN(job.job_min_salary) ? job.job_min_salary : null,
+            job_max_salary: typeof job.job_max_salary === 'number' && !isNaN(job.job_max_salary) ? job.job_max_salary : null,
+            job_apply_quality_score: typeof job.job_apply_quality_score === 'number' && !isNaN(job.job_apply_quality_score) ? job.job_apply_quality_score : null,
+            employer_name: job.employer_name || 'Unknown Company',
+            job_title: job.job_title || 'Unknown Position',
+            job_city: job.job_city || '',
+            job_state: job.job_state || '',
+            job_description: job.job_description || '',
+            job_employment_type: job.job_employment_type || 'Full-time',
+            job_posted_at_datetime_utc: job.job_posted_at_datetime_utc || new Date().toISOString(),
+          }));
+
+          setJobs(prev => [...prev, ...sanitized]);
+          setCursor(res.cursor ?? null);
+          setIsDone(!!res.isDone);
+          setHasMore(!res.isDone && !!res.cursor);
+          if (typeof res.total === 'number') setTotalJobsFound(res.total);
+        } catch (e) {
+          console.error('Load more failed:', e);
+        } finally {
+          setLoading(false);
+        }
+      }
+    }, { threshold: 0.1 });
+
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [sentinelRef.current, sessionId, cursor, hasMore, isDone, loading]);
 
   // Fetch user's resume and preferences, then auto-search
   useEffect(() => {
@@ -320,116 +362,48 @@ const JobSearchPage: React.FC = () => {
                 
                 // Perform auto-search - use AI search if we have resume for match scores
                 setLoading(true);
-                setIsStreaming(true);
-                setStreamProgress(0);
-                setTotalJobsFound(0);
-                setProcessedCount(0);
-                setProgressMessage('Searching for jobs...');
+                setError(null);
+                setJobs([]);
+                setSessionId(null);
+                setCursor(null);
+                setIsDone(false);
                 setHasMore(true);
-                
-                // Create abort controller for auto-search
-                currentControllerRef.current = new AbortController();
-                
+
                 try {
-                  const aiRequest: JobMatchRequest = {
+                  const res = await joboticApi.searchJobsProgressive({
                     resumeText: text,
                     query: primaryRole,
                     location: primaryLocation || undefined,
-                    page: 1,
-                    num_pages: 2, // Get 2 pages (20 jobs) by default - backend limit
-                    // Apply saved filters if available
-                    ...(filters.remote_jobs_only && { remote_jobs_only: true })
-                  };
-                  
-                  // Define streaming callbacks for auto-search
-                  const autoSearchCallbacks: StreamCallbacks = {
-                    initial: (data) => {
-                      setTotalJobsFound(data.totalFound);
-                      setProgressMessage(`Found ${data.totalFound} jobs matching your profile`);
-                    },
-                    keepalive: (data) => {
-                      console.log('Auto-search keepalive received at:', new Date(data.timestamp * 1000));
-                    },
-                    jobs: (data) => {
-                      // Sanitize job data to prevent NaN issues
-                      const sanitizedJobs = data.jobs.map(job => ({
-                        ...job,
-                        match_score: typeof job.match_score === 'number' && !isNaN(job.match_score) ? job.match_score : null,
-                        job_min_salary: typeof job.job_min_salary === 'number' && !isNaN(job.job_min_salary) ? job.job_min_salary : null,
-                        job_max_salary: typeof job.job_max_salary === 'number' && !isNaN(job.job_max_salary) ? job.job_max_salary : null,
-                        job_apply_quality_score: typeof job.job_apply_quality_score === 'number' && !isNaN(job.job_apply_quality_score) ? job.job_apply_quality_score : null,
-                        // Ensure required string fields have defaults
-                        employer_name: job.employer_name || 'Unknown Company',
-                        job_title: job.job_title || 'Unknown Position',
-                        job_city: job.job_city || '',
-                        job_state: job.job_state || '',
-                        job_description: job.job_description || '',
-                        job_employment_type: job.job_employment_type || 'Full-time',
-                        job_posted_at_datetime_utc: job.job_posted_at_datetime_utc || new Date().toISOString(),
-                      }));
-                      
-                      setJobs(prevJobs => [...prevJobs, ...sanitizedJobs]);
-                      setStreamProgress((data.batchNumber / data.totalBatches) * 100);
-                      setProcessedCount(prev => prev + data.jobs.length);
-                    },
-                    progress: (data) => {
-                      setProcessedCount(data.processed);
-                      setProgressMessage(`Processing ${data.processed} of ${data.total} jobs...`);
-                      setStreamProgress(data.percentage);
-                    },
-                    complete: async (data) => {
-                      setUsageStats({
-                        jobsViewed: data.usage?.monthly_used || 0,
-                        jobLimit: data.usage?.monthly_limit || 100
-                      });
-                      setLoading(false);
-                      setIsStreaming(false);
-                      setProgressMessage('');
-                      
-                      // Cache the usage data from API response
-                      if (user?.id && data.usage) {
-                        updateCachedUsage(user.id, data.usage);
-                      }
-                      
-                      if (user?.id && data.totalProcessed > 0) {
-                        await trackJobSearchUsage(user.id, data.totalProcessed, {
-                          search_type: 'auto_search',
-                          query: primaryRole,
-                          location: primaryLocation
-                        });
-                      }
-                      
-                      // Update hasMore state based on total processed
-                      setHasMore(false);
-                      
-                      // Update session with results
-                      sessionUtils.updateSession({
-                        totalJobsFound: data.totalProcessed,
-                        jobsLoaded: jobs.length
-                      });
-                      
-                      // Only show toast if no jobs found (important feedback)
-                      if (data.totalProcessed === 0) {
-                        toast('No jobs found. Try updating your preferences.');
-                      }
-                      // Silent success - jobs are already visible on screen
-                    },
-                    error: (data) => {
-                      console.error('Auto-search streaming error:', data);
-                    }
-                  };
-                  
-                  await joboticApi.searchJobsStreaming(aiRequest, autoSearchCallbacks, currentControllerRef.current.signal);
-                  
+                    limit: 10
+                  });
+
+                  const sanitized = (res.jobs || []).map((job: any) => ({
+                    ...job,
+                    match_score: typeof job.match_score === 'number' && !isNaN(job.match_score) ? job.match_score : null,
+                    job_min_salary: typeof job.job_min_salary === 'number' && !isNaN(job.job_min_salary) ? job.job_min_salary : null,
+                    job_max_salary: typeof job.job_max_salary === 'number' && !isNaN(job.job_max_salary) ? job.job_max_salary : null,
+                    job_apply_quality_score: typeof job.job_apply_quality_score === 'number' && !isNaN(job.job_apply_quality_score) ? job.job_apply_quality_score : null,
+                    employer_name: job.employer_name || 'Unknown Company',
+                    job_title: job.job_title || 'Unknown Position',
+                    job_city: job.job_city || '',
+                    job_state: job.job_state || '',
+                    job_description: job.job_description || '',
+                    job_employment_type: job.job_employment_type || 'Full-time',
+                    job_posted_at_datetime_utc: job.job_posted_at_datetime_utc || new Date().toISOString(),
+                  }));
+
+                  setJobs(sanitized);
+                  setSessionId(res.sessionId || null);
+                  setCursor((res as any).cursor ?? null);
+                  setIsDone(!!(res as any).isDone);
+                  setHasMore(!(res as any).isDone && (!!(res as any).cursor || (res as any).hasMore ?? false));
+                  setTotalJobsFound((res as any).total || sanitized.length);
                   setInitialLoad(false);
                 } catch (err) {
-                  if (err instanceof Error && err.name !== 'AbortError') {
-                    console.error('Auto-search error:', err);
-                  }
+                  console.error('Auto-search error:', err);
+                  setError('Failed to load jobs. Please try again.');
                 } finally {
                   setLoading(false);
-                  setIsStreaming(false);
-                  currentControllerRef.current = null;
                 }
               } else {
                 // No specific role found, do a general search
@@ -518,12 +492,10 @@ const JobSearchPage: React.FC = () => {
     setJobs([]);
     setLoading(true);
     setError(null);
-    setIsStreaming(true);
-    setStreamProgress(0);
     setTotalJobsFound(0);
-    setProcessedCount(0);
-    setProgressMessage('Initializing search...');
-    
+    setSessionId(null);
+    setCursor(null);
+    setIsDone(false);
     setHasMore(true);
 
     // Create new abort controller
@@ -552,81 +524,34 @@ const JobSearchPage: React.FC = () => {
         ...(filters.job_requirements.length > 0 && { job_requirements: filters.job_requirements as ('no_exp' | 'under_3_years_exp' | 'more_than_3_years_exp' | 'no_degree' | 'fair_chance')[] })
       };
 
-      // Define streaming callbacks
-      const callbacks: StreamCallbacks = {
-        initial: (data) => {
-          setTotalJobsFound(data.totalFound);
-          setProgressMessage(`Found ${data.totalFound} jobs matching your criteria`);
-        },
-        keepalive: (data) => {
-          console.log('Search keepalive received at:', new Date(data.timestamp * 1000));
-        },
-        jobs: (data) => {
-          // Sanitize job data to prevent NaN issues
-          const sanitizedJobs = data.jobs.map(job => ({
-            ...job,
-            match_score: typeof job.match_score === 'number' && !isNaN(job.match_score) ? job.match_score : null,
-            job_min_salary: typeof job.job_min_salary === 'number' && !isNaN(job.job_min_salary) ? job.job_min_salary : null,
-            job_max_salary: typeof job.job_max_salary === 'number' && !isNaN(job.job_max_salary) ? job.job_max_salary : null,
-            job_apply_quality_score: typeof job.job_apply_quality_score === 'number' && !isNaN(job.job_apply_quality_score) ? job.job_apply_quality_score : null,
-            // Ensure required string fields have defaults
-            employer_name: job.employer_name || 'Unknown Company',
-            job_title: job.job_title || 'Unknown Position',
-            job_city: job.job_city || '',
-            job_state: job.job_state || '',
-            job_description: job.job_description || '',
-            job_employment_type: job.job_employment_type || 'Full-time',
-            job_posted_at_datetime_utc: job.job_posted_at_datetime_utc || new Date().toISOString(),
-          }));
-          
-          setJobs(prevJobs => [...prevJobs, ...sanitizedJobs]);
-          setStreamProgress((data.batchNumber / data.totalBatches) * 100);
-          setProcessedCount(prev => prev + data.jobs.length);
-        },
-        progress: (data) => {
-          setProcessedCount(data.processed);
-          setProgressMessage(`Processing ${data.processed} of ${data.total} jobs...`);
-          setStreamProgress(data.percentage);
-        },
-        complete: async (data) => {
-          setUsageStats({
-            jobsViewed: data.usage?.monthly_used || 0,
-            jobLimit: data.usage?.monthly_limit || 100
-          });
-          setLoading(false);
-          setIsStreaming(false);
-          setProgressMessage('');
-          
-          // Cache the usage data from API response
-          if (user?.id && data.usage) {
-            updateCachedUsage(user.id, data.usage);
-          }
-          
-          if (user?.id && data.totalProcessed > 0) {
-            await trackJobSearchUsage(user.id, data.totalProcessed, {
-              search_type: 'manual_search',
-              query: searchQuery,
-              location: location
-            });
-          }
-          
-          // Update hasMore state - since streaming loads all jobs, set to false when complete
-          setHasMore(false);
-          
-          // Update session with results
-          sessionUtils.updateSession({
-            totalJobsFound: data.totalProcessed,
-            jobsLoaded: jobs.length
-          });
-        },
-        error: (data) => {
-          console.error('Streaming error:', data);
-          toast.error(`Error processing batch ${data.batchNumber}: ${data.message}`);
-        }
-      };
+      const res = await joboticApi.searchJobsProgressive({
+        resumeText: request.resumeText,
+        query: request.query || '',
+        location: request.location,
+        limit: 10
+      });
 
-      // Use streaming API
-      await joboticApi.searchJobsStreaming(request, callbacks, currentControllerRef.current.signal);
+      const sanitized = (res.jobs || []).map((job: any) => ({
+        ...job,
+        match_score: typeof job.match_score === 'number' && !isNaN(job.match_score) ? job.match_score : null,
+        job_min_salary: typeof job.job_min_salary === 'number' && !isNaN(job.job_min_salary) ? job.job_min_salary : null,
+        job_max_salary: typeof job.job_max_salary === 'number' && !isNaN(job.job_max_salary) ? job.job_max_salary : null,
+        job_apply_quality_score: typeof job.job_apply_quality_score === 'number' && !isNaN(job.job_apply_quality_score) ? job.job_apply_quality_score : null,
+        employer_name: job.employer_name || 'Unknown Company',
+        job_title: job.job_title || 'Unknown Position',
+        job_city: job.job_city || '',
+        job_state: job.job_state || '',
+        job_description: job.job_description || '',
+        job_employment_type: job.job_employment_type || 'Full-time',
+        job_posted_at_datetime_utc: job.job_posted_at_datetime_utc || new Date().toISOString(),
+      }));
+
+      setJobs(sanitized);
+      setSessionId(res.sessionId || null);
+      setCursor((res as any).cursor ?? null);
+      setIsDone(!!(res as any).isDone);
+      setHasMore(!(res as any).isDone && (!!(res as any).cursor || (res as any).hasMore ?? false));
+      setTotalJobsFound((res as any).total || sanitized.length);
       
     } catch (err) {
       if (err instanceof Error && err.name !== 'AbortError') {
@@ -636,7 +561,6 @@ const JobSearchPage: React.FC = () => {
       }
     } finally {
       setLoading(false);
-      setIsStreaming(false);
       currentControllerRef.current = null;
     }
   };
@@ -1089,28 +1013,10 @@ const JobSearchPage: React.FC = () => {
           </div>
         )}
 
-        {/* Progress Bar for Streaming */}
-        {isStreaming && (
-          <div className="mb-6 bg-white rounded-lg border border-gray-200 p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700">
-                {progressMessage || 'Loading jobs...'}
-              </span>
-              <span className="text-sm text-gray-500">
-                {processedCount} of {totalJobsFound} jobs
-              </span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-teal-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${streamProgress}%` }}
-              />
-            </div>
-          </div>
-        )}
+        {/* Streaming progress removed in v2 progressive UI */}
 
         {/* Jobs Grid */}
-        {(displayedJobs.length > 0 || isStreaming) && (
+        {displayedJobs.length > 0 && (
           <div className="grid gap-4">
             {displayedJobs.map((job, index) => (
               <motion.div
@@ -1319,16 +1225,11 @@ const JobSearchPage: React.FC = () => {
               </motion.div>
             ))}
             
-            {/* Skeleton Loaders while streaming */}
-            {isStreaming && (
-              <>
-                {Array.from({ length: 5 }).map((_, index) => (
-                  <JobSkeleton key={`skeleton-${index}`} />
-                ))}
-              </>
-            )}
+            {/* Skeletons removed for v2; first batch returns quickly */}
           </div>
         )}
+        {/* Infinite scroll sentinel */}
+        <div ref={sentinelRef} />
           
 
         {/* Job count and end message */}
