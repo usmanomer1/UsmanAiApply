@@ -97,8 +97,9 @@ interface BrowserUseConfig {
   githubUrl?: string;
 }
 
-// LinkedIn location ID mapping - expanded with more locations
+// LinkedIn location ID mapping - expanded with more worldwide locations
 export const LINKEDIN_LOCATIONS = {
+  // United States
   'San Francisco Bay Area': '90000084',
   'New York City': '90000070', 
   'Los Angeles': '90000049',
@@ -118,29 +119,106 @@ export const LINKEDIN_LOCATIONS = {
   'Miami': '90000068',
   'Detroit': '90000053',
   'Minneapolis': '90000069',
+  'San Jose': '90000088',
+  'Nashville': '90000075',
+  'Charlotte': '90000045',
+  'Salt Lake City': '90000100',
+  'Las Vegas': '90000057',
+  
+  // Canada
   'Toronto': '100025096',
   'Vancouver': '100083280',
   'Montreal': '100073278',
+  'Calgary': '100182393',
+  'Ottawa': '101174742',
+  'Edmonton': '100562943',
+  
+  // United Kingdom & Ireland
   'London': '100853491',
+  'Manchester': '101355876',
+  'Birmingham': '101356765',
+  'Edinburgh': '100727941',
+  'Dublin': '100842717',
+  'Glasgow': '101096527',
+  'Bristol': '101358738',
+  'Leeds': '103644278',
+  
+  // Europe
   'Berlin': '102975707',
   'Amsterdam': '102011674',
   'Paris': '100985050',
   'Munich': '100968856',
   'Zurich': '100036621',
-  'Dublin': '100842717',
   'Stockholm': '100086362',
+  'Copenhagen': '104514075',
+  'Oslo': '103313161',
+  'Helsinki': '100456013',
+  'Madrid': '100511883',
+  'Barcelona': '101680190',
+  'Milan': '100885713',
+  'Rome': '100802576',
+  'Vienna': '103883259',
+  'Brussels': '100565514',
+  'Warsaw': '105072130',
+  'Prague': '104508036',
+  'Budapest': '100288700',
+  'Lisbon': '100364837',
+  'Athens': '105633663',
+  
+  // Asia Pacific
   'Singapore': '102454443',
   'Hong Kong': '102817007',
   'Tokyo': '101355337',
   'Sydney': '105490917',
   'Melbourne': '101452733',
-  'Dubai': '103588996',
-  'Tel Aviv': '101620260',
+  'Brisbane': '104769905',
+  'Auckland': '102105699',
+  'Seoul': '105149562',
+  'Shanghai': '102772228',
+  'Beijing': '103749031',
+  'Shenzhen': '102988331',
+  'Taipei': '104187078',
+  'Bangkok': '105146118',
+  'Jakarta': '106078326',
+  'Manila': '103121230',
+  'Kuala Lumpur': '106808692',
+  'Ho Chi Minh City': '104195383',
+  
+  // India
   'Mumbai': '105214831',
   'Bangalore': '109524677',
-  'Delhi': '102713980',
+  'Delhi NCR': '102713980',
   'Hyderabad': '104869687',
-  'Remote': '0'
+  'Chennai': '106693272',
+  'Pune': '103030111',
+  'Kolkata': '105556991',
+  'Ahmedabad': '103995949',
+  'Noida': '103641230',
+  'Gurgaon': '109727617',
+  
+  // Middle East & Africa
+  'Dubai': '103588996',
+  'Tel Aviv': '101620260',
+  'Riyadh': '100459316',
+  'Doha': '104170880',
+  'Cairo': '106939050',
+  'Cape Town': '104035573',
+  'Johannesburg': '103362014',
+  'Lagos': '105120595',
+  'Nairobi': '104068158',
+  
+  // Latin America
+  'São Paulo': '104025165',
+  'Mexico City': '103679190',
+  'Buenos Aires': '100446943',
+  'Santiago': '104621616',
+  'Lima': '102927786',
+  'Bogota': '105915875',
+  'Rio de Janeiro': '106057974',
+  
+  // Remote & Worldwide
+  'Remote': '0',
+  'Worldwide': '0'
 };
 
 // AI Model definitions with properties

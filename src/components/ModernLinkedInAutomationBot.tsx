@@ -177,6 +177,7 @@ const ModernLinkedInAutomationBot: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showPaywall, setShowPaywall] = useState(false);
   const [selectedTab, setSelectedTab] = useState(0);
+  const [showBrowserPreview, setShowBrowserPreview] = useState(true); // Browser preview toggle state
   
   // Automation metrics
   const [appliedCount, setAppliedCount] = useState(0);
@@ -419,12 +420,23 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                 </Button>
               </>
             )}
-            {currentTask?.live_url && (
+            {currentTask?.live_url && showBrowserPreview && (
               <Button
                 size="lg"
                 icon={RiEyeLine}
                 variant="secondary"
-                onClick={() => window.open(currentTask.live_url, '_blank')}
+                onClick={() => {
+                  // Open in a new window with specific dimensions for browser preview
+                  const width = 1280;
+                  const height = 800;
+                  const left = (window.screen.width - width) / 2;
+                  const top = (window.screen.height - height) / 2;
+                  window.open(
+                    currentTask.live_url, 
+                    'browser_preview',
+                    `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+                  );
+                }}
               >
                 View Live
               </Button>
@@ -535,7 +547,7 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                     <TextInput
                       placeholder="e.g., Software Engineer"
                       value={config.jobTitle}
-                      onChange={(e) => setConfig({...config, jobTitle: e.target.value})}
+                      onChange={(e) => setConfig(prev => ({...prev, jobTitle: e.target.value}))}
                     />
                   </div>
 
@@ -544,9 +556,11 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                     <SearchSelect
                       value={config.location}
                       onValueChange={(value) => {
+                        // Only update config, don't trigger any automation restart
                         const locationId = LINKEDIN_LOCATIONS[value as keyof typeof LINKEDIN_LOCATIONS] || '0';
-                        setConfig({...config, location: value, locationId});
+                        setConfig(prev => ({...prev, location: value, locationId}));
                       }}
+                      className="[&_button]:bg-white [&_button]:dark:bg-dark-tremor-background"
                     >
                       {Object.keys(LINKEDIN_LOCATIONS).map(loc => (
                         <SearchSelectItem key={loc} value={loc}>
@@ -561,7 +575,7 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                       <Text className="mb-2">Experience Level</Text>
                       <Select
                         value={config.experience}
-                        onValueChange={(value) => setConfig({...config, experience: value})}
+                        onValueChange={(value) => setConfig(prev => ({...prev, experience: value}))}
                       >
                         <SelectItem value="All">All Levels</SelectItem>
                         <SelectItem value="Internship">Internship</SelectItem>
@@ -577,7 +591,7 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                       <Text className="mb-2">Work Type</Text>
                       <Select
                         value={config.remotePreference}
-                        onValueChange={(value) => setConfig({...config, remotePreference: value})}
+                        onValueChange={(value) => setConfig(prev => ({...prev, remotePreference: value}))}
                       >
                         <SelectItem value="All">All Types</SelectItem>
                         <SelectItem value="Remote">Remote</SelectItem>
@@ -592,7 +606,7 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                       <Text className="mb-2">Date Posted</Text>
                       <Select
                         value={config.datePosted || 'All time'}
-                        onValueChange={(value) => setConfig({...config, datePosted: value})}
+                        onValueChange={(value) => setConfig(prev => ({...prev, datePosted: value}))}
                       >
                         <SelectItem value="All time">All Time</SelectItem>
                         <SelectItem value="Past 24 hours">Past 24 Hours</SelectItem>
@@ -605,7 +619,7 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                       <Text className="mb-2">Target Applications</Text>
                       <NumberInput
                         value={parseInt(config.targetCount)}
-                        onValueChange={(value) => setConfig({...config, targetCount: value.toString()})}
+                        onValueChange={(value) => setConfig(prev => ({...prev, targetCount: value.toString()}))}
                         min={1}
                         max={50}
                       />
@@ -628,7 +642,7 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                       type="email"
                       placeholder="your@email.com"
                       value={config.linkedinEmail}
-                      onChange={(e) => setConfig({...config, linkedinEmail: e.target.value})}
+                      onChange={(e) => setConfig(prev => ({...prev, linkedinEmail: e.target.value}))}
                     />
                   </div>
 
@@ -637,7 +651,8 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                       <Text className="mb-2">Country</Text>
                       <Select
                         value={config.countryCode}
-                        onValueChange={(value) => setConfig({...config, countryCode: value})}
+                        onValueChange={(value) => setConfig(prev => ({...prev, countryCode: value}))}
+                        className="[&_button]:bg-white [&_button]:dark:bg-dark-tremor-background"
                       >
                         {COUNTRY_CODES.map(country => (
                           <SelectItem key={country.code} value={country.code}>
@@ -652,7 +667,8 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                         type="tel"
                         placeholder="123-456-7890"
                         value={config.contactNumber}
-                        onChange={(e) => setConfig({...config, contactNumber: e.target.value})}
+                        onChange={(e) => setConfig(prev => ({...prev, contactNumber: e.target.value}))}
+                        className="bg-white dark:bg-dark-tremor-background"
                       />
                     </div>
                   </div>
@@ -662,7 +678,7 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                     <TextInput
                       placeholder="e.g., John_Doe_Resume.pdf"
                       value={config.linkedinResume}
-                      onChange={(e) => setConfig({...config, linkedinResume: e.target.value})}
+                      onChange={(e) => setConfig(prev => ({...prev, linkedinResume: e.target.value}))}
                     />
                   </div>
 
@@ -673,8 +689,42 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                       rows={3}
                       placeholder="Any special instructions for the AI agent..."
                       value={config.customInstructions}
-                      onChange={(e) => setConfig({...config, customInstructions: e.target.value})}
+                      onChange={(e) => setConfig(prev => ({...prev, customInstructions: e.target.value}))}
                     />
+                  </div>
+                  
+                  <Divider />
+                  
+                  <div>
+                    <Text className="mb-3 font-medium">System Preferences</Text>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <RiEyeLine className="w-4 h-4 text-tremor-content dark:text-dark-tremor-content" />
+                          <Text>Show Browser Preview</Text>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowBrowserPreview(prev => !prev)}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                            showBrowserPreview 
+                              ? 'bg-tremor-brand dark:bg-dark-tremor-brand' 
+                              : 'bg-tremor-border dark:bg-dark-tremor-border'
+                          }`}
+                          aria-pressed={showBrowserPreview}
+                        >
+                          <span className="sr-only">Show browser preview</span>
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              showBrowserPreview ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                      <Text className="text-tremor-label text-tremor-content-subtle dark:text-dark-tremor-content-subtle">
+                        When enabled, opens a preview window to watch the automation in real-time
+                      </Text>
+                    </div>
                   </div>
                 </div>
               </Card>
@@ -693,7 +743,7 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                         type="checkbox"
                         id="applyToExternal"
                         checked={config.applyToExternalJobs}
-                        onChange={(e) => setConfig({...config, applyToExternalJobs: e.target.checked})}
+                        onChange={(e) => setConfig(prev => ({...prev, applyToExternalJobs: e.target.checked}))}
                         className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                       />
                       <label htmlFor="applyToExternal" className="text-tremor-default font-medium">
@@ -709,7 +759,7 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                             type="email"
                             placeholder="email@example.com"
                             value={config.externalJobEmail}
-                            onChange={(e) => setConfig({...config, externalJobEmail: e.target.value})}
+                            onChange={(e) => setConfig(prev => ({...prev, externalJobEmail: e.target.value}))}
                           />
                         </div>
 
@@ -719,7 +769,7 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                             type="password"
                             placeholder="Password for external sites"
                             value={config.externalJobPassword}
-                            onChange={(e) => setConfig({...config, externalJobPassword: e.target.value})}
+                            onChange={(e) => setConfig(prev => ({...prev, externalJobPassword: e.target.value}))}
                           />
                         </div>
 
@@ -728,7 +778,7 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                           <TextInput
                             placeholder="John"
                             value={config.firstName}
-                            onChange={(e) => setConfig({...config, firstName: e.target.value})}
+                            onChange={(e) => setConfig(prev => ({...prev, firstName: e.target.value}))}
                           />
                         </div>
 
@@ -737,7 +787,7 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                           <TextInput
                             placeholder="Doe"
                             value={config.lastName}
-                            onChange={(e) => setConfig({...config, lastName: e.target.value})}
+                            onChange={(e) => setConfig(prev => ({...prev, lastName: e.target.value}))}
                           />
                         </div>
 
@@ -747,7 +797,7 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                             type="url"
                             placeholder="https://linkedin.com/in/johndoe"
                             value={config.linkedInProfileUrl}
-                            onChange={(e) => setConfig({...config, linkedInProfileUrl: e.target.value})}
+                            onChange={(e) => setConfig(prev => ({...prev, linkedInProfileUrl: e.target.value}))}
                           />
                         </div>
 
@@ -757,7 +807,7 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                             type="url"
                             placeholder="https://yourportfolio.com"
                             value={config.portfolioUrl}
-                            onChange={(e) => setConfig({...config, portfolioUrl: e.target.value})}
+                            onChange={(e) => setConfig(prev => ({...prev, portfolioUrl: e.target.value}))}
                           />
                         </div>
 
@@ -767,7 +817,7 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                             type="url"
                             placeholder="https://github.com/yourusername"
                             value={config.githubUrl}
-                            onChange={(e) => setConfig({...config, githubUrl: e.target.value})}
+                            onChange={(e) => setConfig(prev => ({...prev, githubUrl: e.target.value}))}
                           />
                         </div>
 
@@ -776,7 +826,7 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                           <TextInput
                             placeholder="123 Main St"
                             value={config.address}
-                            onChange={(e) => setConfig({...config, address: e.target.value})}
+                            onChange={(e) => setConfig(prev => ({...prev, address: e.target.value}))}
                           />
                         </div>
 
@@ -785,7 +835,7 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                           <TextInput
                             placeholder="San Francisco"
                             value={config.city}
-                            onChange={(e) => setConfig({...config, city: e.target.value})}
+                            onChange={(e) => setConfig(prev => ({...prev, city: e.target.value}))}
                           />
                         </div>
 
@@ -794,7 +844,7 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                           <TextInput
                             placeholder="CA"
                             value={config.state}
-                            onChange={(e) => setConfig({...config, state: e.target.value})}
+                            onChange={(e) => setConfig(prev => ({...prev, state: e.target.value}))}
                           />
                         </div>
 
@@ -803,7 +853,7 @@ const ModernLinkedInAutomationBot: React.FC = () => {
                           <TextInput
                             placeholder="94105"
                             value={config.zipCode}
-                            onChange={(e) => setConfig({...config, zipCode: e.target.value})}
+                            onChange={(e) => setConfig(prev => ({...prev, zipCode: e.target.value}))}
                           />
                         </div>
                       </div>
