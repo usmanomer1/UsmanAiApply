@@ -346,32 +346,7 @@ class JoboticApiService {
     isDone?: boolean;
     cursor?: string | null;
   }> {
-    try {
-      return await this.makeRequest('/api/v2/jobs/match', request, { requiresAuth: true });
-    } catch (err: any) {
-      // Fallback for backends without v2 route: call legacy /api/jobs/match once
-      if (err && err.status === 404) {
-        const legacy = await this.makeRequest<JobMatchResponse>('/api/jobs/match', {
-          resumeText: request.resumeText,
-          query: request.query,
-          location: request.location,
-          page: 1,
-          num_pages: Math.ceil((request.limit ?? 10) / 10),
-        }, { requiresAuth: true });
-        const jobs = legacy?.data?.jobs ?? [];
-        const total = legacy?.data?.totalFound ?? jobs.length;
-        return {
-          success: true,
-          jobs,
-          total,
-          sessionId: '',
-          hasMore: false,
-          isDone: true,
-          cursor: null,
-        } as any;
-      }
-      throw err;
-    }
+    return this.makeRequest('/api/v2/jobs/match', request, { requiresAuth: true });
   }
 
   // Fetch additional jobs for an existing progressive session (cursor-based)
@@ -381,29 +356,15 @@ class JoboticApiService {
     cursor?: string | null;
     isDone?: boolean;
     total?: number;
+    sessionId?: string;
   }> {
-    const searchParams = new URLSearchParams();
-    if (params.limit) searchParams.set('limit', String(params.limit));
-    if (params.cursor) searchParams.set('cursor', params.cursor);
-
-    // Supabase bearer auth
-    const { supabase } = await import('./supabase');
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) throw new Error('No session token available - user must be logged in');
-
-    const response = await fetch(`${API_BASE_URL}/api/v2/jobs/session/${encodeURIComponent(sessionId)}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`,
-      },
-    });
-
-    if (!response.ok) {
-      const text = await response.text().catch(() => '');
-      throw new Error(`Session fetch failed: ${response.status}${text ? ` - ${text}` : ''}`);
-    }
-
-    return response.json();
+    // Continuation uses the same POST /api/v2/jobs/match with sessionId + cursor
+    const body: any = {
+      sessionId,
+      limit: params.limit ?? 10,
+    };
+    if (params.cursor) body.cursor = params.cursor;
+    return this.makeRequest('/api/v2/jobs/match', body, { requiresAuth: true });
   }
 
   // Streaming version of searchJobs
