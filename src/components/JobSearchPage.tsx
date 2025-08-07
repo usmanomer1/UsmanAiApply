@@ -3,18 +3,15 @@ import { Search, MapPin, Briefcase, Filter, Loader2, Heart, Users, DollarSign, B
 import { joboticApi, JobMatchRequest } from '../lib/joboticApi';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
-import * as sessionUtils from '../lib/sessionUtils';
 import { useAuth } from '../contexts/AuthContext';
 import { extractTextFromPDF } from '../lib/pdfExtractor';
 import { ResumeAnalyzerV2 } from './ResumeAnalyzerV2';
 import { toast } from 'react-hot-toast';
 import LoadingTransition from './LoadingTransition';
 import { useLocation } from 'react-router-dom';
-import { trackJobSearchUsage, updateCachedUsage } from '../lib/jobSearchUsage';
+import { updateCachedUsage } from '../lib/jobSearchUsage';
 import { getPlanLimits } from '../stripe-config';
-import { JobSkeleton } from './JobSkeleton';
 import { usePaginatedQuery } from 'convex/react';
-import { api } from '../../convex/_generated/api';
 
 interface Job {
   job_id: string;
@@ -80,7 +77,7 @@ const JobSearchPage: React.FC = () => {
   // Progressive loading (v2)
   const [totalJobsFound, setTotalJobsFound] = useState(0);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [cursor, setCursor] = useState<string | null>(null);
+  // Cursor is managed by Convex pagination; no local cursor state needed
   const [isDone, setIsDone] = useState(false);
   const currentControllerRef = useRef<AbortController | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -90,8 +87,8 @@ const JobSearchPage: React.FC = () => {
     status: pagedStatus,
     loadMore,
   } = usePaginatedQuery(
-    api.jobs.getProcessedJobs as any,
-    (sessionId ? ({ sessionId } as any) : (undefined as any)),
+    'jobs:getProcessedJobs' as any,
+    sessionId ? ({ sessionId } as any) : (undefined as any),
     { initialNumItems: 10 }
   );
   
@@ -379,7 +376,7 @@ const JobSearchPage: React.FC = () => {
                 setError(null);
                 setJobs([]);
                 setSessionId(null);
-                setCursor(null);
+                // no local cursor
                 setIsDone(false);
                 setHasMore(true);
 
@@ -412,7 +409,7 @@ const JobSearchPage: React.FC = () => {
                   const doneFlag = (res as any).isDone ?? (res as any).data?.isDone ?? false;
                   const total = (res as any).total ?? (res as any).data?.total ?? (res as any).data?.totalFound ?? sanitized.length;
                   setSessionId((res as any).sessionId || (res as any).session?.id || null);
-                  setCursor(nextCursor ?? null);
+                  // no local cursor
                   setIsDone(!!doneFlag);
                   setHasMore(!!nextCursor && !doneFlag);
                   setTotalJobsFound(total);
@@ -512,7 +509,7 @@ const JobSearchPage: React.FC = () => {
     setError(null);
     setTotalJobsFound(0);
     setSessionId(null);
-    setCursor(null);
+    // no local cursor
     setIsDone(false);
     setHasMore(true);
 
@@ -525,7 +522,6 @@ const JobSearchPage: React.FC = () => {
         toast('Please upload your resume in your profile to get AI-matched job recommendations.');
         setError('Resume required for job matching. Please upload your resume in your profile.');
         setLoading(false);
-        setIsStreaming(false);
         return;
       }
 
@@ -570,7 +566,7 @@ const JobSearchPage: React.FC = () => {
       const doneFlag = (res as any).isDone ?? (res as any).data?.isDone ?? false;
       const total = (res as any).total ?? (res as any).data?.total ?? (res as any).data?.totalFound ?? sanitized.length;
       setSessionId((res as any).sessionId || (res as any).session?.id || null);
-      setCursor(nextCursor ?? null);
+      // no local cursor
       setIsDone(!!doneFlag);
       setHasMore(!!nextCursor && !doneFlag);
       setTotalJobsFound(total);
