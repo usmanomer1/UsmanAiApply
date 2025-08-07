@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, MapPin, Briefcase, Filter, Loader2, Heart, Users, DollarSign, Building2, Star, Bookmark, ArrowUpRight, TrendingUp, ChevronRight } from 'lucide-react';
-import { joboticApi, JobMatchRequest } from '../lib/joboticApi';
+// Removed direct REST pagination; using Convex session + subscription
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,9 +9,9 @@ import { ResumeAnalyzerV2 } from './ResumeAnalyzerV2';
 import { toast } from 'react-hot-toast';
 import LoadingTransition from './LoadingTransition';
 import { useLocation } from 'react-router-dom';
-import { updateCachedUsage } from '../lib/jobSearchUsage';
+// import { updateCachedUsage } from '../lib/jobSearchUsage';
 import { getPlanLimits } from '../stripe-config';
-import { usePaginatedQuery } from 'convex/react';
+import { usePaginatedQuery, useMutation, useAction } from 'convex/react';
 
 interface Job {
   job_id: string;
@@ -82,6 +82,8 @@ const JobSearchPage: React.FC = () => {
   const currentControllerRef = useRef<AbortController | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   // Convex paginated feed for processed jobs
+  const startSession = useMutation('jobs:startSession' as any);
+  const runSearch = useAction('jobs:runSearch' as any);
   const {
     results: pagedJobs = [],
     status: pagedStatus,
@@ -381,38 +383,13 @@ const JobSearchPage: React.FC = () => {
                 setHasMore(true);
 
                 try {
-                  const res = await joboticApi.searchJobsProgressive({
-                    resumeText: text,
+                  const newSessionId = await startSession({
                     query: primaryRole,
                     location: primaryLocation || undefined,
-                    limit: 10
-                  });
-
-                  const rows = ((res as any).jobs ?? (res as any).data?.jobs ?? []) as any[];
-                  const sanitized = rows.map((job: any) => ({
-                    ...job,
-                    match_score: typeof job.match_score === 'number' && !isNaN(job.match_score) ? job.match_score : null,
-                    job_min_salary: typeof job.job_min_salary === 'number' && !isNaN(job.job_min_salary) ? job.job_min_salary : null,
-                    job_max_salary: typeof job.job_max_salary === 'number' && !isNaN(job.job_max_salary) ? job.job_max_salary : null,
-                    job_apply_quality_score: typeof job.job_apply_quality_score === 'number' && !isNaN(job.job_apply_quality_score) ? job.job_apply_quality_score : null,
-                    employer_name: job.employer_name || 'Unknown Company',
-                    job_title: job.job_title || 'Unknown Position',
-                    job_city: job.job_city || '',
-                    job_state: job.job_state || '',
-                    job_description: job.job_description || '',
-                    job_employment_type: job.job_employment_type || 'Full-time',
-                    job_posted_at_datetime_utc: job.job_posted_at_datetime_utc || new Date().toISOString(),
-                  }));
-
-                  setJobs(sanitized);
-                  const nextCursor = (res as any).cursor ?? (res as any).data?.cursor ?? null;
-                  const doneFlag = (res as any).isDone ?? (res as any).data?.isDone ?? false;
-                  const total = (res as any).total ?? (res as any).data?.total ?? (res as any).data?.totalFound ?? sanitized.length;
-                  setSessionId((res as any).sessionId || (res as any).session?.id || null);
-                  // no local cursor
-                  setIsDone(!!doneFlag);
-                  setHasMore(!!nextCursor && !doneFlag);
-                  setTotalJobsFound(total);
+                    resumeText: text,
+                  } as any);
+                  setSessionId(newSessionId as string);
+                  await runSearch({ sessionId: newSessionId as string } as any);
                   setInitialLoad(false);
                 } catch (err) {
                   console.error('Auto-search error:', err);
@@ -426,35 +403,16 @@ const JobSearchPage: React.FC = () => {
                 setSearchQuery('Software Engineer'); // Default search
                 setLocation('Remote');
                 
-                const aiRequest: JobMatchRequest = {
-                  resumeText: text,
-                  query: 'Software Engineer',
-                  location: 'Remote',
-                  page: 1,
-                  num_pages: 2, // Get 2 pages (20 jobs) by default - backend limit
-                };
-
                 setLoading(true);
                 setHasMore(true);
                 try {
-                  // Always use AI-powered search
-                  const response = await joboticApi.searchJobs(aiRequest);
-                  setJobs(response.data?.jobs || []);
-                  // Set hasMore state from response
-                  setHasMore(false);
-                  
-                  // Update usage stats from API response
-                  if (response.usage) {
-                    setUsageStats({
-                      jobsViewed: response.usage.monthly_used,
-                      jobLimit: typeof response.usage.monthly_limit === 'number' ? response.usage.monthly_limit : -1
-                    });
-                    // Cache the usage data
-                    if (user?.id) {
-                      updateCachedUsage(user.id, response.usage);
-                    }
-                  }
-                  
+                  const newSessionId = await startSession({
+                    query: 'Software Engineer',
+                    location: 'Remote',
+                    resumeText: text,
+                  } as any);
+                  setSessionId(newSessionId as string);
+                  await runSearch({ sessionId: newSessionId as string } as any);
                   setInitialLoad(false);
                 } catch (err) {
                   console.error('Default search error:', err);
@@ -525,51 +483,13 @@ const JobSearchPage: React.FC = () => {
         return;
       }
 
-      const request: JobMatchRequest = {
-        resumeText: resumeText,
+      const newSessionId = await startSession({
         query: searchQuery,
         location: location || undefined,
-        page: 1,
-        num_pages: 2, // Default to 2 pages (20 jobs) - backend limit
-        // Include filters
-        ...(filters.employment_types.length > 0 && { employment_types: filters.employment_types as ('FULLTIME' | 'PARTTIME' | 'INTERN' | 'CONTRACTOR')[] }),
-        ...(filters.date_posted && { date_posted: filters.date_posted as 'all' | 'today' | '3days' | 'week' | 'month' }),
-        ...(filters.remote_jobs_only && { remote_jobs_only: true }),
-        ...(filters.job_requirements.length > 0 && { job_requirements: filters.job_requirements as ('no_exp' | 'under_3_years_exp' | 'more_than_3_years_exp' | 'no_degree' | 'fair_chance')[] })
-      };
-
-      const res = await joboticApi.searchJobsProgressive({
-        resumeText: request.resumeText,
-        query: request.query || '',
-        location: request.location,
-        limit: 10
-      });
-
-      const rows = ((res as any).jobs ?? (res as any).data?.jobs ?? []) as any[];
-      const sanitized = rows.map((job: any) => ({
-        ...job,
-        match_score: typeof job.match_score === 'number' && !isNaN(job.match_score) ? job.match_score : null,
-        job_min_salary: typeof job.job_min_salary === 'number' && !isNaN(job.job_min_salary) ? job.job_min_salary : null,
-        job_max_salary: typeof job.job_max_salary === 'number' && !isNaN(job.job_max_salary) ? job.job_max_salary : null,
-        job_apply_quality_score: typeof job.job_apply_quality_score === 'number' && !isNaN(job.job_apply_quality_score) ? job.job_apply_quality_score : null,
-        employer_name: job.employer_name || 'Unknown Company',
-        job_title: job.job_title || 'Unknown Position',
-        job_city: job.job_city || '',
-        job_state: job.job_state || '',
-        job_description: job.job_description || '',
-        job_employment_type: job.job_employment_type || 'Full-time',
-        job_posted_at_datetime_utc: job.job_posted_at_datetime_utc || new Date().toISOString(),
-      }));
-
-      setJobs(sanitized);
-      const nextCursor = (res as any).cursor ?? (res as any).data?.cursor ?? null;
-      const doneFlag = (res as any).isDone ?? (res as any).data?.isDone ?? false;
-      const total = (res as any).total ?? (res as any).data?.total ?? (res as any).data?.totalFound ?? sanitized.length;
-      setSessionId((res as any).sessionId || (res as any).session?.id || null);
-      // no local cursor
-      setIsDone(!!doneFlag);
-      setHasMore(!!nextCursor && !doneFlag);
-      setTotalJobsFound(total);
+        resumeText: resumeText,
+      } as any);
+      setSessionId(newSessionId as string);
+      await runSearch({ sessionId: newSessionId as string } as any);
       
     } catch (err) {
       if (err instanceof Error && err.name !== 'AbortError') {
