@@ -76,9 +76,12 @@ const JobSearchPageConvex: React.FC = () => {
   const [usageStats, setUsageStats] = useState<{ jobsViewed: number; jobLimit: number }>({ jobsViewed: 0, jobLimit: 100 });
   
   // Convex real-time queries
+  // Page size for progressive pagination
+  const PAGE_SIZE = 10;
+
   const processedJobsData = useQuery(
     api.jobs.getProcessedJobs,
-    sessionId ? { sessionId, offset: 0, limit: 100 } : "skip"
+    sessionId ? { sessionId, offset: currentOffset, limit: PAGE_SIZE } : "skip"
   );
   
   const sessionStatus = useQuery(
@@ -336,15 +339,9 @@ const JobSearchPageConvex: React.FC = () => {
 
   const loadMoreJobs = async () => {
     if (loadingMore || !sessionId || !processedJobsData?.hasMore) return;
-    
     setLoadingMore(true);
-    
     try {
-      // Since we're using Convex real-time subscriptions, 
-      // we just need to update the offset for pagination
-      setCurrentOffset(prev => prev + 10);
-      
-      // The useQuery hook will automatically update with new data
+      setCurrentOffset(prev => prev + PAGE_SIZE);
       toast.info('Loading more jobs...');
     } catch (error: any) {
       console.error('Load more error:', error);
