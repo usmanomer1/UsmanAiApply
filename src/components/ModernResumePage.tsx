@@ -1,69 +1,87 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-  RiUploadLine,
-  RiFileTextLine,
-  RiCheckLine,
-  RiAlertLine,
-  RiDownloadLine,
-  RiRefreshLine,
-  RiEyeLine,
-  RiEditLine,
-  RiShieldCheckLine,
-  RiLightbulbLine,
-  RiMagicLine,
-  RiSparklingLine,
-  RiTimeLine,
-  RiPercentLine,
-  RiBarChartLine,
-  RiTrophyLine,
-  RiBriefcaseLine,
-  RiBuildingLine,
-  RiInformationLine,
-  RiFileCopyLine,
-  RiStarLine,
-  RiArrowRightLine,
-  RiDashboardLine,
-  RiCheckboxCircleLine,
-  RiCloseCircleLine,
-  RiErrorWarningLine,
-  RiLoader2Line,
-  RiHistoryLine,
-  RiAddLine,
-  RiDeleteBinLine
-} from '@remixicon/react';
 import {
   Card,
-  Metric,
+  Title,
   Text,
-  Flex,
-  ProgressBar,
-  Badge,
-  Grid,
   Button,
-  TextInput,
-  Textarea,
-  Tab,
+  Badge,
   TabGroup,
   TabList,
-  TabPanel,
+  Tab,
   TabPanels,
-  AreaChart,
-  BarList,
+  TabPanel,
+  Grid,
+  Metric,
+  Flex,
+  ProgressBar,
+  Callout,
+  TextInput,
+  Textarea,
+  Select,
+  SelectItem,
+  Divider,
   List,
   ListItem,
-  Callout,
-  Divider,
-  Title,
-  Subtitle,
-  Bold,
-  Italic,
+  ProgressCircle,
+  AreaChart,
+  BarList,
   Dialog,
   DialogPanel,
-  ProgressCircle,
-  CategoryBar,
-  DonutChart
+  Subtitle,
+  MultiSelect,
+  MultiSelectItem,
+  NumberInput,
+  Switch,
+  DateRangePickerValue,
+  Color
 } from '@tremor/react';
+import {
+  DocumentTextIcon,
+  CloudArrowUpIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  InformationCircleIcon,
+  SparklesIcon,
+  ChartBarIcon,
+  ClockIcon,
+  BriefcaseIcon,
+  BuildingOfficeIcon,
+  DocumentArrowDownIcon,
+  LightBulbIcon,
+  ShieldCheckIcon,
+  BoltIcon,
+  PencilIcon,
+  DocumentDuplicateIcon,
+  ArrowPathIcon,
+  DocumentCheckIcon,
+  ChartPieIcon,
+  AdjustmentsHorizontalIcon,
+  BeakerIcon,
+  CpuChipIcon,
+  UserGroupIcon,
+  BookOpenIcon,
+  AcademicCapIcon,
+  FireIcon,
+  TrophyIcon,
+  StarIcon,
+  RocketLaunchIcon,
+  CommandLineIcon,
+  CursorArrowRaysIcon,
+  PresentationChartLineIcon,
+  ClipboardDocumentCheckIcon,
+  XMarkIcon,
+  ArrowDownTrayIcon,
+  EyeIcon,
+  TrashIcon,
+  ArrowRightIcon,
+  ChevronDownIcon,
+  ChevronUpIcon
+} from '@heroicons/react/24/outline';
+import {
+  DocumentTextIcon as DocumentTextIconSolid,
+  CheckCircleIcon as CheckCircleIconSolid,
+  ExclamationTriangleIcon as ExclamationTriangleIconSolid
+} from '@heroicons/react/24/solid';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -91,453 +109,590 @@ interface ResumeAnalysis {
   created_at: string;
 }
 
-const ModernResumePage: React.FC = () => {
+export default function ModernResumePage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const [selectedTab, setSelectedTab] = useState(0);
+  
   const [uploading, setUploading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
   
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadedResume, setUploadedResume] = useState<ResumeUpload | null>(null);
-  const [resumeText, setResumeText] = useState<string>('');
+  const [resumeText, setResumeText] = useState('');
   const [jobTitle, setJobTitle] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [jobDescription, setJobDescription] = useState('');
   
   const [analysisResult, setAnalysisResult] = useState<AnalyzeResponse | null>(null);
-  const [generatedResume, setGeneratedResume] = useState<GenerateResponse | null>(null);
-  const [savedAnalyses, setSavedAnalyses] = useState<ResumeAnalysis[]>([]);
-  const [selectedAnalysis, setSelectedAnalysis] = useState<ResumeAnalysis | null>(null);
+  const [currentAnalysisId, setCurrentAnalysisId] = useState<string | null>(null);
+  
+  const [recentUploads, setRecentUploads] = useState<ResumeUpload[]>([]);
+  const [recentAnalyses, setRecentAnalyses] = useState<ResumeAnalysis[]>([]);
+  
+  const [selectedSections, setSelectedSections] = useState<string[]>([]);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [additionalInstructions, setAdditionalInstructions] = useState('');
+  const [editType, setEditType] = useState<'full' | 'quick'>('full');
+  const [score, setScore] = useState(0);
+  
+  const [expandedSections, setExpandedSections] = useState<string[]>(['keywords', 'skills', 'suggestions']);
+  const [selectedAnalysisForView, setSelectedAnalysisForView] = useState<ResumeAnalysis | null>(null);
   const [showAnalysisDialog, setShowAnalysisDialog] = useState(false);
-
-  // Key metrics for display
-  const [metrics, setMetrics] = useState({
-    totalAnalyses: 0,
-    averageScore: 0,
-    improvementRate: 0,
-    successRate: 0
-  });
-
+  
   useEffect(() => {
     if (user) {
-      loadSavedAnalyses();
-      calculateMetrics();
+      fetchRecentUploads();
+      fetchRecentAnalyses();
     }
   }, [user]);
-
-  const loadSavedAnalyses = async () => {
+  
+  // Animate score when analysis result changes
+  useEffect(() => {
+    if (analysisResult?.data?.summary?.overallScore) {
+      const targetScore = analysisResult.data.summary.overallScore;
+      const duration = 1500;
+      const startTime = Date.now();
+      
+      const animateScore = () => {
+        const elapsedTime = Date.now() - startTime;
+        const progress = Math.min(elapsedTime / duration, 1);
+        
+        // Easing function
+        const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+        const currentScore = Math.round(targetScore * easeOutQuart);
+        
+        setScore(currentScore);
+        
+        if (progress < 1) {
+          requestAnimationFrame(animateScore);
+        }
+      };
+      
+      animateScore();
+    }
+  }, [analysisResult]);
+  
+  const fetchRecentUploads = async () => {
     if (!user) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('resume_analyses')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setSavedAnalyses(data || []);
-    } catch (error) {
-      console.error('Error loading analyses:', error);
+    const { data, error } = await supabase
+      .from('resume_uploads')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (!error && data) {
+      setRecentUploads(data);
     }
   };
 
-  const calculateMetrics = async () => {
-    if (!user || savedAnalyses.length === 0) return;
+  const fetchRecentAnalyses = async () => {
+    if (!user) return;
 
-    const totalAnalyses = savedAnalyses.length;
-    const scores = savedAnalyses
-      .filter(a => a.analysis_result?.ats_score)
-      .map(a => a.analysis_result.ats_score);
-    
-    const averageScore = scores.length > 0 
-      ? scores.reduce((a, b) => a + b, 0) / scores.length 
-      : 0;
+    const { data, error } = await supabase
+      .from('resume_analyses')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(5);
 
-    const improvementRate = scores.length > 1 
-      ? ((scores[0] - scores[scores.length - 1]) / scores[scores.length - 1]) * 100
-      : 0;
-
-    const successRate = scores.filter(s => s >= 70).length / scores.length * 100;
-
-    setMetrics({
-      totalAnalyses,
-      averageScore,
-      improvementRate,
-      successRate
-    });
-  };
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const validation = validateResumeFile(file);
-      if (!validation.valid) {
-        toast.error(validation.error || 'Invalid file');
-        return;
-      }
-      setSelectedFile(file);
-      handleUpload(file);
+    if (!error && data) {
+      setRecentAnalyses(data);
     }
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     setIsDragging(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    const pdfFile = files.find(file => file.type === 'application/pdf');
     
-    const file = e.dataTransfer.files[0];
-    if (file) {
-      const validation = validateResumeFile(file);
-      if (!validation.valid) {
-        toast.error(validation.error || 'Invalid file');
-        return;
-      }
-      setSelectedFile(file);
-      handleUpload(file);
+    if (pdfFile) {
+      handleFileSelect({ target: { files: [pdfFile] } } as any);
+    } else {
+      toast.error('Please drop a PDF file');
     }
   };
 
-  const handleUpload = async (file: File) => {
-    if (!user) {
-      toast.error('Please sign in to upload resumes');
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const error = validateResumeFile(file);
+    if (error) {
+      toast.error(error);
       return;
     }
 
+    setSelectedFile(file);
     setUploading(true);
     
+    // Extract text from PDF
     try {
-      // Extract text from PDF
       const text = await extractTextFromPDF(file);
       setResumeText(text);
-      
-      // Upload file to Supabase Storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-      const filePath = `resumes/${fileName}`;
-
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('resume-uploads')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) throw uploadError;
-
-      // Save to database
-      const { data: resumeData, error: dbError } = await supabase
-        .from('resume_uploads')
-        .insert({
-          user_id: user.id,
-          filename: file.name,
-          file_url: filePath,
-          file_size: file.size
-        })
-        .select()
-        .single();
-
-      if (dbError) throw dbError;
-
-      setUploadedResume(resumeData);
       toast.success('Resume uploaded successfully!');
     } catch (error) {
-      console.error('Upload error:', error);
-      toast.error('Failed to upload resume');
+      console.error('Error extracting text:', error);
+      toast.error('Failed to extract text from PDF');
     } finally {
       setUploading(false);
     }
   };
 
+  const uploadResumeToStorage = async (file: File): Promise<string> => {
+    if (!user) throw new Error('User not authenticated');
+
+    const fileName = `${user.id}/${Date.now()}_${file.name}`;
+    const { data, error } = await supabase.storage
+      .from('resume-uploads')
+      .upload(fileName, file);
+
+    if (error) throw error;
+    return data.path;
+  };
+
   const handleAnalyze = async () => {
-    if (!user || !resumeText) {
-      toast.error('Please upload a resume first');
+    if (!selectedFile || !user) {
+      toast.error('Please select a resume file');
       return;
     }
 
-    // Check usage limits
-    const canProceed = await canPerformAction(user.id, 'resume_optimization');
-    if (!canProceed.allowed) {
-      toast.error(canProceed.reason || 'Usage limit reached');
+    if (!jobTitle || !companyName || !jobDescription) {
+      toast.error('Please fill in all job details');
+      return;
+    }
+
+    // Check AI token limits before analyzing
+    const canPerform = await canPerformAction(user.id, 'resume_optimization');
+    if (!canPerform.allowed) {
+      toast.error(canPerform.reason || 'Insufficient AI tokens for resume analysis');
       return;
     }
 
     setAnalyzing(true);
     
     try {
-      const apiToken = await getApiToken();
-      if (!apiToken) {
-        throw new Error('Failed to get API token');
-      }
+      // Upload file to storage
+      const filePath = await uploadResumeToStorage(selectedFile);
+      
+      // Save upload record
+      const { data: uploadData, error: uploadError } = await supabase
+        .from('resume_uploads')
+        .insert({
+          user_id: user.id,
+          filename: selectedFile.name,
+          file_url: filePath,
+          file_size: selectedFile.size,
+          upload_type: 'analysis'
+        })
+        .select()
+        .single();
 
+      if (uploadError) throw uploadError;
+
+      // Call analysis API
       const result = await analyzeResume(
-        resumeText,
-        jobTitle || undefined,
-        companyName || undefined,
-        jobDescription || undefined
+        user.id,
+        selectedFile,
+        jobDescription,
+        jobTitle,
+        companyName
       );
 
       setAnalysisResult(result);
 
-      // Track token usage
-      await trackAITokenUsage(user.id, 'resume_optimization', {
-        job_title: jobTitle,
-        company_name: companyName
-      });
-
-      // Save analysis to database
-      const { error: saveError } = await supabase
+      // Save analysis record
+      const { data: analysisData, error: analysisError } = await supabase
         .from('resume_analyses')
         .insert({
           user_id: user.id,
+          resume_upload_id: uploadData.id,
           resume_text: resumeText,
           job_title: jobTitle,
           company_name: companyName,
           job_description: jobDescription,
           analysis_result: result,
-          analysis_id: result.analysis_id
-        });
+          analysis_id: result.data.analysisId
+        })
+        .select()
+        .single();
 
-      if (saveError) {
-        console.error('Error saving analysis:', saveError);
+      if (analysisError) throw analysisError;
+
+      setCurrentAnalysisId(analysisData.id);
+      
+      // Initialize selected sections and skills
+      if (result.data.sections) {
+        setSelectedSections(result.data.sections.map((s: any) => s.id));
+      }
+      if (result.data.skills?.suggested) {
+        setSelectedSkills(result.data.skills.suggested.slice(0, 10));
       }
 
-      await loadSavedAnalyses();
       toast.success('Resume analyzed successfully!');
-    } catch (error) {
+      
+      // Track AI token usage
+      await trackAITokenUsage(user.id, 'resume_optimization', {
+        action: 'analyze',
+        analysisId: result.data.analysisId,
+        jobTitle: jobTitle,
+        companyName: companyName
+      });
+      
+      // Refresh lists
+      fetchRecentUploads();
+      fetchRecentAnalyses();
+      
+    } catch (error: any) {
       console.error('Analysis error:', error);
-      toast.error('Failed to analyze resume');
+      toast.error(error.message || 'Failed to analyze resume');
     } finally {
       setAnalyzing(false);
     }
   };
 
   const handleGenerate = async () => {
-    if (!analysisResult?.analysis_id) {
-      toast.error('Please analyze your resume first');
+    if (!analysisResult || !user || !currentAnalysisId) {
+      toast.error('Please analyze a resume first');
+      return;
+    }
+
+    // Check AI token limits before generating
+    const canPerform = await canPerformAction(user.id, 'resume_optimization');
+    if (!canPerform.allowed) {
+      toast.error(canPerform.reason || 'Insufficient AI tokens for resume generation');
       return;
     }
 
     setGenerating(true);
-    
+
     try {
-      const result = await generateOptimizedResume(analysisResult.analysis_id);
-      setGeneratedResume(result);
-      toast.success('Optimized resume generated!');
-    } catch (error) {
+      const result = await generateOptimizedResume(
+        user.id,
+        analysisResult.data.analysisId,
+        editType,
+        selectedSections,
+        selectedSkills,
+        additionalInstructions
+      );
+
+      // Save generation record
+      await supabase
+        .from('resume_generations')
+        .insert({
+          user_id: user.id,
+          analysis_id: currentAnalysisId,
+          generation_id: result.data.generationId,
+          generation_result: result,
+          download_url: result.data.downloadUrl,
+          filename: result.data.filename,
+          edit_type: editType,
+          selected_sections: selectedSections,
+          selected_skills: selectedSkills,
+          additional_instructions: additionalInstructions
+        });
+
+      // Download the file
+      const downloadUrl = await downloadResume(user.id, result.data.generationId);
+      
+      // Instead of opening in new tab, trigger a download
+      try {
+        const token = await getApiToken(user.id);
+        const response = await fetch(downloadUrl, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (!response.ok) throw new Error('Download failed');
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = result.data.filename || 'optimized_resume.pdf';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } catch (error) {
+        console.error('Download error:', error);
+        // Fallback to opening in new tab
+        window.open(downloadUrl, '_blank');
+      }
+      
+      toast.success('Resume generated successfully!');
+      
+      // Track AI token usage for generation
+      await trackAITokenUsage(user.id, 'resume_optimization', {
+        action: 'generate',
+        generationId: result.data.generationId,
+        editType: editType
+      });
+      
+    } catch (error: any) {
       console.error('Generation error:', error);
-      toast.error('Failed to generate optimized resume');
+      toast.error(error.message || 'Failed to generate resume');
     } finally {
       setGenerating(false);
     }
   };
 
-  const handleDownload = async () => {
-    if (!generatedResume?.resume_url) {
-      toast.error('No resume to download');
-      return;
-    }
-
-    try {
-      await downloadResume(generatedResume.resume_url);
-      toast.success('Resume downloaded!');
-    } catch (error) {
-      console.error('Download error:', error);
-      toast.error('Failed to download resume');
+  const loadPreviousAnalysis = (analysis: ResumeAnalysis) => {
+    if (analysis.analysis_result) {
+      setAnalysisResult(analysis.analysis_result);
+      setCurrentAnalysisId(analysis.id);
+      setJobTitle(analysis.job_title || '');
+      setCompanyName(analysis.company_name || '');
+      setJobDescription(analysis.job_description || '');
+      
+      // Initialize selections
+      if (analysis.analysis_result.data.sections) {
+        setSelectedSections(analysis.analysis_result.data.sections.map((s: any) => s.id));
+      }
+      if (analysis.analysis_result.data.skills?.suggested) {
+        setSelectedSkills(analysis.analysis_result.data.skills.suggested.slice(0, 10));
+      }
+      
+      setActiveTab(0);
+      toast.success('Previous analysis loaded');
     }
   };
 
+  const getScoreColor = (score: number): Color => {
+    if (score >= 70) return 'emerald';
+    if (score >= 30) return 'amber';
+    return 'red';
+  };
+
+  const toggleSection = (sectionId: string) => {
+    setExpandedSections(prev => 
+      prev.includes(sectionId) 
+        ? prev.filter(id => id !== sectionId)
+        : [...prev, sectionId]
+    );
+  };
+
+  // Get available skills from analysis result
+  const getAvailableSkills = () => {
+    if (!analysisResult?.data?.skills) return [];
+    const { suggested = [], existing = [] } = analysisResult.data.skills;
+    return [...new Set([...suggested, ...existing])];
+  };
+
+  // Get available sections from analysis result
+  const getAvailableSections = () => {
+    if (!analysisResult?.data?.sections) return [];
+    return analysisResult.data.sections.map((section: any) => ({
+      id: section.id,
+      name: section.name || section.id
+    }));
+  };
+
+  // Calculate metrics
+  const calculateMetrics = () => {
+    const totalAnalyses = recentAnalyses.length;
+    const scores = recentAnalyses
+      .filter(a => a.analysis_result?.data?.summary?.overallScore)
+      .map(a => a.analysis_result.data.summary.overallScore);
+    
+    const averageScore = scores.length > 0 
+      ? scores.reduce((a, b) => a + b, 0) / scores.length 
+      : 0;
+    
+    const successRate = scores.filter(s => s >= 70).length / (scores.length || 1) * 100;
+    
+    return {
+      totalAnalyses,
+      averageScore,
+      successRate,
+      improvementRate: scores.length > 1 
+        ? ((scores[0] - scores[scores.length - 1]) / (scores[scores.length - 1] || 1)) * 100
+        : 0
+    };
+  };
+
+  const metrics = calculateMetrics();
+
   return (
-    <>
-      {/* Header Section */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-tremor-content-strong dark:text-dark-tremor-content-strong">
-          Resume Optimization Center
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-semibold text-tremor-content-strong dark:text-dark-tremor-content-strong">
+          Resume Optimizer
         </h1>
         <p className="mt-2 text-tremor-default text-tremor-content dark:text-dark-tremor-content">
-          AI-powered resume analysis and optimization to increase your job search success
+          AI-powered resume analysis and optimization for your dream job
         </p>
       </div>
 
       {/* Key Metrics */}
-      <Grid numItemsSm={2} numItemsLg={4} className="gap-6 mb-8">
+      <Grid numItemsSm={2} numItemsLg={4} className="gap-6">
         <Card decoration="top" decorationColor="blue">
           <Flex alignItems="start">
             <div>
               <Text>Total Analyses</Text>
-              <Metric className="mt-2">{metrics.totalAnalyses}</Metric>
-              <Text className="mt-2 text-tremor-default">
-                Resume optimizations
-              </Text>
+              <Metric>{metrics.totalAnalyses}</Metric>
             </div>
-            <Badge icon={RiFileTextLine} color="blue">
+            <Badge icon={DocumentTextIcon} color="blue">
               Active
             </Badge>
           </Flex>
         </Card>
 
-        <Card decoration="top" decorationColor="green">
+        <Card decoration="top" decorationColor="emerald">
           <Flex alignItems="start">
             <div>
-              <Text>Average ATS Score</Text>
-              <Metric className="mt-2">{metrics.averageScore.toFixed(0)}%</Metric>
-              <Text className="mt-2 text-tremor-default">
-                Industry avg: 65%
-              </Text>
+              <Text>Average Score</Text>
+              <Metric>{Math.round(metrics.averageScore)}%</Metric>
             </div>
-            <Badge icon={RiTrophyLine} color="green">
-              {metrics.averageScore > 65 ? 'Above Avg' : 'Below Avg'}
+            <Badge icon={TrophyIcon} color="emerald">
+              {metrics.averageScore >= 70 ? 'Good' : 'Improving'}
             </Badge>
           </Flex>
-          <ProgressBar value={metrics.averageScore} className="mt-3" color="green" />
+          <ProgressBar value={metrics.averageScore} className="mt-3" color="emerald" />
         </Card>
 
         <Card decoration="top" decorationColor="amber">
           <Flex alignItems="start">
             <div>
-              <Text>Improvement Rate</Text>
-              <Metric className="mt-2">
-                {metrics.improvementRate > 0 ? '+' : ''}{metrics.improvementRate.toFixed(1)}%
-              </Metric>
-              <Text className="mt-2 text-tremor-default">
-                Score change
-              </Text>
+              <Text>Success Rate</Text>
+              <Metric>{Math.round(metrics.successRate)}%</Metric>
             </div>
-            <Badge icon={RiBarChartLine} color="amber">
-              {metrics.improvementRate > 0 ? 'Improving' : 'Stable'}
+            <Badge icon={ChartBarIcon} color="amber">
+              Quality
             </Badge>
           </Flex>
-          <ProgressBar value={Math.abs(metrics.improvementRate)} className="mt-3" color="amber" />
+          <ProgressBar value={metrics.successRate} className="mt-3" color="amber" />
         </Card>
 
         <Card decoration="top" decorationColor="purple">
           <Flex alignItems="start">
             <div>
-              <Text>Success Rate</Text>
-              <Metric className="mt-2">{metrics.successRate.toFixed(0)}%</Metric>
-              <Text className="mt-2 text-tremor-default">
-                Scores ≥70%
-              </Text>
+              <Text>Improvement</Text>
+              <Metric>
+                {metrics.improvementRate > 0 ? '+' : ''}{Math.round(metrics.improvementRate)}%
+              </Metric>
             </div>
-            <Badge icon={RiCheckboxCircleLine} color="purple">
-              Quality
+            <Badge icon={FireIcon} color="purple">
+              Trending
             </Badge>
           </Flex>
-          <ProgressBar value={metrics.successRate} className="mt-3" color="purple" />
         </Card>
       </Grid>
 
-      {/* Main Content Tabs */}
-      <TabGroup defaultIndex={0} onIndexChange={setSelectedTab}>
-        <TabList className="mb-6">
-          <Tab icon={RiUploadLine}>Upload & Analyze</Tab>
-          <Tab icon={RiHistoryLine}>History</Tab>
-          <Tab icon={RiMagicLine}>Generated Resumes</Tab>
-          <Tab icon={RiLightbulbLine}>Insights</Tab>
+      {/* Main Content */}
+      <TabGroup defaultIndex={0} onIndexChange={setActiveTab}>
+        <TabList>
+          <Tab icon={CloudArrowUpIcon}>Upload & Analyze</Tab>
+          <Tab icon={ClockIcon}>History</Tab>
+          <Tab icon={ChartBarIcon}>Insights</Tab>
         </TabList>
 
         <TabPanels>
           {/* Upload & Analyze Tab */}
           <TabPanel>
-            <Grid numItemsSm={1} numItemsLg={2} className="gap-6">
+            <Grid numItemsMd={2} className="gap-6">
               {/* Upload Section */}
               <Card>
-                <div className="mb-4">
-                  <Title>Upload Resume</Title>
-                  <Text className="mt-1">Upload your resume for AI analysis</Text>
-                </div>
-
-                <div
-                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                    isDragging 
-                      ? 'border-tremor-brand bg-tremor-brand/5' 
-                      : 'border-tremor-border dark:border-dark-tremor-border'
-                  }`}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setIsDragging(true);
-                  }}
-                  onDragLeave={() => setIsDragging(false)}
-                  onDrop={handleDrop}
-                >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".pdf"
-                    onChange={handleFileSelect}
-                    className="hidden"
-                  />
-                  
-                  <div className="flex flex-col items-center space-y-4">
-                    <div className="p-4 bg-tremor-background-subtle dark:bg-dark-tremor-background-subtle rounded-full">
-                      <RiUploadLine className="w-8 h-8 text-tremor-content dark:text-dark-tremor-content" />
-                    </div>
+                <Title>Upload Resume</Title>
+                <Text className="mt-1">Upload your resume for AI-powered analysis</Text>
+                
+                <div className="mt-6 space-y-4">
+                  <div
+                    className={`border-2 border-dashed rounded-lg p-8 text-center transition-all ${
+                      isDragging
+                        ? 'border-tremor-brand bg-tremor-brand-faint'
+                        : selectedFile
+                        ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
+                        : 'border-tremor-border hover:border-tremor-border-dark'
+                    }`}
+                    onDragEnter={handleDragEnter}
+                    onDragLeave={handleDragLeave}
+                    onDragOver={handleDragOver}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".pdf"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
                     
-                    {selectedFile ? (
-                      <>
-                        <div className="flex items-center space-x-2">
-                          <RiFileTextLine className="w-5 h-5 text-green-600" />
-                          <Text className="font-medium">{selectedFile.name}</Text>
+                    {uploading ? (
+                      <div className="space-y-4">
+                        <ArrowPathIcon className="mx-auto h-12 w-12 text-tremor-brand animate-spin" />
+                        <ProgressBar value={50} className="mt-3" />
+                        <Text>Processing your resume...</Text>
+                      </div>
+                    ) : selectedFile ? (
+                      <div className="space-y-3">
+                        <CheckCircleIconSolid className="mx-auto h-12 w-12 text-emerald-500" />
+                        <div className="p-3 bg-tremor-background-subtle rounded-lg">
+                          <Flex>
+                            <div className="flex items-center gap-2">
+                              <DocumentTextIcon className="h-5 w-5 text-tremor-content" />
+                              <Text>{selectedFile.name}</Text>
+                            </div>
+                            <Button
+                              size="xs"
+                              variant="secondary"
+                              icon={XMarkIcon}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedFile(null);
+                                setResumeText('');
+                              }}
+                            >
+                              Remove
+                            </Button>
+                          </Flex>
                         </div>
-                        <Text className="text-tremor-label">
-                          {(selectedFile.size / 1024).toFixed(1)} KB
-                        </Text>
-                      </>
+                      </div>
                     ) : (
                       <>
-                        <Text className="font-medium">
-                          Drag and drop your resume here
-                        </Text>
-                        <Text className="text-tremor-label">
-                          or click to browse (PDF only, max 5MB)
-                        </Text>
+                        <CloudArrowUpIcon className="mx-auto h-12 w-12 text-tremor-content-subtle" />
+                        <Text className="mt-2">Drop your resume here or click to browse</Text>
+                        <Text className="text-tremor-content-subtle">Supports PDF files (max 10MB)</Text>
                       </>
                     )}
-                    
-                    <Button
-                      icon={RiUploadLine}
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploading}
-                    >
-                      {uploading ? 'Uploading...' : 'Select File'}
-                    </Button>
                   </div>
-                </div>
 
-                {resumeText && (
-                  <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                    <div className="flex items-center space-x-2">
-                      <RiCheckLine className="w-5 h-5 text-green-600 dark:text-green-400" />
-                      <Text className="font-medium text-green-700 dark:text-green-400">
-                        Resume uploaded successfully
-                      </Text>
-                    </div>
-                    <Text className="mt-1 text-tremor-label">
-                      {resumeText.split(' ').length} words extracted
-                    </Text>
-                  </div>
-                )}
-              </Card>
+                  <Divider />
 
-              {/* Job Details Section */}
-              <Card>
-                <div className="mb-4">
-                  <Title>Job Details (Optional)</Title>
-                  <Text className="mt-1">Provide job details for targeted optimization</Text>
-                </div>
-
-                <div className="space-y-4">
                   <div>
                     <Text className="mb-2">Job Title</Text>
                     <TextInput
                       placeholder="e.g., Senior Software Engineer"
                       value={jobTitle}
-                      onChange={(e) => setJobTitle(e.target.value)}
-                      icon={RiBriefcaseLine}
+                      onValueChange={setJobTitle}
+                      icon={BriefcaseIcon}
                     />
                   </div>
 
@@ -546,259 +701,343 @@ const ModernResumePage: React.FC = () => {
                     <TextInput
                       placeholder="e.g., Google"
                       value={companyName}
-                      onChange={(e) => setCompanyName(e.target.value)}
-                      icon={RiBuildingLine}
+                      onValueChange={setCompanyName}
+                      icon={BuildingOfficeIcon}
                     />
                   </div>
 
                   <div>
                     <Text className="mb-2">Job Description</Text>
-                    <textarea
-                      className="w-full px-3 py-2 text-tremor-default border border-tremor-border rounded-tremor-default focus:outline-none focus:ring-2 focus:ring-tremor-brand dark:bg-dark-tremor-background dark:border-dark-tremor-border"
-                      rows={6}
+                    <Textarea
                       placeholder="Paste the job description here..."
                       value={jobDescription}
-                      onChange={(e) => setJobDescription(e.target.value)}
+                      onValueChange={setJobDescription}
+                      rows={6}
                     />
                   </div>
 
-                  <Divider />
-
-                  <div className="flex space-x-3">
-                    <Button
-                      icon={RiSparklingLine}
-                      size="lg"
-                      onClick={handleAnalyze}
-                      disabled={!resumeText || analyzing}
-                      className="flex-1"
-                    >
-                      {analyzing ? 'Analyzing...' : 'Analyze Resume'}
-                    </Button>
-                    
-                    {analysisResult && (
-                      <Button
-                        icon={RiMagicLine}
-                        size="lg"
-                        variant="secondary"
-                        onClick={handleGenerate}
-                        disabled={generating}
-                        className="flex-1"
-                      >
-                        {generating ? 'Generating...' : 'Generate Optimized'}
-                      </Button>
-                    )}
-                  </div>
+                  <Button
+                    size="lg"
+                    icon={analyzing ? ArrowPathIcon : BeakerIcon}
+                    onClick={handleAnalyze}
+                    disabled={!selectedFile || !jobTitle || !companyName || !jobDescription || analyzing}
+                    loading={analyzing}
+                    className="w-full"
+                  >
+                    {analyzing ? 'Analyzing with AI...' : 'Analyze Resume'}
+                  </Button>
                 </div>
               </Card>
-            </Grid>
 
-            {/* Analysis Results */}
-            {analysisResult && (
-              <Card className="mt-6">
-                <div className="mb-4">
+              {/* Analysis Results */}
+              <div className="space-y-6">
+                <Card>
                   <Title>Analysis Results</Title>
-                  <Text className="mt-1">AI-powered insights and recommendations</Text>
-                </div>
-
-                <Grid numItemsSm={1} numItemsLg={3} className="gap-6 mb-6">
-                  <Card>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Text>ATS Score</Text>
-                        <div className="flex items-center space-x-2 mt-2">
-                          <Metric>{analysisResult.ats_score}%</Metric>
-                          <Badge color={analysisResult.ats_score >= 70 ? 'green' : 'amber'}>
-                            {analysisResult.ats_score >= 70 ? 'Good' : 'Needs Work'}
-                          </Badge>
-                        </div>
-                      </div>
-                      <ProgressCircle 
-                        value={analysisResult.ats_score} 
-                        size="md"
-                        color={analysisResult.ats_score >= 70 ? 'green' : 'amber'}
-                      />
-                    </div>
-                  </Card>
-
-                  <Card>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Text>Keywords Found</Text>
-                        <Metric className="mt-2">
-                          {analysisResult.keywords?.length || 0}
-                        </Metric>
-                      </div>
-                      <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                        <RiCheckLine className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                      </div>
-                    </div>
-                  </Card>
-
-                  <Card>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Text>Improvements</Text>
-                        <Metric className="mt-2">
-                          {analysisResult.improvements?.length || 0}
-                        </Metric>
-                      </div>
-                      <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
-                        <RiLightbulbLine className="w-6 h-6 text-amber-600 dark:text-amber-400" />
-                      </div>
-                    </div>
-                  </Card>
-                </Grid>
-
-                {/* Detailed Feedback */}
-                <div className="space-y-4">
-                  {analysisResult.improvements && analysisResult.improvements.length > 0 && (
-                    <div>
-                      <Text className="font-semibold mb-3">Recommended Improvements</Text>
-                      <div className="space-y-2">
-                        {analysisResult.improvements.map((improvement, idx) => (
-                          <div key={idx} className="flex items-start space-x-2">
-                            <RiLightbulbLine className="w-4 h-4 text-amber-600 mt-0.5" />
-                            <Text className="text-tremor-default">{improvement}</Text>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {analysisResult.keywords && analysisResult.keywords.length > 0 && (
-                    <div>
-                      <Text className="font-semibold mb-3">Keywords Detected</Text>
-                      <div className="flex flex-wrap gap-2">
-                        {analysisResult.keywords.map((keyword, idx) => (
-                          <Badge key={idx} color="blue">
-                            {keyword}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {generatedResume && (
-                  <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                          <RiCheckLine className="w-5 h-5 text-green-600 dark:text-green-400" />
-                        </div>
+                  {analysisResult ? (
+                    <div className="mt-6">
+                      <Flex className="mb-6">
                         <div>
-                          <Text className="font-semibold">Optimized Resume Ready</Text>
-                          <Text className="text-tremor-label">Your enhanced resume is ready to download</Text>
+                          <Text>Match Score</Text>
+                          <Metric className="mt-2">{score}%</Metric>
+                        </div>
+                        <ProgressCircle
+                          value={score}
+                          size="lg"
+                          color={getScoreColor(score)}
+                        >
+                          <span className="text-2xl font-semibold">{score}%</span>
+                        </ProgressCircle>
+                      </Flex>
+
+                      <div className="space-y-4">
+                        {/* Matched Keywords */}
+                        <div>
+                          <button
+                            onClick={() => toggleSection('keywords')}
+                            className="w-full flex items-center justify-between text-left p-3 hover:bg-tremor-background-subtle rounded-lg transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <CheckCircleIcon className="h-5 w-5 text-emerald-500" />
+                              <Text className="font-medium">
+                                Matched Keywords ({analysisResult.data.summary?.keywordMatches?.length || 0})
+                              </Text>
+                            </div>
+                            {expandedSections.includes('keywords') ? (
+                              <ChevronUpIcon className="h-5 w-5 text-tremor-content-subtle" />
+                            ) : (
+                              <ChevronDownIcon className="h-5 w-5 text-tremor-content-subtle" />
+                            )}
+                          </button>
+                          {expandedSections.includes('keywords') && (
+                            <Flex className="gap-2 flex-wrap mt-3 px-3">
+                              {analysisResult.data.summary?.keywordMatches?.slice(0, 10).map((keyword: string) => (
+                                <Badge key={keyword} color="emerald">
+                                  {keyword}
+                                </Badge>
+                              ))}
+                            </Flex>
+                          )}
+                        </div>
+
+                        {/* Missing Skills */}
+                        <div>
+                          <button
+                            onClick={() => toggleSection('skills')}
+                            className="w-full flex items-center justify-between text-left p-3 hover:bg-tremor-background-subtle rounded-lg transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <ExclamationTriangleIcon className="h-5 w-5 text-amber-500" />
+                              <Text className="font-medium">
+                                Missing Skills ({analysisResult.data.summary?.missingSkills?.length || 0})
+                              </Text>
+                            </div>
+                            {expandedSections.includes('skills') ? (
+                              <ChevronUpIcon className="h-5 w-5 text-tremor-content-subtle" />
+                            ) : (
+                              <ChevronDownIcon className="h-5 w-5 text-tremor-content-subtle" />
+                            )}
+                          </button>
+                          {expandedSections.includes('skills') && (
+                            <Flex className="gap-2 flex-wrap mt-3 px-3">
+                              {analysisResult.data.summary?.missingSkills?.slice(0, 10).map((skill: string) => (
+                                <Badge key={skill} color="amber">
+                                  {skill}
+                                </Badge>
+                              ))}
+                            </Flex>
+                          )}
+                        </div>
+
+                        {/* AI Suggestions */}
+                        <div>
+                          <button
+                            onClick={() => toggleSection('suggestions')}
+                            className="w-full flex items-center justify-between text-left p-3 hover:bg-tremor-background-subtle rounded-lg transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <LightBulbIcon className="h-5 w-5 text-blue-500" />
+                              <Text className="font-medium">
+                                AI Suggestions ({analysisResult.data.summary?.suggestions?.length || 0})
+                              </Text>
+                            </div>
+                            {expandedSections.includes('suggestions') ? (
+                              <ChevronUpIcon className="h-5 w-5 text-tremor-content-subtle" />
+                            ) : (
+                              <ChevronDownIcon className="h-5 w-5 text-tremor-content-subtle" />
+                            )}
+                          </button>
+                          {expandedSections.includes('suggestions') && (
+                            <List className="mt-3 px-3">
+                              {analysisResult.data.summary?.suggestions?.slice(0, 5).map((suggestion: string, index: number) => (
+                                <ListItem key={index}>
+                                  <Flex justifyContent="start" className="gap-2">
+                                    <LightBulbIcon className="h-4 w-4 text-tremor-brand flex-shrink-0 mt-0.5" />
+                                    <Text>{suggestion}</Text>
+                                  </Flex>
+                                </ListItem>
+                              ))}
+                            </List>
+                          )}
                         </div>
                       </div>
+                    </div>
+                  ) : (
+                    <div className="mt-6 text-center py-12">
+                      <ChartBarIcon className="mx-auto h-12 w-12 text-tremor-content-subtle" />
+                      <Text className="mt-4 text-tremor-content-subtle">
+                        Upload a resume and provide job details to see AI-powered analysis
+                      </Text>
+                    </div>
+                  )}
+                </Card>
+
+                {/* Generate Optimized Resume */}
+                <Card>
+                  <Title>Generate Optimized Resume</Title>
+                  {analysisResult ? (
+                    <div className="mt-6 space-y-4">
+                      <div>
+                        <Text className="mb-2">Optimization Type</Text>
+                        <Select value={editType} onValueChange={(value) => setEditType(value as 'full' | 'quick')}>
+                          <SelectItem value="full">
+                            Full Optimization - Complete rewrite
+                          </SelectItem>
+                          <SelectItem value="quick">
+                            Quick Edit - Minor tweaks
+                          </SelectItem>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Text className="mb-2">Skills to Include</Text>
+                        <MultiSelect
+                          value={selectedSkills}
+                          onValueChange={setSelectedSkills}
+                          placeholder="Select skills to highlight"
+                        >
+                          {getAvailableSkills().map((skill) => (
+                            <MultiSelectItem key={skill} value={skill}>
+                              {skill}
+                            </MultiSelectItem>
+                          ))}
+                        </MultiSelect>
+                      </div>
+
+                      <div>
+                        <Text className="mb-2">Sections to Include</Text>
+                        <MultiSelect
+                          value={selectedSections}
+                          onValueChange={setSelectedSections}
+                          placeholder="Select sections"
+                        >
+                          {getAvailableSections().map((section) => (
+                            <MultiSelectItem key={section.id} value={section.id}>
+                              {section.name}
+                            </MultiSelectItem>
+                          ))}
+                        </MultiSelect>
+                      </div>
+
+                      <div>
+                        <Text className="mb-2">Additional Instructions (Optional)</Text>
+                        <Textarea
+                          placeholder="Any specific requirements or preferences..."
+                          value={additionalInstructions}
+                          onValueChange={setAdditionalInstructions}
+                          rows={3}
+                        />
+                      </div>
+
                       <Button
-                        icon={RiDownloadLine}
-                        onClick={handleDownload}
-                        color="green"
+                        size="lg"
+                        variant="primary"
+                        onClick={handleGenerate}
+                        loading={generating}
+                        disabled={generating || !analysisResult}
+                        className="w-full"
+                        icon={generating ? ArrowPathIcon : DocumentArrowDownIcon}
                       >
-                        Download Resume
+                        {generating ? 'Generating with AI...' : 'Generate & Download'}
                       </Button>
                     </div>
-                  </div>
-                )}
-              </Card>
-            )}
+                  ) : (
+                    <div className="mt-6 text-center py-12">
+                      <DocumentArrowDownIcon className="mx-auto h-12 w-12 text-tremor-content-subtle" />
+                      <Text className="mt-4 text-tremor-content-subtle">
+                        Analyze your resume first to generate an optimized version
+                      </Text>
+                    </div>
+                  )}
+                </Card>
+              </div>
+            </Grid>
           </TabPanel>
 
           {/* History Tab */}
           <TabPanel>
-            <Card>
-              <div className="mb-4">
-                <Title>Analysis History</Title>
-                <Text className="mt-1">View and manage your previous resume analyses</Text>
-              </div>
-
-              <List>
-                {savedAnalyses.map((analysis) => (
-                  <ListItem key={analysis.id}>
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center space-x-3">
-                        <div className="p-2 bg-tremor-background-subtle dark:bg-dark-tremor-background-subtle rounded-lg">
-                          <RiFileTextLine className="w-5 h-5 text-tremor-content dark:text-dark-tremor-content" />
-                        </div>
-                        <div>
-                          <Text className="font-medium">
-                            {analysis.job_title || 'General Resume Analysis'}
-                          </Text>
-                          <Text className="text-tremor-label">
-                            {new Date(analysis.created_at).toLocaleDateString()} • 
-                            {analysis.company_name && ` ${analysis.company_name} • `}
-                            Score: {analysis.analysis_result?.ats_score || 'N/A'}%
-                          </Text>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge color={
-                          analysis.analysis_result?.ats_score >= 70 ? 'green' : 
-                          analysis.analysis_result?.ats_score >= 50 ? 'amber' : 
-                          'red'
-                        }>
-                          {analysis.analysis_result?.ats_score || 0}%
-                        </Badge>
-                        <Button
-                          size="xs"
-                          variant="secondary"
-                          icon={RiEyeLine}
-                          onClick={() => {
-                            setSelectedAnalysis(analysis);
-                            setShowAnalysisDialog(true);
-                          }}
+            <Grid numItemsMd={2} className="gap-6">
+              <Card>
+                <Title>Recent Analyses</Title>
+                {recentAnalyses.length > 0 ? (
+                  <List className="mt-6">
+                    {recentAnalyses.map((analysis) => (
+                      <ListItem key={analysis.id}>
+                        <button
+                          onClick={() => loadPreviousAnalysis(analysis)}
+                          className="w-full text-left hover:bg-tremor-background-subtle rounded-lg p-2 -m-2 transition-colors"
                         >
-                          View
-                        </Button>
-                      </div>
-                    </div>
-                  </ListItem>
-                ))}
-                {savedAnalyses.length === 0 && (
-                  <div className="text-center py-8">
-                    <Text className="text-tremor-content dark:text-dark-tremor-content">
-                      No analyses yet. Upload your resume to get started!
+                          <Flex>
+                            <div>
+                              <Text className="font-medium">
+                                {analysis.job_title || 'Untitled'} at {analysis.company_name || 'Unknown'}
+                              </Text>
+                              <Text className="text-tremor-content-subtle">
+                                {new Date(analysis.created_at).toLocaleDateString()}
+                              </Text>
+                            </div>
+                            {analysis.analysis_result?.data?.summary?.overallScore && (
+                              <Badge
+                                color={
+                                  analysis.analysis_result.data.summary.overallScore >= 70
+                                    ? 'emerald'
+                                    : analysis.analysis_result.data.summary.overallScore >= 30
+                                    ? 'amber'
+                                    : 'red'
+                                }
+                              >
+                                {analysis.analysis_result.data.summary.overallScore}% Match
+                              </Badge>
+                            )}
+                          </Flex>
+                        </button>
+                      </ListItem>
+                    ))}
+                  </List>
+                ) : (
+                  <div className="mt-6 text-center py-12">
+                    <ClockIcon className="mx-auto h-12 w-12 text-tremor-content-subtle" />
+                    <Text className="mt-4 text-tremor-content-subtle">
+                      No analyses yet. Start by uploading a resume!
                     </Text>
                   </div>
                 )}
-              </List>
-            </Card>
-          </TabPanel>
-
-          {/* Generated Resumes Tab */}
-          <TabPanel>
-            <Card>
-              <div className="mb-4">
-                <Title>Generated Resumes</Title>
-                <Text className="mt-1">Download your AI-optimized resumes</Text>
-              </div>
-
-              <Callout title="Coming Soon" icon={RiInformationLine} color="blue">
-                Your generated resumes will appear here. Generate your first optimized resume from the Upload & Analyze tab.
-              </Callout>
-            </Card>
+              </Card>
+              
+              <Card>
+                <Title>Recent Uploads</Title>
+                {recentUploads.length > 0 ? (
+                  <List className="mt-6">
+                    {recentUploads.map((upload) => (
+                      <ListItem key={upload.id}>
+                        <Flex>
+                          <div className="flex items-center gap-3">
+                            <DocumentTextIcon className="h-5 w-5 text-tremor-content-subtle" />
+                            <div>
+                              <Text className="font-medium">{upload.filename}</Text>
+                              <Text className="text-tremor-content-subtle">
+                                {(upload.file_size / 1024 / 1024).toFixed(2)} MB • {new Date(upload.created_at).toLocaleDateString()}
+                              </Text>
+                            </div>
+                          </div>
+                        </Flex>
+                      </ListItem>
+                    ))}
+                  </List>
+                ) : (
+                  <div className="mt-6 text-center py-12">
+                    <CloudArrowUpIcon className="mx-auto h-12 w-12 text-tremor-content-subtle" />
+                    <Text className="mt-4 text-tremor-content-subtle">
+                      No uploads yet. Upload your first resume to get started!
+                    </Text>
+                  </div>
+                )}
+              </Card>
+            </Grid>
           </TabPanel>
 
           {/* Insights Tab */}
           <TabPanel>
-            <Grid numItemsSm={1} numItemsLg={2} className="gap-6">
+            <Grid numItemsMd={2} className="gap-6">
               <Card>
                 <Title>Score Trends</Title>
                 <Text>Your ATS score improvement over time</Text>
-                <AreaChart
-                  className="h-72 mt-4"
-                  data={savedAnalyses.map(a => ({
-                    date: new Date(a.created_at).toLocaleDateString(),
-                    Score: a.analysis_result?.ats_score || 0
-                  }))}
-                  index="date"
-                  categories={["Score"]}
-                  colors={["blue"]}
-                  showLegend={false}
-                  showGridLines={false}
-                  yAxisWidth={40}
-                />
+                {recentAnalyses.length > 0 ? (
+                  <AreaChart
+                    className="h-72 mt-4"
+                    data={recentAnalyses.map(a => ({
+                      date: new Date(a.created_at).toLocaleDateString(),
+                      Score: a.analysis_result?.data?.summary?.overallScore || 0
+                    }))}
+                    index="date"
+                    categories={["Score"]}
+                    colors={["blue"]}
+                    yAxisWidth={40}
+                  />
+                ) : (
+                  <div className="h-72 mt-4 flex items-center justify-center">
+                    <Text className="text-tremor-content-subtle">No data available yet</Text>
+                  </div>
+                )}
               </Card>
 
               <Card>
@@ -818,19 +1057,22 @@ const ModernResumePage: React.FC = () => {
                 </div>
               </Card>
 
-              <Card className="lg:col-span-2">
+              <Card className="col-span-full">
                 <Title>Optimization Tips</Title>
                 <Text>Expert recommendations to improve your resume</Text>
                 
                 <div className="mt-4 space-y-3">
-                  <Callout title="Use Action Verbs" icon={RiLightbulbLine} color="blue">
+                  <Callout title="Use Action Verbs" icon={LightBulbIcon} color="blue">
                     Start bullet points with strong action verbs like "Led", "Developed", "Implemented", or "Achieved"
                   </Callout>
-                  <Callout title="Quantify Achievements" icon={RiBarChartLine} color="green">
+                  <Callout title="Quantify Achievements" icon={ChartBarIcon} color="emerald">
                     Include numbers and metrics to demonstrate impact (e.g., "Increased sales by 30%")
                   </Callout>
-                  <Callout title="Match Keywords" icon={RiCheckLine} color="amber">
+                  <Callout title="Match Keywords" icon={CheckCircleIcon} color="amber">
                     Tailor your resume to include keywords from the job description
+                  </Callout>
+                  <Callout title="Keep it Concise" icon={DocumentTextIcon} color="purple">
+                    Limit your resume to 2 pages and use bullet points for easy scanning
                   </Callout>
                 </div>
               </Card>
@@ -838,70 +1080,6 @@ const ModernResumePage: React.FC = () => {
           </TabPanel>
         </TabPanels>
       </TabGroup>
-
-      {/* Analysis Detail Dialog */}
-      <Dialog
-        open={showAnalysisDialog}
-        onClose={() => setShowAnalysisDialog(false)}
-        static={true}
-        className="z-[100]"
-      >
-        <DialogPanel className="max-w-3xl">
-          {selectedAnalysis && (
-            <>
-              <div className="mb-4">
-                <Title>Analysis Details</Title>
-                <Text>{new Date(selectedAnalysis.created_at).toLocaleString()}</Text>
-              </div>
-              
-              <div className="space-y-4">
-                <div>
-                  <Text className="font-semibold">Job Details</Text>
-                  <div className="mt-2 space-y-1">
-                    <Text>Title: {selectedAnalysis.job_title || 'Not specified'}</Text>
-                    <Text>Company: {selectedAnalysis.company_name || 'Not specified'}</Text>
-                  </div>
-                </div>
-
-                {selectedAnalysis.analysis_result && (
-                  <>
-                    <div>
-                      <Text className="font-semibold">ATS Score</Text>
-                      <div className="flex items-center space-x-3 mt-2">
-                        <Metric>{selectedAnalysis.analysis_result.ats_score}%</Metric>
-                        <Badge color={selectedAnalysis.analysis_result.ats_score >= 70 ? 'green' : 'amber'}>
-                          {selectedAnalysis.analysis_result.ats_score >= 70 ? 'Good' : 'Needs Improvement'}
-                        </Badge>
-                      </div>
-                    </div>
-
-                    {selectedAnalysis.analysis_result.improvements && (
-                      <div>
-                        <Text className="font-semibold">Recommendations</Text>
-                        <List className="mt-2">
-                          {selectedAnalysis.analysis_result.improvements.map((item: string, idx: number) => (
-                            <ListItem key={idx}>
-                              <Text>{item}</Text>
-                            </ListItem>
-                          ))}
-                        </List>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-
-              <div className="mt-6 flex justify-end">
-                <Button onClick={() => setShowAnalysisDialog(false)}>
-                  Close
-                </Button>
-              </div>
-            </>
-          )}
-        </DialogPanel>
-      </Dialog>
-    </>
+    </div>
   );
-};
-
-export default ModernResumePage;
+}
