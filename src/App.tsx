@@ -9,7 +9,7 @@ import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import Sidebar from './components/layout/Sidebar';
 import ProfilePage from './components/ProfilePage';
 import { ResumePage } from './components/ResumePage';
-import LinkedInAutomationBot from './components/LinkedInAutomationBot';
+import ModernLinkedInAutomationBot from './components/ModernLinkedInAutomationBot';
 import { SuccessPage } from './components/SuccessPage';
 import JobSearchPage from './components/JobSearchPage';
 import { BillingPage } from './components/billing/BillingPage';
@@ -41,7 +41,7 @@ function App() {
                             <Route path="/jobs" element={<JobSearchPage />} />
                             <Route path="/applications" element={<ApplicationsPage />} />
                             <Route path="/profile" element={<ProfilePage />} />
-                            <Route path="/auto-apply" element={<LinkedInAutomationBot />} />
+                            <Route path="/auto-apply" element={<ModernLinkedInAutomationBot />} />
                             <Route path="/resume" element={<ResumePage />} />
                             <Route path="/billing" element={<BillingPage />} />
                             <Route path="/settings" element={<SettingsPage />} />

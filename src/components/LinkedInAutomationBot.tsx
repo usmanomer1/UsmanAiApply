@@ -45,7 +45,7 @@ import {
 } from '../lib/usageTracking';
 
 // Feature flags
-const FEATURE_FLAGS = {
+export const FEATURE_FLAGS = {
   // External job applications are currently disabled due to tab switching issues
   // The browser automation agent consistently fails to switch to new tabs after clicking external apply buttons
   // All external job application code is preserved for future re-enabling once the tab switching issue is resolved
@@ -98,7 +98,7 @@ interface BrowserUseConfig {
 }
 
 // LinkedIn location ID mapping - expanded with more locations
-const LINKEDIN_LOCATIONS = {
+export const LINKEDIN_LOCATIONS = {
   'San Francisco Bay Area': '90000084',
   'New York City': '90000070', 
   'Los Angeles': '90000049',
@@ -143,8 +143,42 @@ const LINKEDIN_LOCATIONS = {
   'Remote': '0'
 };
 
+// AI Model definitions with properties
+export const AI_MODELS = {
+  'gemini-2.0-flash': {
+    name: 'Gemini 2.0 Flash',
+    provider: 'Google',
+    stepMultiplier: 1,
+    requestLabel: '1x steps',
+    speed: 'Fastest',
+    description: 'Best efficiency and performance ratio',
+    icon: '🚀',
+    color: 'from-blue-500 to-indigo-600'
+  },
+  'gpt-4.1': {
+    name: 'GPT-4.1',
+    provider: 'OpenAI',
+    stepMultiplier: 3,
+    requestLabel: '3x steps',
+    speed: 'Fast',
+    description: 'Highest accuracy and reliability',
+    icon: '🎯',
+    color: 'from-emerald-500 to-teal-600'
+  },
+  'claude-3-7-sonnet-20250219': {
+    name: 'Claude 3.7 Sonnet',
+    provider: 'Anthropic',
+    stepMultiplier: 3,
+    requestLabel: '3x steps',
+    speed: 'Fast',
+    description: 'Advanced reasoning and analysis',
+    icon: '🧠',
+    color: 'from-purple-500 to-indigo-600'
+  }
+} as const;
+
 // Country codes with flags - sorted by country name
-const COUNTRY_CODES = [
+export const COUNTRY_CODES = [
   { code: '+1', country: 'United States', flag: '🇺🇸' },
   { code: '+1-CA', country: 'Canada', flag: '🇨🇦' },
   { code: '+44', country: 'United Kingdom', flag: '🇬🇧' },
@@ -298,40 +332,6 @@ const LinkedInAutomationBot: React.FC = () => {
   // AI Model selection state
   const [selectedModel, setSelectedModel] = useState<'gemini-2.0-flash' | 'gpt-4.1' | 'claude-3-7-sonnet-20250219'>('gemini-2.0-flash');
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
-
-  // Model definitions with properties
-  const AI_MODELS = {
-    'gemini-2.0-flash': {
-      name: 'Gemini 2.0 Flash',
-      provider: 'Google',
-      stepMultiplier: 1,
-      requestLabel: '1x steps',
-      speed: 'Fastest',
-      description: 'Best efficiency and performance ratio',
-      icon: '🚀',
-      color: 'from-blue-500 to-indigo-600'
-    },
-    'gpt-4.1': {
-      name: 'GPT-4.1',
-      provider: 'OpenAI',
-      stepMultiplier: 3,
-      requestLabel: '3x steps',
-      speed: 'Fast',
-      description: 'Highest accuracy and reliability',
-      icon: '🎯',
-      color: 'from-emerald-500 to-teal-600'
-    },
-    'claude-3-7-sonnet-20250219': {
-      name: 'Claude 3.7 Sonnet',
-      provider: 'Anthropic',
-      stepMultiplier: 3,
-      requestLabel: '3x steps',
-      speed: 'Fast',
-      description: 'Advanced reasoning and analysis',
-      icon: '🧠',
-      color: 'from-purple-500 to-indigo-600'
-    }
-  } as const;
   
   const [currentTask, setCurrentTask] = useState<TaskStatus | null>(null);
   const [isRunning, setIsRunning] = useState(false);
