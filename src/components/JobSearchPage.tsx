@@ -13,6 +13,8 @@ import { useLocation } from 'react-router-dom';
 import { trackJobSearchUsage, updateCachedUsage } from '../lib/jobSearchUsage';
 import { getPlanLimits } from '../stripe-config';
 import { JobSkeleton } from './JobSkeleton';
+import { usePaginatedQuery } from 'convex/react';
+import { api } from '../../convex/_generated/api';
 
 interface Job {
   job_id: string;
@@ -82,6 +84,16 @@ const JobSearchPage: React.FC = () => {
   const [isDone, setIsDone] = useState(false);
   const currentControllerRef = useRef<AbortController | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  // Convex paginated feed for processed jobs
+  const {
+    results: pagedJobs = [],
+    status: pagedStatus,
+    loadMore,
+  } = usePaginatedQuery(
+    api.jobs.getProcessedJobs as any,
+    (sessionId ? ({ sessionId } as any) : (undefined as any)),
+    { initialNumItems: 10 }
+  );
   
   // Modal state - temporary values while modal is open
   const [modalFilters, setModalFilters] = useState({
@@ -195,36 +207,38 @@ const JobSearchPage: React.FC = () => {
     }
   }, [routeLocation]);
 
-  // Infinite scroll: observe sentinel and fetch next page when visible
+  // Sync Convex paginated results into local jobs state
+  useEffect(() => {
+    if (!sessionId) return;
+    const sanitized = (pagedJobs as any[]).map((job: any) => ({
+      ...job,
+      match_score: typeof job.match_score === 'number' && !isNaN(job.match_score) ? job.match_score : null,
+      job_min_salary: typeof job.job_min_salary === 'number' && !isNaN(job.job_min_salary) ? job.job_min_salary : null,
+      job_max_salary: typeof job.job_max_salary === 'number' && !isNaN(job.job_max_salary) ? job.job_max_salary : null,
+      job_apply_quality_score: typeof job.job_apply_quality_score === 'number' && !isNaN(job.job_apply_quality_score) ? job.job_apply_quality_score : null,
+      employer_name: job.employer_name || 'Unknown Company',
+      job_title: job.job_title || 'Unknown Position',
+      job_city: job.job_city || '',
+      job_state: job.job_state || '',
+      job_description: job.job_description || '',
+      job_employment_type: job.job_employment_type || 'Full-time',
+      job_posted_at_datetime_utc: job.job_posted_at_datetime_utc || new Date().toISOString(),
+    }));
+    setJobs(sanitized);
+    setHasMore(pagedStatus === 'CanLoadMore');
+    setIsDone(pagedStatus === 'Exhausted');
+  }, [sessionId, JSON.stringify(pagedJobs), pagedStatus]);
+
+  // Infinite scroll: observe sentinel and fetch next page when visible (Convex loadMore)
   useEffect(() => {
     if (!sentinelRef.current) return;
     if (!sessionId || isDone || !hasMore) return;
 
     const observer = new IntersectionObserver(async (entries) => {
-      if (entries[0].isIntersecting && sessionId && hasMore && !loading) {
+      if (entries[0].isIntersecting && sessionId && hasMore && !loading && pagedStatus === 'CanLoadMore') {
         try {
           setLoading(true);
-          const res = await joboticApi.getSessionJobs(sessionId, { limit: 10, cursor });
-          const sanitized = (res.jobs || []).map((job: any) => ({
-            ...job,
-            match_score: typeof job.match_score === 'number' && !isNaN(job.match_score) ? job.match_score : null,
-            job_min_salary: typeof job.job_min_salary === 'number' && !isNaN(job.job_min_salary) ? job.job_min_salary : null,
-            job_max_salary: typeof job.job_max_salary === 'number' && !isNaN(job.job_max_salary) ? job.job_max_salary : null,
-            job_apply_quality_score: typeof job.job_apply_quality_score === 'number' && !isNaN(job.job_apply_quality_score) ? job.job_apply_quality_score : null,
-            employer_name: job.employer_name || 'Unknown Company',
-            job_title: job.job_title || 'Unknown Position',
-            job_city: job.job_city || '',
-            job_state: job.job_state || '',
-            job_description: job.job_description || '',
-            job_employment_type: job.job_employment_type || 'Full-time',
-            job_posted_at_datetime_utc: job.job_posted_at_datetime_utc || new Date().toISOString(),
-          }));
-
-          setJobs(prev => [...prev, ...sanitized]);
-          setCursor(res.cursor ?? null);
-          setIsDone(!!res.isDone);
-          setHasMore(!res.isDone && !!res.cursor);
-          if (typeof res.total === 'number') setTotalJobsFound(res.total);
+          await loadMore(10);
         } catch (e) {
           console.error('Load more failed:', e);
         } finally {
@@ -235,7 +249,7 @@ const JobSearchPage: React.FC = () => {
 
     observer.observe(sentinelRef.current);
     return () => observer.disconnect();
-  }, [sentinelRef.current, sessionId, cursor, hasMore, isDone, loading]);
+  }, [sentinelRef.current, sessionId, hasMore, isDone, loading, pagedStatus, loadMore]);
 
   // Fetch user's resume and preferences, then auto-search
   useEffect(() => {
@@ -377,7 +391,8 @@ const JobSearchPage: React.FC = () => {
                     limit: 10
                   });
 
-                  const sanitized = (res.jobs || []).map((job: any) => ({
+                  const rows = ((res as any).jobs ?? (res as any).data?.jobs ?? []) as any[];
+                  const sanitized = rows.map((job: any) => ({
                     ...job,
                     match_score: typeof job.match_score === 'number' && !isNaN(job.match_score) ? job.match_score : null,
                     job_min_salary: typeof job.job_min_salary === 'number' && !isNaN(job.job_min_salary) ? job.job_min_salary : null,
@@ -393,11 +408,14 @@ const JobSearchPage: React.FC = () => {
                   }));
 
                   setJobs(sanitized);
-                  setSessionId(res.sessionId || null);
-                  setCursor((res as any).cursor ?? null);
-                  setIsDone(!!(res as any).isDone);
-                  setHasMore(!(res as any).isDone && (!!(res as any).cursor || (((res as any).hasMore) ?? false)));
-                  setTotalJobsFound((res as any).total || sanitized.length);
+                  const nextCursor = (res as any).cursor ?? (res as any).data?.cursor ?? null;
+                  const doneFlag = (res as any).isDone ?? (res as any).data?.isDone ?? false;
+                  const total = (res as any).total ?? (res as any).data?.total ?? (res as any).data?.totalFound ?? sanitized.length;
+                  setSessionId((res as any).sessionId || (res as any).session?.id || null);
+                  setCursor(nextCursor ?? null);
+                  setIsDone(!!doneFlag);
+                  setHasMore(!!nextCursor && !doneFlag);
+                  setTotalJobsFound(total);
                   setInitialLoad(false);
                 } catch (err) {
                   console.error('Auto-search error:', err);
@@ -531,7 +549,8 @@ const JobSearchPage: React.FC = () => {
         limit: 10
       });
 
-      const sanitized = (res.jobs || []).map((job: any) => ({
+      const rows = ((res as any).jobs ?? (res as any).data?.jobs ?? []) as any[];
+      const sanitized = rows.map((job: any) => ({
         ...job,
         match_score: typeof job.match_score === 'number' && !isNaN(job.match_score) ? job.match_score : null,
         job_min_salary: typeof job.job_min_salary === 'number' && !isNaN(job.job_min_salary) ? job.job_min_salary : null,
@@ -547,16 +566,14 @@ const JobSearchPage: React.FC = () => {
       }));
 
       setJobs(sanitized);
-      setSessionId(res.sessionId || null);
-      setCursor((res as any).cursor ?? null);
-      setIsDone(!!(res as any).isDone);
-      setHasMore(
-        !(res as any).isDone &&
-        (
-          !!(res as any).cursor || (((res as any).hasMore) ?? false)
-        )
-      );
-      setTotalJobsFound((res as any).total || sanitized.length);
+      const nextCursor = (res as any).cursor ?? (res as any).data?.cursor ?? null;
+      const doneFlag = (res as any).isDone ?? (res as any).data?.isDone ?? false;
+      const total = (res as any).total ?? (res as any).data?.total ?? (res as any).data?.totalFound ?? sanitized.length;
+      setSessionId((res as any).sessionId || (res as any).session?.id || null);
+      setCursor(nextCursor ?? null);
+      setIsDone(!!doneFlag);
+      setHasMore(!!nextCursor && !doneFlag);
+      setTotalJobsFound(total);
       
     } catch (err) {
       if (err instanceof Error && err.name !== 'AbortError') {

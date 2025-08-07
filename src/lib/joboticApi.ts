@@ -357,14 +357,13 @@ class JoboticApiService {
     isDone?: boolean;
     total?: number;
     sessionId?: string;
+    hasMore?: boolean;
   }> {
-    // Continuation uses the same POST /api/v2/jobs/match with sessionId + cursor
-    const body: any = {
+    return this.makeRequest('/api/v2/jobs/match', {
       sessionId,
-      limit: params.limit ?? 10,
-    };
-    if (params.cursor) body.cursor = params.cursor;
-    return this.makeRequest('/api/v2/jobs/match', body, { requiresAuth: true });
+      limit: params.limit,
+      cursor: params.cursor ?? undefined,
+    }, { requiresAuth: true });
   }
 
   // Streaming version of searchJobs
