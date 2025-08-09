@@ -301,6 +301,19 @@ export const insertJobBatchInternal = internalMutation({
     
     // Insert jobs with sessionId and proper field formatting
     for (const job of args.jobs) {
+      // Define allowed fields based on the schema
+      const schemaFields = new Set([
+        'job_id', 'employer_name', 'employer_logo', 'employer_website', 'employer_company_type',
+        'job_title', 'job_description', 'job_apply_link', 'job_apply_is_direct', 'job_apply_quality_score',
+        'apply_options', 'job_is_remote', 'job_city', 'job_state', 'job_country',
+        'job_latitude', 'job_longitude', 'job_posted_at_timestamp', 'job_posted_at_datetime_utc',
+        'job_offer_expiration_timestamp', 'job_required_experience', 'job_required_skills',
+        'job_required_education', 'job_min_salary', 'job_max_salary', 'job_salary_currency',
+        'job_salary_period', 'job_highlights', 'job_benefits', 'job_onet_soc', 'job_onet_job_zone',
+        'match_score', 'full_analysis', 'resume_improvements', 'gaps_analysis',
+        'missing_skills', 'matching_skills', 'strengths_for_role', 'red_flags', 'application_strategy'
+      ]);
+      
       // Handle fields that need to be JSON stringified
       const formattedJob: any = {
         sessionId: args.sessionId,
@@ -308,8 +321,13 @@ export const insertJobBatchInternal = internalMutation({
         createdAt: Date.now(),
       };
       
-      // Copy all fields, handling special cases
+      // Copy only allowed fields, handling special cases
       for (const [key, value] of Object.entries(job)) {
+        // Skip fields not in schema
+        if (!schemaFields.has(key)) {
+          continue;
+        }
+        
         // Skip null values - Convex expects undefined instead of null for optional fields
         if (value === null) {
           continue;
