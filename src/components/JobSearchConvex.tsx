@@ -16,7 +16,7 @@ import { extractTextFromPDF } from '../lib/pdfExtractor';
 import { supabase } from '../lib/supabase';
 import { toast } from 'react-hot-toast';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { resumeApiClient } from '../lib/resumeApiClient';
+import { getApiToken } from '../lib/resumeApiClient';
 
 // Types
 interface Job {
@@ -262,7 +262,7 @@ const JobSearchConvex: React.FC = () => {
       });
       
       // Get resume API token
-      const token = await resumeApiClient.getAuthToken(user!.id);
+      const token = await getApiToken(user!.id);
       
       // Prepare optimization request
       const optimizationData = {
