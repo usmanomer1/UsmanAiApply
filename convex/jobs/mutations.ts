@@ -310,13 +310,18 @@ export const insertJobBatchInternal = internalMutation({
       
       // Copy all fields, handling special cases
       for (const [key, value] of Object.entries(job)) {
+        // Skip null values - Convex expects undefined instead of null for optional fields
+        if (value === null) {
+          continue;
+        }
+        
         if (key === 'apply_options' && typeof value !== 'string') {
           // JSON stringify apply_options if it's not already a string
           formattedJob[key] = JSON.stringify(value);
         } else if ((key === 'job_highlights' || key === 'job_required_experience' || 
                    key === 'job_required_education' || key === 'gaps_analysis' || 
                    key === 'full_analysis') && 
-                   typeof value !== 'string' && value !== null && value !== undefined) {
+                   typeof value !== 'string' && value !== undefined) {
           // JSON stringify other object fields
           formattedJob[key] = JSON.stringify(value);
         } else {
