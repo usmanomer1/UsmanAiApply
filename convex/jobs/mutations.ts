@@ -163,15 +163,16 @@ export const saveJobInteraction = mutation({
     if (existing) {
       // Update existing interaction
       await ctx.db.patch(existing._id, {
-        interactionType: args.interactionType,
+        action: args.interactionType,
+        timestamp: Date.now(),
       });
     } else {
       // Create new interaction
       await ctx.db.insert("userJobInteractions", {
         userId,
         jobId: args.jobId,
-        interactionType: args.interactionType,
-        createdAt: Date.now(),
+        action: args.interactionType,
+        timestamp: Date.now(),
       });
     }
   },
