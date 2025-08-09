@@ -120,8 +120,9 @@ export const searchJobsAuthenticated = action({
         status: "searching",
       });
       
-      // Call backend API
+      // Call backend API with callback URL
       const backendUrl = process.env.BACKEND_URL || "http://localhost:3001";
+      const convexUrl = process.env.CONVEX_URL || "https://veracious-meadowlark-646.convex.cloud";
       
       const backendResponse = await fetch(`${backendUrl}/api/jobs/match`, {
         method: "POST",
@@ -135,6 +136,7 @@ export const searchJobsAuthenticated = action({
           location: args.location,
           filters: args.filters,
           numJobs: args.numJobs || 100,
+          callbackUrl: `${convexUrl}/processBatch`, // Add callback URL
         }),
       });
       
@@ -144,7 +146,7 @@ export const searchJobsAuthenticated = action({
       
       const data = await backendResponse.json();
       
-      // Update session with results info
+      // Update session with initial info
       await ctx.runMutation("jobs/mutations:updateSessionStatusInternal", {
         userId,
         sessionId: args.sessionId,
@@ -153,32 +155,15 @@ export const searchJobsAuthenticated = action({
         searchCost: data.searchMetadata?.costMultiplier || 1,
       });
       
-      // Store jobs in batches
-      const BATCH_SIZE = 10;
-      const jobs = data.jobs || [];
+      // Backend will send jobs via webhook to /processBatch endpoint
+      // No need to process jobs here anymore
       
-      for (let i = 0; i < jobs.length; i += BATCH_SIZE) {
-        const batch = jobs.slice(i, i + BATCH_SIZE);
-        
-        await ctx.runMutation("jobs/mutations:insertJobBatchInternal", {
-          userId,
-          sessionId: args.sessionId,
-          jobs: batch,
-          batchIndex: Math.floor(i / BATCH_SIZE),
-        });
-        
-        // Small delay for smooth streaming effect
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-      
-      // Mark complete
-      await ctx.runMutation("jobs/mutations:updateSessionStatusInternal", {
-        userId,
-        sessionId: args.sessionId,
-        status: "completed",
-      });
-      
-      return { success: true, jobsFound: jobs.length };
+      return { 
+        success: true, 
+        sessionId: data.sessionId,
+        totalFound: data.totalFound,
+        message: "Jobs are being processed and will appear progressively"
+      };
       
     } catch (error) {
       console.error("Search error:", error);

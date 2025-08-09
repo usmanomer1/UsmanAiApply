@@ -254,8 +254,12 @@ export const updateSessionStatusInternal = internalMutation({
   },
   handler: async (ctx, args) => {
     const session = await ctx.db.get(args.sessionId);
-    if (!session || session.userId !== args.userId) {
-      throw new Error("Session not found or unauthorized");
+    if (!session) {
+      throw new Error("Session not found");
+    }
+    // Allow webhook updates (userId = "webhook") or matching user
+    if (args.userId !== "webhook" && session.userId !== args.userId) {
+      throw new Error("Unauthorized");
     }
     
     const updates: any = {
@@ -287,8 +291,12 @@ export const insertJobBatchInternal = internalMutation({
   },
   handler: async (ctx, args) => {
     const session = await ctx.db.get(args.sessionId);
-    if (!session || session.userId !== args.userId) {
-      throw new Error("Session not found or unauthorized");
+    if (!session) {
+      throw new Error("Session not found");
+    }
+    // Allow webhook updates (userId = "webhook") or matching user
+    if (args.userId !== "webhook" && session.userId !== args.userId) {
+      throw new Error("Unauthorized");
     }
     
     // Insert jobs with sessionId
