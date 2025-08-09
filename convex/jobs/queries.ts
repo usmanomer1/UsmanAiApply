@@ -62,7 +62,7 @@ export const getUserInteractions = query({
     // Get all interactions for these jobs
     const interactions = await ctx.db
       .query("userJobInteractions")
-      .withIndex("by_user")
+      .withIndex("by_user_action")
       .filter(q => q.eq(q.field("userId"), args.userId))
       .collect();
     
@@ -71,7 +71,11 @@ export const getUserInteractions = query({
     
     for (const interaction of interactions) {
       if (args.jobIds.includes(interaction.jobId)) {
-        interactionMap[interaction.jobId] = interaction;
+        // Convert action field to interactionType for frontend compatibility
+        interactionMap[interaction.jobId] = {
+          ...interaction,
+          interactionType: interaction.action
+        };
       }
     }
     
@@ -90,11 +94,11 @@ export const getLikedJobs = query({
     // Get liked job interactions
     const likedInteractions = await ctx.db
       .query("userJobInteractions")
-      .withIndex("by_user")
+      .withIndex("by_user_action")
       .filter(q => 
         q.and(
           q.eq(q.field("userId"), args.userId),
-          q.eq(q.field("interactionType"), "liked")
+          q.eq(q.field("action"), "liked")
         )
       )
       .order("desc")
