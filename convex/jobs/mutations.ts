@@ -136,7 +136,7 @@ export const insertJobBatch = mutation({
 
 export const saveJobInteraction = mutation({
   args: {
-    authToken: v.string(), // Required for authentication
+    userId: v.string(), // Trust frontend auth
     jobId: v.string(),
     interactionType: v.union(
       v.literal("liked"),
@@ -145,8 +145,8 @@ export const saveJobInteraction = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    // Verify authentication and get userId
-    const userId = await requireAuth(args.authToken);
+    // Use userId from args (frontend already authenticated)
+    const userId = args.userId;
     
     // Check if interaction already exists
     const existing = await ctx.db
@@ -164,7 +164,6 @@ export const saveJobInteraction = mutation({
       // Update existing interaction
       await ctx.db.patch(existing._id, {
         interactionType: args.interactionType,
-        updatedAt: Date.now(),
       });
     } else {
       // Create new interaction
@@ -173,7 +172,6 @@ export const saveJobInteraction = mutation({
         jobId: args.jobId,
         interactionType: args.interactionType,
         createdAt: Date.now(),
-        updatedAt: Date.now(),
       });
     }
   },
@@ -261,7 +259,6 @@ export const updateSessionStatusInternal = internalMutation({
     
     const updates: any = {
       status: args.status,
-      updatedAt: Date.now(),
     };
     
     if (args.totalFound !== undefined) {
@@ -306,7 +303,6 @@ export const insertJobBatchInternal = internalMutation({
     // Update processed count
     await ctx.db.patch(args.sessionId, {
       processedCount: session.processedCount + args.jobs.length,
-      updatedAt: Date.now(),
     });
   },
 });

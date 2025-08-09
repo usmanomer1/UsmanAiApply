@@ -78,20 +78,20 @@ const JobSearchConvex: React.FC = () => {
   const searchJobs = useAction(api.jobs.authAction.searchJobsAuthenticated);
   const trackInteraction = useMutation(api.jobs.mutations.saveJobInteraction);
   
-  // Queries - only run when sessionId and authToken exist
+  // Queries - only run when sessionId exists
   const session = useQuery(
     api.jobs.queries.getSession,
-    sessionId && authToken ? { authToken, sessionId } : "skip"
+    sessionId ? { sessionId } : "skip"
   );
   
   const jobs = useQuery(
     api.jobs.queries.getSessionJobs,
-    sessionId && authToken ? { authToken, sessionId, limit: 100 } : "skip"
+    sessionId ? { sessionId, limit: 100 } : "skip"
   );
   
   const userInteractions = useQuery(
     api.jobs.queries.getUserInteractions,
-    jobs && authToken ? { authToken, jobIds: jobs.map(j => j.job_id) } : "skip"
+    jobs && user?.id ? { userId: user.id, jobIds: jobs.map(j => j.job_id) } : "skip"
   );
   
   // Process and sort jobs
@@ -256,7 +256,7 @@ const JobSearchConvex: React.FC = () => {
     try {
       // Track optimization
       await trackInteraction({
-        authToken,
+        userId: user!.id,
         jobId: job.job_id,
         interactionType: 'applied', // or create 'optimized' type
       });
@@ -305,7 +305,7 @@ const JobSearchConvex: React.FC = () => {
   
   // Handle interactions
   const handleLike = async (jobId: string) => {
-    if (!authToken) {
+    if (!user?.id) {
       toast.error('Please log in to save jobs');
       return;
     }
@@ -315,7 +315,7 @@ const JobSearchConvex: React.FC = () => {
     try {
       if (isLiked) {
         await trackInteraction({
-          authToken,
+          userId: user.id,
           jobId,
           interactionType: 'hidden',
         });
@@ -326,7 +326,7 @@ const JobSearchConvex: React.FC = () => {
         });
       } else {
         await trackInteraction({
-          authToken,
+          userId: user.id,
           jobId,
           interactionType: 'liked',
         });
@@ -703,8 +703,8 @@ const JobSearchConvex: React.FC = () => {
                               href={job.job_apply_link}
                               target="_blank"
                               rel="noopener noreferrer"
-                              onClick={() => authToken && trackInteraction({
-                                authToken,
+                              onClick={() => user?.id && trackInteraction({
+                                userId: user.id,
                                 jobId: job.job_id,
                                 interactionType: 'applied',
                               })}
