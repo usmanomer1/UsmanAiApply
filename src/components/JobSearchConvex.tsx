@@ -17,6 +17,7 @@ import { supabase } from '../lib/supabase';
 import { toast } from 'react-hot-toast';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { getApiToken } from '../lib/resumeApiClient';
+import { ResumeOptimizer } from './ResumeOptimizer';
 
 // Types
 interface Job {
@@ -68,6 +69,10 @@ const JobSearchConvex: React.FC = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [likedJobs, setLikedJobs] = useState<Set<string>>(new Set());
   const [appliedJobs, setAppliedJobs] = useState<Set<string>>(new Set());
+  
+  // Resume optimizer modal state
+  const [isOptimizerOpen, setIsOptimizerOpen] = useState(false);
+  const [selectedJobForOptimization, setSelectedJobForOptimization] = useState<Job | null>(null);
   
   // Refs for virtual scrolling
   const parentRef = useRef<HTMLDivElement>(null);
@@ -252,60 +257,48 @@ const JobSearchConvex: React.FC = () => {
   };
   
   // Handle resume optimization
-  const handleOptimizeResume = async (job: Job) => {
-    if (!authToken) {
+  const handleOptimizeResume = (job: Job) => {
+    if (!user) {
       toast.error('Please log in to optimize your resume');
       return;
     }
     
-    try {
-      // Track optimization
-      await trackInteraction({
-        userId: user!.id,
-        jobId: job.job_id,
-        interactionType: 'applied', // or create 'optimized' type
-      });
-      
-      // Get resume API token
-      const token = await getApiToken(user!.id);
-      
-      // Prepare optimization request
-      const optimizationData = {
-        job_description: job.job_description,
-        job_title: job.job_title,
-        company: job.employer_name,
-        required_skills: job.job_required_experience?.required_skills || [],
-        missing_skills: job.gaps_analysis?.missing_skills || [],
-      };
-      
-      // Open optimization in new tab
-      const optimizationUrl = `${import.meta.env.VITE_RESUME_API_URL}/api/resume/analyze`;
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = optimizationUrl;
-      form.target = '_blank';
-      
-      const tokenInput = document.createElement('input');
-      tokenInput.type = 'hidden';
-      tokenInput.name = 'token';
-      tokenInput.value = token;
-      
-      const dataInput = document.createElement('input');
-      dataInput.type = 'hidden';
-      dataInput.name = 'data';
-      dataInput.value = JSON.stringify(optimizationData);
-      
-      form.appendChild(tokenInput);
-      form.appendChild(dataInput);
-      document.body.appendChild(form);
-      form.submit();
-      document.body.removeChild(form);
-      
-      toast.success('Opening resume optimizer...');
-    } catch (error) {
-      console.error('Optimization error:', error);
-      toast.error('Failed to optimize resume');
+    // Parse JSON fields if they exist
+    let parsedJob = { ...job };
+    
+    // Parse gaps_analysis if it's a JSON string
+    if (typeof job.gaps_analysis === 'string') {
+      try {
+        parsedJob.gaps_analysis = JSON.parse(job.gaps_analysis);
+      } catch (e) {
+        console.error('Failed to parse gaps_analysis:', e);
+        parsedJob.gaps_analysis = {};
+      }
     }
+    
+    // Parse job_required_experience if it's a JSON string
+    if (typeof job.job_required_experience === 'string') {
+      try {
+        parsedJob.job_required_experience = JSON.parse(job.job_required_experience);
+      } catch (e) {
+        console.error('Failed to parse job_required_experience:', e);
+        parsedJob.job_required_experience = {};
+      }
+    }
+    
+    // Parse job_highlights if it's a JSON string
+    if (typeof job.job_highlights === 'string') {
+      try {
+        parsedJob.job_highlights = JSON.parse(job.job_highlights);
+      } catch (e) {
+        console.error('Failed to parse job_highlights:', e);
+        parsedJob.job_highlights = {};
+      }
+    }
+    
+    // Set the selected job and open the modal
+    setSelectedJobForOptimization(parsedJob);
+    setIsOptimizerOpen(true);
   };
   
   // Handle interactions
@@ -767,6 +760,19 @@ const JobSearchConvex: React.FC = () => {
           </div>
         )}
       </div>
+      
+      {/* Resume Optimizer Modal */}
+      {selectedJobForOptimization && (
+        <ResumeOptimizer
+          isOpen={isOptimizerOpen}
+          onClose={() => {
+            setIsOptimizerOpen(false);
+            setSelectedJobForOptimization(null);
+          }}
+          job={selectedJobForOptimization}
+          resumeText={resumeText}
+        />
+      )}
     </div>
   );
 };
