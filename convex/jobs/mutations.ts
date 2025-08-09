@@ -299,14 +299,33 @@ export const insertJobBatchInternal = internalMutation({
       throw new Error("Unauthorized");
     }
     
-    // Insert jobs with sessionId
+    // Insert jobs with sessionId and proper field formatting
     for (const job of args.jobs) {
-      await ctx.db.insert("jobs", {
-        ...job,
+      // Handle fields that need to be JSON stringified
+      const formattedJob: any = {
         sessionId: args.sessionId,
         batchIndex: args.batchIndex,
         createdAt: Date.now(),
-      });
+      };
+      
+      // Copy all fields, handling special cases
+      for (const [key, value] of Object.entries(job)) {
+        if (key === 'apply_options' && typeof value !== 'string') {
+          // JSON stringify apply_options if it's not already a string
+          formattedJob[key] = JSON.stringify(value);
+        } else if ((key === 'job_highlights' || key === 'job_required_experience' || 
+                   key === 'job_required_education' || key === 'gaps_analysis' || 
+                   key === 'full_analysis') && 
+                   typeof value !== 'string' && value !== null && value !== undefined) {
+          // JSON stringify other object fields
+          formattedJob[key] = JSON.stringify(value);
+        } else {
+          // Copy as-is for other fields
+          formattedJob[key] = value;
+        }
+      }
+      
+      await ctx.db.insert("jobs", formattedJob);
     }
     
     // Update processed count
