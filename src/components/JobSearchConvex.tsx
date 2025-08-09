@@ -556,24 +556,16 @@ const JobSearchConvex: React.FC = () => {
               position: 'relative',
             }}
           >
-            <AnimatePresence>
-              {virtualizer.getVirtualItems().map((virtualItem) => {
-                const job = processedJobs[virtualItem.index];
-                if (!job) return null;
-                
-                const isLiked = likedJobs.has(job.job_id);
-                const isApplied = appliedJobs.has(job.job_id);
-                
-                return (
-                  <motion.div
+            {virtualizer.getVirtualItems().map((virtualItem) => {
+              const job = processedJobs[virtualItem.index];
+              if (!job) return null;
+              
+              const isLiked = likedJobs.has(job.job_id);
+              const isApplied = appliedJobs.has(job.job_id);
+              
+              return (
+                  <div
                     key={job._id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{
-                      duration: 0.3,
-                      delay: Math.min(virtualItem.index * 0.05, 0.5), // Cap delay
-                    }}
                     style={{
                       position: 'absolute',
                       top: 0,
@@ -584,6 +576,9 @@ const JobSearchConvex: React.FC = () => {
                     }}
                   >
                     <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.3 }}
                       whileHover={{ y: -4, transition: { duration: 0.2 } }}
                       className={`bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow p-6 mx-2 my-2 border-2 ${getMatchScoreColor(job.match_score)}`}
                     >
@@ -746,10 +741,9 @@ const JobSearchConvex: React.FC = () => {
                         </div>
                       </div>
                     </motion.div>
-                  </motion.div>
+                  </div>
                 );
-              })}
-            </AnimatePresence>
+            })}
           </div>
         </div>
         
