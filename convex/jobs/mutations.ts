@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation } from "../_generated/server";
+import { mutation, internalMutation } from "../_generated/server";
 import { requireAuth } from "../auth";
 
 export const createSearchSession = mutation({
@@ -203,5 +203,110 @@ export const removeJobInteraction = mutation({
     if (interaction) {
       await ctx.db.delete(interaction._id);
     }
+  },
+});
+
+// Internal mutations that don't require auth (called from actions after auth verification)
+export const createSearchSessionInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    query: v.string(),
+    location: v.optional(v.string()),
+    resumeText: v.string(),
+    filters: v.object({
+      datePosted: v.optional(v.string()),
+      remote: v.optional(v.boolean()),
+      employmentTypes: v.optional(v.array(v.string())),
+      experienceLevel: v.optional(v.array(v.string())),
+      radius: v.optional(v.number()),
+    }),
+  },
+  handler: async (ctx, args) => {
+    const sessionId = await ctx.db.insert("jobSearchSessions", {
+      userId: args.userId,
+      query: args.query,
+      location: args.location,
+      resumeText: args.resumeText,
+      filters: args.filters,
+      status: "initializing",
+      totalFound: 0,
+      processedCount: 0,
+      createdAt: Date.now(),
+    });
+    
+    return sessionId;
+  },
+});
+
+export const updateSessionStatusInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    sessionId: v.id("jobSearchSessions"),
+    status: v.union(
+      v.literal("initializing"),
+      v.literal("searching"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("error")
+    ),
+    errorMessage: v.optional(v.string()),
+    totalFound: v.optional(v.number()),
+    searchCost: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session || session.userId !== args.userId) {
+      throw new Error("Session not found or unauthorized");
+    }
+    
+    const updates: any = {
+      status: args.status,
+      updatedAt: Date.now(),
+    };
+    
+    if (args.totalFound !== undefined) {
+      updates.totalFound = args.totalFound;
+    }
+    
+    if (args.searchCost !== undefined) {
+      updates.searchCost = args.searchCost;
+    }
+    
+    if (args.errorMessage) {
+      updates.errorMessage = args.errorMessage;
+    }
+    
+    await ctx.db.patch(args.sessionId, updates);
+  },
+});
+
+export const insertJobBatchInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    sessionId: v.id("jobSearchSessions"),
+    jobs: v.array(v.any()),
+    batchIndex: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session || session.userId !== args.userId) {
+      throw new Error("Session not found or unauthorized");
+    }
+    
+    // Insert jobs with sessionId
+    for (const job of args.jobs) {
+      await ctx.db.insert("jobs", {
+        ...job,
+        sessionId: args.sessionId,
+        batchIndex: args.batchIndex,
+        createdAt: Date.now(),
+      });
+    }
+    
+    // Update processed count
+    await ctx.db.patch(args.sessionId, {
+      processedCount: session.processedCount + args.jobs.length,
+      updatedAt: Date.now(),
+    });
   },
 });

@@ -16,6 +16,7 @@ import type {
 import type * as auth from "../auth.js";
 import type * as helpers_withAuth from "../helpers/withAuth.js";
 import type * as jobs_actions from "../jobs/actions.js";
+import type * as jobs_authAction from "../jobs/authAction.js";
 import type * as jobs_mutations from "../jobs/mutations.js";
 import type * as jobs_queries from "../jobs/queries.js";
 
@@ -31,6 +32,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   "helpers/withAuth": typeof helpers_withAuth;
   "jobs/actions": typeof jobs_actions;
+  "jobs/authAction": typeof jobs_authAction;
   "jobs/mutations": typeof jobs_mutations;
   "jobs/queries": typeof jobs_queries;
 }>;
