@@ -125,6 +125,11 @@ export const searchJobsAuthenticated = action({
       // Convex HTTP endpoints use the site subdomain
       const convexSiteUrl = process.env.CONVEX_SITE_URL || "https://veracious-meadowlark-646.convex.site";
       
+      // Bundle location with query for better search results
+      const searchQuery = args.location 
+        ? `${args.query} in ${args.location}`
+        : args.query;
+      
       const backendResponse = await fetch(`${backendUrl}/api/jobs/match`, {
         method: "POST",
         headers: {
@@ -133,8 +138,8 @@ export const searchJobsAuthenticated = action({
         },
         body: JSON.stringify({
           resumeText: args.resumeText,
-          query: args.query,
-          location: args.location,
+          query: searchQuery, // Combined query with location
+          location: args.location, // Still send separately for backend processing
           filters: args.filters,
           numJobs: args.numJobs || 100,
           callbackUrl: `${convexSiteUrl}/processBatch`, // Use .site domain for HTTP endpoints
