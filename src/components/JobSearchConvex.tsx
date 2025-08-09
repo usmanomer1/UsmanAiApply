@@ -73,9 +73,9 @@ const JobSearchConvex: React.FC = () => {
   const parentRef = useRef<HTMLDivElement>(null);
   const scrollingRef = useRef<HTMLDivElement>(null);
   
-  // Convex hooks
-  const createSession = useMutation(api.jobs.mutations.createSearchSession);
-  const searchJobs = useAction(api.jobs.actions.searchJobs);
+  // Convex hooks - use auth actions instead of mutations
+  const createSession = useAction(api.jobs.authAction.createAuthenticatedSession);
+  const searchJobs = useAction(api.jobs.authAction.searchJobsAuthenticated);
   const trackInteraction = useMutation(api.jobs.mutations.saveJobInteraction);
   
   // Queries - only run when sessionId and authToken exist
