@@ -123,16 +123,21 @@ const JobSearchConvex: React.FC = () => {
   const virtualizer = useVirtualizer({
     count: processedJobs.length,
     getScrollElement: () => scrollingRef.current,
-    estimateSize: useCallback(() => {
+    estimateSize: useCallback((index) => {
       switch (viewMode) {
         case 'grid': return 320;
-        case 'list': return 180;
-        case 'compact': return 80;
-        default: return 180;
+        case 'list': return 200;
+        case 'compact': return 100;
+        default: return 200;
       }
     }, [viewMode]),
-    overscan: 5, // Render 5 items outside viewport
+    overscan: 3, // Render 3 items outside viewport
   });
+  
+  // Force re-measure when jobs change
+  useEffect(() => {
+    virtualizer.measure();
+  }, [processedJobs.length]);
   
   // Load resume on mount
   useEffect(() => {
@@ -551,7 +556,7 @@ const JobSearchConvex: React.FC = () => {
               position: 'relative',
             }}
           >
-            <AnimatePresence mode="popLayout">
+            <AnimatePresence>
               {virtualizer.getVirtualItems().map((virtualItem) => {
                 const job = processedJobs[virtualItem.index];
                 if (!job) return null;
