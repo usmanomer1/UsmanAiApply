@@ -16,7 +16,7 @@ import { extractTextFromPDF } from '../lib/pdfExtractor';
 import { supabase } from '../lib/supabase';
 import { toast } from 'react-hot-toast';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { resumeApiClient } from '../lib/resumeApi';
+import { resumeApiClient } from '../lib/resumeApiClient';
 
 // Types
 interface Job {
