@@ -122,7 +122,8 @@ export const searchJobsAuthenticated = action({
       
       // Call backend API with callback URL
       const backendUrl = process.env.BACKEND_URL || "http://localhost:3001";
-      const convexUrl = process.env.CONVEX_URL || "https://veracious-meadowlark-646.convex.cloud";
+      // Convex HTTP endpoints use the site subdomain
+      const convexSiteUrl = process.env.CONVEX_SITE_URL || "https://veracious-meadowlark-646.convex.site";
       
       const backendResponse = await fetch(`${backendUrl}/api/jobs/match`, {
         method: "POST",
@@ -136,7 +137,8 @@ export const searchJobsAuthenticated = action({
           location: args.location,
           filters: args.filters,
           numJobs: args.numJobs || 100,
-          callbackUrl: `${convexUrl}/processBatch`, // Add callback URL
+          callbackUrl: `${convexSiteUrl}/processBatch`, // Use .site domain for HTTP endpoints
+          sessionId: args.sessionId, // Pass the Convex sessionId to backend
         }),
       });
       
