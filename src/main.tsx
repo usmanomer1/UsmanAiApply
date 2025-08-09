@@ -3,9 +3,13 @@ import ReactDOM from 'react-dom/client'
 import * as Sentry from '@sentry/react'
 import { browserTracingIntegration } from '@sentry/react'
 import { replayIntegration } from '@sentry/replay'
+import { ConvexProvider, ConvexReactClient } from 'convex/react'
 import App from './App.tsx'
 import './index.css'
 import { supabase } from './lib/supabase.ts'
+
+// Initialize Convex client
+const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL || 'https://notable-sloth-598.convex.cloud')
 
 // Initialize Sentry in both development and production
 Sentry.init({
@@ -143,11 +147,13 @@ const SentryFallback = ({ error, resetError }: { error: unknown; componentStack:
   </div>
 );
 
-// Wrap App component with Sentry Error Boundary
-const AppWithSentry = (
-  <Sentry.ErrorBoundary fallback={SentryFallback} showDialog>
-    <App />
-  </Sentry.ErrorBoundary>
+// Wrap App component with Sentry Error Boundary and Convex Provider
+const AppWithProviders = (
+  <ConvexProvider client={convex}>
+    <Sentry.ErrorBoundary fallback={SentryFallback} showDialog>
+      <App />
+    </Sentry.ErrorBoundary>
+  </ConvexProvider>
 );
 
 // Add Sentry to window type for TypeScript
@@ -164,6 +170,6 @@ if (typeof window !== "undefined") {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    {AppWithSentry}
+    {AppWithProviders}
   </React.StrictMode>,
 )
