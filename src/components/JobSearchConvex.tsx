@@ -77,6 +77,7 @@ const JobSearchConvex: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [likedJobs, setLikedJobs] = useState<Set<string>>(new Set());
+  const [processingLikes, setProcessingLikes] = useState<Set<string>>(new Set());
   const [appliedJobs, setAppliedJobs] = useState<Set<string>>(new Set());
   
   // Resume optimizer modal state
@@ -372,38 +373,85 @@ const JobSearchConvex: React.FC = () => {
     setIsOptimizerOpen(true);
   };
   
-  // Handle interactions
+  // Handle interactions with optimistic UI updates
   const handleLike = async (jobId: string) => {
     if (!user?.id) {
       toast.error('Please log in to save jobs');
       return;
     }
     
+    // Prevent rapid clicking on the same job
+    if (processingLikes.has(jobId)) {
+      return;
+    }
+    
     const isLiked = likedJobs.has(jobId);
     
-    try {
+    // Optimistic update - update UI immediately for instant feedback
+    if (isLiked) {
+      setLikedJobs(prev => {
+        const next = new Set(prev);
+        next.delete(jobId);
+        return next;
+      });
+    } else {
+      setLikedJobs(prev => new Set([...prev, jobId]));
+    }
+    
+    // Mark as processing
+    setProcessingLikes(prev => new Set([...prev, jobId]));
+    
+    // API call in background without blocking UI
+    trackInteraction({
+      userId: user.id,
+      jobId,
+      interactionType: isLiked ? 'hidden' : 'liked',
+    })
+    .then(() => {
+      // Success - remove from processing
+      setProcessingLikes(prev => {
+        const next = new Set(prev);
+        next.delete(jobId);
+        return next;
+      });
+    })
+    .catch(error => {
+      console.error('Like error:', error);
+      
+      // Remove from processing
+      setProcessingLikes(prev => {
+        const next = new Set(prev);
+        next.delete(jobId);
+        return next;
+      });
+      
+      // Rollback on error - revert the optimistic update
       if (isLiked) {
-        await trackInteraction({
-          userId: user.id,
-          jobId,
-          interactionType: 'hidden',
+        // Was liked, tried to unlike, failed - add it back
+        setLikedJobs(prev => new Set([...prev, jobId]));
+        toast.error('Failed to unsave job', {
+          duration: 2000,
+          style: {
+            background: '#FEE2E2',
+            color: '#991B1B',
+          },
         });
+      } else {
+        // Wasn't liked, tried to like, failed - remove it
         setLikedJobs(prev => {
           const next = new Set(prev);
           next.delete(jobId);
           return next;
         });
-      } else {
-        await trackInteraction({
-          userId: user.id,
-          jobId,
-          interactionType: 'liked',
+        toast.error('Failed to save job', {
+          duration: 2000,
+          style: {
+            background: '#FEE2E2',
+            color: '#991B1B',
+          },
         });
-        setLikedJobs(prev => new Set([...prev, jobId]));
       }
-    } catch (error) {
-      console.error('Like error:', error);
-    }
+    });
   };
   
   // Get match score color
@@ -1100,14 +1148,16 @@ const JobSearchConvex: React.FC = () => {
                             <motion.button
                               onClick={() => handleLike(job.job_id)}
                               whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              className={`p-2 rounded-lg ${
+                              whileTap={{ scale: 0.85 }}
+                              animate={isLiked ? { scale: [1, 1.2, 1] } : { scale: 1 }}
+                              transition={{ duration: 0.3, type: "spring", stiffness: 500 }}
+                              className={`p-2 rounded-lg transition-colors duration-150 ${
                                 isLiked
                                   ? 'bg-rose-100 text-rose-600'
                                   : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'
                               }`}
                             >
-                              <Heart className={`h-4 w-4 ${isLiked ? 'fill-current' : ''}`} />
+                              <Heart className={`h-4 w-4 transition-all duration-150 ${isLiked ? 'fill-current' : ''}`} />
                             </motion.button>
                           </div>
                         </div>
