@@ -360,26 +360,21 @@ const JobSearchConvex: React.FC = () => {
   }, [session]);
   
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#334155]">
-      {/* Premium animated background */}
-      <div className="fixed inset-0 opacity-30 pointer-events-none">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#1DE0DD]/10 via-indigo-600/10 to-purple-600/10" />
-      </div>
-      
-      {/* Premium Search Section */}
-      <div className="relative z-10 bg-gradient-to-r from-[#0f172a]/95 to-[#1e293b]/95 backdrop-blur-xl border-b border-white/10 sticky top-0">
-        <div className="max-w-7xl mx-auto px-4 py-6">
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+      {/* Search Section */}
+      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
+        <div className="max-w-7xl mx-auto px-6 py-4">
           {/* Resume Upload Alert */}
           {!resumeText && (
             <motion.div 
-              initial={{ opacity: 0, y: -20 }}
+              initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mb-6 p-4 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-xl flex items-center gap-3 backdrop-blur-sm"
+              className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-3"
             >
-              <div className="p-2 bg-amber-500/20 rounded-lg">
-                <FileText className="h-5 w-5 text-amber-400" />
+              <div className="p-2 bg-amber-100 rounded-lg">
+                <FileText className="h-5 w-5 text-amber-600" />
               </div>
-              <span className="text-amber-100 font-medium">Upload your resume to unlock AI-powered job matching</span>
+              <span className="text-amber-900 font-medium">Upload your resume to unlock AI-powered job matching</span>
               <label className="ml-auto">
                 <input
                   type="file"
@@ -389,9 +384,9 @@ const JobSearchConvex: React.FC = () => {
                 />
                 <motion.button
                   type="button"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-medium rounded-lg hover:from-amber-600 hover:to-orange-600 transition-all shadow-lg shadow-amber-500/25"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="px-5 py-2 bg-gradient-to-r from-[#1DE0DD] to-[#00C4CC] text-white font-medium rounded-lg hover:shadow-md transition-all"
                 >
                   Upload Resume
                 </motion.button>
@@ -399,36 +394,30 @@ const JobSearchConvex: React.FC = () => {
             </motion.div>
           )}
           
-          {/* Premium Search Inputs */}
-          <div className="flex gap-4 mb-4">
-            <div className="flex-1 relative group">
-              <div className="absolute inset-0 bg-gradient-to-r from-[#1DE0DD]/20 to-indigo-500/20 rounded-xl blur-xl group-hover:blur-2xl transition-all opacity-50" />
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                  placeholder="Job title, keywords, or company"
-                  className="w-full pl-12 pr-4 py-3.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1DE0DD]/50 focus:border-[#1DE0DD]/50 transition-all"
-                />
-              </div>
+          {/* Search Inputs */}
+          <div className="flex gap-3">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                placeholder="Job title, keywords, or company"
+                className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#1DE0DD] focus:border-[#1DE0DD] transition-all"
+              />
             </div>
             
-            <div className="flex-1 relative group">
-              <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 rounded-xl blur-xl group-hover:blur-2xl transition-all opacity-50" />
-              <div className="relative">
-                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
-                <input
-                  type="text"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                  placeholder="City, state, or remote"
-                  className="w-full pl-12 pr-4 py-3.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1DE0DD]/50 focus:border-[#1DE0DD]/50 transition-all"
-                />
-              </div>
+            <div className="flex-1 relative">
+              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
+              <input
+                type="text"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                placeholder="City, state, or remote"
+                className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#1DE0DD] focus:border-[#1DE0DD] transition-all"
+              />
             </div>
             
             <motion.button
@@ -436,89 +425,74 @@ const JobSearchConvex: React.FC = () => {
               disabled={isSearching || !resumeText || !authToken || authLoading}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="relative px-8 py-3.5 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all overflow-hidden group"
+              className="px-6 py-2.5 bg-gradient-to-r from-[#1DE0DD] to-[#00C4CC] text-white font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-lg flex items-center gap-2"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-[#1DE0DD] to-indigo-500 transition-all" />
-              <div className="absolute inset-0 bg-gradient-to-r from-[#1DE0DD] to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="relative flex items-center gap-2 text-white">
-                {isSearching ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    Searching...
-                  </>
-                ) : (
-                  <>
-                    <Search className="h-5 w-5" />
-                    Search Jobs
-                  </>
-                )}
-              </div>
+              {isSearching ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Searching...
+                </>
+              ) : (
+                <>
+                  <Search className="h-5 w-5" />
+                  Search Jobs
+                </>
+              )}
             </motion.button>
           </div>
           
-          {/* Premium Filter Controls */}
-          <div className="flex gap-3 items-center">
-            <motion.button
+          </div>
+          
+          {/* Filter Controls */}
+          <div className="flex gap-2 items-center mt-3">
+            <button
               onClick={() => setShowFilters(!showFilters)}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className={`px-4 py-2.5 rounded-lg flex items-center gap-2 transition-all border ${
+              className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-all border ${
                 showFilters 
-                  ? 'bg-[#1DE0DD]/20 border-[#1DE0DD]/50 text-[#1DE0DD]' 
-                  : 'bg-white/10 backdrop-blur-sm border-white/20 text-white hover:bg-white/15'
+                  ? 'bg-[#1DE0DD]/10 border-[#1DE0DD] text-[#1DE0DD]' 
+                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
               }`}
             >
               <SlidersHorizontal className="h-4 w-4" />
               Filters
-            </motion.button>
+            </button>
             
-            <motion.button
+            <button
               onClick={() => setFilters({ ...filters, remote: !filters.remote })}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className={`px-4 py-2.5 rounded-lg flex items-center gap-2 transition-all border ${
+              className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-all border ${
                 filters.remote
-                  ? 'bg-[#1DE0DD]/20 text-[#1DE0DD] border-[#1DE0DD]/50'
-                  : 'bg-white/10 backdrop-blur-sm border-white/20 text-white hover:bg-white/15'
+                  ? 'bg-[#1DE0DD]/10 text-[#1DE0DD] border-[#1DE0DD]'
+                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
               }`}
             >
               <Sparkles className="h-4 w-4" />
               Remote Only
-            </motion.button>
+            </button>
             
             {/* View Mode Toggle */}
-            <div className="ml-auto flex gap-1 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-1">
+            <div className="ml-auto flex gap-1 bg-gray-100 rounded-lg p-1">
               {(['grid', 'list', 'compact'] as ViewMode[]).map((mode) => (
-                <motion.button
+                <button
                   key={mode}
                   onClick={() => setViewMode(mode)}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
                   className={`p-2 rounded transition-all ${
                     viewMode === mode
-                      ? 'bg-gradient-to-r from-[#1DE0DD] to-indigo-500 text-white shadow-lg'
-                      : 'text-gray-400 hover:text-white hover:bg-white/10'
+                      ? 'bg-white text-[#1DE0DD] shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
                   {mode === 'grid' && <Grid3X3 className="h-4 w-4" />}
                   {mode === 'list' && <List className="h-4 w-4" />}
                   {mode === 'compact' && <LayoutGrid className="h-4 w-4" />}
-                </motion.button>
+                </button>
               ))}
             </div>
             
-            {/* Premium Sort Dropdown */}
+            {/* Sort Dropdown */}
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortBy)}
-              className="px-4 py-2.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#1DE0DD]/50 focus:border-[#1DE0DD]/50 transition-all appearance-none cursor-pointer"
-              style={{
-                backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'right 0.5rem center',
-                backgroundSize: '1.5em 1.5em',
-                paddingRight: '2.5rem'
-              }}
+              className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1DE0DD] focus:border-[#1DE0DD] transition-all"
             >
               <option value="match_score">Best Match</option>
               <option value="date">Most Recent</option>
@@ -560,7 +534,7 @@ const JobSearchConvex: React.FC = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Employment Type</label>
                     <div className="space-y-2">
                       {['FULLTIME', 'PARTTIME', 'CONTRACT', 'INTERNSHIP'].map((type) => (
-                        <label key={type} className="flex items-center">
+                        <label key={type} className="flex items-center text-gray-700 hover:text-gray-900 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={filters.employmentTypes?.includes(type) || false}
@@ -572,7 +546,7 @@ const JobSearchConvex: React.FC = () => {
                                 setFilters({ ...filters, employmentTypes: types.filter(t => t !== type) });
                               }
                             }}
-                            className="mr-2 text-indigo-600 focus:ring-indigo-500"
+                            className="mr-2 text-[#1DE0DD] focus:ring-[#1DE0DD] rounded"
                           />
                           <span className="text-sm">{type.charAt(0) + type.slice(1).toLowerCase()}</span>
                         </label>
@@ -585,7 +559,7 @@ const JobSearchConvex: React.FC = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Experience Level</label>
                     <div className="space-y-2">
                       {['entry', 'mid', 'senior', 'executive'].map((level) => (
-                        <label key={level} className="flex items-center">
+                        <label key={level} className="flex items-center text-gray-700 hover:text-gray-900 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={filters.experienceLevel?.includes(level) || false}
@@ -597,7 +571,7 @@ const JobSearchConvex: React.FC = () => {
                                 setFilters({ ...filters, experienceLevel: levels.filter(l => l !== level) });
                               }
                             }}
-                            className="mr-2 text-indigo-600 focus:ring-indigo-500"
+                            className="mr-2 text-[#1DE0DD] focus:ring-[#1DE0DD] rounded"
                           />
                           <span className="text-sm capitalize">{level}</span>
                         </label>
@@ -608,7 +582,7 @@ const JobSearchConvex: React.FC = () => {
                   {/* Remote Filter */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Work Type</label>
-                    <label className="flex items-center">
+                    <label className="flex items-center text-gray-700 hover:text-gray-900 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={filters.remote || false}
@@ -622,7 +596,7 @@ const JobSearchConvex: React.FC = () => {
                   {/* Search Radius Filter */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Search Radius: {filters.radius || 50} miles
+                      Search Radius: <span className="text-[#1DE0DD] font-semibold">{filters.radius || 50}</span> miles
                     </label>
                     <input
                       type="range"
@@ -631,7 +605,7 @@ const JobSearchConvex: React.FC = () => {
                       step="10"
                       value={filters.radius || 50}
                       onChange={(e) => setFilters({ ...filters, radius: parseInt(e.target.value) })}
-                      className="w-full"
+                      className="w-full accent-[#1DE0DD]"
                     />
                     <div className="flex justify-between text-xs text-gray-500 mt-1">
                       <span>10 mi</span>
@@ -641,10 +615,8 @@ const JobSearchConvex: React.FC = () => {
                 </div>
                 
                 {/* Apply/Clear Buttons */}
-                <div className="flex justify-end gap-3 mt-6">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                <div className="flex justify-end gap-2 mt-4">
+                  <button
                     onClick={() => setFilters({
                       datePosted: 'week',
                       remote: false,
@@ -652,49 +624,47 @@ const JobSearchConvex: React.FC = () => {
                       experienceLevel: [],
                       radius: 50
                     })}
-                    className="px-6 py-2.5 text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-all"
+                    className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
                   >
                     Clear All
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                  </button>
+                  <button
                     onClick={() => setShowFilters(false)}
-                    className="px-6 py-2.5 bg-gradient-to-r from-[#1DE0DD] to-indigo-500 text-white rounded-lg font-medium shadow-lg hover:shadow-xl transition-all"
+                    className="px-5 py-2 bg-gradient-to-r from-[#1DE0DD] to-[#00C4CC] text-white rounded-lg font-medium hover:shadow-md transition-all"
                   >
                     Apply Filters
-                  </motion.button>
+                  </button>
                 </div>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
         
-        {/* Premium Progress Indicator */}
+        {/* Progress Indicator */}
         {session && session.status !== 'initializing' && (
-          <div className="border-t border-white/10 px-4 py-4 bg-[#0f172a]/60 backdrop-blur-xl">
+          <div className="bg-white border-b border-gray-200 px-6 py-3">
             <div className="max-w-7xl mx-auto flex items-center justify-between">
               <div className="flex items-center gap-6">
                 {/* Stage Indicators */}
                 <div className="flex items-center gap-3">
                   <div className={`flex items-center gap-2 ${
                     session.status === 'searching' || session.status === 'processing' || session.status === 'completed'
-                      ? 'text-[#1DE0DD]' : 'text-gray-500'
+                      ? 'text-[#1DE0DD]' : 'text-gray-400'
                   }`}>
                     <CheckCircle2 className="h-5 w-5" />
                     <span className="text-sm font-medium">Searching</span>
                   </div>
                   
-                  <ChevronRight className="h-4 w-4 text-gray-600" />
+                  <ChevronRight className="h-4 w-4 text-gray-300" />
                   
                   <div className={`flex items-center gap-2 ${
                     session.status === 'processing' || session.status === 'completed'
-                      ? 'text-[#1DE0DD]' : 'text-gray-500'
+                      ? 'text-[#1DE0DD]' : 'text-gray-400'
                   }`}>
                     <div className="relative">
                       {session.status === 'processing' && (
                         <div className="absolute inset-0 animate-ping">
-                          <div className="h-5 w-5 rounded-full bg-emerald-400 opacity-75" />
+                          <div className="h-5 w-5 rounded-full bg-[#1DE0DD] opacity-75" />
                         </div>
                       )}
                       <CheckCircle2 className="h-5 w-5 relative" />
@@ -702,26 +672,26 @@ const JobSearchConvex: React.FC = () => {
                     <span className="text-sm font-medium">Processing</span>
                   </div>
                   
-                  <ChevronRight className="h-4 w-4 text-gray-400" />
+                  <ChevronRight className="h-4 w-4 text-gray-300" />
                   
                   <div className={`flex items-center gap-2 ${
-                    session.status === 'completed' ? 'text-emerald-600' : 'text-gray-400'
+                    session.status === 'completed' ? 'text-[#1DE0DD]' : 'text-gray-400'
                   }`}>
                     <CheckCircle2 className="h-5 w-5" />
                     <span className="text-sm font-medium">Complete</span>
                   </div>
                 </div>
                 
-                {/* Job Count - Exact UI from Design */}
+                {/* Job Count */}
                 <div className="flex items-center gap-2">
-                  <div className="bg-indigo-600 text-white px-3 py-1.5 rounded-full text-sm font-bold min-w-[40px] text-center">
+                  <div className="bg-[#1DE0DD] text-white px-3 py-1.5 rounded-full text-sm font-bold min-w-[40px] text-center">
                     {session.processedCount}
                   </div>
-                  <span className="text-sm text-gray-500 font-medium">of</span>
+                  <span className="text-sm text-gray-600 font-medium">of</span>
                   <div className="bg-gray-200 text-gray-800 px-3 py-1.5 rounded-full text-sm font-bold min-w-[40px] text-center">
                     {session.totalFound}
                   </div>
-                  <span className="text-sm text-gray-500 font-medium">jobs found</span>
+                  <span className="text-sm text-gray-600 font-medium">jobs found</span>
                 </div>
               </div>
               
@@ -729,7 +699,7 @@ const JobSearchConvex: React.FC = () => {
               <div className="flex items-center gap-4">
                 <div className="w-32 bg-gray-200 rounded-full h-2 overflow-hidden">
                   <motion.div
-                    className="h-full bg-gradient-to-r from-indigo-500 to-purple-500"
+                    className="h-full bg-gradient-to-r from-[#1DE0DD] to-[#00C4CC]"
                     initial={{ width: 0 }}
                     animate={{ width: `${progress}%` }}
                     transition={{ duration: 0.5, ease: "easeOut" }}
