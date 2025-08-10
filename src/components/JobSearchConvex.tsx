@@ -5,7 +5,7 @@ import {
   Building2, Star, Bookmark, ArrowUpRight, TrendingUp, 
   ChevronRight, Clock, DollarSign, Users, Sparkles,
   Grid3X3, List, LayoutGrid, SlidersHorizontal,
-  CheckCircle2, XCircle, AlertCircle
+  CheckCircle2, XCircle, AlertCircle, FileText
 } from 'lucide-react';
 import { useMutation, useQuery, useAction } from 'convex/react';
 import { api } from '../../convex/_generated/api';
@@ -360,39 +360,75 @@ const JobSearchConvex: React.FC = () => {
   }, [session]);
   
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50 to-purple-50">
-      {/* Animated gradient background */}
+    <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#334155]">
+      {/* Premium animated background */}
       <div className="fixed inset-0 opacity-30 pointer-events-none">
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/20 via-purple-600/20 to-pink-600/20 animate-gradient" />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#1DE0DD]/10 via-indigo-600/10 to-purple-600/10" />
       </div>
       
-      {/* Search Section */}
-      <div className="relative z-10 bg-white/80 backdrop-blur-md border-b border-gray-200/50 sticky top-0">
+      {/* Premium Search Section */}
+      <div className="relative z-10 bg-gradient-to-r from-[#0f172a]/95 to-[#1e293b]/95 backdrop-blur-xl border-b border-white/10 sticky top-0">
         <div className="max-w-7xl mx-auto px-4 py-6">
-          {/* Search Inputs */}
+          {/* Resume Upload Alert */}
+          {!resumeText && (
+            <motion.div 
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6 p-4 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-xl flex items-center gap-3 backdrop-blur-sm"
+            >
+              <div className="p-2 bg-amber-500/20 rounded-lg">
+                <FileText className="h-5 w-5 text-amber-400" />
+              </div>
+              <span className="text-amber-100 font-medium">Upload your resume to unlock AI-powered job matching</span>
+              <label className="ml-auto">
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  onChange={handleResumeUpload}
+                  className="hidden"
+                />
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-medium rounded-lg hover:from-amber-600 hover:to-orange-600 transition-all shadow-lg shadow-amber-500/25"
+                >
+                  Upload Resume
+                </motion.button>
+              </label>
+            </motion.div>
+          )}
+          
+          {/* Premium Search Inputs */}
           <div className="flex gap-4 mb-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                placeholder="Job title, keywords, or company"
-                className="w-full pl-10 pr-4 py-3 bg-white/90 backdrop-blur border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-              />
+            <div className="flex-1 relative group">
+              <div className="absolute inset-0 bg-gradient-to-r from-[#1DE0DD]/20 to-indigo-500/20 rounded-xl blur-xl group-hover:blur-2xl transition-all opacity-50" />
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                  placeholder="Job title, keywords, or company"
+                  className="w-full pl-12 pr-4 py-3.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1DE0DD]/50 focus:border-[#1DE0DD]/50 transition-all"
+                />
+              </div>
             </div>
             
-            <div className="flex-1 relative">
-              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
-              <input
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                placeholder="City, state, or remote"
-                className="w-full pl-10 pr-4 py-3 bg-white/90 backdrop-blur border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-              />
+            <div className="flex-1 relative group">
+              <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 rounded-xl blur-xl group-hover:blur-2xl transition-all opacity-50" />
+              <div className="relative">
+                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
+                <input
+                  type="text"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                  placeholder="City, state, or remote"
+                  className="w-full pl-12 pr-4 py-3.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1DE0DD]/50 focus:border-[#1DE0DD]/50 transition-all"
+                />
+              </div>
             </div>
             
             <motion.button
@@ -400,29 +436,37 @@ const JobSearchConvex: React.FC = () => {
               disabled={isSearching || !resumeText || !authToken || authLoading}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="px-8 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+              className="relative px-8 py-3.5 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all overflow-hidden group"
             >
-              {isSearching ? (
-                <>
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  Searching...
-                </>
-              ) : (
-                <>
-                  <Search className="h-5 w-5" />
-                  Search Jobs
-                </>
-              )}
+              <div className="absolute inset-0 bg-gradient-to-r from-[#1DE0DD] to-indigo-500 transition-all" />
+              <div className="absolute inset-0 bg-gradient-to-r from-[#1DE0DD] to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative flex items-center gap-2 text-white">
+                {isSearching ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Searching...
+                  </>
+                ) : (
+                  <>
+                    <Search className="h-5 w-5" />
+                    Search Jobs
+                  </>
+                )}
+              </div>
             </motion.button>
           </div>
           
-          {/* Filter Pills */}
+          {/* Premium Filter Controls */}
           <div className="flex gap-3 items-center">
             <motion.button
               onClick={() => setShowFilters(!showFilters)}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="px-4 py-2 bg-white/90 backdrop-blur border border-gray-300 rounded-lg flex items-center gap-2 hover:bg-gray-50 transition-colors"
+              className={`px-4 py-2.5 rounded-lg flex items-center gap-2 transition-all border ${
+                showFilters 
+                  ? 'bg-[#1DE0DD]/20 border-[#1DE0DD]/50 text-[#1DE0DD]' 
+                  : 'bg-white/10 backdrop-blur-sm border-white/20 text-white hover:bg-white/15'
+              }`}
             >
               <SlidersHorizontal className="h-4 w-4" />
               Filters
@@ -432,10 +476,10 @@ const JobSearchConvex: React.FC = () => {
               onClick={() => setFilters({ ...filters, remote: !filters.remote })}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
+              className={`px-4 py-2.5 rounded-lg flex items-center gap-2 transition-all border ${
                 filters.remote
-                  ? 'bg-indigo-100 text-indigo-700 border border-indigo-300'
-                  : 'bg-white/90 backdrop-blur border border-gray-300 hover:bg-gray-50'
+                  ? 'bg-[#1DE0DD]/20 text-[#1DE0DD] border-[#1DE0DD]/50'
+                  : 'bg-white/10 backdrop-blur-sm border-white/20 text-white hover:bg-white/15'
               }`}
             >
               <Sparkles className="h-4 w-4" />
@@ -443,17 +487,17 @@ const JobSearchConvex: React.FC = () => {
             </motion.button>
             
             {/* View Mode Toggle */}
-            <div className="ml-auto flex gap-2 bg-white/90 backdrop-blur border border-gray-300 rounded-lg p-1">
+            <div className="ml-auto flex gap-1 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-1">
               {(['grid', 'list', 'compact'] as ViewMode[]).map((mode) => (
                 <motion.button
                   key={mode}
                   onClick={() => setViewMode(mode)}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className={`p-2 rounded transition-colors ${
+                  className={`p-2 rounded transition-all ${
                     viewMode === mode
-                      ? 'bg-indigo-100 text-indigo-700'
-                      : 'text-gray-600 hover:bg-gray-100'
+                      ? 'bg-gradient-to-r from-[#1DE0DD] to-indigo-500 text-white shadow-lg'
+                      : 'text-gray-400 hover:text-white hover:bg-white/10'
                   }`}
                 >
                   {mode === 'grid' && <Grid3X3 className="h-4 w-4" />}
@@ -463,11 +507,18 @@ const JobSearchConvex: React.FC = () => {
               ))}
             </div>
             
-            {/* Sort Dropdown */}
+            {/* Premium Sort Dropdown */}
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortBy)}
-              className="px-4 py-2 bg-white/90 backdrop-blur border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="px-4 py-2.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#1DE0DD]/50 focus:border-[#1DE0DD]/50 transition-all appearance-none cursor-pointer"
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 0.5rem center',
+                backgroundSize: '1.5em 1.5em',
+                paddingRight: '2.5rem'
+              }}
             >
               <option value="match_score">Best Match</option>
               <option value="date">Most Recent</option>
@@ -476,7 +527,7 @@ const JobSearchConvex: React.FC = () => {
           </div>
         </div>
         
-        {/* Filters Panel */}
+        {/* Premium Filters Panel */}
         <AnimatePresence>
           {showFilters && (
             <motion.div
@@ -484,23 +535,23 @@ const JobSearchConvex: React.FC = () => {
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.3 }}
-              className="border-t border-gray-200/50 bg-white/80 backdrop-blur overflow-hidden"
+              className="border-t border-white/10 bg-[#0f172a]/80 backdrop-blur-xl overflow-hidden"
             >
-              <div className="max-w-7xl mx-auto px-4 py-4">
+              <div className="max-w-7xl mx-auto px-4 py-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
                   {/* Date Posted Filter */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Date Posted</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Date Posted</label>
                     <select
                       value={filters.datePosted || 'week'}
                       onChange={(e) => setFilters({ ...filters, datePosted: e.target.value })}
-                      className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#1DE0DD]/50 focus:border-[#1DE0DD]/50 transition-all"
                     >
-                      <option value="today">Today</option>
-                      <option value="3days">Last 3 days</option>
-                      <option value="week">Last week</option>
-                      <option value="month">Last month</option>
-                      <option value="all">All time</option>
+                      <option value="today" className="bg-[#1e293b]">Today</option>
+                      <option value="3days" className="bg-[#1e293b]">Last 3 days</option>
+                      <option value="week" className="bg-[#1e293b]">Last week</option>
+                      <option value="month" className="bg-[#1e293b]">Last month</option>
+                      <option value="all" className="bg-[#1e293b]">All time</option>
                     </select>
                   </div>
                   
@@ -590,8 +641,10 @@ const JobSearchConvex: React.FC = () => {
                 </div>
                 
                 {/* Apply/Clear Buttons */}
-                <div className="flex justify-end gap-2 mt-4">
-                  <button
+                <div className="flex justify-end gap-3 mt-6">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={() => setFilters({
                       datePosted: 'week',
                       remote: false,
@@ -599,42 +652,44 @@ const JobSearchConvex: React.FC = () => {
                       experienceLevel: [],
                       radius: 50
                     })}
-                    className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                    className="px-6 py-2.5 text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-all"
                   >
                     Clear All
-                  </button>
-                  <button
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={() => setShowFilters(false)}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                    className="px-6 py-2.5 bg-gradient-to-r from-[#1DE0DD] to-indigo-500 text-white rounded-lg font-medium shadow-lg hover:shadow-xl transition-all"
                   >
                     Apply Filters
-                  </button>
+                  </motion.button>
                 </div>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
         
-        {/* Progress Indicator */}
+        {/* Premium Progress Indicator */}
         {session && session.status !== 'initializing' && (
-          <div className="border-t border-gray-200/50 px-4 py-3 bg-white/60 backdrop-blur">
+          <div className="border-t border-white/10 px-4 py-4 bg-[#0f172a]/60 backdrop-blur-xl">
             <div className="max-w-7xl mx-auto flex items-center justify-between">
               <div className="flex items-center gap-6">
                 {/* Stage Indicators */}
                 <div className="flex items-center gap-3">
                   <div className={`flex items-center gap-2 ${
                     session.status === 'searching' || session.status === 'processing' || session.status === 'completed'
-                      ? 'text-emerald-600' : 'text-gray-400'
+                      ? 'text-[#1DE0DD]' : 'text-gray-500'
                   }`}>
                     <CheckCircle2 className="h-5 w-5" />
                     <span className="text-sm font-medium">Searching</span>
                   </div>
                   
-                  <ChevronRight className="h-4 w-4 text-gray-400" />
+                  <ChevronRight className="h-4 w-4 text-gray-600" />
                   
                   <div className={`flex items-center gap-2 ${
                     session.status === 'processing' || session.status === 'completed'
-                      ? 'text-emerald-600' : 'text-gray-400'
+                      ? 'text-[#1DE0DD]' : 'text-gray-500'
                   }`}>
                     <div className="relative">
                       {session.status === 'processing' && (
