@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { 
   Search, MapPin, Briefcase, Filter, Loader2, Heart, 
   Building2, Star, Bookmark, ArrowUpRight, TrendingUp, 
@@ -57,6 +58,7 @@ type SortBy = 'match_score' | 'date' | 'salary';
 const JobSearchConvex: React.FC = () => {
   const { user } = useAuth();
   const { authToken, loading: authLoading, error: authError } = useConvexAuth();
+  const navigate = useNavigate();
   
   // State
   const [searchQuery, setSearchQuery] = useState('');
@@ -436,29 +438,22 @@ const JobSearchConvex: React.FC = () => {
                 <FileText className="h-5 w-5 text-amber-600" />
               </div>
               <span className="text-amber-900 font-medium">Upload your resume to unlock AI-powered job matching</span>
-              <label className="ml-auto">
-                <input
-                  type="file"
-                  accept="application/pdf"
-                  onChange={handleResumeUpload}
-                  className="hidden"
-                />
-                <motion.button
-                  type="button"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="px-5 py-2 bg-gradient-to-r from-[#1DE0DD] to-[#00C4CC] text-white font-medium rounded-lg hover:shadow-md transition-all"
-                >
-                  Upload Resume
-                </motion.button>
-              </label>
+              <motion.button
+                type="button"
+                onClick={() => navigate('/profile?tab=professional')}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="ml-auto px-5 py-2 bg-gradient-to-r from-[#1DE0DD] to-[#00C4CC] text-white font-medium rounded-lg hover:shadow-md transition-all cursor-pointer"
+              >
+                Upload Resume
+              </motion.button>
             </motion.div>
           )}
           
           {/* Search Inputs */}
           <div className="flex gap-3">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <div className="flex-1 relative flex items-center">
+              <Search className="absolute left-3 text-gray-400 h-5 w-5 pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
@@ -469,8 +464,8 @@ const JobSearchConvex: React.FC = () => {
               />
             </div>
             
-            <div className="flex-1 relative">
-              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <div className="flex-1 relative flex items-center">
+              <MapPin className="absolute left-3 text-gray-400 h-5 w-5 pointer-events-none" />
               <input
                 type="text"
                 value={location}
