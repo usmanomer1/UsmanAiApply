@@ -117,6 +117,7 @@ export const ResumePage: React.FC = () => {
   const [expandedSections, setExpandedSections] = useState<string[]>(['keywords', 'skills', 'suggestions']);
   const [score, setScore] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [currentStep, setCurrentStep] = useState<'upload' | 'analysis' | 'generation'>('upload');
 
   useEffect(() => {
     if (user) {
@@ -270,11 +271,7 @@ export const ResumePage: React.FC = () => {
     }
 
     setAnalyzing(true);
-    
-    // Smooth scroll to results
-    setTimeout(() => {
-      document.getElementById('analysis-results')?.scrollIntoView({ behavior: 'smooth' });
-    }, 500);
+    setCurrentStep('analysis');
     
     try {
       // Upload file to storage
@@ -305,6 +302,11 @@ export const ResumePage: React.FC = () => {
       );
 
       setAnalysisResult(result);
+      
+      // Transition to analysis view
+      setTimeout(() => {
+        setAnalyzing(false);
+      }, 500);
 
       // Save analysis record
       const { data: analysisData, error: analysisError } = await supabase
@@ -370,6 +372,7 @@ export const ResumePage: React.FC = () => {
     }
 
     setGenerating(true);
+    setCurrentStep('generation');
 
     try {
       const result = await generateOptimizedResume(
@@ -428,6 +431,21 @@ export const ResumePage: React.FC = () => {
       
       toast.success('Resume generated successfully!');
       
+      // Show success state briefly then reset
+      setTimeout(() => {
+        setGenerating(false);
+      }, 500);
+      
+      // Auto-reset after showing success
+      setTimeout(() => {
+        setCurrentStep('upload');
+        setAnalysisResult(null);
+        setSelectedFile(null);
+        setJobTitle('');
+        setCompanyName('');
+        setJobDescription('');
+      }, 3000);
+      
       // Track AI token usage for generation
       await trackAITokenUsage(user.id, 'resume_optimization', {
         action: 'generate',
@@ -484,66 +502,89 @@ export const ResumePage: React.FC = () => {
     return 'from-red-500 to-red-600';
   };
 
+  // Calculate progress based on completed steps
+  const calculateProgress = () => {
+    let steps = 0;
+    if (selectedFile) steps++;
+    if (jobTitle && companyName && jobDescription) steps++;
+    if (analysisResult) steps++;
+    if (analysisResult && (selectedSections.length > 0 || selectedSkills.length > 0)) steps++;
+    return (steps / 4) * 100;
+  };
+
+  const progress = calculateProgress();
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-900">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
+      <div className="bg-white dark:bg-gray-900 shadow-sm">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-2xl font-light text-gray-900 dark:text-white">
                 Resume Optimizer
               </h1>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                AI-powered analysis and optimization
+                Transform your resume for your dream job
               </p>
             </div>
             <button
               onClick={() => navigate('/dashboard')}
-              className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+              className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors flex items-center gap-1"
             >
-              Back to Dashboard
+              <ArrowLeft className="w-3 h-3" />
+              Back
             </button>
+          </div>
+          
+          {/* Progress Bar */}
+          <div className="relative">
+            <div className="h-1 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
+              <motion.div
+                className="h-full bg-gradient-to-r from-[#1DE0DD] to-[#00C4CC]"
+                initial={{ width: 0 }}
+                animate={{ width: `${progress}%` }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+              />
+            </div>
+            <div className="flex justify-between mt-2">
+              {['Upload', 'Job Details', 'Analysis', 'Generate'].map((step, index) => (
+                <div key={step} className="flex items-center gap-1">
+                  <div className={`w-2 h-2 rounded-full ${
+                    (index + 1) * 25 <= progress ? 'bg-[#1DE0DD]' : 'bg-gray-300 dark:bg-gray-700'
+                  }`} />
+                  <span className={`text-xs ${
+                    (index + 1) * 25 <= progress ? 'text-gray-700 dark:text-gray-300' : 'text-gray-400 dark:text-gray-600'
+                  }`}>{step}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
-        <div className="flex gap-8 border-b border-gray-200 dark:border-gray-800">
+      {/* Quick Actions */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+        <div className="flex gap-3">
           <button
             onClick={() => setActiveTab('upload')}
-            className={`pb-3 text-sm font-medium transition-colors relative ${
+            className={`flex-1 px-4 py-2 rounded-full text-sm font-medium transition-all ${
               activeTab === 'upload'
-                ? 'text-gray-900 dark:text-white'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                ? 'bg-[#1DE0DD] text-white shadow-lg'
+                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:shadow-md border border-gray-200 dark:border-gray-700'
             }`}
           >
             New Analysis
-            {activeTab === 'upload' && (
-              <motion.div
-                layoutId="activeTab"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1DE0DD]"
-                transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-              />
-            )}
           </button>
           <button
             onClick={() => setActiveTab('history')}
-            className={`pb-3 text-sm font-medium transition-colors relative ${
+            className={`flex-1 px-4 py-2 rounded-full text-sm font-medium transition-all ${
               activeTab === 'history'
-                ? 'text-gray-900 dark:text-white'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                ? 'bg-[#1DE0DD] text-white shadow-lg'
+                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:shadow-md border border-gray-200 dark:border-gray-700'
             }`}
           >
-            History
-            {activeTab === 'history' && (
-              <motion.div
-                layoutId="activeTab"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1DE0DD]"
-                transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-              />
-            )}
+            View History
           </button>
         </div>
       </div>
@@ -558,12 +599,13 @@ export const ResumePage: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.3 }}
-              className="grid grid-cols-1 lg:grid-cols-2 gap-8"
+              className="max-w-5xl mx-auto"
             >
-              {/* Left Column - Upload & Job Details */}
-              <div className="space-y-6">
-                {/* File Upload */}
-                <motion.div
+              {/* Progressive Flow Based on Current Step */}
+              {currentStep === 'upload' ? (
+                <div className="space-y-6">
+                  {/* Step 1: File Upload */}
+                  <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 }}
@@ -611,7 +653,7 @@ export const ResumePage: React.FC = () => {
                         </div>
                       ) : selectedFile ? (
                         <div className="space-y-3">
-                          <FileCheck className="w-8 h-8 text-green-600 mx-auto" />
+                          <CheckCircle className="w-8 h-8 text-[#1DE0DD] mx-auto" />
                           <div>
                             <p className="text-sm text-gray-900 dark:text-white">
                               {selectedFile.name}
@@ -628,7 +670,7 @@ export const ResumePage: React.FC = () => {
                             }}
                             className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                           >
-                            Remove file
+                            Change file
                           </button>
                         </div>
                       ) : (
@@ -649,42 +691,53 @@ export const ResumePage: React.FC = () => {
                       )}
                     </motion.div>
                   </div>
-                </motion.div>
+              </motion.div>
 
-                {/* Job Details */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                  className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6"
-                >
-                  <div className="flex items-center justify-between mb-6">
+              {/* Step 2: Job Details */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className={`bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800 p-6 relative overflow-hidden transition-opacity ${
+                  !selectedFile ? 'opacity-50 pointer-events-none' : ''
+                }`}
+              >
+                {/* Step Number */}
+                <div className="absolute top-6 right-6 w-8 h-8 bg-gradient-to-br from-[#1DE0DD]/10 to-[#00C4CC]/10 rounded-full flex items-center justify-center">
+                  <span className="text-sm font-medium text-[#1DE0DD]">2</span>
+                </div>
+                
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-lg flex items-center justify-center">
+                    <Briefcase className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                    </div>
                     <div>
-                      <h2 className="text-lg font-light text-gray-900 dark:text-white mb-1">
-                        Job Details
+                      <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                        Target Position
                       </h2>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Enter the position you're applying for
+                        Describe the job you're applying for
                       </p>
                     </div>
-                    <button
-                      onClick={async () => {
-                        try {
-                          const text = await navigator.clipboard.readText();
-                          if (text) {
-                            setJobDescription(text);
-                            toast.success('Pasted from clipboard');
-                          }
-                        } catch (error) {
-                          toast.error('Failed to paste from clipboard');
+                </div>
+                
+                <button
+                    onClick={async () => {
+                      try {
+                        const text = await navigator.clipboard.readText();
+                        if (text) {
+                          setJobDescription(text);
+                          toast.success('Pasted from clipboard');
                         }
-                      }}
-                      className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
-                      title="Paste from clipboard"
-                    >
-                      <Copy className="w-4 h-4" />
-                    </button>
-                  </div>
+                      } catch (error) {
+                        toast.error('Failed to paste from clipboard');
+                      }
+                    }}
+                    className="absolute top-6 right-14 p-2 text-gray-400 hover:text-[#1DE0DD] transition-colors rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+                    title="Paste from clipboard"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </button>
                   
                   <div className="space-y-4">
                     <div>
@@ -735,59 +788,90 @@ export const ResumePage: React.FC = () => {
                   <button
                     onClick={handleAnalyze}
                     disabled={!selectedFile || !jobTitle || !companyName || !jobDescription || analyzing}
-                    className="mt-6 w-full bg-[#1DE0DD] hover:bg-[#00C4CC] text-white font-medium py-3 px-6 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#1DE0DD] flex items-center justify-center gap-2"
+                    className="mt-6 w-full bg-gradient-to-r from-[#1DE0DD] to-[#00C4CC] hover:from-[#00C4CC] hover:to-[#00B4BC] text-white font-medium py-3 px-6 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-[#1DE0DD] disabled:hover:to-[#00C4CC] flex items-center justify-center gap-2 shadow-lg"
                   >
                     {analyzing ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Analyzing...
+                        Analyzing Resume...
                       </>
                     ) : (
-                      'Analyze Resume'
+                      <>
+                        <Brain className="w-5 h-5" />
+                        Analyze with AI
+                      </>
                     )}
                   </button>
-                </motion.div>
-              </div>
-
-              {/* Right Column - Analysis Results */}
-              <div className="space-y-6" id="analysis-results">
-                {analyzing ? (
-                  // Skeleton Loader for Analysis
-                  <div className="space-y-6">
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-6">
-                      <SkeletonLoader className="h-6 w-32 mb-6" />
-                      <div className="flex justify-center mb-6">
-                        <SkeletonLoader className="w-32 h-32 rounded-full" />
-                      </div>
-                      <div className="space-y-3">
-                        <SkeletonLoader className="h-4 w-full" />
-                        <SkeletonLoader className="h-4 w-3/4" />
-                        <SkeletonLoader className="h-4 w-5/6" />
-                      </div>
+                  </motion.div>
+                </div>
+              ) : currentStep === 'analysis' ? (
+                /* Analysis View */
+                analyzing ? (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="flex flex-col items-center justify-center py-32"
+                  >
+                    <div className="w-20 h-20 bg-gradient-to-br from-[#1DE0DD]/20 to-[#00C4CC]/20 rounded-full flex items-center justify-center mb-6 animate-pulse">
+                      <Brain className="w-10 h-10 text-[#1DE0DD] animate-pulse" />
                     </div>
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-6">
-                      <SkeletonLoader className="h-6 w-48 mb-4" />
-                      <div className="space-y-3">
-                        <SkeletonLoader className="h-10 w-full" />
-                        <SkeletonLoader className="h-10 w-full" />
-                      </div>
+                    <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">
+                      Analyzing Your Resume
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                      Comparing with {jobTitle} at {companyName}
+                    </p>
+                    <div className="w-64 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <motion.div
+                        className="h-full bg-gradient-to-r from-[#1DE0DD] to-[#00C4CC]"
+                        initial={{ width: 0 }}
+                        animate={{ width: '100%' }}
+                        transition={{ duration: 3, ease: "easeInOut" }}
+                      />
                     </div>
-                  </div>
-                ) : analysisResult ? (
-                  <>
-                    {/* Score Overview */}
+                  </motion.div>
+                ) : analysisResult && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5 }}
+                    className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+                  >
+                    {/* Analysis Card */}
                     <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6"
+                      className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800 p-6 relative overflow-hidden"
                     >
+                      {/* Back Button */}
+                      <button
+                        onClick={() => {
+                          setCurrentStep('upload');
+                          setAnalysisResult(null);
+                        }}
+                        className="absolute top-6 left-6 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+                        title="Back to upload"
+                      >
+                        <ArrowLeft className="w-4 h-4" />
+                      </button>
+                      
+                      {/* Step Number */}
+                      <div className="absolute top-6 right-6 w-8 h-8 bg-gradient-to-br from-[#1DE0DD]/10 to-[#00C4CC]/10 rounded-full flex items-center justify-center">
+                        <span className="text-sm font-medium text-[#1DE0DD]">3</span>
+                      </div>
+                      
                       <div className="mb-6">
-                        <h2 className="text-lg font-light text-gray-900 dark:text-white mb-1">
-                          Analysis Results
-                        </h2>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          AI-powered resume analysis
-                        </p>
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-10 h-10 bg-gradient-to-br from-[#1DE0DD]/20 to-[#00C4CC]/20 rounded-lg flex items-center justify-center">
+                            <BarChart3 className="w-5 h-5 text-[#1DE0DD]" />
+                          </div>
+                          <div>
+                            <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                              Analysis Complete
+                            </h2>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              Your resume has been analyzed
+                            </p>
+                          </div>
+                        </div>
                       </div>
                       
                       <div className="flex items-center justify-center mb-8">
@@ -831,7 +915,29 @@ export const ResumePage: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Results Sections */}
+                      {/* Results Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 text-center">
+                          <p className="text-2xl font-light text-gray-900 dark:text-white mb-1">
+                            {analysisResult.data.summary.keywordMatches.length}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Matched Keywords</p>
+                        </div>
+                        <div className="bg-amber-50 dark:bg-amber-900/10 rounded-xl p-4 text-center">
+                          <p className="text-2xl font-light text-amber-600 dark:text-amber-500 mb-1">
+                            {analysisResult.data.summary.missingSkills.length}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Skills to Add</p>
+                        </div>
+                        <div className="bg-blue-50 dark:bg-blue-900/10 rounded-xl p-4 text-center">
+                          <p className="text-2xl font-light text-blue-600 dark:text-blue-500 mb-1">
+                            {analysisResult.data.summary.suggestions.length}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Suggestions</p>
+                        </div>
+                      </div>
+                      
+                      {/* Expandable Sections */}
                       <div className="space-y-3">
                         {/* Matched Keywords */}
                         <div className="border-t border-gray-200 dark:border-gray-800 pt-4">
@@ -864,7 +970,7 @@ export const ResumePage: React.FC = () => {
                                   {analysisResult.data.summary.keywordMatches.slice(0, 10).map((keyword) => (
                                     <span
                                       key={keyword}
-                                      className="px-2 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded text-xs"
+                                      className="px-3 py-1.5 bg-[#1DE0DD]/10 text-[#1DE0DD] rounded-lg text-xs font-medium"
                                     >
                                       {keyword}
                                     </span>
@@ -906,7 +1012,7 @@ export const ResumePage: React.FC = () => {
                                   {analysisResult.data.summary.missingSkills.slice(0, 10).map((skill) => (
                                     <span
                                       key={skill}
-                                      className="px-2 py-1 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 rounded text-xs border border-amber-200 dark:border-amber-800"
+                                      className="px-3 py-1.5 bg-amber-50 dark:bg-amber-900/10 text-amber-600 dark:text-amber-400 rounded-lg text-xs font-medium"
                                     >
                                       {skill}
                                     </span>
@@ -948,10 +1054,10 @@ export const ResumePage: React.FC = () => {
                                   {analysisResult.data.summary.suggestions.slice(0, 3).map((suggestion, index) => (
                                     <div
                                       key={index}
-                                      className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400"
+                                      className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg text-sm text-gray-600 dark:text-gray-400"
                                     >
-                                      <span className="w-1 h-1 bg-[#1DE0DD] rounded-full mt-1.5 flex-shrink-0" />
-                                      <span>{suggestion}</span>
+                                      <LightbulbIcon className="w-4 h-4 text-[#1DE0DD] flex-shrink-0 mt-0.5" />
+                                      <span className="leading-relaxed">{suggestion}</span>
                                     </div>
                                   ))}
                                 </div>
@@ -962,20 +1068,32 @@ export const ResumePage: React.FC = () => {
                       </div>
                     </motion.div>
 
-                    {/* Generation Options */}
+                    {/* Step 4: Generation Options */}
                     <motion.div
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.1 }}
-                      className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6"
+                      transition={{ delay: 0.4 }}
+                      className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800 p-6 relative overflow-hidden"
                     >
+                      {/* Step Number */}
+                      <div className="absolute top-6 right-6 w-8 h-8 bg-gradient-to-br from-[#1DE0DD]/10 to-[#00C4CC]/10 rounded-full flex items-center justify-center">
+                        <span className="text-sm font-medium text-[#1DE0DD]">4</span>
+                      </div>
+                      
                       <div className="mb-6">
-                        <h2 className="text-lg font-light text-gray-900 dark:text-white mb-1">
-                          Generate Optimized Resume
-                        </h2>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Create a tailored version for this position
-                        </p>
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-10 h-10 bg-gradient-to-br from-[#1DE0DD]/20 to-[#00C4CC]/20 rounded-lg flex items-center justify-center">
+                            <Wand2 className="w-5 h-5 text-[#1DE0DD]" />
+                          </div>
+                          <div>
+                            <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                              Generate Optimized Resume
+                            </h2>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              Create a tailored version for this position
+                            </p>
+                          </div>
+                        </div>
                       </div>
                       
                       <div className="space-y-4">
@@ -1016,7 +1134,7 @@ export const ResumePage: React.FC = () => {
                               {editType === 'full' && (
                                 <motion.div
                                   layoutId="editTypeIndicator"
-                                  className="absolute top-2 right-2 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center"
+                                  className="absolute top-2 right-2 w-5 h-5 bg-[#1DE0DD] rounded-full flex items-center justify-center"
                                   transition={{ type: "spring", bounce: 0.3 }}
                                 >
                                   <CheckCircle2 className="w-3 h-3 text-white" />
@@ -1056,7 +1174,7 @@ export const ResumePage: React.FC = () => {
                               {editType === 'quick' && (
                                 <motion.div
                                   layoutId="editTypeIndicator"
-                                  className="absolute top-2 right-2 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center"
+                                  className="absolute top-2 right-2 w-5 h-5 bg-[#1DE0DD] rounded-full flex items-center justify-center"
                                   transition={{ type: "spring", bounce: 0.3 }}
                                 >
                                   <CheckCircle2 className="w-3 h-3 text-white" />
@@ -1074,7 +1192,7 @@ export const ResumePage: React.FC = () => {
                             value={additionalInstructions}
                             onChange={(e) => setAdditionalInstructions(e.target.value)}
                             rows={3}
-                            className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white transition-all resize-none"
+                            className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-[#1DE0DD]/20 focus:border-[#1DE0DD] dark:bg-gray-800 dark:text-white transition-all resize-none"
                             placeholder="Any specific requirements or preferences..."
                           />
                         </div>
@@ -1082,35 +1200,99 @@ export const ResumePage: React.FC = () => {
                         <button
                           onClick={handleGenerate}
                           disabled={generating}
-                          className="w-full bg-[#1DE0DD] hover:bg-[#00C4CC] text-white font-medium py-3 px-6 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#1DE0DD] flex items-center justify-center gap-2"
+                          className="w-full bg-gradient-to-r from-[#1DE0DD] to-[#00C4CC] hover:from-[#00C4CC] hover:to-[#00B4BC] text-white font-medium py-3 px-6 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-[#1DE0DD] disabled:hover:to-[#00C4CC] flex items-center justify-center gap-2 shadow-md hover:shadow-lg transform hover:scale-[1.02] active:scale-[0.98]"
                         >
                           {generating ? (
                             <>
                               <Loader2 className="w-4 h-4 animate-spin" />
-                              Generating...
+                              Generating Optimized Resume...
                             </>
                           ) : (
-                            'Generate & Download'
+                            <>
+                              <Download className="w-5 h-5" />
+                              Generate & Download
+                            </>
                           )}
                         </button>
                       </div>
                     </motion.div>
-                  </>
+                  </motion.div>
+                )
+              ) : currentStep === 'generation' ? (
+                /* Generation View */
+                generating ? (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="flex flex-col items-center justify-center py-32"
+                  >
+                    <div className="w-20 h-20 bg-gradient-to-br from-[#1DE0DD]/20 to-[#00C4CC]/20 rounded-full flex items-center justify-center mb-6 animate-pulse">
+                      <Wand2 className="w-10 h-10 text-[#1DE0DD] animate-pulse" />
+                    </div>
+                    <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">
+                      Generating Optimized Resume
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                      Creating your tailored resume...
+                    </p>
+                    <div className="w-64 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <motion.div
+                        className="h-full bg-gradient-to-r from-[#1DE0DD] to-[#00C4CC]"
+                        initial={{ width: 0 }}
+                        animate={{ width: '100%' }}
+                        transition={{ duration: 5, ease: "easeInOut" }}
+                      />
+                    </div>
+                  </motion.div>
                 ) : (
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-12 text-center"
+                    className="max-w-md mx-auto text-center"
                   >
-                    <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <BarChart3 className="w-8 h-8 text-gray-400" strokeWidth={1.5} />
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800 p-8">
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: "spring", bounce: 0.4 }}
+                        className="w-20 h-20 bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6"
+                      >
+                        <CheckCircle className="w-10 h-10 text-green-500" />
+                      </motion.div>
+                      
+                      <h3 className="text-2xl font-light text-gray-900 dark:text-white mb-2">
+                        Resume Ready!
+                      </h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">
+                        Your optimized resume has been generated
+                      </p>
+                      
+                      <div className="space-y-3">
+                        <button
+                          onClick={() => {
+                            setCurrentStep('upload');
+                            setAnalysisResult(null);
+                            setSelectedFile(null);
+                            setJobTitle('');
+                            setCompanyName('');
+                            setJobDescription('');
+                          }}
+                          className="w-full px-6 py-3 bg-gradient-to-r from-[#1DE0DD] to-[#00C4CC] hover:from-[#00C4CC] hover:to-[#00B4BC] text-white font-medium rounded-xl transition-all shadow-md hover:shadow-lg"
+                        >
+                          Create Another Resume
+                        </button>
+                        
+                        <button
+                          onClick={() => setActiveTab('history')}
+                          className="w-full px-6 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
+                        >
+                          View History
+                        </button>
+                      </div>
                     </div>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">
-                      Upload a resume and provide job details to see analysis
-                    </p>
                   </motion.div>
-                )}
-              </div>
+                )
+              ) : null}
             </motion.div>
           ) : (
             <motion.div
@@ -1123,14 +1305,23 @@ export const ResumePage: React.FC = () => {
             >
               {/* Recent Analyses */}
               <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-6"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800 p-8 hover:shadow-xl transition-all"
               >
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-purple-600" />
-                  Recent Analyses
-                </h2>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-lg flex items-center justify-center">
+                    <Clock className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                      Recent Analyses
+                    </h2>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Your previous resume optimizations
+                    </p>
+                  </div>
+                </div>
                 
                 {recentAnalyses.length > 0 ? (
                   <div className="space-y-3">
@@ -1140,12 +1331,12 @@ export const ResumePage: React.FC = () => {
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.1 }}
-                        className="group flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all cursor-pointer"
+                        className="group flex items-center justify-between p-5 bg-gradient-to-r from-gray-50 to-gray-100/50 dark:from-gray-800/50 dark:to-gray-800/30 rounded-2xl hover:shadow-lg transition-all cursor-pointer border border-gray-100 dark:border-gray-700 hover:border-[#1DE0DD]/30 dark:hover:border-[#1DE0DD]/30"
                         onClick={() => loadPreviousAnalysis(analysis)}
                       >
                         <div className="flex items-center gap-4">
-                          <div className="p-3 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl text-white group-hover:scale-110 transition-transform">
-                            <FileText className="w-5 h-5" />
+                          <div className="p-3 bg-gradient-to-br from-[#1DE0DD]/20 to-[#00C4CC]/20 rounded-xl group-hover:scale-110 transition-transform">
+                            <FileText className="w-5 h-5 text-[#1DE0DD]" />
                           </div>
                           <div>
                             <p className="font-medium text-gray-900 dark:text-white">
@@ -1158,7 +1349,7 @@ export const ResumePage: React.FC = () => {
                               {analysis.analysis_result?.data?.summary?.overallScore && (
                                 <Badge className={`text-xs ${
                                   analysis.analysis_result.data.summary.overallScore >= 70
-                                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                                    ? 'bg-[#1DE0DD]/10 text-[#1DE0DD]'
                                     : analysis.analysis_result.data.summary.overallScore >= 30
                                     ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
                                     : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
@@ -1173,18 +1364,19 @@ export const ResumePage: React.FC = () => {
                           animate={{ x: [0, 5, 0] }}
                           transition={{ repeat: Infinity, duration: 1.5 }}
                         >
-                          <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-200" />
+                          <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-[#1DE0DD] transition-colors" />
                         </motion.div>
                       </motion.div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-12">
-                    <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <FileText className="w-8 h-8 text-gray-400" />
+                  <div className="text-center py-16">
+                    <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                      <FileText className="w-10 h-10 text-gray-400 dark:text-gray-500" />
                     </div>
-                    <p className="text-gray-500 dark:text-gray-400">
-                      No analyses yet. Start by uploading a resume!
+                    <h3 className="text-lg font-light text-gray-700 dark:text-gray-300 mb-2">No Analyses Yet</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 max-w-xs mx-auto">
+                      Upload your resume and analyze it for a job position to see it here
                     </p>
                   </div>
                 )}
@@ -1192,15 +1384,24 @@ export const ResumePage: React.FC = () => {
               
               {/* Recent Uploads */}
               <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-6"
+                className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800 p-8 hover:shadow-xl transition-all"
               >
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-                  <Upload className="w-5 h-5 text-blue-600" />
-                  Recent Uploads
-                </h2>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500/20 to-blue-600/20 rounded-lg flex items-center justify-center">
+                    <Upload className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                      Recent Uploads
+                    </h2>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Your uploaded resume files
+                    </p>
+                  </div>
+                </div>
                 
                 {recentUploads.length > 0 ? (
                   <div className="space-y-3">
@@ -1210,11 +1411,11 @@ export const ResumePage: React.FC = () => {
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.1 }}
-                        className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl"
+                        className="flex items-center justify-between p-5 bg-gradient-to-r from-gray-50 to-gray-100/50 dark:from-gray-800/50 dark:to-gray-800/30 rounded-2xl border border-gray-100 dark:border-gray-700"
                       >
                         <div className="flex items-center gap-4">
-                          <div className="p-3 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl text-white">
-                            <FileType className="w-5 h-5" />
+                          <div className="p-3 bg-gradient-to-br from-blue-500/20 to-cyan-600/20 rounded-xl">
+                            <FileType className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                           </div>
                           <div>
                             <p className="font-medium text-gray-900 dark:text-white">
@@ -1231,12 +1432,13 @@ export const ResumePage: React.FC = () => {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-12">
-                    <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Upload className="w-8 h-8 text-gray-400" />
+                  <div className="text-center py-16">
+                    <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                      <Upload className="w-10 h-10 text-gray-400 dark:text-gray-500" />
                     </div>
-                    <p className="text-gray-500 dark:text-gray-400">
-                      No uploads yet. Upload your first resume to get started!
+                    <h3 className="text-lg font-light text-gray-700 dark:text-gray-300 mb-2">No Uploads Yet</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 max-w-xs mx-auto">
+                      Your uploaded resumes will appear here for quick access
                     </p>
                   </div>
                 )}
