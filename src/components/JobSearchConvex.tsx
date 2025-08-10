@@ -46,6 +46,7 @@ interface Job {
 interface Filters {
   datePosted?: string;
   remote?: boolean;
+  likedOnly?: boolean;
   employmentTypes?: string[];
   experienceLevel?: string[];
   radius?: number;
@@ -127,8 +128,13 @@ const JobSearchConvex: React.FC = () => {
       sortedJobs = sortedJobs.filter(job => job.job_is_remote);
     }
     
+    // Filter by liked jobs
+    if (filters.likedOnly) {
+      sortedJobs = sortedJobs.filter(job => likedJobs.has(job.job_id));
+    }
+    
     return sortedJobs;
-  }, [jobs, sortBy, filters]);
+  }, [jobs, sortBy, filters, likedJobs]);
   
   // Virtual scrolling setup for performance
   const virtualizer = useVirtualizer({
@@ -489,6 +495,18 @@ const JobSearchConvex: React.FC = () => {
               >
                 <Sparkles className="h-4 w-4" />
                 Remote Only
+              </button>
+              
+              <button
+                onClick={() => setFilters({ ...filters, likedOnly: !filters.likedOnly })}
+                className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-all font-medium ${
+                  filters.likedOnly
+                    ? 'bg-[#1DE0DD] text-white shadow-sm'
+                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                }`}
+              >
+                <Heart className={`h-4 w-4 ${filters.likedOnly ? 'fill-current' : ''}`} />
+                Liked Jobs {likedJobs.size > 0 && `(${likedJobs.size})`}
               </button>
               
               {/* Sort Dropdown - Moved to right */}

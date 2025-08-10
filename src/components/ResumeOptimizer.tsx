@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Loader2, Download, FileText, CheckCircle, AlertCircle, Eye } from 'lucide-react';
+import { X, Loader2, Download, FileText, CheckCircle, AlertCircle, Eye, TrendingUp, Target, Zap, Award, Briefcase, BookOpen } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, getSignedResumeUrl } from '../lib/supabase';
 import { extractTextFromPDF } from '../lib/pdfExtractor';
@@ -315,7 +315,7 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full mx-4 z-50"
+              className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full mx-4 z-50 max-h-[90vh] overflow-y-auto"
             >
               {/* Close button */}
               <button
@@ -365,40 +365,164 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
                     </button>
                   </div>
                 ) : state.analysisComplete && !state.previewUrl ? (
-                  <div className="text-center">
-                    <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <FileText className="w-8 h-8 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                      Resume Analysis Complete
-                    </h3>
-                    <p className="text-gray-600 dark:text-gray-400 mb-2">
-                      Your resume has been analyzed for
-                    </p>
-                    <p className="font-medium text-gray-900 dark:text-white mb-6">
-                      {job?.job_title} at {job?.employer_name}
-                    </p>
-
-                    {state.optimizationScore && (
-                      <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-6">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Current Match Score</span>
-                          <div className="text-2xl font-bold text-gray-900 dark:text-white">{state.optimizationScore.before}%</div>
+                  <div>
+                    {/* Premium Header */}
+                    <div className="text-center mb-6">
+                      <motion.div 
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="w-20 h-20 bg-gradient-to-br from-[#1DE0DD]/20 to-[#00C4CC]/20 rounded-full flex items-center justify-center mx-auto mb-4"
+                      >
+                        <div className="w-14 h-14 bg-gradient-to-br from-[#1DE0DD] to-[#00C4CC] rounded-full flex items-center justify-center">
+                          <Target className="w-8 h-8 text-white" />
                         </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Potential Score</span>
-                          <div className="text-2xl font-bold text-green-600">{state.optimizationScore.after}%</div>
+                      </motion.div>
+                      <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                        Analysis Complete!
+                      </h3>
+                      <p className="text-gray-600 dark:text-gray-400">
+                        <span className="font-semibold text-gray-900 dark:text-white">{job?.job_title}</span>
+                        {' at '}
+                        <span className="font-semibold text-gray-900 dark:text-white">{job?.employer_name}</span>
+                      </p>
+                    </div>
+
+                    {/* Match Score Card with Progress Bar */}
+                    {state.optimizationScore && (
+                      <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 rounded-xl p-5 mb-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-2">
+                            <TrendingUp className="w-5 h-5 text-[#1DE0DD]" />
+                            <span className="font-semibold text-gray-900 dark:text-white">Match Analysis</span>
+                          </div>
+                          <span className="text-xs px-2 py-1 bg-[#1DE0DD]/10 text-[#1DE0DD] rounded-full font-medium">
+                            AI Powered
+                          </span>
+                        </div>
+                        
+                        {/* Current Score */}
+                        <div className="space-y-3">
+                          <div>
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="text-sm text-gray-600 dark:text-gray-400">Current Match</span>
+                              <span className="text-lg font-bold text-gray-900 dark:text-white">{state.optimizationScore.before}%</span>
+                            </div>
+                            <div className="w-full h-3 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
+                              <motion.div 
+                                initial={{ width: 0 }}
+                                animate={{ width: `${state.optimizationScore.before}%` }}
+                                transition={{ duration: 1, ease: "easeOut" }}
+                                className="h-full bg-gradient-to-r from-gray-400 to-gray-500 rounded-full"
+                              />
+                            </div>
+                          </div>
+                          
+                          {/* Potential Score */}
+                          <div>
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                                <Zap className="w-4 h-4 text-[#1DE0DD]" />
+                                Potential Match
+                              </span>
+                              <span className="text-lg font-bold text-[#1DE0DD]">{state.optimizationScore.after}%</span>
+                            </div>
+                            <div className="w-full h-3 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
+                              <motion.div 
+                                initial={{ width: 0 }}
+                                animate={{ width: `${state.optimizationScore.after}%` }}
+                                transition={{ duration: 1.2, ease: "easeOut", delay: 0.2 }}
+                                className="h-full bg-gradient-to-r from-[#1DE0DD] to-[#00C4CC] rounded-full"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Improvement Badge */}
+                        <div className="mt-4 flex items-center justify-center">
+                          <div className="px-3 py-1.5 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center gap-2">
+                            <TrendingUp className="w-4 h-4 text-green-600 dark:text-green-400" />
+                            <span className="text-sm font-medium text-green-700 dark:text-green-400">
+                              +{state.optimizationScore.after - state.optimizationScore.before}% Improvement Possible
+                            </span>
+                          </div>
                         </div>
                       </div>
                     )}
 
-                    <button
+                    {/* Analysis Details */}
+                    {state.analysisData && (
+                      <div className="space-y-3 mb-6">
+                        {/* Key Insights */}
+                        {(state.analysisData.keyInsights || state.analysisData.summary?.keyInsights) && (
+                          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                              <BookOpen className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                              <span className="text-sm font-medium text-blue-900 dark:text-blue-300">Key Insights</span>
+                            </div>
+                            <ul className="text-sm text-blue-700 dark:text-blue-200 space-y-1">
+                              {(state.analysisData.keyInsights || state.analysisData.summary?.keyInsights || []).slice(0, 3).map((insight: string, idx: number) => (
+                                <li key={idx} className="flex items-start">
+                                  <span className="mr-2">•</span>
+                                  <span>{insight}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Skills Match */}
+                        {(state.analysisData.matchingSkills || state.analysisData.skills?.matching) && (
+                          <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Award className="w-4 h-4 text-green-600 dark:text-green-400" />
+                              <span className="text-sm font-medium text-green-900 dark:text-green-300">Matching Skills</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {(state.analysisData.matchingSkills || state.analysisData.skills?.matching || []).slice(0, 5).map((skill: string, idx: number) => (
+                                <span key={idx} className="px-2 py-1 bg-green-100 dark:bg-green-800/30 text-green-700 dark:text-green-300 rounded-md text-xs">
+                                  {skill}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Missing Skills */}
+                        {(state.analysisData.missingSkills || state.analysisData.skills?.missing || state.analysisData.gaps) && (
+                          <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Briefcase className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                              <span className="text-sm font-medium text-amber-900 dark:text-amber-300">Skills to Highlight</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {(state.analysisData.missingSkills || state.analysisData.skills?.missing || state.analysisData.gaps || []).slice(0, 5).map((skill: string, idx: number) => (
+                                <span key={idx} className="px-2 py-1 bg-amber-100 dark:bg-amber-800/30 text-amber-700 dark:text-amber-300 rounded-md text-xs">
+                                  {skill}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Generate Button */}
+                    <motion.button
                       onClick={generateOptimizedResume}
-                      className="w-full px-4 py-3 bg-[#1DE0DD] text-white rounded-lg hover:bg-[#1DE0DD]/90 transition-colors flex items-center justify-center gap-2"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="w-full px-6 py-4 bg-gradient-to-r from-[#1DE0DD] to-[#00C4CC] text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-3"
                     >
-                      <FileText className="w-5 h-5" />
-                      Generate Optimized Resume
-                    </button>
+                      <div className="p-2 bg-white/20 rounded-lg">
+                        <Zap className="w-5 h-5" />
+                      </div>
+                      <span>Generate Optimized Resume</span>
+                    </motion.button>
+
+                    {/* Info Text */}
+                    <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-4">
+                      Your resume will be tailored specifically for this position using AI
+                    </p>
                   </div>
                 ) : state.previewUrl ? (
                   <div className="text-center">
