@@ -51,7 +51,6 @@ interface Filters {
   radius?: number;
 }
 
-type ViewMode = 'grid' | 'list' | 'compact';
 type SortBy = 'match_score' | 'date' | 'salary';
 
 const JobSearchConvex: React.FC = () => {
@@ -64,7 +63,6 @@ const JobSearchConvex: React.FC = () => {
   const [resumeText, setResumeText] = useState('');
   const [sessionId, setSessionId] = useState<Id<"jobSearchSessions"> | null>(null);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [sortBy, setSortBy] = useState<SortBy>('match_score');
   const [filters, setFilters] = useState<Filters>({
     datePosted: 'week',
@@ -136,14 +134,7 @@ const JobSearchConvex: React.FC = () => {
   const virtualizer = useVirtualizer({
     count: processedJobs.length,
     getScrollElement: () => scrollingRef.current,
-    estimateSize: useCallback((index) => {
-      switch (viewMode) {
-        case 'grid': return 260;
-        case 'list': return 140;
-        case 'compact': return 80;
-        default: return 140;
-      }
-    }, [viewMode]),
+    estimateSize: useCallback(() => 140, []), // Fixed height for list view
     overscan: 3, // Render 3 items outside viewport
   });
   
@@ -470,62 +461,49 @@ const JobSearchConvex: React.FC = () => {
           </div>
           
           </div>
-          
-          {/* Filter Controls */}
-          <div className="flex gap-2 items-center mt-3">
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-all border ${
-                showFilters 
-                  ? 'bg-[#1DE0DD]/10 border-[#1DE0DD] text-[#1DE0DD]' 
-                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              Filters
-            </button>
-            
-            <button
-              onClick={() => setFilters({ ...filters, remote: !filters.remote })}
-              className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-all border ${
-                filters.remote
-                  ? 'bg-[#1DE0DD]/10 text-[#1DE0DD] border-[#1DE0DD]'
-                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <Sparkles className="h-4 w-4" />
-              Remote Only
-            </button>
-            
-            {/* View Mode Toggle */}
-            <div className="ml-auto flex gap-1 bg-gray-100 rounded-lg p-1">
-              {(['grid', 'list', 'compact'] as ViewMode[]).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => setViewMode(mode)}
-                  className={`p-2 rounded transition-all ${
-                    viewMode === mode
-                      ? 'bg-white text-[#1DE0DD] shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
+        </div>
+        
+        {/* Filter Controls - Outside the container for full width */}
+        <div className="bg-gray-50 border-t border-gray-100">
+          <div className="max-w-7xl mx-auto px-6 py-3">
+            <div className="flex gap-2 items-center">
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-all font-medium ${
+                  showFilters 
+                    ? 'bg-[#1DE0DD] text-white shadow-sm' 
+                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                }`}
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+                Filters
+              </button>
+              
+              <button
+                onClick={() => setFilters({ ...filters, remote: !filters.remote })}
+                className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-all font-medium ${
+                  filters.remote
+                    ? 'bg-[#1DE0DD] text-white shadow-sm'
+                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                }`}
+              >
+                <Sparkles className="h-4 w-4" />
+                Remote Only
+              </button>
+              
+              {/* Sort Dropdown - Moved to right */}
+              <div className="ml-auto">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortBy)}
+                  className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-[#1DE0DD] focus:border-[#1DE0DD] transition-all"
                 >
-                  {mode === 'grid' && <Grid3X3 className="h-4 w-4" />}
-                  {mode === 'list' && <List className="h-4 w-4" />}
-                  {mode === 'compact' && <LayoutGrid className="h-4 w-4" />}
-                </button>
-              ))}
+                  <option value="match_score">Best Match</option>
+                  <option value="date">Most Recent</option>
+                  <option value="salary">Highest Salary</option>
+                </select>
+              </div>
             </div>
-            
-            {/* Sort Dropdown */}
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortBy)}
-              className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1DE0DD] focus:border-[#1DE0DD] transition-all"
-            >
-              <option value="match_score">Best Match</option>
-              <option value="date">Most Recent</option>
-              <option value="salary">Highest Salary</option>
-            </select>
           </div>
         </div>
         
@@ -537,23 +515,23 @@ const JobSearchConvex: React.FC = () => {
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.3 }}
-              className="border-t border-white/10 bg-[#0f172a]/80 backdrop-blur-xl overflow-hidden"
+              className="border-t border-gray-200 bg-white shadow-sm overflow-hidden"
             >
-              <div className="max-w-7xl mx-auto px-4 py-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              <div className="max-w-7xl mx-auto px-6 py-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
                   {/* Date Posted Filter */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Date Posted</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Date Posted</label>
                     <select
                       value={filters.datePosted || 'week'}
                       onChange={(e) => setFilters({ ...filters, datePosted: e.target.value })}
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#1DE0DD]/50 focus:border-[#1DE0DD]/50 transition-all"
+                      className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#1DE0DD] focus:border-[#1DE0DD] transition-all"
                     >
-                      <option value="today" className="bg-[#1e293b]">Today</option>
-                      <option value="3days" className="bg-[#1e293b]">Last 3 days</option>
-                      <option value="week" className="bg-[#1e293b]">Last week</option>
-                      <option value="month" className="bg-[#1e293b]">Last month</option>
-                      <option value="all" className="bg-[#1e293b]">All time</option>
+                      <option value="today">Today</option>
+                      <option value="3days">Last 3 days</option>
+                      <option value="week">Last week</option>
+                      <option value="month">Last month</option>
+                      <option value="all">All time</option>
                     </select>
                   </div>
                   

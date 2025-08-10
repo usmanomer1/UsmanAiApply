@@ -17,6 +17,10 @@ interface ResumeOptimizerProps {
 interface OptimizationState {
   loading: boolean;
   error: string | null;
+  analysisComplete: boolean;
+  analysisData: any | null;
+  authToken?: string;
+  generating: boolean;
   previewUrl: string | null;
   downloadUrl: string | null;
   fileName: string | null;
@@ -36,6 +40,9 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
   const [state, setState] = useState<OptimizationState>({
     loading: false,
     error: null,
+    analysisComplete: false,
+    analysisData: null,
+    generating: false,
     previewUrl: null,
     downloadUrl: null,
     fileName: null
@@ -44,8 +51,8 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
   // Get API URL for Railway-hosted resume service
   const RESUME_API_URL = import.meta.env.VITE_RESUME_API_URL || 'https://terrific-imagination-production-6ca9.up.railway.app';
 
-  const optimizeResume = async () => {
-    setState(prev => ({ ...prev, loading: true, error: null }));
+  const analyzeResume = async () => {
+    setState(prev => ({ ...prev, loading: true, error: null, analysisComplete: false }));
 
     try {
       if (!user?.id) {
@@ -58,45 +65,40 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
         throw new Error(reason || 'Insufficient AI tokens for resume optimization');
       }
 
-      let resumeFile: File;
-      let resumeTextToSend = resumeText;
+      let resumeFile: File | undefined;
 
-      // If no resume text, fetch from Supabase
-      if (!resumeText || resumeText.trim().length === 0) {
-        if (!user?.id) {
-          throw new Error('User not authenticated');
-        }
-
-        // Fetch user's profile to get resume_url
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('resume_url')
-          .eq('user_id', user.id)
-          .single();
-
-        if (profileError || !profileData?.resume_url) {
-          throw new Error('No resume found. Please upload a resume in your profile.');
-        }
-
-        // Get signed URL for the resume
-        const signedUrl = await getSignedResumeUrl(profileData.resume_url);
-        if (!signedUrl) {
-          throw new Error('Failed to access resume file');
-        }
-
-        // Fetch the actual file
-        const response = await fetch(signedUrl);
-        if (!response.ok) {
-          throw new Error('Failed to download resume from storage');
-        }
-
-        const blob = await response.blob();
-        const fileName = profileData.resume_url.split('/').pop() || 'resume.pdf';
-        resumeFile = new File([blob], fileName, { type: 'application/pdf' });
-        
-        // Extract text from PDF
-        resumeTextToSend = await extractTextFromPDF(resumeFile);
+      // We always need a file for the API, so fetch from Supabase
+      // (The backend doesn't accept text-only requests)
+      if (!user?.id) {
+        throw new Error('User not authenticated');
       }
+
+      // Fetch user's profile to get resume_url
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('resume_url')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profileError || !profileData?.resume_url) {
+        throw new Error('No resume found. Please upload a resume in your profile.');
+      }
+
+      // Get signed URL for the resume
+      const signedUrl = await getSignedResumeUrl(profileData.resume_url);
+      if (!signedUrl) {
+        throw new Error('Failed to access resume file');
+      }
+
+      // Fetch the actual file
+      const response = await fetch(signedUrl);
+      if (!response.ok) {
+        throw new Error('Failed to download resume from storage');
+      }
+
+      const blob = await response.blob();
+      const fileName = profileData.resume_url.split('/').pop() || 'resume.pdf';
+      resumeFile = new File([blob], fileName, { type: 'application/pdf' });
 
       // Get Supabase session
       const { data: { session } } = await supabase.auth.getSession();
@@ -105,14 +107,13 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
       }
       
       // Get JWT token from Resume API
-      const tokenResponse = await fetch(`${RESUME_API_URL}/auth/token`, {
+      const tokenResponse = await fetch(`${RESUME_API_URL}/api/auth/token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          user_id: session.user.id,
-          email: session.user.email,
+          user_id: session.user.id
         })
       });
       
@@ -126,40 +127,31 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
         throw new Error('Failed to get authentication token');
       }
 
-      // Step 1: Analyze the resume
-      let analyzeResponse;
-      
-      if (resumeFile!) {
-        // If we have a PDF file, use multipart form data
-        const formData = new FormData();
-        formData.append('resume', resumeFile);
-        formData.append('job_description', job?.job_description || '');
-        formData.append('job_title', job?.job_title || '');
-        formData.append('company_name', job?.employer_name || '');
-        
-        analyzeResponse = await fetch(`${RESUME_API_URL}/api/resume/analyze`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${authToken}`,
-          },
-          body: formData
-        });
-      } else {
-        // Send as JSON if we only have text
-        analyzeResponse = await fetch(`${RESUME_API_URL}/api/resume/analyze`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`,
-          },
-          body: JSON.stringify({
-            resumeText: resumeTextToSend,
-            jobDescription: job?.job_description || '',
-            jobTitle: job?.job_title || '',
-            companyName: job?.employer_name || ''
-          })
-        });
+      // Store token for later use in generate
+      setState(prev => ({ ...prev, authToken }));
+
+      // Step 1: Analyze the resume - API only accepts form data with file upload
+      if (!resumeFile) {
+        throw new Error('Resume file is required for analysis');
       }
+
+      // Use multipart form data (the only format the backend accepts)
+      const formData = new FormData();
+      formData.append('resume', resumeFile);
+      
+      // Ensure minimum length requirements are met
+      const jobDesc = job?.job_description || 'No specific job description provided. Looking for a general position that matches the candidate skills and experience in the technology industry.';
+      formData.append('job_description', jobDesc.length >= 50 ? jobDesc : jobDesc.padEnd(50, '.'));
+      formData.append('job_title', job?.job_title || 'Software Engineer');
+      formData.append('company_name', job?.employer_name || 'Technology Company');
+      
+      const analyzeResponse = await fetch(`${RESUME_API_URL}/api/resume/analyze`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+        },
+        body: formData
+      });
 
       if (!analyzeResponse.ok) {
         const errorData = await analyzeResponse.json().catch(() => ({}));
@@ -169,41 +161,99 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
       const analyzeResult = await analyzeResponse.json();
       const analysisData = analyzeResult.data || analyzeResult;
       
+      // Log the analysis data to debug
+      console.log('Analysis Data:', analysisData);
+      
+      // Update state with analysis results
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        analysisComplete: true,
+        analysisData,
+        optimizationScore: {
+          before: analysisData.summary?.overallScore || analysisData.currentScore || 0,
+          after: analysisData.summary?.potentialScore || analysisData.potentialScore || 0
+        }
+      }));
+
+      toast.success('Resume analyzed successfully!');
+
+    } catch (error: any) {
+      console.error('Analysis error:', error);
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: error.message || 'Failed to analyze resume'
+      }));
+      toast.error(error.message || 'Failed to analyze resume');
+    }
+  };
+
+  const generateOptimizedResume = async () => {
+    setState(prev => ({ ...prev, generating: true, error: null }));
+
+    try {
+      if (!state.analysisData || !state.authToken) {
+        throw new Error('Please analyze the resume first');
+      }
+
       // Step 2: Generate the optimized resume
+      // Ensure we have valid data for the request
+      const requestBody = {
+        analysisId: state.analysisData.analysisId || state.analysisData.id,
+        editType: 'full', // or 'quick' based on user preference
+        selectedSections: Array.isArray(state.analysisData.suggestedSections) 
+          ? state.analysisData.suggestedSections 
+          : [],
+        selectedSkills: Array.isArray(state.analysisData.suggestedSkills) 
+          ? state.analysisData.suggestedSkills 
+          : [],
+        additionalInstructions: ''
+      };
+      
+      console.log('Generate Request Body:', requestBody);
+      
       const generateResponse = await fetch(`${RESUME_API_URL}/api/resume/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
+          'Authorization': `Bearer ${state.authToken}`,
         },
-        body: JSON.stringify({
-          analysisId: analysisData.analysisId,
-          editType: 'full', // or 'quick' based on user preference
-          selectedSections: analysisData.suggestedSections || [],
-          selectedSkills: analysisData.suggestedSkills || [],
-          additionalInstructions: ''
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (!generateResponse.ok) {
         const errorData = await generateResponse.json().catch(() => ({}));
-        throw new Error(errorData.error || errorData.message || `Generation failed: ${generateResponse.status}`);
+        
+        console.error('Generate Error Response:', {
+          status: generateResponse.status,
+          error: errorData
+        });
+        
+        // Handle LaTeX compilation errors specifically
+        if (generateResponse.status === 500 && (errorData.error?.includes('LaTeX') || errorData.message?.includes('LaTeX'))) {
+          throw new Error('Resume generation failed due to formatting issues. The backend is having issues with special characters in the resume. This is a known issue we are working to fix.');
+        }
+        
+        // Handle validation errors
+        if (generateResponse.status === 422) {
+          const details = errorData.detail?.[0]?.msg || errorData.detail || 'Invalid request data';
+          throw new Error(`Validation error: ${details}`);
+        }
+        
+        throw new Error(errorData.error || errorData.message || errorData.detail || `Generation failed: ${generateResponse.status}`);
       }
 
       const generateResult = await generateResponse.json();
       const generationData = generateResult.data || generateResult;
       
-      // Update state with analysis and generation results
+      // Update state with generation results
       setState(prev => ({
         ...prev,
-        loading: false,
+        generating: false,
         previewUrl: generationData.previewUrl || generationData.downloadUrl,
         downloadUrl: generationData.downloadUrl || generationData.previewUrl,
-        fileName: generationData.fileName || `optimized_resume_${new Date().toISOString().split('T')[0]}.pdf`,
-        optimizationScore: {
-          before: analysisData.summary?.overallScore || analysisData.currentScore || 0,
-          after: analysisData.summary?.potentialScore || analysisData.potentialScore || 0
-        }
+        fileName: generationData.fileName || `optimized_resume_${new Date().toISOString().split('T')[0]}.pdf`
       }));
 
       // Track successful optimization
@@ -213,16 +263,16 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
         method: 'simple_optimizer'
       });
 
-      toast.success('Resume optimized successfully!');
+      toast.success('Resume generated successfully!');
 
     } catch (error: any) {
-      console.error('Optimization error:', error);
+      console.error('Generation error:', error);
       setState(prev => ({
         ...prev,
-        loading: false,
-        error: error.message || 'Failed to optimize resume'
+        generating: false,
+        error: error.message || 'Failed to generate resume'
       }));
-      toast.error(error.message || 'Failed to optimize resume');
+      toast.error(error.message || 'Failed to generate resume');
     }
   };
 
@@ -239,10 +289,10 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
     }
   };
 
-  // Auto-start optimization when panel opens
+  // Auto-start analysis when panel opens
   React.useEffect(() => {
-    if (isOpen && !state.loading && !state.previewUrl) {
-      optimizeResume();
+    if (isOpen && !state.loading && !state.analysisComplete && !state.previewUrl) {
+      analyzeResume();
     }
   }, [isOpen]);
 
@@ -280,10 +330,20 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
                   <div className="text-center py-12">
                     <Loader2 className="w-12 h-12 text-[#1DE0DD] animate-spin mx-auto mb-4" />
                     <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                      Optimizing Your Resume
+                      Analyzing Your Resume
                     </h3>
                     <p className="text-gray-600 dark:text-gray-400">
-                      Using AI to tailor your resume for {job?.job_title || 'this position'}...
+                      Comparing your resume with {job?.job_title || 'this position'}...
+                    </p>
+                  </div>
+                ) : state.generating ? (
+                  <div className="text-center py-12">
+                    <Loader2 className="w-12 h-12 text-[#1DE0DD] animate-spin mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                      Generating Optimized Resume
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      Creating your tailored resume document...
                     </p>
                   </div>
                 ) : state.error ? (
@@ -298,10 +358,46 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
                       {state.error}
                     </p>
                     <button
-                      onClick={optimizeResume}
+                      onClick={analyzeResume}
                       className="px-4 py-2 bg-[#1DE0DD] text-white rounded-lg hover:bg-[#1DE0DD]/90 transition-colors"
                     >
                       Try Again
+                    </button>
+                  </div>
+                ) : state.analysisComplete && !state.previewUrl ? (
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <FileText className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                      Resume Analysis Complete
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-400 mb-2">
+                      Your resume has been analyzed for
+                    </p>
+                    <p className="font-medium text-gray-900 dark:text-white mb-6">
+                      {job?.job_title} at {job?.employer_name}
+                    </p>
+
+                    {state.optimizationScore && (
+                      <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-6">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Current Match Score</span>
+                          <div className="text-2xl font-bold text-gray-900 dark:text-white">{state.optimizationScore.before}%</div>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Potential Score</span>
+                          <div className="text-2xl font-bold text-green-600">{state.optimizationScore.after}%</div>
+                        </div>
+                      </div>
+                    )}
+
+                    <button
+                      onClick={generateOptimizedResume}
+                      className="w-full px-4 py-3 bg-[#1DE0DD] text-white rounded-lg hover:bg-[#1DE0DD]/90 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <FileText className="w-5 h-5" />
+                      Generate Optimized Resume
                     </button>
                   </div>
                 ) : state.previewUrl ? (
