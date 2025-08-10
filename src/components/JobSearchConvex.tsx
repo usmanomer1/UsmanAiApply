@@ -213,6 +213,34 @@ const JobSearchConvex: React.FC = () => {
     }
   }, [userInteractions]);
   
+  // Handle resume upload
+  const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (file.type !== 'application/pdf') {
+      toast.error('Please upload a PDF file');
+      return;
+    }
+    
+    try {
+      const text = await extractTextFromPDF(file);
+      setResumeText(text);
+      
+      // Cache for performance
+      try {
+        localStorage.setItem('resume_text_cache', text);
+      } catch (err) {
+        console.warn('Could not cache resume:', err);
+      }
+      
+      toast.success('Resume uploaded successfully!');
+    } catch (error) {
+      console.error('Error processing resume:', error);
+      toast.error('Failed to process resume. Please try again.');
+    }
+  };
+  
   // Handle search
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
@@ -710,7 +738,6 @@ const JobSearchConvex: React.FC = () => {
             </div>
           </div>
         )}
-      </div>
       
       {/* Jobs List with Virtual Scrolling */}
       <div className="max-w-7xl mx-auto px-4 py-8">
