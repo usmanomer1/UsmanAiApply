@@ -425,8 +425,9 @@ const JobSearchConvex: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       {/* Search Section */}
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
+      <div className="sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 backdrop-blur-sm hover:shadow-xl transition-shadow duration-300">
           {/* Resume Upload Alert */}
           {!resumeText && (
             <motion.div 
@@ -501,9 +502,9 @@ const JobSearchConvex: React.FC = () => {
               </span>
             </div>
           </div>
-          
           </div>
         </div>
+      </div>
         
         {/* Filter Controls - Outside the container for full width */}
         <div className="bg-gray-50 border-t border-gray-100">
