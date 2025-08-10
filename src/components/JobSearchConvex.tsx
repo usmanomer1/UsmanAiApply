@@ -140,14 +140,23 @@ const JobSearchConvex: React.FC = () => {
   const virtualizer = useVirtualizer({
     count: processedJobs.length,
     getScrollElement: () => scrollingRef.current,
-    estimateSize: useCallback(() => 140, []), // Fixed height for list view
+    estimateSize: useCallback(() => 150, []), // Increased height to prevent overlap
     overscan: 3, // Render 3 items outside viewport
+    measureElement: (element) => {
+      // Measure actual element height to prevent stacking
+      if (element) {
+        return element.getBoundingClientRect().height + 8; // Add gap
+      }
+      return 150;
+    },
   });
   
   // Force re-measure when jobs change
   useEffect(() => {
-    virtualizer.measure();
-  }, [processedJobs.length]);
+    if (virtualizer) {
+      virtualizer.measure();
+    }
+  }, [processedJobs.length, virtualizer]);
   
   // Load resume on mount
   useEffect(() => {
@@ -790,19 +799,22 @@ const JobSearchConvex: React.FC = () => {
               return (
                   <div
                     key={job._id}
+                    data-index={virtualItem.index}
+                    ref={virtualizer.measureElement}
                     style={{
                       position: 'absolute',
                       top: 0,
                       left: 0,
                       width: '100%',
-                      height: `${virtualItem.size}px`,
                       transform: `translateY(${virtualItem.start}px)`,
+                      zIndex: 1,
+                      paddingBottom: '8px',
                     }}
                   >
                     <motion.div
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      transition={{ duration: 0.3 }}
+                      transition={{ duration: 0.3, delay: virtualItem.index * 0.05 }}
                       whileHover={{ y: -2, transition: { duration: 0.2 } }}
                       className={`bg-white rounded-lg shadow-sm hover:shadow-lg transition-shadow p-4 mx-2 mb-2 border ${getMatchScoreColor(job.match_score)}`}
                     >
