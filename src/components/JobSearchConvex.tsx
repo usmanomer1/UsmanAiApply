@@ -1109,15 +1109,6 @@ const JobSearchConvex: React.FC = () => {
                             >
                               <Heart className={`h-4 w-4 ${isLiked ? 'fill-current' : ''}`} />
                             </motion.button>
-                            
-                            <motion.button
-                              onClick={() => setSelectedJob(job)}
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              className="p-2 bg-white border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50"
-                            >
-                              <ChevronRight className="h-4 w-4" />
-                            </motion.button>
                           </div>
                         </div>
                       </div>
