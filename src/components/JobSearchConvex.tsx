@@ -779,191 +779,100 @@ const JobSearchConvex: React.FC = () => {
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="flex flex-col items-center justify-center py-16"
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            className="flex flex-col items-center justify-center py-20"
           >
-            {/* Animated Background Pattern */}
-            <div className="relative mb-8">
-              <motion.div
-                animate={{
-                  scale: [1, 1.2, 1],
-                  rotate: [0, 180, 360],
-                }}
-                transition={{
-                  duration: 20,
-                  repeat: Infinity,
-                  ease: "linear"
-                }}
-                className="absolute inset-0 w-32 h-32 bg-gradient-to-br from-[#1DE0DD]/20 to-purple-500/20 rounded-full blur-3xl"
-              />
-              <motion.div
-                animate={{
-                  scale: [1.2, 1, 1.2],
-                  rotate: [360, 180, 0],
-                }}
-                transition={{
-                  duration: 15,
-                  repeat: Infinity,
-                  ease: "linear"
-                }}
-                className="absolute inset-0 w-32 h-32 bg-gradient-to-br from-indigo-500/20 to-[#00C4CC]/20 rounded-full blur-3xl"
-              />
-              <motion.div
-                animate={{ 
-                  y: [0, -10, 0],
-                  rotate: [0, 5, -5, 0]
-                }}
-                transition={{ 
-                  duration: 4,
-                  repeat: Infinity,
-                  ease: "easeInOut"
-                }}
-                className="relative"
-              >
-                <div className="relative bg-gradient-to-br from-[#1DE0DD] to-[#00C4CC] p-4 rounded-2xl shadow-2xl">
-                  <Briefcase className="h-16 w-16 text-white" />
-                  <motion.div
-                    animate={{ scale: [0, 1, 0] }}
-                    transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
-                    className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full"
-                  />
-                  <motion.div
-                    animate={{ scale: [0, 1, 0] }}
-                    transition={{ duration: 2, repeat: Infinity, delay: 1 }}
-                    className="absolute -bottom-1 -left-1 w-3 h-3 bg-pink-400 rounded-full"
-                  />
-                </div>
-              </motion.div>
-            </div>
+            {/* Minimalist Icon */}
+            <motion.div 
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.1, duration: 0.5, ease: "easeOut" }}
+              className="relative mb-8"
+            >
+              {/* Subtle glow effect */}
+              <div className="absolute inset-0 w-24 h-24 bg-[#1DE0DD]/10 rounded-full blur-2xl" />
+              
+              {/* Clean icon container */}
+              <div className="relative bg-gradient-to-b from-gray-50 to-white border border-gray-200 p-6 rounded-2xl shadow-sm">
+                <Briefcase className="h-12 w-12 text-gray-700" strokeWidth={1.5} />
+              </div>
+            </motion.div>
             
-            {/* Animated Title with Gradient */}
+            {/* Elegant Typography */}
             <motion.h3 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 0.2 }}
-              className="text-3xl font-bold mb-3 bg-gradient-to-r from-[#1DE0DD] via-indigo-600 to-purple-600 bg-clip-text text-transparent"
+              transition={{ delay: 0.2, duration: 0.5 }}
+              className="text-2xl font-light text-gray-900 mb-3 tracking-tight"
             >
-              Your Dream Job Awaits!
+              Find Your Next Opportunity
             </motion.h3>
             
-            {/* Animated Subtitle */}
             <motion.p 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 0.3 }}
-              className="text-gray-600 text-center max-w-lg mb-8 text-lg"
+              transition={{ delay: 0.3, duration: 0.5 }}
+              className="text-gray-500 text-center max-w-md mb-12 leading-relaxed"
             >
-              Powered by AI to match you with the perfect opportunities
+              AI-powered job matching tailored to your experience and aspirations
             </motion.p>
             
-            {/* Statistics Cards */}
+            {/* Premium Statistics */}
             <motion.div 
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="grid grid-cols-3 gap-4 mb-8"
+              transition={{ delay: 0.4, duration: 0.5 }}
+              className="flex gap-12 mb-12"
             >
-              <motion.div 
-                whileHover={{ scale: 1.05, y: -5 }}
-                className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-4 rounded-xl border border-emerald-200 shadow-sm"
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <TrendingUp className="h-5 w-5 text-emerald-600" />
-                  <span className="text-2xl font-bold text-emerald-700">85%</span>
-                </div>
-                <p className="text-xs text-emerald-600 font-medium">Avg Match Rate</p>
-              </motion.div>
-              
-              <motion.div 
-                whileHover={{ scale: 1.05, y: -5 }}
-                className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-xl border border-indigo-200 shadow-sm"
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <Users className="h-5 w-5 text-indigo-600" />
-                  <span className="text-2xl font-bold text-indigo-700">10K+</span>
-                </div>
-                <p className="text-xs text-indigo-600 font-medium">Active Jobs</p>
-              </motion.div>
-              
-              <motion.div 
-                whileHover={{ scale: 1.05, y: -5 }}
-                className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl border border-purple-200 shadow-sm"
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <Star className="h-5 w-5 text-purple-600" />
-                  <span className="text-2xl font-bold text-purple-700">4.9</span>
-                </div>
-                <p className="text-xs text-purple-600 font-medium">User Rating</p>
-              </motion.div>
-            </motion.div>
-            
-            {/* Search Tips with Icons */}
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
-              className="flex flex-wrap gap-3 justify-center mb-8"
-            >
-              {[
-                { icon: <Sparkles className="h-4 w-4" />, text: "AI-Powered Matching", color: "from-yellow-400 to-orange-400" },
-                { icon: <Clock className="h-4 w-4" />, text: "Real-time Results", color: "from-blue-400 to-indigo-400" },
-                { icon: <MapPin className="h-4 w-4" />, text: "Location-based Search", color: "from-green-400 to-emerald-400" },
-                { icon: <Heart className="h-4 w-4" />, text: "Save Favorites", color: "from-pink-400 to-rose-400" },
-              ].map((tip, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.6 + index * 0.1 }}
-                  whileHover={{ scale: 1.05, y: -2 }}
-                  className={`flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r ${tip.color} text-white rounded-full text-sm font-medium shadow-md`}
-                >
-                  {tip.icon}
-                  <span>{tip.text}</span>
-                </motion.div>
-              ))}
-            </motion.div>
-            
-            {/* Call to Action with Arrow Animation */}
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.7 }}
-              className="flex flex-col items-center gap-3"
-            >
-              <motion.div
-                animate={{ y: [0, -5, 0] }}
-                transition={{ duration: 1.5, repeat: Infinity }}
-                className="flex items-center gap-2 text-gray-500"
-              >
-                <span className="text-sm font-medium">Start searching above</span>
-                <motion.div
-                  animate={{ y: [-2, 2, -2] }}
-                  transition={{ duration: 1, repeat: Infinity }}
-                >
-                  <ChevronRight className="h-4 w-4 rotate-[-90deg]" />
-                </motion.div>
-              </motion.div>
-              
-              {/* Decorative Sparkles */}
-              <div className="flex gap-2">
-                {[...Array(3)].map((_, i) => (
-                  <motion.div
-                    key={i}
-                    animate={{
-                      opacity: [0, 1, 0],
-                      scale: [0.5, 1, 0.5],
-                    }}
-                    transition={{
-                      duration: 2,
-                      repeat: Infinity,
-                      delay: i * 0.3,
-                    }}
-                  >
-                    <Sparkles className="h-3 w-3 text-[#1DE0DD]" />
-                  </motion.div>
-                ))}
+              <div className="text-center">
+                <div className="text-3xl font-light text-gray-900 mb-1">10K+</div>
+                <div className="text-xs text-gray-500 uppercase tracking-wider">Active Jobs</div>
               </div>
+              <div className="text-center border-l border-r border-gray-200 px-12">
+                <div className="text-3xl font-light text-gray-900 mb-1">85%</div>
+                <div className="text-xs text-gray-500 uppercase tracking-wider">Match Rate</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-light text-gray-900 mb-1">24h</div>
+                <div className="text-xs text-gray-500 uppercase tracking-wider">Updates</div>
+              </div>
+            </motion.div>
+            
+            {/* Subtle Features */}
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5, duration: 0.5 }}
+              className="flex gap-6 mb-8"
+            >
+              <div className="flex items-center gap-2 text-gray-600">
+                <div className="w-1 h-1 bg-[#1DE0DD] rounded-full" />
+                <span className="text-sm">Smart Matching</span>
+              </div>
+              <div className="flex items-center gap-2 text-gray-600">
+                <div className="w-1 h-1 bg-[#1DE0DD] rounded-full" />
+                <span className="text-sm">Real-time Updates</span>
+              </div>
+              <div className="flex items-center gap-2 text-gray-600">
+                <div className="w-1 h-1 bg-[#1DE0DD] rounded-full" />
+                <span className="text-sm">Resume Analysis</span>
+              </div>
+            </motion.div>
+            
+            {/* Elegant CTA */}
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.6, duration: 0.5 }}
+              className="flex items-center gap-2"
+            >
+              <span className="text-sm text-gray-400">Enter a job title above to begin</span>
+              <motion.div
+                animate={{ x: [0, 3, 0] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              >
+                <ArrowUpRight className="h-3 w-3 text-gray-400 rotate-[-45deg]" />
+              </motion.div>
             </motion.div>
           </motion.div>
         )}
@@ -971,35 +880,43 @@ const JobSearchConvex: React.FC = () => {
         {/* Loading State */}
         {isSearching && processedJobs.length === 0 && (
           <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4 }}
             className="flex flex-col items-center justify-center py-24"
           >
-            <div className="relative">
+            {/* Elegant loading indicator */}
+            <div className="relative mb-8">
               <motion.div
                 animate={{ rotate: 360 }}
+                transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                className="w-16 h-16 border border-gray-200 rounded-full"
+              />
+              <motion.div
+                animate={{ rotate: -360 }}
                 transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                className="w-20 h-20 border-4 border-[#1DE0DD]/20 border-t-[#1DE0DD] rounded-full"
+                className="absolute inset-0 w-16 h-16 border border-transparent border-t-[#1DE0DD] rounded-full"
               />
               <div className="absolute inset-0 flex items-center justify-center">
-                <Briefcase className="h-8 w-8 text-[#1DE0DD]" />
+                <div className="w-1 h-1 bg-gray-400 rounded-full" />
               </div>
             </div>
+            
             <motion.h3 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.2 }}
-              className="text-xl font-semibold text-gray-900 mb-2 mt-6"
+              className="text-lg font-light text-gray-900 mb-2"
             >
-              Finding Perfect Matches...
+              Analyzing opportunities
             </motion.h3>
             <motion.p 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.3 }}
-              className="text-gray-600"
+              className="text-sm text-gray-500"
             >
-              Our AI is analyzing thousands of opportunities for you
+              Matching your profile with available positions
             </motion.p>
           </motion.div>
         )}
