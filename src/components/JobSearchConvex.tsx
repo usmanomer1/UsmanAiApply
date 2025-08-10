@@ -32,11 +32,13 @@ interface Job {
   job_state?: string;
   job_country?: string;
   job_is_remote: boolean;
-  job_posted_at_datetime_utc: string;
+  job_posted_at_datetime_utc?: string;
   job_highlights?: any;
   job_required_experience?: any;
   match_score?: number;
   gaps_analysis?: any;
+  missing_skills?: string[];
+  matching_skills?: string[];
   createdAt: number;
   batchIndex: number;
 }
@@ -64,7 +66,13 @@ const JobSearchConvex: React.FC = () => {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [sortBy, setSortBy] = useState<SortBy>('match_score');
-  const [filters, setFilters] = useState<Filters>({});
+  const [filters, setFilters] = useState<Filters>({
+    datePosted: 'week',
+    remote: false,
+    employmentTypes: [],
+    experienceLevel: [],
+    radius: 50
+  });
   const [showFilters, setShowFilters] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [likedJobs, setLikedJobs] = useState<Set<string>>(new Set());
@@ -130,10 +138,10 @@ const JobSearchConvex: React.FC = () => {
     getScrollElement: () => scrollingRef.current,
     estimateSize: useCallback((index) => {
       switch (viewMode) {
-        case 'grid': return 320;
-        case 'list': return 200;
-        case 'compact': return 100;
-        default: return 200;
+        case 'grid': return 260;
+        case 'list': return 140;
+        case 'compact': return 80;
+        default: return 140;
       }
     }, [viewMode]),
     overscan: 3, // Render 3 items outside viewport
@@ -468,6 +476,145 @@ const JobSearchConvex: React.FC = () => {
           </div>
         </div>
         
+        {/* Filters Panel */}
+        <AnimatePresence>
+          {showFilters && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="border-t border-gray-200/50 bg-white/80 backdrop-blur overflow-hidden"
+            >
+              <div className="max-w-7xl mx-auto px-4 py-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                  {/* Date Posted Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Date Posted</label>
+                    <select
+                      value={filters.datePosted || 'week'}
+                      onChange={(e) => setFilters({ ...filters, datePosted: e.target.value })}
+                      className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="today">Today</option>
+                      <option value="3days">Last 3 days</option>
+                      <option value="week">Last week</option>
+                      <option value="month">Last month</option>
+                      <option value="all">All time</option>
+                    </select>
+                  </div>
+                  
+                  {/* Employment Type Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Employment Type</label>
+                    <div className="space-y-2">
+                      {['FULLTIME', 'PARTTIME', 'CONTRACT', 'INTERNSHIP'].map((type) => (
+                        <label key={type} className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={filters.employmentTypes?.includes(type) || false}
+                            onChange={(e) => {
+                              const types = filters.employmentTypes || [];
+                              if (e.target.checked) {
+                                setFilters({ ...filters, employmentTypes: [...types, type] });
+                              } else {
+                                setFilters({ ...filters, employmentTypes: types.filter(t => t !== type) });
+                              }
+                            }}
+                            className="mr-2 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <span className="text-sm">{type.charAt(0) + type.slice(1).toLowerCase()}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Experience Level Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Experience Level</label>
+                    <div className="space-y-2">
+                      {['entry', 'mid', 'senior', 'executive'].map((level) => (
+                        <label key={level} className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={filters.experienceLevel?.includes(level) || false}
+                            onChange={(e) => {
+                              const levels = filters.experienceLevel || [];
+                              if (e.target.checked) {
+                                setFilters({ ...filters, experienceLevel: [...levels, level] });
+                              } else {
+                                setFilters({ ...filters, experienceLevel: levels.filter(l => l !== level) });
+                              }
+                            }}
+                            className="mr-2 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <span className="text-sm capitalize">{level}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Remote Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Work Type</label>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={filters.remote || false}
+                        onChange={(e) => setFilters({ ...filters, remote: e.target.checked })}
+                        className="mr-2 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span className="text-sm">Remote Only</span>
+                    </label>
+                  </div>
+                  
+                  {/* Search Radius Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Search Radius: {filters.radius || 50} miles
+                    </label>
+                    <input
+                      type="range"
+                      min="10"
+                      max="200"
+                      step="10"
+                      value={filters.radius || 50}
+                      onChange={(e) => setFilters({ ...filters, radius: parseInt(e.target.value) })}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                      <span>10 mi</span>
+                      <span>200 mi</span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Apply/Clear Buttons */}
+                <div className="flex justify-end gap-2 mt-4">
+                  <button
+                    onClick={() => setFilters({
+                      datePosted: 'week',
+                      remote: false,
+                      employmentTypes: [],
+                      experienceLevel: [],
+                      radius: 50
+                    })}
+                    className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                  >
+                    Clear All
+                  </button>
+                  <button
+                    onClick={() => setShowFilters(false)}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                  >
+                    Apply Filters
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        
         {/* Progress Indicator */}
         {session && session.status !== 'initializing' && (
           <div className="border-t border-gray-200/50 px-4 py-3 bg-white/60 backdrop-blur">
@@ -510,12 +657,16 @@ const JobSearchConvex: React.FC = () => {
                   </div>
                 </div>
                 
-                {/* Job Count */}
-                <div className="text-sm text-gray-600">
-                  <span className="font-semibold text-indigo-600">{session.processedCount}</span>
-                  {' of '}
-                  <span className="font-semibold">{session.totalFound}</span>
-                  {' jobs processed'}
+                {/* Job Count - Exact UI from Design */}
+                <div className="flex items-center gap-2">
+                  <div className="bg-indigo-600 text-white px-3 py-1.5 rounded-full text-sm font-bold min-w-[40px] text-center">
+                    {session.processedCount}
+                  </div>
+                  <span className="text-sm text-gray-500 font-medium">of</span>
+                  <div className="bg-gray-200 text-gray-800 px-3 py-1.5 rounded-full text-sm font-bold min-w-[40px] text-center">
+                    {session.totalFound}
+                  </div>
+                  <span className="text-sm text-gray-500 font-medium">jobs found</span>
                 </div>
               </div>
               
@@ -572,8 +723,8 @@ const JobSearchConvex: React.FC = () => {
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ duration: 0.3 }}
-                      whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                      className={`bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow p-6 mx-2 my-2 border-2 ${getMatchScoreColor(job.match_score)}`}
+                      whileHover={{ y: -2, transition: { duration: 0.2 } }}
+                      className={`bg-white rounded-lg shadow-sm hover:shadow-lg transition-shadow p-4 mx-2 mb-2 border ${getMatchScoreColor(job.match_score)}`}
                     >
                       <div className="flex justify-between items-start mb-4">
                         <div className="flex-1">
@@ -659,9 +810,9 @@ const JobSearchConvex: React.FC = () => {
                           </p>
                           
                           {/* Skills */}
-                          {job.gaps_analysis && (
+                          {(job.matching_skills || job.missing_skills) && (
                             <div className="flex flex-wrap gap-2 mb-3">
-                              {job.gaps_analysis.matching_skills?.slice(0, 3).map((skill: string, idx: number) => (
+                              {job.matching_skills?.slice(0, 3).map((skill: string, idx: number) => (
                                 <span
                                   key={idx}
                                   className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs"
@@ -669,7 +820,7 @@ const JobSearchConvex: React.FC = () => {
                                   ✓ {skill}
                                 </span>
                               ))}
-                              {job.gaps_analysis.missing_skills?.slice(0, 2).map((skill: string, idx: number) => (
+                              {job.missing_skills?.slice(0, 2).map((skill: string, idx: number) => (
                                 <span
                                   key={idx}
                                   className="px-2 py-1 bg-rose-100 text-rose-700 rounded-full text-xs"
