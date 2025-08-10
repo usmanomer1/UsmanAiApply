@@ -281,8 +281,35 @@ const JobSearchConvex: React.FC = () => {
       });
       
       toast.success('Search started! Jobs will appear as they\'re processed.');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Search error:', error);
+      
+      // Check if it's a rate limit error
+      try {
+        const errorData = JSON.parse(error.message);
+        if (errorData.type === 'RATE_LIMIT') {
+          // Show rate limit message with retry time
+          toast.error(errorData.message, {
+            duration: 5000,
+            icon: '⏰',
+          });
+          
+          // Optional: Show countdown timer
+          if (errorData.retryInSeconds && errorData.retryInSeconds < 300) {
+            // If retry is less than 5 minutes, show countdown
+            setTimeout(() => {
+              toast.success('You can search again now!', {
+                icon: '✅',
+              });
+            }, errorData.retryInSeconds * 1000);
+          }
+          
+          return;
+        }
+      } catch {
+        // Not a JSON error, handle normally
+      }
+      
       toast.error('Failed to start search. Please try again.');
     } finally {
       setIsSearching(false);
@@ -445,25 +472,30 @@ const JobSearchConvex: React.FC = () => {
               />
             </div>
             
-            <motion.button
-              onClick={handleSearch}
-              disabled={isSearching || !resumeText || !authToken || authLoading}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="px-6 py-2.5 bg-gradient-to-r from-[#1DE0DD] to-[#00C4CC] text-white font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-lg flex items-center gap-2"
-            >
-              {isSearching ? (
-                <>
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  Searching...
-                </>
-              ) : (
-                <>
-                  <Search className="h-5 w-5" />
-                  Search Jobs
-                </>
-              )}
-            </motion.button>
+            <div className="flex flex-col gap-1">
+              <motion.button
+                onClick={handleSearch}
+                disabled={isSearching || !resumeText || !authToken || authLoading}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="px-6 py-2.5 bg-gradient-to-r from-[#1DE0DD] to-[#00C4CC] text-white font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-lg flex items-center gap-2"
+              >
+                {isSearching ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Searching...
+                  </>
+                ) : (
+                  <>
+                    <Search className="h-5 w-5" />
+                    Search Jobs
+                  </>
+                )}
+              </motion.button>
+              <span className="text-xs text-gray-500 text-center">
+                10 searches/hour
+              </span>
+            </div>
           </div>
           
           </div>

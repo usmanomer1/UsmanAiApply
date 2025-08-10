@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, internalMutation } from "../_generated/server";
 import { requireAuth } from "../auth";
+import { checkJobSearchLimit } from "../rateLimiter";
 
 export const createSearchSession = mutation({
   args: {
@@ -19,6 +20,19 @@ export const createSearchSession = mutation({
   handler: async (ctx, args) => {
     // Verify authentication and get userId
     const userId = await requireAuth(args.authToken);
+    
+    // Check rate limit for this user
+    const rateLimitCheck = await checkJobSearchLimit(ctx, userId);
+    
+    if (!rateLimitCheck.allowed) {
+      // Throw an error with rate limit info
+      throw new Error(JSON.stringify({
+        type: "RATE_LIMIT",
+        message: rateLimitCheck.message,
+        retryAfter: rateLimitCheck.retryAfter,
+        retryInSeconds: rateLimitCheck.retryInSeconds,
+      }));
+    }
     
     const sessionId = await ctx.db.insert("jobSearchSessions", {
       userId, // Use authenticated userId
