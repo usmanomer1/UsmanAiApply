@@ -306,17 +306,17 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black bg-opacity-50 z-50"
+              className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
               onClick={onClose}
-            />
-
-            {/* Modal */}
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full mx-4 z-50 max-h-[90vh] overflow-y-auto"
             >
+              {/* Modal - Stop propagation to prevent closing when clicking inside */}
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto relative"
+                onClick={(e) => e.stopPropagation()}
+              >
               {/* Close button */}
               <button
                 onClick={onClose}
@@ -589,8 +589,8 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
                   </div>
                 ) : null}
               </div>
+              </motion.div>
             </motion.div>
-          </>
         )}
       </AnimatePresence>
 
