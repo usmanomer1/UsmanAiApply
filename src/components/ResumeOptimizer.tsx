@@ -98,12 +98,32 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
         resumeTextToSend = await extractTextFromPDF(resumeFile);
       }
 
-      // Get auth token from Supabase
+      // Get Supabase session
       const { data: { session } } = await supabase.auth.getSession();
-      const authToken = session?.access_token;
+      if (!session?.user?.id) {
+        throw new Error('Authentication required');
+      }
+      
+      // Get JWT token from Resume API
+      const tokenResponse = await fetch(`${RESUME_API_URL}/auth/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: session.user.id,
+          email: session.user.email,
+        })
+      });
+      
+      if (!tokenResponse.ok) {
+        throw new Error('Failed to authenticate with resume service');
+      }
+      
+      const { access_token: authToken } = await tokenResponse.json();
       
       if (!authToken) {
-        throw new Error('Authentication required');
+        throw new Error('Failed to get authentication token');
       }
 
       // Step 1: Analyze the resume
