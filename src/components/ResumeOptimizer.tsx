@@ -41,9 +41,8 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
     fileName: null
   });
 
-  // Get API credentials from environment
-  const API_URL = import.meta.env.VITE_JOBOTIC_API_URL || 'https://jobotic-backend.vercel.app';
-  const API_KEY = import.meta.env.VITE_JOBOTIC_API_KEY || '';
+  // Get API URL for Railway-hosted resume service
+  const RESUME_API_URL = import.meta.env.VITE_RESUME_API_URL || 'https://terrific-imagination-production-6ca9.up.railway.app';
 
   const optimizeResume = async () => {
     setState(prev => ({ ...prev, loading: true, error: null }));
@@ -99,77 +98,92 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
         resumeTextToSend = await extractTextFromPDF(resumeFile);
       }
 
-      // Call optimization API
-      const formData = new FormData();
+      // Get auth token from Supabase
+      const { data: { session } } = await supabase.auth.getSession();
+      const authToken = session?.access_token;
+      
+      if (!authToken) {
+        throw new Error('Authentication required');
+      }
+
+      // Step 1: Analyze the resume
+      let analyzeResponse;
+      
       if (resumeFile!) {
+        // If we have a PDF file, use multipart form data
+        const formData = new FormData();
         formData.append('resume', resumeFile);
+        formData.append('job_description', job?.job_description || '');
+        formData.append('job_title', job?.job_title || '');
+        formData.append('company_name', job?.employer_name || '');
+        
+        analyzeResponse = await fetch(`${RESUME_API_URL}/api/resume/analyze`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+          },
+          body: formData
+        });
       } else {
         // Send as JSON if we only have text
-        const response = await fetch(`${API_URL}/api/resume/optimize`, {
+        analyzeResponse = await fetch(`${RESUME_API_URL}/api/resume/analyze`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-API-Key': API_KEY,
+            'Authorization': `Bearer ${authToken}`,
           },
           body: JSON.stringify({
             resumeText: resumeTextToSend,
             jobDescription: job?.job_description || '',
             jobTitle: job?.job_title || '',
-            companyName: job?.employer_name || '',
-            userId: user?.id
+            companyName: job?.employer_name || ''
           })
         });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || `Optimization failed: ${response.status}`);
-        }
-
-        const result = await response.json();
-        
-        setState(prev => ({
-          ...prev,
-          loading: false,
-          previewUrl: result.previewUrl,
-          downloadUrl: result.downloadUrl,
-          fileName: result.fileName || `optimized_resume_${new Date().toISOString().split('T')[0]}.pdf`,
-          optimizationScore: result.score
-        }));
-
-        toast.success('Resume optimized successfully!');
-        return;
       }
 
-      // If we have a file, use multipart
-      formData.append('jobDescription', job?.job_description || '');
-      formData.append('jobTitle', job?.job_title || '');
-      formData.append('companyName', job?.employer_name || '');
-      if (user?.id) {
-        formData.append('userId', user.id);
+      if (!analyzeResponse.ok) {
+        const errorData = await analyzeResponse.json().catch(() => ({}));
+        throw new Error(errorData.error || errorData.message || `Analysis failed: ${analyzeResponse.status}`);
       }
 
-      const response = await fetch(`${API_URL}/api/resume/optimize`, {
+      const analyzeResult = await analyzeResponse.json();
+      const analysisData = analyzeResult.data || analyzeResult;
+      
+      // Step 2: Generate the optimized resume
+      const generateResponse = await fetch(`${RESUME_API_URL}/api/resume/generate`, {
         method: 'POST',
         headers: {
-          'X-API-Key': API_KEY,
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
         },
-        body: formData
+        body: JSON.stringify({
+          analysisId: analysisData.analysisId,
+          editType: 'full', // or 'quick' based on user preference
+          selectedSections: analysisData.suggestedSections || [],
+          selectedSkills: analysisData.suggestedSkills || [],
+          additionalInstructions: ''
+        })
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Optimization failed: ${response.status}`);
+      if (!generateResponse.ok) {
+        const errorData = await generateResponse.json().catch(() => ({}));
+        throw new Error(errorData.error || errorData.message || `Generation failed: ${generateResponse.status}`);
       }
 
-      const result = await response.json();
+      const generateResult = await generateResponse.json();
+      const generationData = generateResult.data || generateResult;
       
+      // Update state with analysis and generation results
       setState(prev => ({
         ...prev,
         loading: false,
-        previewUrl: result.previewUrl,
-        downloadUrl: result.downloadUrl,
-        fileName: result.fileName || `optimized_resume_${new Date().toISOString().split('T')[0]}.pdf`,
-        optimizationScore: result.score
+        previewUrl: generationData.previewUrl || generationData.downloadUrl,
+        downloadUrl: generationData.downloadUrl || generationData.previewUrl,
+        fileName: generationData.fileName || `optimized_resume_${new Date().toISOString().split('T')[0]}.pdf`,
+        optimizationScore: {
+          before: analysisData.summary?.overallScore || analysisData.currentScore || 0,
+          after: analysisData.summary?.potentialScore || analysisData.potentialScore || 0
+        }
       }));
 
       // Track successful optimization
