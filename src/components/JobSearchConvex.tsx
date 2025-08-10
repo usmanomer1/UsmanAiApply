@@ -774,23 +774,255 @@ const JobSearchConvex: React.FC = () => {
       
       {/* Jobs List with Virtual Scrolling */}
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <div
-          ref={scrollingRef}
-          className="relative h-[calc(100vh-280px)] overflow-auto"
-        >
-          <div
-            style={{
-              height: `${virtualizer.getTotalSize()}px`,
-              width: '100%',
-              position: 'relative',
-            }}
+        {/* Empty State - Moved outside scrolling container for visibility */}
+        {!sessionId && !isSearching && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="flex flex-col items-center justify-center py-16"
           >
-            {virtualizer.getVirtualItems().map((virtualItem) => {
-              const job = processedJobs[virtualItem.index];
-              if (!job) return null;
+            {/* Animated Background Pattern */}
+            <div className="relative mb-8">
+              <motion.div
+                animate={{
+                  scale: [1, 1.2, 1],
+                  rotate: [0, 180, 360],
+                }}
+                transition={{
+                  duration: 20,
+                  repeat: Infinity,
+                  ease: "linear"
+                }}
+                className="absolute inset-0 w-32 h-32 bg-gradient-to-br from-[#1DE0DD]/20 to-purple-500/20 rounded-full blur-3xl"
+              />
+              <motion.div
+                animate={{
+                  scale: [1.2, 1, 1.2],
+                  rotate: [360, 180, 0],
+                }}
+                transition={{
+                  duration: 15,
+                  repeat: Infinity,
+                  ease: "linear"
+                }}
+                className="absolute inset-0 w-32 h-32 bg-gradient-to-br from-indigo-500/20 to-[#00C4CC]/20 rounded-full blur-3xl"
+              />
+              <motion.div
+                animate={{ 
+                  y: [0, -10, 0],
+                  rotate: [0, 5, -5, 0]
+                }}
+                transition={{ 
+                  duration: 4,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+                className="relative"
+              >
+                <div className="relative bg-gradient-to-br from-[#1DE0DD] to-[#00C4CC] p-4 rounded-2xl shadow-2xl">
+                  <Briefcase className="h-16 w-16 text-white" />
+                  <motion.div
+                    animate={{ scale: [0, 1, 0] }}
+                    transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
+                    className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full"
+                  />
+                  <motion.div
+                    animate={{ scale: [0, 1, 0] }}
+                    transition={{ duration: 2, repeat: Infinity, delay: 1 }}
+                    className="absolute -bottom-1 -left-1 w-3 h-3 bg-pink-400 rounded-full"
+                  />
+                </div>
+              </motion.div>
+            </div>
+            
+            {/* Animated Title with Gradient */}
+            <motion.h3 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="text-3xl font-bold mb-3 bg-gradient-to-r from-[#1DE0DD] via-indigo-600 to-purple-600 bg-clip-text text-transparent"
+            >
+              Your Dream Job Awaits!
+            </motion.h3>
+            
+            {/* Animated Subtitle */}
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className="text-gray-600 text-center max-w-lg mb-8 text-lg"
+            >
+              Powered by AI to match you with the perfect opportunities
+            </motion.p>
+            
+            {/* Statistics Cards */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="grid grid-cols-3 gap-4 mb-8"
+            >
+              <motion.div 
+                whileHover={{ scale: 1.05, y: -5 }}
+                className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-4 rounded-xl border border-emerald-200 shadow-sm"
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <TrendingUp className="h-5 w-5 text-emerald-600" />
+                  <span className="text-2xl font-bold text-emerald-700">85%</span>
+                </div>
+                <p className="text-xs text-emerald-600 font-medium">Avg Match Rate</p>
+              </motion.div>
               
-              const isLiked = likedJobs.has(job.job_id);
-              const isApplied = appliedJobs.has(job.job_id);
+              <motion.div 
+                whileHover={{ scale: 1.05, y: -5 }}
+                className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-xl border border-indigo-200 shadow-sm"
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Users className="h-5 w-5 text-indigo-600" />
+                  <span className="text-2xl font-bold text-indigo-700">10K+</span>
+                </div>
+                <p className="text-xs text-indigo-600 font-medium">Active Jobs</p>
+              </motion.div>
+              
+              <motion.div 
+                whileHover={{ scale: 1.05, y: -5 }}
+                className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl border border-purple-200 shadow-sm"
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Star className="h-5 w-5 text-purple-600" />
+                  <span className="text-2xl font-bold text-purple-700">4.9</span>
+                </div>
+                <p className="text-xs text-purple-600 font-medium">User Rating</p>
+              </motion.div>
+            </motion.div>
+            
+            {/* Search Tips with Icons */}
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+              className="flex flex-wrap gap-3 justify-center mb-8"
+            >
+              {[
+                { icon: <Sparkles className="h-4 w-4" />, text: "AI-Powered Matching", color: "from-yellow-400 to-orange-400" },
+                { icon: <Clock className="h-4 w-4" />, text: "Real-time Results", color: "from-blue-400 to-indigo-400" },
+                { icon: <MapPin className="h-4 w-4" />, text: "Location-based Search", color: "from-green-400 to-emerald-400" },
+                { icon: <Heart className="h-4 w-4" />, text: "Save Favorites", color: "from-pink-400 to-rose-400" },
+              ].map((tip, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.6 + index * 0.1 }}
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  className={`flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r ${tip.color} text-white rounded-full text-sm font-medium shadow-md`}
+                >
+                  {tip.icon}
+                  <span>{tip.text}</span>
+                </motion.div>
+              ))}
+            </motion.div>
+            
+            {/* Call to Action with Arrow Animation */}
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.7 }}
+              className="flex flex-col items-center gap-3"
+            >
+              <motion.div
+                animate={{ y: [0, -5, 0] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+                className="flex items-center gap-2 text-gray-500"
+              >
+                <span className="text-sm font-medium">Start searching above</span>
+                <motion.div
+                  animate={{ y: [-2, 2, -2] }}
+                  transition={{ duration: 1, repeat: Infinity }}
+                >
+                  <ChevronRight className="h-4 w-4 rotate-[-90deg]" />
+                </motion.div>
+              </motion.div>
+              
+              {/* Decorative Sparkles */}
+              <div className="flex gap-2">
+                {[...Array(3)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    animate={{
+                      opacity: [0, 1, 0],
+                      scale: [0.5, 1, 0.5],
+                    }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                      delay: i * 0.3,
+                    }}
+                  >
+                    <Sparkles className="h-3 w-3 text-[#1DE0DD]" />
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+        
+        {/* Loading State */}
+        {isSearching && processedJobs.length === 0 && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex flex-col items-center justify-center py-24"
+          >
+            <div className="relative">
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                className="w-20 h-20 border-4 border-[#1DE0DD]/20 border-t-[#1DE0DD] rounded-full"
+              />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Briefcase className="h-8 w-8 text-[#1DE0DD]" />
+              </div>
+            </div>
+            <motion.h3 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="text-xl font-semibold text-gray-900 mb-2 mt-6"
+            >
+              Finding Perfect Matches...
+            </motion.h3>
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className="text-gray-600"
+            >
+              Our AI is analyzing thousands of opportunities for you
+            </motion.p>
+          </motion.div>
+        )}
+        
+        {/* Jobs Container - Only show when we have jobs */}
+        {processedJobs.length > 0 && (
+          <div
+            ref={scrollingRef}
+            className="relative h-[calc(100vh-280px)] overflow-auto"
+          >
+            <div
+              style={{
+                height: `${virtualizer.getTotalSize()}px`,
+                width: '100%',
+                position: 'relative',
+              }}
+            >
+              {virtualizer.getVirtualItems().map((virtualItem) => {
+                const job = processedJobs[virtualItem.index];
+                if (!job) return null;
+                
+                const isLiked = likedJobs.has(job.job_id);
+                const isApplied = appliedJobs.has(job.job_id);
               
               return (
                   <div
@@ -975,27 +1207,8 @@ const JobSearchConvex: React.FC = () => {
                     </motion.div>
                   </div>
                 );
-            })}
-          </div>
-        </div>
-        
-        {/* Empty State */}
-        {!sessionId && !isSearching && (
-          <div className="flex flex-col items-center justify-center py-24">
-            <Briefcase className="h-16 w-16 text-gray-400 mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Start Your Job Search</h3>
-            <p className="text-gray-600 text-center max-w-md">
-              Enter a job title and location to find your perfect match. Our AI will analyze your resume and show you the best opportunities.
-            </p>
-          </div>
-        )}
-        
-        {/* Loading State */}
-        {isSearching && processedJobs.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-24">
-            <Loader2 className="h-16 w-16 text-indigo-600 animate-spin mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Searching for Jobs</h3>
-            <p className="text-gray-600">This may take a moment...</p>
+              })}
+            </div>
           </div>
         )}
       </div>
