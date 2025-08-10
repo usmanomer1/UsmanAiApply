@@ -500,7 +500,7 @@ const JobSearchConvex: React.FC = () => {
           )}
           
           {/* Search Inputs */}
-          <div className="flex gap-3">
+          <div className="flex gap-3 items-start">
             <div className="flex-1 relative flex items-center">
               <Search className="absolute left-3 text-gray-400 h-5 w-5 pointer-events-none" />
               <input
@@ -525,13 +525,13 @@ const JobSearchConvex: React.FC = () => {
               />
             </div>
             
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col">
               <motion.button
                 onClick={handleSearch}
                 disabled={isSearching || !resumeText || !authToken || authLoading}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className="px-6 py-2.5 bg-gradient-to-r from-[#1DE0DD] to-[#00C4CC] text-white font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-lg flex items-center gap-2"
+                className="px-6 py-2.5 bg-gradient-to-r from-[#1DE0DD] to-[#00C4CC] text-white font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-lg flex items-center gap-2 h-[42px]"
               >
                 {isSearching ? (
                   <>
@@ -545,8 +545,8 @@ const JobSearchConvex: React.FC = () => {
                   </>
                 )}
               </motion.button>
-              <span className="text-xs text-gray-500 text-center">
-                10 searches/hour
+              <span className="text-[10px] text-gray-400 text-center mt-1">
+                10 searches per hour
               </span>
             </div>
           </div>
