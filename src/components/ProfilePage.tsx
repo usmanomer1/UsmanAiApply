@@ -41,7 +41,7 @@ import { supabase, uploadResume, uploadAvatar } from '../lib/supabase';
 import { getPlanNameByPriceId } from '../stripe-config';
 import { extractTextFromPDF } from '../lib/pdfExtractor';
 import toast from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 interface Profile {
   id: string;
@@ -59,6 +59,7 @@ type TabType = 'general' | 'professional' | 'preferences' | 'privacy';
 const ProfilePage: React.FC = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   
@@ -133,6 +134,22 @@ const ProfilePage: React.FC = () => {
     const completed = fields.filter(Boolean).length;
     return Math.round((completed / fields.length) * 100);
   };
+
+  // Handle URL query parameters to set active tab
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const tab = searchParams.get('tab');
+    
+    if (tab === 'professional') {
+      setActiveTab('professional');
+    } else if (tab === 'preferences') {
+      setActiveTab('preferences');
+    } else if (tab === 'privacy') {
+      setActiveTab('privacy');
+    } else if (tab === 'general') {
+      setActiveTab('general');
+    }
+  }, [location]);
 
   useEffect(() => {
     fetchProfile();
