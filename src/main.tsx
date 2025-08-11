@@ -3,13 +3,60 @@ import ReactDOM from 'react-dom/client'
 import * as Sentry from '@sentry/react'
 import { browserTracingIntegration } from '@sentry/react'
 import { replayIntegration } from '@sentry/replay'
-import { ConvexProvider, ConvexReactClient } from 'convex/react'
+import { ConvexProviderWithAuth, ConvexReactClient } from 'convex/react'
 import App from './App.tsx'
 import './index.css'
 import { supabase } from './lib/supabase.ts'
 
 // Initialize Convex client
 const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL || 'https://notable-sloth-598.convex.cloud')
+
+// Provide Supabase auth to Convex so ctx.auth works server-side
+function useSupabaseConvexAuth() {
+  const [isLoading, setLoading] = React.useState(true)
+  const [token, setToken] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (mounted) setToken(session?.access_token ?? null)
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    })()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (mounted) setToken(session?.access_token ?? null)
+    })
+
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  return {
+    isLoading,
+    isAuthenticated: !!token,
+    // ConvexProviderWithAuth expects `fetchAccessToken({ forceRefreshToken })`
+    fetchAccessToken: async ({ forceRefreshToken }: { forceRefreshToken: boolean }) => {
+      try {
+        if (forceRefreshToken) {
+          const { data, error } = await supabase.auth.refreshSession();
+          if (error) return null;
+          return data.session?.access_token ?? null;
+        }
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) return null;
+        return session?.access_token ?? null;
+      } catch {
+        return null;
+      }
+    },
+  }
+}
 
 // Initialize Sentry in both development and production
 Sentry.init({
@@ -149,11 +196,11 @@ const SentryFallback = ({ error, resetError }: { error: unknown; componentStack:
 
 // Wrap App component with Sentry Error Boundary and Convex Provider
 const AppWithProviders = (
-  <ConvexProvider client={convex}>
+  <ConvexProviderWithAuth client={convex} useAuth={useSupabaseConvexAuth}>
     <Sentry.ErrorBoundary fallback={SentryFallback} showDialog>
       <App />
     </Sentry.ErrorBoundary>
-  </ConvexProvider>
+  </ConvexProviderWithAuth>
 );
 
 // Add Sentry to window type for TypeScript

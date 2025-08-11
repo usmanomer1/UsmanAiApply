@@ -2,7 +2,8 @@ export default {
     providers: [
       {
         domain: "https://wqyquvgduwjkyadkumkl.supabase.co",
-        applicationID: "convex",
+        // Supabase JWT audience is typically "authenticated"
+        applicationID: "authenticated",
       },
     ],
   };

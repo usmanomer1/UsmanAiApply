@@ -9,27 +9,28 @@ export const getSession = query({
     sessionId: v.id("jobSearchSessions"),
   },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
     const session = await ctx.db.get(args.sessionId);
+    if (!session) return null;
+    if (session.userId !== identity.subject) throw new Error("Not found");
     return session;
   },
 });
 
 export const getUserSessions = query({
   args: {
-    userId: v.string(),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
     const limit = args.limit ?? 10;
-    
-    // Get user's sessions, ordered by creation date
-    const sessions = await ctx.db
+    return await ctx.db
       .query("jobSearchSessions")
-      .filter(q => q.eq(q.field("userId"), args.userId))
+      .filter(q => q.eq(q.field("userId"), identity.subject))
       .order("desc")
       .take(limit);
-    
-    return sessions;
   },
 });
 
@@ -39,46 +40,41 @@ export const getSessionJobs = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
+    const session = await ctx.db.get(args.sessionId);
+    if (!session || session.userId !== identity.subject) throw new Error("Not found");
     const limit = args.limit ?? 100;
-    
-    // Get all jobs for this session
-    const jobs = await ctx.db
+    return await ctx.db
       .query("jobs")
       .withIndex("by_session")
       .filter(q => q.eq(q.field("sessionId"), args.sessionId))
       .order("asc")
       .take(limit);
-    
-    return jobs;
   },
 });
 
 export const getUserInteractions = query({
   args: {
-    userId: v.string(),
     jobIds: v.array(v.string()),
   },
   handler: async (ctx, args) => {
-    // Get all interactions for these jobs
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthorized");
     const interactions = await ctx.db
       .query("userJobInteractions")
       .withIndex("by_user_action")
-      .filter(q => q.eq(q.field("userId"), args.userId))
+      .filter(q => q.eq(q.field("userId"), identity.subject))
       .collect();
-    
-    // Filter for requested job IDs and convert to map
     const interactionMap: Record<string, any> = {};
-    
     for (const interaction of interactions) {
       if (args.jobIds.includes(interaction.jobId)) {
-        // Convert action field to interactionType for frontend compatibility
         interactionMap[interaction.jobId] = {
           ...interaction,
-          interactionType: interaction.action
+          interactionType: interaction.action,
         };
       }
     }
-    
     return interactionMap;
   },
 });

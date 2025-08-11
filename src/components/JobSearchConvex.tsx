@@ -8,7 +8,7 @@ import {
   Grid3X3, List, LayoutGrid, SlidersHorizontal,
   CheckCircle2, XCircle, AlertCircle, FileText
 } from 'lucide-react';
-import { useMutation, useQuery, useAction } from 'convex/react';
+import { useMutation, useQuery, useAction, useConvexConnectionState } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import { useAuth } from '../contexts/AuthContext';
@@ -59,6 +59,7 @@ const JobSearchConvex: React.FC = () => {
   const { user } = useAuth();
   const { authToken, loading: authLoading, error: authError } = useConvexAuth();
   const navigate = useNavigate();
+  const connectionState = useConvexConnectionState();
   
   // State
   const [searchQuery, setSearchQuery] = useState('');
@@ -106,7 +107,7 @@ const JobSearchConvex: React.FC = () => {
   
   const userInteractions = useQuery(
     api.jobs.queries.getUserInteractions,
-    jobs && user?.id ? { userId: user.id, jobIds: jobs.map(j => j.job_id) } : "skip"
+    jobs && user ? { jobIds: jobs.map(j => j.job_id) } : "skip"
   );
   
   // Process and sort jobs
@@ -252,6 +253,7 @@ const JobSearchConvex: React.FC = () => {
   
   // Handle search
   const handleSearch = async () => {
+    // Allow firing even if reconnecting; retries below will handle transient disconnects
     if (!searchQuery.trim()) {
       toast.error('Please enter a job title or keywords');
       return;
@@ -262,35 +264,53 @@ const JobSearchConvex: React.FC = () => {
       return;
     }
     
-    if (!authToken) {
-      toast.error('Please log in to search for jobs');
-      return;
-    }
+    // authToken is optional; server will use ctx.auth
     
     setIsSearching(true);
     
     try {
+      const retry = async <T,>(op: () => Promise<T>, max = 5): Promise<T> => {
+        let lastErr: any;
+        for (let i = 0; i < max; i++) {
+          try {
+            return await op();
+          } catch (e: any) {
+            const msg = e?.message || '';
+            if (msg.includes('Connection lost while action was in flight')) {
+              await new Promise(r => setTimeout(r, 500 * (i + 1)));
+              lastErr = e;
+              continue;
+            }
+            throw e;
+          }
+        }
+        throw lastErr;
+      };
       // Create session
-      const newSessionId = await createSession({
-        authToken,
-        query: searchQuery,
-        location: location || undefined,
-        resumeText,
-        filters,
-      });
+      const newSessionId = await retry(() =>
+        createSession({
+          authToken: authToken ?? undefined,
+          query: searchQuery,
+          location: location || undefined,
+          resumeText,
+          filters,
+        })
+      );
       
       setSessionId(newSessionId);
       
       // Trigger search action
-      await searchJobs({
-        authToken,
-        sessionId: newSessionId,
-        query: searchQuery,
-        location: location || undefined,
-        resumeText,
-        filters,
-        numJobs: 100, // Get best value
-      });
+      await retry(() =>
+        searchJobs({
+          authToken: authToken ?? undefined,
+          sessionId: newSessionId,
+          query: searchQuery,
+          location: location || undefined,
+          resumeText,
+          filters,
+          numJobs: 100, // Get best value
+        })
+      );
       
       toast.success('Search started! Jobs will appear as they\'re processed.');
     } catch (error: any) {
@@ -403,7 +423,6 @@ const JobSearchConvex: React.FC = () => {
     
     // API call in background without blocking UI
     trackInteraction({
-      userId: user.id,
       jobId,
       interactionType: isLiked ? 'hidden' : 'liked',
     })
@@ -528,7 +547,7 @@ const JobSearchConvex: React.FC = () => {
             <div className="flex flex-col">
               <motion.button
                 onClick={handleSearch}
-                disabled={isSearching || !resumeText || !authToken || authLoading}
+                disabled={isSearching || !resumeText || authLoading}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="px-6 py-2.5 bg-gradient-to-r from-[#1DE0DD] to-[#00C4CC] text-white font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-lg flex items-center gap-2 h-[42px]"
@@ -1132,8 +1151,7 @@ const JobSearchConvex: React.FC = () => {
                               href={job.job_apply_link}
                               target="_blank"
                               rel="noopener noreferrer"
-                              onClick={() => user?.id && trackInteraction({
-                                userId: user.id,
+                              onClick={() => user && trackInteraction({
                                 jobId: job.job_id,
                                 interactionType: 'applied',
                               })}

@@ -4,6 +4,17 @@ import { api } from "./_generated/api";
 
 // HTTP endpoint to receive job batches from backend
 const processBatch = httpAction(async (ctx, request) => {
+  // Optional shared-secret verification to ensure only our backend can call this
+  const expectedSecret = process.env.BACKEND_WEBHOOK_SECRET;
+  if (expectedSecret) {
+    const provided = request.headers.get('x-backend-secret');
+    if (!provided || provided !== expectedSecret) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  }
   // Parse the incoming batch
   const {
     sessionId,

@@ -83,7 +83,7 @@ export function authenticatedAction<Args extends Record<string, any>, Return>(
         
         // Verify and get user ID
         const payload = await verifySupabaseToken(authToken);
-        const userId = payload.sub;
+        const userId = (payload as any).id;
         
         // Call the original handler with both userId and token (for backend calls)
         return await handler(ctx, args, userId);
