@@ -1,11 +1,11 @@
 import { v } from "convex/values";
 import { mutation, internalMutation } from "../_generated/server";
-import { requireAuth } from "../auth";
+import { requireAuth, getAuthUserId } from "../auth";
 import { checkJobSearchLimit } from "../rateLimiter";
 
 export const createSearchSession = mutation({
   args: {
-    authToken: v.string(), // Required for authentication
+    // No authToken needed - using native Convex auth
     query: v.string(),
     location: v.optional(v.string()),
     resumeText: v.string(),
@@ -18,8 +18,8 @@ export const createSearchSession = mutation({
     }),
   },
   handler: async (ctx, args) => {
-    // Verify authentication and get userId
-    const userId = await requireAuth(args.authToken);
+    // Verify authentication using native Convex auth
+    const userId = await requireAuth(ctx);
     
     // Check rate limit for this user
     const rateLimitCheck = await checkJobSearchLimit(ctx, userId);
@@ -52,7 +52,7 @@ export const createSearchSession = mutation({
 
 export const updateSessionStatus = mutation({
   args: {
-    authToken: v.string(), // Required for authentication
+    // No authToken needed - using native Convex auth
     sessionId: v.id("jobSearchSessions"),
     status: v.union(
       v.literal("initializing"),
@@ -66,8 +66,8 @@ export const updateSessionStatus = mutation({
     searchCost: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    // Verify authentication and get userId
-    const userId = await requireAuth(args.authToken);
+    // Verify authentication using native Convex auth
+    const userId = await requireAuth(ctx);
     
     // Verify the session belongs to this user
     const session = await ctx.db.get(args.sessionId);
@@ -92,14 +92,14 @@ export const updateSessionStatus = mutation({
 
 export const insertJobBatch = mutation({
   args: {
-    authToken: v.string(), // Required for authentication
+    // No authToken needed - using native Convex auth
     sessionId: v.id("jobSearchSessions"),
     jobs: v.array(v.any()),
     batchIndex: v.number(),
   },
   handler: async (ctx, args) => {
-    // Verify authentication and get userId
-    const userId = await requireAuth(args.authToken);
+    // Verify authentication using native Convex auth
+    const userId = await requireAuth(ctx);
     
     // Verify the session belongs to this user
     const session = await ctx.db.get(args.sessionId);
@@ -150,7 +150,7 @@ export const insertJobBatch = mutation({
 
 export const saveJobInteraction = mutation({
   args: {
-    userId: v.string(), // Trust frontend auth
+    // No userId needed - get from auth context
     jobId: v.string(),
     interactionType: v.union(
       v.literal("liked"),
@@ -159,8 +159,8 @@ export const saveJobInteraction = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    // Use userId from args (frontend already authenticated)
-    const userId = args.userId;
+    // Get userId from native Convex auth
+    const userId = await requireAuth(ctx);
     
     // Check if interaction already exists
     const existing = await ctx.db
@@ -194,12 +194,12 @@ export const saveJobInteraction = mutation({
 
 export const removeJobInteraction = mutation({
   args: {
-    authToken: v.string(), // Required for authentication
+    // No authToken needed - using native Convex auth
     jobId: v.string(),
   },
   handler: async (ctx, args) => {
-    // Verify authentication and get userId
-    const userId = await requireAuth(args.authToken);
+    // Verify authentication using native Convex auth
+    const userId = await requireAuth(ctx);
     
     // Find and delete the interaction
     const interaction = await ctx.db

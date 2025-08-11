@@ -57,7 +57,7 @@ type SortBy = 'match_score' | 'date' | 'salary';
 
 const JobSearchConvex: React.FC = () => {
   const { user } = useAuth();
-  const { authToken, loading: authLoading, error: authError } = useConvexAuth();
+  const { isAuthenticated } = useConvexAuth();
   const navigate = useNavigate();
   
   // State
@@ -106,7 +106,7 @@ const JobSearchConvex: React.FC = () => {
   
   const userInteractions = useQuery(
     api.jobs.queries.getUserInteractions,
-    jobs && user?.id ? { userId: user.id, jobIds: jobs.map(j => j.job_id) } : "skip"
+    jobs && isAuthenticated ? { jobIds: jobs.map(j => j.job_id) } : "skip"
   );
   
   // Process and sort jobs
@@ -281,9 +281,8 @@ const JobSearchConvex: React.FC = () => {
       
       setSessionId(newSessionId);
       
-      // Trigger search action
+      // Trigger search action (no authToken needed)
       await searchJobs({
-        authToken,
         sessionId: newSessionId,
         query: searchQuery,
         location: location || undefined,
@@ -403,7 +402,6 @@ const JobSearchConvex: React.FC = () => {
     
     // API call in background without blocking UI
     trackInteraction({
-      userId: user.id,
       jobId,
       interactionType: isLiked ? 'hidden' : 'liked',
     })
@@ -1132,8 +1130,7 @@ const JobSearchConvex: React.FC = () => {
                               href={job.job_apply_link}
                               target="_blank"
                               rel="noopener noreferrer"
-                              onClick={() => user?.id && trackInteraction({
-                                userId: user.id,
+                              onClick={() => isAuthenticated && trackInteraction({
                                 jobId: job.job_id,
                                 interactionType: 'applied',
                               })}

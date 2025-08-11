@@ -1,8 +1,9 @@
 import { v } from "convex/values";
 import { query } from "../_generated/server";
+import { getAuthUserId } from "../auth";
 
-// Note: These queries assume the user is authenticated via the frontend
-// Real authentication happens in the actions layer where fetch() is available
+// Queries use native Convex authentication
+// The user is authenticated via JWT from Supabase
 
 export const getSession = query({
   args: {
@@ -16,16 +17,22 @@ export const getSession = query({
 
 export const getUserSessions = query({
   args: {
-    userId: v.string(),
+    // No userId needed - get from auth context
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Get authenticated user ID
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      return []; // Return empty array if not authenticated
+    }
+    
     const limit = args.limit ?? 10;
     
     // Get user's sessions, ordered by creation date
     const sessions = await ctx.db
       .query("jobSearchSessions")
-      .filter(q => q.eq(q.field("userId"), args.userId))
+      .filter(q => q.eq(q.field("userId"), userId))
       .order("desc")
       .take(limit);
     
@@ -55,15 +62,21 @@ export const getSessionJobs = query({
 
 export const getUserInteractions = query({
   args: {
-    userId: v.string(),
+    // No userId needed - get from auth context
     jobIds: v.array(v.string()),
   },
   handler: async (ctx, args) => {
+    // Get authenticated user ID
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      return {}; // Return empty map if not authenticated
+    }
+    
     // Get all interactions for these jobs
     const interactions = await ctx.db
       .query("userJobInteractions")
       .withIndex("by_user_action")
-      .filter(q => q.eq(q.field("userId"), args.userId))
+      .filter(q => q.eq(q.field("userId"), userId))
       .collect();
     
     // Filter for requested job IDs and convert to map
@@ -85,10 +98,16 @@ export const getUserInteractions = query({
 
 export const getLikedJobs = query({
   args: {
-    userId: v.string(),
+    // No userId needed - get from auth context
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Get authenticated user ID
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      return []; // Return empty array if not authenticated
+    }
+    
     const limit = args.limit ?? 50;
     
     // Get liked job interactions
@@ -97,7 +116,7 @@ export const getLikedJobs = query({
       .withIndex("by_user_action")
       .filter(q => 
         q.and(
-          q.eq(q.field("userId"), args.userId),
+          q.eq(q.field("userId"), userId),
           q.eq(q.field("action"), "liked")
         )
       )
