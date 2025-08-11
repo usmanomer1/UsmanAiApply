@@ -1,28 +1,24 @@
 import { mutation, query, action } from "../_generated/server";
-import { requireAuth, verifySupabaseToken } from "../auth";
+import { requireAuth, getAuthUserId } from "../auth";
 import { v } from "convex/values";
 
 /**
  * Wrapper for authenticated mutations
- * Automatically verifies the auth token and provides userId to the handler
+ * Uses native Convex auth - no authToken needed in args
  */
 export function authenticatedMutation<Args extends Record<string, any>, Return>(
   argsValidator: Args,
-  handler: (ctx: any, args: Omit<Args, "authToken"> & { authToken?: string }, userId: string) => Promise<Return>
+  handler: (ctx: any, args: Args, userId: string) => Promise<Return>
 ) {
   return mutation({
-    args: {
-      ...argsValidator,
-      authToken: v.optional(v.string()), // Make authToken optional in args
-    },
+    args: argsValidator,
     handler: async (ctx, args) => {
       try {
-        // Verify authentication
-        const userId = await requireAuth(args.authToken);
+        // Get userId from native Convex auth
+        const userId = await requireAuth(ctx);
         
         // Call the original handler with userId
-        const { authToken, ...restArgs } = args;
-        return await handler(ctx, restArgs as any, userId);
+        return await handler(ctx, args, userId);
       } catch (error) {
         console.error("Authentication error:", error);
         throw new Error(error instanceof Error ? error.message : "Authentication failed");
@@ -33,25 +29,21 @@ export function authenticatedMutation<Args extends Record<string, any>, Return>(
 
 /**
  * Wrapper for authenticated queries
- * Automatically verifies the auth token and provides userId to the handler
+ * Uses native Convex auth - no authToken needed in args
  */
 export function authenticatedQuery<Args extends Record<string, any>, Return>(
   argsValidator: Args,
-  handler: (ctx: any, args: Omit<Args, "authToken"> & { authToken?: string }, userId: string) => Promise<Return>
+  handler: (ctx: any, args: Args, userId: string) => Promise<Return>
 ) {
   return query({
-    args: {
-      ...argsValidator,
-      authToken: v.optional(v.string()),
-    },
+    args: argsValidator,
     handler: async (ctx, args) => {
       try {
-        // Verify authentication
-        const userId = await requireAuth(args.authToken);
+        // Get userId from native Convex auth
+        const userId = await requireAuth(ctx);
         
         // Call the original handler with userId
-        const { authToken, ...restArgs } = args;
-        return await handler(ctx, restArgs as any, userId);
+        return await handler(ctx, args, userId);
       } catch (error) {
         console.error("Authentication error:", error);
         throw new Error(error instanceof Error ? error.message : "Authentication failed");
@@ -62,30 +54,29 @@ export function authenticatedQuery<Args extends Record<string, any>, Return>(
 
 /**
  * Wrapper for authenticated actions
- * Automatically verifies the auth token and provides userId to the handler
+ * Uses native Convex auth - no authToken needed in args
  */
 export function authenticatedAction<Args extends Record<string, any>, Return>(
   argsValidator: Args,
-  handler: (ctx: any, args: Omit<Args, "authToken"> & { authToken?: string }, userId: string) => Promise<Return>
+  handler: (ctx: any, args: Args, userId: string) => Promise<Return>
 ) {
   return action({
-    args: {
-      ...argsValidator,
-      authToken: v.optional(v.string()),
-    },
+    args: argsValidator,
     handler: async (ctx, args) => {
       try {
-        // For actions, we might need the full token for backend calls
-        const authToken = args.authToken;
-        if (!authToken) {
+        // Get user identity from native Convex auth
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) {
           throw new Error("Authentication required");
         }
         
-        // Verify and get user ID
-        const payload = await verifySupabaseToken(authToken);
-        const userId = payload.sub;
+        // Get user ID from the identity (Supabase uses 'sub' field)
+        const userId = identity.subject || identity.sub;
+        if (!userId) {
+          throw new Error("User ID not found in authentication");
+        }
         
-        // Call the original handler with both userId and token (for backend calls)
+        // Call the original handler with userId
         return await handler(ctx, args, userId);
       } catch (error) {
         console.error("Authentication error:", error);
