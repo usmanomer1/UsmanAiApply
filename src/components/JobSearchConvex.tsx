@@ -143,23 +143,36 @@ const JobSearchConvex: React.FC = () => {
   const virtualizer = useVirtualizer({
     count: processedJobs.length,
     getScrollElement: () => scrollingRef.current,
-    estimateSize: useCallback(() => 150, []), // Increased height to prevent overlap
+    estimateSize: useCallback(() => 180, []), // Explicit height estimation to prevent stacking
     overscan: 3, // Render 3 items outside viewport
-    measureElement: (element) => {
+    measureElement: useCallback((element) => {
       // Measure actual element height to prevent stacking
       if (element) {
-        return element.getBoundingClientRect().height + 8; // Add gap
+        const height = element.getBoundingClientRect().height;
+        return height > 0 ? height + 8 : 180; // Add gap, fallback to estimate if not measured
       }
-      return 150;
-    },
+      return 180;
+    }, []),
   });
   
   // Force re-measure when jobs change
   useEffect(() => {
-    if (virtualizer) {
-      virtualizer.measure();
+    if (virtualizer && processedJobs.length > 0) {
+      // Small delay to ensure DOM is updated before measuring
+      const timer = setTimeout(() => {
+        virtualizer.measure();
+      }, 50);
+      return () => clearTimeout(timer);
     }
   }, [processedJobs.length, virtualizer]);
+  
+  // Force remeasurement when new batches arrive
+  useEffect(() => {
+    if (jobs.length > 0) {
+      // Trigger a full remeasure when jobs update
+      virtualizer.measure();
+    }
+  }, [jobs, virtualizer]);
   
   // Load resume on mount
   useEffect(() => {
@@ -1005,14 +1018,19 @@ const JobSearchConvex: React.FC = () => {
                       transform: `translateY(${virtualItem.start}px)`,
                       zIndex: 1,
                       paddingBottom: '8px',
+                      minHeight: '180px', // Ensure minimum height to prevent stacking
                     }}
                   >
                     <motion.div
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      transition={{ duration: 0.3, delay: virtualItem.index * 0.05 }}
+                      transition={{ 
+                        duration: 0.3, 
+                        delay: job.batchIndex === jobs[jobs.length - 1]?.batchIndex ? virtualItem.index * 0.02 : 0 // Reduce delay for new batches
+                      }}
                       whileHover={{ y: -2, transition: { duration: 0.2 } }}
                       className={`bg-white rounded-lg shadow-sm hover:shadow-lg transition-shadow p-4 mx-2 mb-2 border ${getMatchScoreColor(job.match_score)}`}
+                      style={{ minHeight: '160px' }} // Ensure card has minimum height
                     >
                       <div className="flex justify-between items-start mb-4">
                         <div className="flex-1">
