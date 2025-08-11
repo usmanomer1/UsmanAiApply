@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, startTransition } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -87,6 +87,9 @@ const JobSearchConvex: React.FC = () => {
   // Refs for virtual scrolling
   const parentRef = useRef<HTMLDivElement>(null);
   const scrollingRef = useRef<HTMLDivElement>(null);
+  const measuredHeights = useRef<Map<string, number>>(new Map());
+  const averageHeightRef = useRef<number>(180);
+  const isFirstRenderRef = useRef<Set<string>>(new Set());
   
   // Convex hooks - use auth actions instead of mutations
   const createSession = useAction(api.jobs.authAction.createAuthenticatedSession);
@@ -139,58 +142,90 @@ const JobSearchConvex: React.FC = () => {
     return sortedJobs;
   }, [jobs, sortBy, filters, likedJobs]);
   
+  // Calculate average height from measured items
+  useEffect(() => {
+    if (measuredHeights.current.size > 0) {
+      const heights = Array.from(measuredHeights.current.values());
+      const avg = heights.reduce((sum, h) => sum + h, 0) / heights.length;
+      averageHeightRef.current = Math.round(avg);
+    }
+  }, [processedJobs.length]);
+  
   // Virtual scrolling setup for performance
   const virtualizer = useVirtualizer({
     count: processedJobs.length,
     getScrollElement: () => scrollingRef.current,
-    estimateSize: useCallback(() => 180, []), // Explicit height estimation to prevent stacking
-    overscan: 3, // Render 3 items outside viewport
+    estimateSize: useCallback((index) => {
+      const job = processedJobs[index];
+      if (!job) return averageHeightRef.current;
+      
+      // Use measured height if available, otherwise use average
+      const measured = measuredHeights.current.get(job._id);
+      return measured || averageHeightRef.current;
+    }, [processedJobs]),
+    overscan: 3,
     measureElement: useCallback((element) => {
-      // Measure actual element height to prevent stacking
       if (element) {
-        const height = element.getBoundingClientRect().height;
-        return height > 0 ? height + 8 : 180; // Add gap, fallback to estimate if not measured
+        const index = parseInt(element.dataset.index || '0');
+        const job = processedJobs[index];
+        if (job) {
+          const height = element.getBoundingClientRect().height;
+          if (height > 0) {
+            const totalHeight = height + 8; // Include gap
+            measuredHeights.current.set(job._id, totalHeight);
+            return totalHeight;
+          }
+        }
       }
-      return 180;
-    }, []),
-    // Force getItemKey to help React track items properly
-    getItemKey: useCallback((index) => processedJobs[index]?._id || index, [processedJobs]),
+      return averageHeightRef.current;
+    }, [processedJobs]),
+    getItemKey: useCallback((index) => processedJobs[index]?._id || `index-${index}`, [processedJobs]),
   });
   
-  // Track previous job IDs to detect new batches
-  const prevJobIdsRef = useRef<Set<string>>(new Set());
+  // Track new jobs for animation purposes
+  useEffect(() => {
+    processedJobs.forEach(job => {
+      if (!isFirstRenderRef.current.has(job._id)) {
+        isFirstRenderRef.current.add(job._id);
+      }
+    });
+  }, [processedJobs]);
   
-  // Force re-measure when jobs change
+  // Debounced remeasure to prevent thrashing
+  const measureTimeoutRef = useRef<NodeJS.Timeout>();
+  
+  // Smooth remeasure when jobs change
   useEffect(() => {
     if (virtualizer && processedJobs.length > 0) {
-      // Check if we have new jobs (not just reordering)
-      const currentJobIds = new Set(processedJobs.map(j => j._id));
-      const hasNewJobs = processedJobs.some(job => !prevJobIdsRef.current.has(job._id));
-      prevJobIdsRef.current = currentJobIds;
+      // Clear any pending measure
+      if (measureTimeoutRef.current) {
+        clearTimeout(measureTimeoutRef.current);
+      }
       
-      if (hasNewJobs) {
-        // For new jobs, force aggressive remeasurement
-        // Clear all cached measurements first
-        virtualizer.scrollToOffset(virtualizer.scrollOffset, { behavior: 'auto' });
-        
-        // Multiple measurement passes to ensure accuracy
-        const measureMultipleTimes = () => {
-          virtualizer.measure();
+      // Preserve scroll position during updates
+      const currentOffset = virtualizer.scrollOffset;
+      
+      // Debounced measure to prevent thrashing
+      measureTimeoutRef.current = setTimeout(() => {
+        startTransition(() => {
           requestAnimationFrame(() => {
             virtualizer.measure();
-            setTimeout(() => virtualizer.measure(), 50);
-            setTimeout(() => virtualizer.measure(), 150);
-            setTimeout(() => virtualizer.measure(), 300);
+            
+            // Restore scroll position if it jumped
+            if (Math.abs(virtualizer.scrollOffset - currentOffset) > 100) {
+              virtualizer.scrollToOffset(currentOffset, { behavior: 'auto' });
+            }
           });
-        };
-        
-        measureMultipleTimes();
-      } else {
-        // For other changes (filtering, sorting), single measure
-        virtualizer.measure();
-      }
+        });
+      }, 10); // Small debounce to batch updates
     }
-  }, [processedJobs, virtualizer]);
+    
+    return () => {
+      if (measureTimeoutRef.current) {
+        clearTimeout(measureTimeoutRef.current);
+      }
+    };
+  }, [processedJobs.length, virtualizer]);
   
   // Load resume on mount
   useEffect(() => {
@@ -1008,14 +1043,18 @@ const JobSearchConvex: React.FC = () => {
           <div
             ref={scrollingRef}
             className="relative h-[calc(100vh-280px)] overflow-auto"
-            style={{ contain: 'layout' }} // Optimize reflow
+            style={{ 
+              contain: 'strict',
+              willChange: 'scroll-position'
+            }}
           >
             <div
               style={{
                 height: `${virtualizer.getTotalSize()}px`,
                 width: '100%',
                 position: 'relative',
-                minHeight: `${processedJobs.length * 180}px`, // Ensure minimum container height
+                contain: 'layout style',
+                willChange: 'height',
               }}
             >
               {virtualizer.getVirtualItems().map((virtualItem) => {
@@ -1024,10 +1063,12 @@ const JobSearchConvex: React.FC = () => {
                 
                 const isLiked = likedJobs.has(job.job_id);
                 const isApplied = appliedJobs.has(job.job_id);
+                const isMeasured = measuredHeights.current.has(job._id);
+                const isNewItem = !isMeasured && !isFirstRenderRef.current.has(job._id);
               
               return (
                   <div
-                    key={`${job._id}-${virtualItem.index}`}
+                    key={job._id}
                     data-index={virtualItem.index}
                     ref={virtualizer.measureElement}
                     style={{
@@ -1036,27 +1077,24 @@ const JobSearchConvex: React.FC = () => {
                       left: 0,
                       width: '100%',
                       transform: `translateY(${virtualItem.start}px)`,
-                      zIndex: 1,
-                      paddingBottom: '8px',
-                      minHeight: '180px', // Ensure minimum height to prevent stacking
-                      willChange: 'transform', // Optimize for animations
+                      willChange: 'transform',
+                      contain: 'layout style',
+                      minHeight: `${averageHeightRef.current}px`,
                     }}
                   >
                     <motion.div
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
+                      initial={isNewItem ? { opacity: 0 } : false}
+                      animate={{ opacity: 1 }}
                       transition={{ 
-                        duration: 0.2, 
-                        delay: 0 // Remove animation delay to prevent measurement issues
+                        duration: isNewItem ? 0.2 : 0,
+                        ease: 'easeOut'
                       }}
-                      whileHover={{ y: -2, transition: { duration: 0.2 } }}
-                      className={`bg-white rounded-lg shadow-sm hover:shadow-lg transition-shadow p-4 mx-2 mb-2 border ${getMatchScoreColor(job.match_score)}`}
-                      style={{ minHeight: '160px' }} // Ensure card has minimum height
-                      onAnimationComplete={() => {
-                        // Trigger remeasure after animation completes for this specific item
-                        requestAnimationFrame(() => {
-                          virtualizer.measureElement(document.querySelector(`[data-index="${virtualItem.index}"]`) as HTMLElement);
-                        });
+                      whileHover={isMeasured ? { y: -2, transition: { duration: 0.2 } } : undefined}
+                      className={`bg-white rounded-lg shadow-sm hover:shadow-lg transition-shadow p-4 mx-2 border ${getMatchScoreColor(job.match_score)}`}
+                      style={{ 
+                        minHeight: Math.max(160, averageHeightRef.current - 20) + 'px',
+                        willChange: isNewItem ? 'opacity' : 'auto',
+                        contain: 'layout style paint'
                       }}
                     >
                       <div className="flex justify-between items-start mb-4">
