@@ -1,4 +1,4 @@
-import { ReactNode, useCallback, useEffect, useRef } from 'react';
+import { ReactNode, useCallback, useEffect } from 'react';
 import { ConvexProvider, ConvexReactClient } from 'convex/react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -16,64 +16,58 @@ interface ConvexAuthProviderProps {
  */
 export function ConvexAuthProvider({ children }: ConvexAuthProviderProps) {
   const { user } = useAuth();
-  const tokenRef = useRef<string | null>(null);
 
-  // Function to set the auth token in Convex
-  const setAuthToken = useCallback(async () => {
+  // Create an async function that fetches the token
+  const fetchAccessToken = useCallback(async ({ forceRefreshToken }: { forceRefreshToken: boolean }) => {
     try {
       if (!user) {
-        // Clear auth if no user
-        await convex.setAuth(null);
-        tokenRef.current = null;
-        return;
+        // No user, no token
+        return null;
       }
 
       // Get the current session from Supabase
-      const { data: { session }, error } = await supabase.auth.getSession();
+      const { data: { session }, error } = forceRefreshToken 
+        ? await supabase.auth.refreshSession()
+        : await supabase.auth.getSession();
       
       if (error) {
         console.error('Error getting session:', error);
-        await convex.setAuth(null);
-        tokenRef.current = null;
-        return;
+        return null;
       }
 
-      if (session?.access_token && session.access_token !== tokenRef.current) {
-        // Set the token in Convex
-        await convex.setAuth(session.access_token);
-        tokenRef.current = session.access_token;
-        console.log('Convex auth token set successfully');
-      } else if (!session) {
-        // No session, clear auth
-        await convex.setAuth(null);
-        tokenRef.current = null;
+      if (session?.access_token) {
+        return session.access_token;
       }
+
+      // Try to refresh if no token
+      const { data: { session: refreshedSession } } = await supabase.auth.refreshSession();
+      return refreshedSession?.access_token || null;
     } catch (error) {
-      console.error('Error setting Convex auth:', error);
-      await convex.setAuth(null);
-      tokenRef.current = null;
+      console.error('Error fetching access token:', error);
+      return null;
     }
   }, [user]);
 
-  // Set auth token when user changes
+  // Set the auth function when component mounts or user changes
   useEffect(() => {
-    setAuthToken();
-  }, [user, setAuthToken]);
+    if (user) {
+      // Set the async function that Convex will call to get tokens
+      convex.setAuth(fetchAccessToken);
+    } else {
+      // Clear auth when no user
+      convex.clearAuth();
+    }
+  }, [user, fetchAccessToken]);
 
-  // Listen for auth state changes
+  // Listen for auth state changes to trigger re-authentication
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event);
       
-      if (session?.access_token && session.access_token !== tokenRef.current) {
-        // Update Convex auth when session changes
-        await convex.setAuth(session.access_token);
-        tokenRef.current = session.access_token;
-        console.log('Convex auth updated after state change');
-      } else if (!session) {
-        // Clear auth on sign out
-        await convex.setAuth(null);
-        tokenRef.current = null;
+      // When auth state changes, Convex will automatically call fetchAccessToken
+      // due to the setAuth configuration above
+      if (event === 'SIGNED_OUT') {
+        convex.clearAuth();
         console.log('Convex auth cleared');
       }
     });
@@ -82,27 +76,6 @@ export function ConvexAuthProvider({ children }: ConvexAuthProviderProps) {
       subscription.unsubscribe();
     };
   }, []);
-
-  // Refresh token periodically (every 45 minutes to be safe)
-  useEffect(() => {
-    const refreshInterval = setInterval(async () => {
-      if (user) {
-        try {
-          const { data: { session }, error } = await supabase.auth.refreshSession();
-          
-          if (!error && session?.access_token && session.access_token !== tokenRef.current) {
-            await convex.setAuth(session.access_token);
-            tokenRef.current = session.access_token;
-            console.log('Convex auth token refreshed');
-          }
-        } catch (error) {
-          console.error('Error refreshing token:', error);
-        }
-      }
-    }, 45 * 60 * 1000); // 45 minutes
-
-    return () => clearInterval(refreshInterval);
-  }, [user]);
 
   return (
     <ConvexProvider client={convex}>
