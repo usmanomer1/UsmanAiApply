@@ -153,26 +153,44 @@ const JobSearchConvex: React.FC = () => {
       }
       return 180;
     }, []),
+    // Force getItemKey to help React track items properly
+    getItemKey: useCallback((index) => processedJobs[index]?._id || index, [processedJobs]),
   });
+  
+  // Track previous job IDs to detect new batches
+  const prevJobIdsRef = useRef<Set<string>>(new Set());
   
   // Force re-measure when jobs change
   useEffect(() => {
     if (virtualizer && processedJobs.length > 0) {
-      // Small delay to ensure DOM is updated before measuring
-      const timer = setTimeout(() => {
+      // Check if we have new jobs (not just reordering)
+      const currentJobIds = new Set(processedJobs.map(j => j._id));
+      const hasNewJobs = processedJobs.some(job => !prevJobIdsRef.current.has(job._id));
+      prevJobIdsRef.current = currentJobIds;
+      
+      if (hasNewJobs) {
+        // For new jobs, force aggressive remeasurement
+        // Clear all cached measurements first
+        virtualizer.scrollToOffset(virtualizer.scrollOffset, { behavior: 'auto' });
+        
+        // Multiple measurement passes to ensure accuracy
+        const measureMultipleTimes = () => {
+          virtualizer.measure();
+          requestAnimationFrame(() => {
+            virtualizer.measure();
+            setTimeout(() => virtualizer.measure(), 50);
+            setTimeout(() => virtualizer.measure(), 150);
+            setTimeout(() => virtualizer.measure(), 300);
+          });
+        };
+        
+        measureMultipleTimes();
+      } else {
+        // For other changes (filtering, sorting), single measure
         virtualizer.measure();
-      }, 50);
-      return () => clearTimeout(timer);
+      }
     }
-  }, [processedJobs.length, virtualizer]);
-  
-  // Force remeasurement when new batches arrive
-  useEffect(() => {
-    if (jobs.length > 0) {
-      // Trigger a full remeasure when jobs update
-      virtualizer.measure();
-    }
-  }, [jobs, virtualizer]);
+  }, [processedJobs, virtualizer]);
   
   // Load resume on mount
   useEffect(() => {
@@ -990,12 +1008,14 @@ const JobSearchConvex: React.FC = () => {
           <div
             ref={scrollingRef}
             className="relative h-[calc(100vh-280px)] overflow-auto"
+            style={{ contain: 'layout' }} // Optimize reflow
           >
             <div
               style={{
                 height: `${virtualizer.getTotalSize()}px`,
                 width: '100%',
                 position: 'relative',
+                minHeight: `${processedJobs.length * 180}px`, // Ensure minimum container height
               }}
             >
               {virtualizer.getVirtualItems().map((virtualItem) => {
@@ -1007,7 +1027,7 @@ const JobSearchConvex: React.FC = () => {
               
               return (
                   <div
-                    key={job._id}
+                    key={`${job._id}-${virtualItem.index}`}
                     data-index={virtualItem.index}
                     ref={virtualizer.measureElement}
                     style={{
@@ -1019,18 +1039,25 @@ const JobSearchConvex: React.FC = () => {
                       zIndex: 1,
                       paddingBottom: '8px',
                       minHeight: '180px', // Ensure minimum height to prevent stacking
+                      willChange: 'transform', // Optimize for animations
                     }}
                   >
                     <motion.div
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ 
-                        duration: 0.3, 
-                        delay: job.batchIndex === jobs[jobs.length - 1]?.batchIndex ? virtualItem.index * 0.02 : 0 // Reduce delay for new batches
+                        duration: 0.2, 
+                        delay: 0 // Remove animation delay to prevent measurement issues
                       }}
                       whileHover={{ y: -2, transition: { duration: 0.2 } }}
                       className={`bg-white rounded-lg shadow-sm hover:shadow-lg transition-shadow p-4 mx-2 mb-2 border ${getMatchScoreColor(job.match_score)}`}
                       style={{ minHeight: '160px' }} // Ensure card has minimum height
+                      onAnimationComplete={() => {
+                        // Trigger remeasure after animation completes for this specific item
+                        requestAnimationFrame(() => {
+                          virtualizer.measureElement(document.querySelector(`[data-index="${virtualItem.index}"]`) as HTMLElement);
+                        });
+                      }}
                     >
                       <div className="flex justify-between items-start mb-4">
                         <div className="flex-1">
