@@ -80,14 +80,11 @@ export const searchJobsAuthenticated = action({
     // Call backend API with callback URL
     const backendUrl = process.env.BACKEND_URL || "http://localhost:3001";
     
-    // Get Convex site URL from environment variable
-    // This should be set to your Convex deployment's site URL
-    // e.g., https://veracious-meadowlark-646.convex.site for dev
-    // or your production URL for prod
-    const convexSiteUrl = process.env.CONVEX_SITE_URL;
+    // Get Convex site URL - use CONVEX_SITE_URL if set, otherwise use the automatic CONVEX_URL
+    const convexSiteUrl = process.env.CONVEX_SITE_URL || process.env.CONVEX_URL;
     
     if (!convexSiteUrl) {
-      throw new Error("CONVEX_SITE_URL environment variable is not configured");
+      throw new Error("Unable to determine Convex site URL");
     }
     
     try {
