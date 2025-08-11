@@ -44,53 +44,61 @@ function useAuthFromSupabase() {
 
       // Create a new fetch promise
       fetchPromiseRef.current = (async () => {
-        try {
-          // Get the session (with optional refresh)
-          const { data: { session }, error } = forceRefreshToken 
-            ? await supabase.auth.refreshSession()
-            : await supabase.auth.getSession();
+        // Get the session (with optional refresh)
+        const { data: { session }, error } = forceRefreshToken 
+          ? await supabase.auth.refreshSession()
+          : await supabase.auth.getSession();
+        
+        if (error) {
+          // Check for rate limit errors more reliably
+          const isRateLimit = error.status === 429 || 
+                            error.code === 'rate_limit' ||
+                            error.message?.toLowerCase().includes('rate limit');
           
-          if (error) {
-            // Check for rate limit errors more reliably
-            const isRateLimit = error.status === 429 || 
-                              error.code === 'rate_limit' ||
-                              error.message?.toLowerCase().includes('rate limit');
-            
-            if (!isRateLimit) {
-              console.error('Error getting session:', error);
-            }
-            
-            // Only return cached token if it's still valid
-            const currentTime = Date.now();
-            if (tokenCacheRef.current.token && tokenCacheRef.current.expiry > currentTime) {
-              return tokenCacheRef.current.token;
-            }
-            
-            // No valid cached token available
-            return null;
+          if (!isRateLimit) {
+            console.error('Error getting session:', error);
           }
-
-          if (session?.access_token) {
-            // Cache the token with its expiry time
-            // Supabase tokens typically expire after 1 hour
-            const expiresIn = session.expires_in || 3600; // Default to 1 hour
-            const expiryTime = Date.now() + (expiresIn * 1000);
-            
-            tokenCacheRef.current = {
-              token: session.access_token,
-              expiry: expiryTime
-            };
-            
-            return session.access_token;
+          
+          // Clear promise reference after delay even on error
+          setTimeout(() => {
+            fetchPromiseRef.current = null;
+          }, 500);
+          
+          // Only return cached token if it's still valid
+          const currentTime = Date.now();
+          if (tokenCacheRef.current.token && tokenCacheRef.current.expiry > currentTime) {
+            return tokenCacheRef.current.token;
           }
-
-          // No session available
+          
+          // No valid cached token available
           return null;
-        } finally {
-          // Clear the promise reference after completion
-          // This allows new fetches after this one completes
-          fetchPromiseRef.current = null;
         }
+
+        if (session?.access_token) {
+          // Cache the token with its expiry time
+          // Supabase tokens typically expire after 1 hour
+          const expiresIn = session.expires_in || 3600; // Default to 1 hour
+          const expiryTime = Date.now() + (expiresIn * 1000);
+          
+          tokenCacheRef.current = {
+            token: session.access_token,
+            expiry: expiryTime
+          };
+          
+          // Clear promise reference after a delay to prevent rapid successive calls
+          setTimeout(() => {
+            fetchPromiseRef.current = null;
+          }, 500);
+          
+          return session.access_token;
+        }
+
+        // No session available - also clear promise after delay
+        setTimeout(() => {
+          fetchPromiseRef.current = null;
+        }, 500);
+        
+        return null;
       })();
 
       return fetchPromiseRef.current;
