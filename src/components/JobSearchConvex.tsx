@@ -367,12 +367,17 @@ const JobSearchConvex: React.FC = () => {
     setSearchProgress({ current: 0, total: 0 });
     
     try {
+      // Combine location with query since backend expects it in query
+      const combinedQuery = location?.trim() 
+        ? `${searchQuery} in ${location}`
+        : searchQuery;
+      
       // Stream jobs directly from backend
       await jobStreamClient.streamJobs(
         {
           resumeText,
-          query: searchQuery,
-          location: location || undefined,
+          query: combinedQuery,
+          // Don't send location separately - it's in the query now
           filters,
           numJobs: 100,
         },
@@ -399,9 +404,12 @@ const JobSearchConvex: React.FC = () => {
             
             // Log search to Convex for history
             try {
+              const combinedQuery = location?.trim() 
+                ? `${searchQuery} in ${location}`
+                : searchQuery;
+              
               await logSearchSession({
-                query: searchQuery,
-                location: location || undefined,
+                query: combinedQuery,
                 totalFound: totalProcessed,
               });
             } catch (err) {
