@@ -40,55 +40,69 @@ export const getUserSessions = query({
   },
 });
 
-export const getSessionJobs = query({
+// Get liked jobs with cached data
+export const getLikedJobsWithData = query({
   args: {
-    sessionId: v.id("jobSearchSessions"),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const limit = args.limit ?? 100;
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      return [];
+    }
     
-    // Get all jobs for this session
-    const jobs = await ctx.db
-      .query("jobs")
-      .withIndex("by_session")
-      .filter(q => q.eq(q.field("sessionId"), args.sessionId))
-      .order("asc")
+    const limit = args.limit ?? 50;
+    
+    // Get all liked jobs with cached data
+    const likedJobs = await ctx.db
+      .query("userJobInteractions")
+      .withIndex("by_user_action")
+      .filter(q => 
+        q.and(
+          q.eq(q.field("userId"), userId),
+          q.eq(q.field("action"), "liked")
+        )
+      )
+      .order("desc")
       .take(limit);
     
-    return jobs;
+    // Return jobs with their cached data
+    return likedJobs.map(interaction => ({
+      jobId: interaction.jobId,
+      ...interaction.cachedJobData,
+      likedAt: interaction.timestamp,
+    }));
   },
 });
 
+// Get user interactions for specific job IDs (for current search results)
 export const getUserInteractions = query({
   args: {
-    // No userId needed - get from auth context
     jobIds: v.array(v.string()),
   },
   handler: async (ctx, args) => {
-    // Get authenticated user ID
     const userId = await getAuthUserId(ctx);
     if (!userId) {
-      return {}; // Return empty map if not authenticated
+      return {};
     }
     
-    // Get all interactions for these jobs
-    const interactions = await ctx.db
-      .query("userJobInteractions")
-      .withIndex("by_user_action")
-      .filter(q => q.eq(q.field("userId"), userId))
-      .collect();
+    // Get interactions for requested job IDs only
+    const interactionMap: Record<string, string> = {};
     
-    // Filter for requested job IDs and convert to map
-    const interactionMap: Record<string, any> = {};
-    
-    for (const interaction of interactions) {
-      if (args.jobIds.includes(interaction.jobId)) {
-        // Convert action field to interactionType for frontend compatibility
-        interactionMap[interaction.jobId] = {
-          ...interaction,
-          interactionType: interaction.action
-        };
+    for (const jobId of args.jobIds) {
+      const interaction = await ctx.db
+        .query("userJobInteractions")
+        .withIndex("by_user_job")
+        .filter(q => 
+          q.and(
+            q.eq(q.field("userId"), userId),
+            q.eq(q.field("jobId"), jobId)
+          )
+        )
+        .first();
+      
+      if (interaction) {
+        interactionMap[jobId] = interaction.action;
       }
     }
     

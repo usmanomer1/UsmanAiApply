@@ -90,61 +90,100 @@ export const updateSessionStatus = mutation({
   },
 });
 
-export const insertJobBatch = mutation({
+// Like a job and cache its data
+export const likeJob = mutation({
   args: {
-    // No authToken needed - using native Convex auth
-    sessionId: v.id("jobSearchSessions"),
-    jobs: v.array(v.any()),
-    batchIndex: v.number(),
+    jobId: v.string(),
+    jobData: v.object({
+      job_title: v.string(),
+      employer_name: v.string(),
+      employer_logo: v.optional(v.string()),
+      job_city: v.optional(v.string()),
+      job_state: v.optional(v.string()),
+      job_country: v.optional(v.string()),
+      job_is_remote: v.boolean(),
+      job_apply_link: v.string(),
+      job_description: v.string(),
+      job_posted_at_datetime_utc: v.optional(v.string()),
+      match_score: v.optional(v.number()),
+      missing_skills: v.optional(v.array(v.string())),
+      matching_skills: v.optional(v.array(v.string())),
+    }),
   },
   handler: async (ctx, args) => {
-    // Verify authentication using native Convex auth
     const userId = await requireAuth(ctx);
     
-    // Verify the session belongs to this user
-    const session = await ctx.db.get(args.sessionId);
-    if (!session) {
-      throw new Error("Session not found");
-    }
-    if (session.userId !== userId) {
-      throw new Error("Unauthorized: Session does not belong to this user");
+    // Check if already liked
+    const existing = await ctx.db
+      .query("userJobInteractions")
+      .withIndex("by_user_job", q => q.eq("userId", userId).eq("jobId", args.jobId))
+      .filter(q => q.eq(q.field("action"), "liked"))
+      .first();
+    
+    if (existing) {
+      return { success: true, message: "Already liked" };
     }
     
-    // Insert each job with proper formatting
-    for (const job of args.jobs) {
-      await ctx.db.insert("jobs", {
-        sessionId: args.sessionId,
-        job_id: job.job_id || job.id,
-        employer_name: job.employer_name || job.company || "Unknown",
-        job_title: job.job_title || job.title || "Unknown Position",
-        job_description: job.job_description || job.description || "",
-        job_apply_link: job.job_apply_link || job.applyUrl || "",
-        job_city: job.job_city || job.location?.city || "",
-        job_state: job.job_state || job.location?.state || "",
-        job_country: job.job_country || job.location?.country || "",
-        job_is_remote: job.job_is_remote || false,
-        job_posted_at_datetime_utc: job.job_posted_at_datetime_utc || new Date().toISOString(),
-        
-        // JSON stringified fields for complex data
-        job_highlights: JSON.stringify(job.job_highlights || {}),
-        job_required_experience: JSON.stringify(job.job_required_experience || {}),
-        
-        // Scoring and analysis
-        match_score: job.match_score || 0,
-        gaps_analysis: JSON.stringify(job.gaps_analysis || {}),
-        
-        batchIndex: args.batchIndex,
-        createdAt: Date.now(),
+    // Store the like with cached job data
+    await ctx.db.insert("userJobInteractions", {
+      userId,
+      jobId: args.jobId,
+      action: "liked",
+      cachedJobData: args.jobData,
+      timestamp: Date.now(),
+    });
+    
+    return { success: true };
+  },
+});
+
+// Unlike a job
+export const unlikeJob = mutation({
+  args: {
+    jobId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    
+    const interaction = await ctx.db
+      .query("userJobInteractions")
+      .withIndex("by_user_job", q => q.eq("userId", userId).eq("jobId", args.jobId))
+      .filter(q => q.eq(q.field("action"), "liked"))
+      .first();
+    
+    if (interaction) {
+      await ctx.db.delete(interaction._id);
+    }
+    
+    return { success: true };
+  },
+});
+
+// Mark job as applied
+export const markApplied = mutation({
+  args: {
+    jobId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    
+    // Check if already marked
+    const existing = await ctx.db
+      .query("userJobInteractions")
+      .withIndex("by_user_job", q => q.eq("userId", userId).eq("jobId", args.jobId))
+      .filter(q => q.eq(q.field("action"), "applied"))
+      .first();
+    
+    if (!existing) {
+      await ctx.db.insert("userJobInteractions", {
+        userId,
+        jobId: args.jobId,
+        action: "applied",
+        timestamp: Date.now(),
       });
     }
     
-    // Update session processed count
-    const currentSession = await ctx.db.get(args.sessionId);
-    if (currentSession) {
-      await ctx.db.patch(args.sessionId, {
-        processedCount: (currentSession.processedCount || 0) + args.jobs.length,
-      });
-    }
+    return { success: true };
   },
 });
 
