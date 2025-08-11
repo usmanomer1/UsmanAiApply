@@ -11,6 +11,12 @@ export default defineSchema({
     status: v.string(), // "searching", "completed", "error"
     createdAt: v.number(),
     completedAt: v.optional(v.number()),
+    // Legacy fields (can be removed after migration)
+    filters: v.optional(v.any()),
+    resumeText: v.optional(v.string()),
+    processedCount: v.optional(v.number()),
+    errorMessage: v.optional(v.string()),
+    searchCost: v.optional(v.number()),
   })
     .index("by_user", ["userId", "createdAt"]),
 

@@ -13,6 +13,7 @@ import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import { useAuth } from '../contexts/AuthContext';
 import { useConvexAuth } from '../hooks/useConvexAuth';
+import { jobStreamClient } from '../lib/jobStreamClient';
 import { extractTextFromPDF } from '../lib/pdfExtractor';
 import { supabase } from '../lib/supabase';
 import { toast } from 'react-hot-toast';
@@ -65,6 +66,7 @@ const JobSearchConvex: React.FC = () => {
   const [location, setLocation] = useState('');
   const [resumeText, setResumeText] = useState('');
   const [sessionId, setSessionId] = useState<Id<"jobSearchSessions"> | null>(null);
+  const [jobs, setJobs] = useState<Job[]>([]); // Local state for streamed jobs
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [sortBy, setSortBy] = useState<SortBy>('match_score');
   const [filters, setFilters] = useState<Filters>({
@@ -91,20 +93,16 @@ const JobSearchConvex: React.FC = () => {
   const averageHeightRef = useRef<number>(180);
   const isFirstRenderRef = useRef<Set<string>>(new Set());
   
-  // Convex hooks - use auth actions instead of mutations
-  const createSession = useAction(api.jobs.authAction.createAuthenticatedSession);
-  const searchJobs = useAction(api.jobs.authAction.searchJobsAuthenticated);
-  const trackInteraction = useMutation(api.jobs.mutations.saveJobInteraction);
+  // Convex mutations for interactions only (not for job search)
+  const logSearchSession = useMutation(api.jobs.mutations.logSearchSession);
+  const likeJob = useMutation(api.jobs.mutations.likeJob);
+  const unlikeJob = useMutation(api.jobs.mutations.unlikeJob);
+  const markApplied = useMutation(api.jobs.mutations.markApplied);
   
-  // Queries - only run when sessionId exists
+  // Queries - only for session metadata and interactions
   const session = useQuery(
     api.jobs.queries.getSession,
     sessionId ? { sessionId } : "skip"
-  );
-  
-  const jobs = useQuery(
-    api.jobs.queries.getSessionJobs,
-    sessionId ? { sessionId, limit: 100 } : "skip"
   );
   
   const userInteractions = useQuery(
@@ -336,33 +334,50 @@ const JobSearchConvex: React.FC = () => {
     }
     
     setIsSearching(true);
-    console.log('Creating session...');
+    setJobs([]); // Clear previous results
     
     try {
-      // Create session (no authToken needed)
-      const newSessionId = await createSession({
-        query: searchQuery,
-        location: location || undefined,
-        resumeText,
-        filters,
-      });
-      
-      console.log('Session created:', newSessionId);
-      setSessionId(newSessionId);
-      
-      // Trigger search action (no authToken needed)
-      console.log('Starting job search...');
-      await searchJobs({
-        sessionId: newSessionId,
-        query: searchQuery,
-        location: location || undefined,
-        resumeText,
-        filters,
-        numJobs: 100, // Get best value
-      });
-      
-      console.log('Search completed successfully');
-      toast.success('Search started! Jobs will appear as they\'re processed.');
+      // Stream jobs directly from backend
+      await jobStreamClient.streamJobs(
+        {
+          resumeText,
+          query: searchQuery,
+          location: location || undefined,
+          filters,
+          numJobs: 100,
+        },
+        {
+          onConnected: (sessionId) => {
+            console.log('Connected to stream:', sessionId);
+          },
+          onJobsFound: (total, fetchTime) => {
+            console.log(`Found ${total} jobs in ${fetchTime}ms`);
+            toast.success(`Found ${total} jobs!`);
+          },
+          onJob: (job) => {
+            // Add job to state immediately as it arrives
+            setJobs(prev => [...prev, job]);
+          },
+          onComplete: async (totalProcessed) => {
+            console.log('Stream complete:', totalProcessed);
+            
+            // Log search to Convex for history
+            try {
+              await logSearchSession({
+                query: searchQuery,
+                location: location || undefined,
+                totalFound: totalProcessed,
+              });
+            } catch (err) {
+              console.error('Failed to log search:', err);
+            }
+          },
+          onError: (error) => {
+            console.error('Stream error:', error);
+            toast.error(error);
+          },
+        }
+      );
     } catch (error: any) {
       console.error('Search error details:', error);
       
