@@ -1029,8 +1029,8 @@ const JobSearchConvex: React.FC = () => {
           </div>
         )}
         
-        {/* Empty State - Moved outside scrolling container for visibility */}
-        {!sessionId && !isSearching && jobs.length === 0 && (
+        {/* Empty State - Don't show if liked filter is active or we have jobs to show */}
+        {!sessionId && !isSearching && jobs.length === 0 && !filters.likedOnly && processedJobs.length === 0 && (
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
