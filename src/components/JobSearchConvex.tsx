@@ -78,6 +78,8 @@ const JobSearchConvex: React.FC = () => {
   });
   const [showFilters, setShowFilters] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchStatus, setSearchStatus] = useState<'idle' | 'connecting' | 'searching' | 'processing' | 'completed' | 'error'>('idle');
+  const [searchProgress, setSearchProgress] = useState({ current: 0, total: 0 });
   const [likedJobs, setLikedJobs] = useState<Set<string>>(new Set());
   const [processingLikes, setProcessingLikes] = useState<Set<string>>(new Set());
   const [appliedJobs, setAppliedJobs] = useState<Set<string>>(new Set());
@@ -107,14 +109,41 @@ const JobSearchConvex: React.FC = () => {
   
   const userInteractions = useQuery(
     api.jobs.queries.getUserInteractions,
-    jobs && isAuthenticated ? { jobIds: jobs.map(j => j.job_id) } : "skip"
+    jobs && jobs.length > 0 && isAuthenticated ? { jobIds: jobs.map(j => j.job_id) } : "skip"
+  );
+  
+  // Always query liked jobs to show count and for filter
+  const likedJobsData = useQuery(
+    api.jobs.queries.getLikedJobsWithData,
+    isAuthenticated ? {} : "skip"
   );
   
   // Process and sort jobs
   const processedJobs = useMemo(() => {
-    if (!jobs) return [];
+    let jobsToProcess = [];
     
-    let sortedJobs = [...jobs];
+    // PRIORITY 1: If liked filter is on, ONLY show liked jobs from Convex
+    if (filters.likedOnly) {
+      if (!likedJobsData) {
+        // Still loading liked jobs
+        return [];
+      }
+      // Convert liked jobs data to Job format
+      jobsToProcess = likedJobsData.map(liked => ({
+        ...liked,
+        job_id: liked.jobId,
+        _id: liked.jobId as any,
+        createdAt: liked.likedAt || Date.now(),
+        batchIndex: 0,
+      }));
+    } else {
+      // Use streamed jobs from current session
+      jobsToProcess = jobs || [];
+    }
+    
+    if (!jobsToProcess || jobsToProcess.length === 0) return [];
+    
+    let sortedJobs = [...jobsToProcess];
     
     // Apply sorting
     switch (sortBy) {
@@ -127,18 +156,17 @@ const JobSearchConvex: React.FC = () => {
       // Add salary sorting if needed
     }
     
-    // Apply filters
+    // Apply other filters (remote, employment type, etc.)
+    // NOTE: These filters only work on jobs currently in memory:
+    // - For liked filter: filters the persisted liked jobs from Convex
+    // - For regular search: filters the streamed jobs from current session
+    // - Without a search, there are no jobs to filter (except liked jobs)
     if (filters.remote) {
       sortedJobs = sortedJobs.filter(job => job.job_is_remote);
     }
     
-    // Filter by liked jobs
-    if (filters.likedOnly) {
-      sortedJobs = sortedJobs.filter(job => likedJobs.has(job.job_id));
-    }
-    
     return sortedJobs;
-  }, [jobs, sortBy, filters, likedJobs]);
+  }, [jobs, sortBy, filters, likedJobsData]);
   
   // Calculate average height from measured items
   useEffect(() => {
@@ -276,9 +304,9 @@ const JobSearchConvex: React.FC = () => {
       const liked = new Set<string>();
       const applied = new Set<string>();
       
-      Object.entries(userInteractions).forEach(([jobId, interaction]: [string, any]) => {
-        if (interaction.interactionType === 'liked') liked.add(jobId);
-        if (interaction.interactionType === 'applied') applied.add(jobId);
+      Object.entries(userInteractions).forEach(([jobId, action]: [string, any]) => {
+        if (action === 'liked') liked.add(jobId);
+        if (action === 'applied') applied.add(jobId);
       });
       
       setLikedJobs(liked);
@@ -335,6 +363,8 @@ const JobSearchConvex: React.FC = () => {
     
     setIsSearching(true);
     setJobs([]); // Clear previous results
+    setSearchStatus('connecting');
+    setSearchProgress({ current: 0, total: 0 });
     
     try {
       // Stream jobs directly from backend
@@ -349,17 +379,23 @@ const JobSearchConvex: React.FC = () => {
         {
           onConnected: (sessionId) => {
             console.log('Connected to stream:', sessionId);
+            setSearchStatus('searching');
           },
           onJobsFound: (total, fetchTime) => {
             console.log(`Found ${total} jobs in ${fetchTime}ms`);
+            setSearchStatus('processing');
+            setSearchProgress({ current: 0, total });
             toast.success(`Found ${total} jobs!`);
           },
           onJob: (job) => {
             // Add job to state immediately as it arrives
             setJobs(prev => [...prev, job]);
+            setSearchProgress(prev => ({ ...prev, current: prev.current + 1 }));
           },
           onComplete: async (totalProcessed) => {
             console.log('Stream complete:', totalProcessed);
+            setSearchStatus('completed');
+            setSearchProgress(prev => ({ ...prev, current: totalProcessed }));
             
             // Log search to Convex for history
             try {
@@ -374,6 +410,7 @@ const JobSearchConvex: React.FC = () => {
           },
           onError: (error) => {
             console.error('Stream error:', error);
+            setSearchStatus('error');
             toast.error(error);
           },
         }
@@ -471,6 +508,7 @@ const JobSearchConvex: React.FC = () => {
     }
     
     const isLiked = likedJobs.has(jobId);
+    const job = jobs.find(j => j.job_id === jobId);
     
     // Optimistic update - update UI immediately for instant feedback
     if (isLiked) {
@@ -486,20 +524,40 @@ const JobSearchConvex: React.FC = () => {
     // Mark as processing
     setProcessingLikes(prev => new Set([...prev, jobId]));
     
-    // API call in background without blocking UI
-    trackInteraction({
-      jobId,
-      interactionType: isLiked ? 'hidden' : 'liked',
-    })
-    .then(() => {
+    try {
+      // API call in background without blocking UI
+      if (isLiked) {
+        // Unlike the job
+        await unlikeJob({ jobId });
+      } else {
+        // Like the job with cached data
+        await likeJob({ 
+          jobId,
+          jobData: job ? {
+            job_title: job.job_title,
+            employer_name: job.employer_name,
+            employer_logo: job.employer_logo,
+            job_city: job.job_city,
+            job_state: job.job_state,
+            job_country: job.job_country,
+            job_is_remote: job.job_is_remote,
+            job_apply_link: job.job_apply_link,
+            job_description: job.job_description,
+            job_posted_at_datetime_utc: job.job_posted_at_datetime_utc,
+            match_score: job.match_score,
+            missing_skills: job.missing_skills,
+            matching_skills: job.matching_skills,
+          } : undefined
+        });
+      }
+      
       // Success - remove from processing
       setProcessingLikes(prev => {
         const next = new Set(prev);
         next.delete(jobId);
         return next;
       });
-    })
-    .catch(error => {
+    } catch (error) {
       console.error('Like error:', error);
       
       // Remove from processing
@@ -535,7 +593,7 @@ const JobSearchConvex: React.FC = () => {
           },
         });
       }
-    });
+    }
   };
   
   // Get match score color
@@ -548,11 +606,11 @@ const JobSearchConvex: React.FC = () => {
   
   // Progress calculation
   const progress = useMemo(() => {
-    if (!session) return 0;
-    if (session.status === 'completed') return 100;
-    if (session.totalFound === 0) return 0;
-    return Math.round((session.processedCount / session.totalFound) * 100);
-  }, [session]);
+    if (searchStatus === 'idle') return 0;
+    if (searchStatus === 'completed') return 100;
+    if (searchProgress.total === 0) return 0;
+    return Math.round((searchProgress.current / searchProgress.total) * 100);
+  }, [searchStatus, searchProgress]);
   
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -675,7 +733,7 @@ const JobSearchConvex: React.FC = () => {
                 }`}
               >
                 <Heart className={`h-4 w-4 ${filters.likedOnly ? 'fill-current' : ''}`} />
-                Liked Jobs {likedJobs.size > 0 && `(${likedJobs.size})`}
+                Liked Jobs {likedJobsData && likedJobsData.length > 0 && `(${likedJobsData.length})`}
               </button>
               
               {/* Sort Dropdown - Moved to right */}
@@ -834,14 +892,14 @@ const JobSearchConvex: React.FC = () => {
         </AnimatePresence>
         
         {/* Progress Indicator */}
-        {session && session.status !== 'initializing' && (
+        {searchStatus !== 'idle' && searchProgress.total > 0 && (
           <div className="bg-white border-b border-gray-200 px-6 py-3">
             <div className="max-w-7xl mx-auto flex items-center justify-between">
               <div className="flex items-center gap-6">
                 {/* Stage Indicators */}
                 <div className="flex items-center gap-3">
                   <div className={`flex items-center gap-2 ${
-                    session.status === 'searching' || session.status === 'processing' || session.status === 'completed'
+                    searchStatus === 'searching' || searchStatus === 'processing' || searchStatus === 'completed'
                       ? 'text-[#1DE0DD]' : 'text-gray-400'
                   }`}>
                     <CheckCircle2 className="h-5 w-5" />
@@ -851,11 +909,11 @@ const JobSearchConvex: React.FC = () => {
                   <ChevronRight className="h-4 w-4 text-gray-300" />
                   
                   <div className={`flex items-center gap-2 ${
-                    session.status === 'processing' || session.status === 'completed'
+                    searchStatus === 'processing' || searchStatus === 'completed'
                       ? 'text-[#1DE0DD]' : 'text-gray-400'
                   }`}>
                     <div className="relative">
-                      {session.status === 'processing' && (
+                      {searchStatus === 'processing' && (
                         <div className="absolute inset-0 animate-ping">
                           <div className="h-5 w-5 rounded-full bg-[#1DE0DD] opacity-75" />
                         </div>
@@ -868,7 +926,7 @@ const JobSearchConvex: React.FC = () => {
                   <ChevronRight className="h-4 w-4 text-gray-300" />
                   
                   <div className={`flex items-center gap-2 ${
-                    session.status === 'completed' ? 'text-[#1DE0DD]' : 'text-gray-400'
+                    searchStatus === 'completed' ? 'text-[#1DE0DD]' : 'text-gray-400'
                   }`}>
                     <CheckCircle2 className="h-5 w-5" />
                     <span className="text-sm font-medium">Complete</span>
@@ -878,11 +936,11 @@ const JobSearchConvex: React.FC = () => {
                 {/* Job Count */}
                 <div className="flex items-center gap-2">
                   <div className="bg-[#1DE0DD] text-white px-3 py-1.5 rounded-full text-sm font-bold min-w-[40px] text-center">
-                    {session.processedCount}
+                    {searchProgress.current}
                   </div>
                   <span className="text-sm text-gray-600 font-medium">of</span>
                   <div className="bg-gray-200 text-gray-800 px-3 py-1.5 rounded-full text-sm font-bold min-w-[40px] text-center">
-                    {session.totalFound}
+                    {searchProgress.total}
                   </div>
                   <span className="text-sm text-gray-600 font-medium">jobs found</span>
                 </div>
@@ -906,8 +964,44 @@ const JobSearchConvex: React.FC = () => {
       
       {/* Jobs List with Virtual Scrolling */}
       <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Job Count Header */}
+        {jobs.length > 0 && (
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <h2 className="text-2xl font-bold text-gray-900">
+                {processedJobs.length} {processedJobs.length === 1 ? 'Job' : 'Jobs'} Found
+              </h2>
+              {filters.likedOnly && (
+                <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium">
+                  Liked Jobs
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              {searchStatus === 'searching' && (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Searching...
+                </span>
+              )}
+              {searchStatus === 'processing' && (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Processing {searchProgress.current} of {searchProgress.total}...
+                </span>
+              )}
+              {searchStatus === 'completed' && (
+                <span className="flex items-center gap-2 text-green-600">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Search Complete
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+        
         {/* Empty State - Moved outside scrolling container for visibility */}
-        {!sessionId && !isSearching && (
+        {!sessionId && !isSearching && jobs.length === 0 && (
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1050,6 +1144,54 @@ const JobSearchConvex: React.FC = () => {
             >
               Matching your profile with available positions
             </motion.p>
+          </motion.div>
+        )}
+        
+        {/* Loading state for liked jobs filter */}
+        {filters.likedOnly && !likedJobsData && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4 }}
+            className="flex flex-col items-center justify-center py-24"
+          >
+            <div className="relative mb-8">
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                className="w-12 h-12 border-2 border-gray-200 rounded-full"
+              />
+              <motion.div
+                className="absolute inset-0 w-12 h-12 border-2 border-transparent border-t-red-500 rounded-full"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+              />
+              <Heart className="absolute inset-0 m-auto h-5 w-5 text-red-500" />
+            </div>
+            <h3 className="text-lg font-light text-gray-900 mb-2">
+              Loading liked jobs...
+            </h3>
+            <p className="text-sm text-gray-500">
+              Fetching your saved positions
+            </p>
+          </motion.div>
+        )}
+        
+        {/* No liked jobs message */}
+        {filters.likedOnly && likedJobsData && likedJobsData.length === 0 && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4 }}
+            className="flex flex-col items-center justify-center py-24"
+          >
+            <Heart className="h-12 w-12 text-gray-300 mb-4" />
+            <h3 className="text-lg font-light text-gray-900 mb-2">
+              No liked jobs yet
+            </h3>
+            <p className="text-sm text-gray-500">
+              Start searching and save jobs you're interested in
+            </p>
           </motion.div>
         )}
         
@@ -1233,10 +1375,7 @@ const JobSearchConvex: React.FC = () => {
                               href={job.job_apply_link}
                               target="_blank"
                               rel="noopener noreferrer"
-                              onClick={() => isAuthenticated && trackInteraction({
-                                jobId: job.job_id,
-                                interactionType: 'applied',
-                              })}
+                              onClick={() => isAuthenticated && markApplied({ jobId: job.job_id })}
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
                               className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-gray-50"
