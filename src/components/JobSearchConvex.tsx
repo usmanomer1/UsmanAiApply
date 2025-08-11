@@ -612,6 +612,27 @@ const JobSearchConvex: React.FC = () => {
     return 'border-rose-500';
   };
   
+  // Format job posted date
+  const formatPostedDate = (dateString?: string) => {
+    if (!dateString) return null;
+    
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffTime = Math.abs(now.getTime() - date.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 0) return 'Today';
+      if (diffDays === 1) return 'Yesterday';
+      if (diffDays < 7) return `${diffDays} days ago`;
+      if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+      if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
+      return `${Math.floor(diffDays / 365)} years ago`;
+    } catch {
+      return null;
+    }
+  };
+  
   // Progress calculation
   const progress = useMemo(() => {
     if (searchStatus === 'idle') return 0;
@@ -1268,22 +1289,22 @@ const JobSearchConvex: React.FC = () => {
                             {/* Company Logo or Initial */}
                             <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center flex-shrink-0">
                               {job.employer_logo ? (
-                                <img src={job.employer_logo} alt={job.employer_name} className="w-full h-full object-contain rounded-lg" />
+                                <img src={job.employer_logo} alt={job.employer_name || 'Company'} className="w-full h-full object-contain rounded-lg" />
                               ) : (
                                 <span className="text-xl font-bold text-indigo-600">
-                                  {job.employer_name.charAt(0)}
+                                  {job.employer_name ? job.employer_name.charAt(0) : '?'}
                                 </span>
                               )}
                             </div>
                             
                             <div className="flex-1">
                               <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                                {job.job_title}
+                                {job.job_title || 'Untitled Position'}
                               </h3>
                               <div className="flex items-center gap-3 text-sm text-gray-600 mb-2">
                                 <span className="flex items-center gap-1">
                                   <Building2 className="h-4 w-4" />
-                                  {job.employer_name}
+                                  {job.employer_name || 'Unknown Company'}
                                 </span>
                                 {(job.job_city || job.job_state) && (
                                   <span className="flex items-center gap-1">
@@ -1294,6 +1315,12 @@ const JobSearchConvex: React.FC = () => {
                                 {job.job_is_remote && (
                                   <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
                                     Remote
+                                  </span>
+                                )}
+                                {formatPostedDate(job.job_posted_at_datetime_utc) && (
+                                  <span className="flex items-center gap-1 text-gray-500">
+                                    <Clock className="h-3.5 w-3.5" />
+                                    {formatPostedDate(job.job_posted_at_datetime_utc)}
                                   </span>
                                 )}
                               </div>
