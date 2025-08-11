@@ -8,7 +8,7 @@ import { api } from "../_generated/api";
  */
 export const searchJobs = action({
   args: {
-    authToken: v.string(), // Authentication token
+    // No authToken needed - backend is authless
     sessionId: v.id("jobSearchSessions"),
     query: v.string(),
     location: v.optional(v.string()),
@@ -26,7 +26,7 @@ export const searchJobs = action({
     try {
       // Update status to searching
       await ctx.runMutation(api.jobs.mutations.updateSessionStatus, {
-        authToken: args.authToken, // Pass auth to mutation
+        // No authToken needed - mutation uses native auth
         sessionId: args.sessionId,
         status: "searching",
       });
@@ -38,7 +38,7 @@ export const searchJobs = action({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${args.authToken}`, // Pass auth to backend
+          // Backend is authless - no auth header needed
         },
         body: JSON.stringify({
           resumeText: args.resumeText,
@@ -57,7 +57,7 @@ export const searchJobs = action({
       
       // Update session with results info
       await ctx.runMutation(api.jobs.mutations.updateSessionStatus, {
-        authToken: args.authToken, // Pass auth to mutation
+        // No authToken needed - mutation uses native auth
         sessionId: args.sessionId,
         status: "processing",
         totalFound: data.totalFound,
@@ -72,7 +72,7 @@ export const searchJobs = action({
         const batch = jobs.slice(i, i + BATCH_SIZE);
         
         await ctx.runMutation(api.jobs.mutations.insertJobBatch, {
-          authToken: args.authToken, // Pass auth to mutation
+          // No authToken needed - mutation uses native auth
           sessionId: args.sessionId,
           jobs: batch,
           batchIndex: Math.floor(i / BATCH_SIZE),
@@ -84,7 +84,7 @@ export const searchJobs = action({
 
       // Mark complete
       await ctx.runMutation(api.jobs.mutations.updateSessionStatus, {
-        authToken: args.authToken, // Pass auth to mutation
+        // No authToken needed - mutation uses native auth
         sessionId: args.sessionId,
         status: "completed",
       });
@@ -95,7 +95,7 @@ export const searchJobs = action({
       console.error("Search error:", error);
       
       await ctx.runMutation(api.jobs.mutations.updateSessionStatus, {
-        authToken: args.authToken, // Pass auth to mutation
+        // No authToken needed - mutation uses native auth
         sessionId: args.sessionId,
         status: "error",
         errorMessage: error instanceof Error ? error.message : "Search failed",

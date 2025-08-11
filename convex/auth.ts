@@ -1,93 +1,66 @@
 /**
  * Authentication utilities for Convex functions
- * Since Convex runs in a sandboxed environment, we'll verify tokens
- * by calling Supabase's API to validate the session
+ * Using native Convex authentication with Supabase as the JWT provider
  */
-
-// Type for the decoded Supabase JWT
-interface SupabaseUser {
-  id: string;
-  email?: string;
-  role?: string;
-  aud?: string;
-}
 
 /**
- * Verify a Supabase JWT token by calling Supabase's API
- * This approach works in Convex's sandboxed environment
+ * Get the authenticated user ID from the context
+ * This uses native Convex authentication instead of manual token verification
  */
-export async function verifySupabaseToken(token: string): Promise<SupabaseUser> {
-  if (!token) {
-    throw new Error("No authentication token provided");
+export async function getAuthUserId(ctx: any): Promise<string | null> {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) {
+    return null;
   }
-
-  // Get Supabase URL from environment
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
   
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Supabase configuration missing");
-  }
-
-  try {
-    // Remove "Bearer " prefix if present
-    const cleanToken = token.replace(/^Bearer\s+/i, "");
-    
-    // Call Supabase's /auth/v1/user endpoint to validate the token
-    const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${cleanToken}`,
-        "apikey": supabaseAnonKey,
-      },
-    });
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error("Invalid or expired authentication token");
-      }
-      throw new Error(`Authentication failed: ${response.status}`);
-    }
-
-    const userData = await response.json();
-    
-    if (!userData || !userData.id) {
-      throw new Error("Invalid user data received");
-    }
-
-    return {
-      id: userData.id,
-      email: userData.email,
-      role: userData.role,
-      aud: userData.aud,
-    };
-  } catch (error) {
-    if (error instanceof Error && error.message.includes("Invalid or expired")) {
-      throw error;
-    }
-    throw new Error(`Authentication failed: ${error instanceof Error ? error.message : "Unknown error"}`);
-  }
+  // Supabase uses 'sub' as the user ID field in the JWT
+  // The sub field contains the user's UUID from Supabase
+  return identity.subject || identity.sub || null;
 }
 
 /**
- * Extract user ID from Supabase token
+ * Require authentication for a function
+ * Throws an error if the user is not authenticated
  */
-export async function getUserIdFromToken(token: string): Promise<string> {
-  const user = await verifySupabaseToken(token);
-  return user.id;
-}
-
-/**
- * Simple auth check for queries/mutations that just need user ID
- */
-export async function requireAuth(token: string | undefined): Promise<string> {
-  if (!token) {
+export async function requireAuth(ctx: any): Promise<string> {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) {
     throw new Error("Authentication required");
   }
+  return userId;
+}
+
+/**
+ * Check if a user is in demo mode (optional implementation)
+ * Can be used to restrict certain operations for demo users
+ */
+export async function isDemoUser(ctx: any): Promise<boolean> {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) {
+    return true; // Treat unauthenticated users as demo users
+  }
   
-  const userId = await getUserIdFromToken(token);
-  if (!userId) {
-    throw new Error("Invalid authentication");
+  // You can check for specific demo user emails or other criteria
+  const email = identity.email;
+  if (email && email.includes("demo")) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Guard for write operations - can restrict demo users
+ */
+export async function requireWriteAccess(ctx: any): Promise<string> {
+  const userId = await requireAuth(ctx);
+  
+  // Optional: Check if user is in demo mode and restrict writes
+  const isDemo = await isDemoUser(ctx);
+  if (isDemo) {
+    // You can choose to allow or deny demo users
+    // For now, we'll allow all authenticated users
+    // throw new Error("Demo users cannot perform write operations");
   }
   
   return userId;
