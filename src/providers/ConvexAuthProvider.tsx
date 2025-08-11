@@ -17,7 +17,6 @@ interface ConvexAuthProviderProps {
 function useAuthFromSupabase() {
   const { user } = useAuth();
   const tokenCacheRef = useRef<{ token: string | null; expiry: number }>({ token: null, expiry: 0 });
-  const lastFetchRef = useRef<number>(0);
   const fetchPromiseRef = useRef<Promise<string | null> | null>(null);
 
   const fetchAccessToken = useCallback(async ({ forceRefreshToken }: { forceRefreshToken: boolean }) => {
@@ -29,59 +28,82 @@ function useAuthFromSupabase() {
         return null;
       }
 
-      // Check if we have a cached token that's still valid
       const now = Date.now();
+      
+      // Check if we have a cached token that's still valid
       if (!forceRefreshToken && tokenCacheRef.current.token && tokenCacheRef.current.expiry > now + 60000) {
         // Token is cached and valid for at least another minute
         return tokenCacheRef.current.token;
       }
 
-      // Prevent rapid successive calls - return existing promise if one is in progress
-      if (fetchPromiseRef.current && (now - lastFetchRef.current < 1000)) {
+      // If a fetch is already in progress, return the existing promise
+      // This prevents stampedes regardless of timing
+      if (fetchPromiseRef.current) {
         return fetchPromiseRef.current;
       }
 
       // Create a new fetch promise
       fetchPromiseRef.current = (async () => {
-        lastFetchRef.current = now;
-
-        // Get the session (with optional refresh)
-        const { data: { session }, error } = forceRefreshToken 
-          ? await supabase.auth.refreshSession()
-          : await supabase.auth.getSession();
-        
-        if (error) {
-          // Don't log rate limit errors - they're expected when hitting limits
-          if (!error.message?.includes('rate limit')) {
-            console.error('Error getting session:', error);
+        try {
+          // Get the session (with optional refresh)
+          const { data: { session }, error } = forceRefreshToken 
+            ? await supabase.auth.refreshSession()
+            : await supabase.auth.getSession();
+          
+          if (error) {
+            // Check for rate limit errors more reliably
+            const isRateLimit = error.status === 429 || 
+                              error.code === 'rate_limit' ||
+                              error.message?.toLowerCase().includes('rate limit');
+            
+            if (!isRateLimit) {
+              console.error('Error getting session:', error);
+            }
+            
+            // Only return cached token if it's still valid
+            const currentTime = Date.now();
+            if (tokenCacheRef.current.token && tokenCacheRef.current.expiry > currentTime) {
+              return tokenCacheRef.current.token;
+            }
+            
+            // No valid cached token available
+            return null;
           }
-          // Return cached token if we have one, even if expired (better than nothing)
-          return tokenCacheRef.current.token;
-        }
 
-        if (session?.access_token) {
-          // Cache the token with its expiry time
-          // Supabase tokens typically expire after 1 hour
-          const expiresIn = session.expires_in || 3600; // Default to 1 hour
-          const expiryTime = Date.now() + (expiresIn * 1000);
-          
-          tokenCacheRef.current = {
-            token: session.access_token,
-            expiry: expiryTime
-          };
-          
-          return session.access_token;
-        }
+          if (session?.access_token) {
+            // Cache the token with its expiry time
+            // Supabase tokens typically expire after 1 hour
+            const expiresIn = session.expires_in || 3600; // Default to 1 hour
+            const expiryTime = Date.now() + (expiresIn * 1000);
+            
+            tokenCacheRef.current = {
+              token: session.access_token,
+              expiry: expiryTime
+            };
+            
+            return session.access_token;
+          }
 
-        // Return cached token as fallback
-        return tokenCacheRef.current.token;
+          // No session available
+          return null;
+        } finally {
+          // Clear the promise reference after completion
+          // This allows new fetches after this one completes
+          fetchPromiseRef.current = null;
+        }
       })();
 
       return fetchPromiseRef.current;
     } catch (error) {
       console.error('Error fetching access token:', error);
-      // Return cached token as fallback
-      return tokenCacheRef.current.token;
+      
+      // Only return cached token if it's still valid
+      const now = Date.now();
+      if (tokenCacheRef.current.token && tokenCacheRef.current.expiry > now) {
+        return tokenCacheRef.current.token;
+      }
+      
+      return null;
     }
   }, [user]);
 
