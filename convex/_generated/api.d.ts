@@ -15,6 +15,7 @@ import type * as jobs_actions from "../jobs/actions.js";
 import type * as jobs_authAction from "../jobs/authAction.js";
 import type * as jobs_mutations from "../jobs/mutations.js";
 import type * as jobs_queries from "../jobs/queries.js";
+import type * as lib_jwtBridge from "../lib/jwtBridge.js";
 import type * as rateLimiter from "../rateLimiter.js";
 
 import type {
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   "jobs/authAction": typeof jobs_authAction;
   "jobs/mutations": typeof jobs_mutations;
   "jobs/queries": typeof jobs_queries;
+  "lib/jwtBridge": typeof lib_jwtBridge;
   rateLimiter: typeof rateLimiter;
 }>;
 declare const fullApiWithMounts: typeof fullApi;

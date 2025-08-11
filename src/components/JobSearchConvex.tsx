@@ -252,6 +252,8 @@ const JobSearchConvex: React.FC = () => {
   
   // Handle search
   const handleSearch = async () => {
+    console.log('Starting search...', { searchQuery, isAuthenticated, user });
+    
     if (!searchQuery.trim()) {
       toast.error('Please enter a job title or keywords');
       return;
@@ -268,6 +270,7 @@ const JobSearchConvex: React.FC = () => {
     }
     
     setIsSearching(true);
+    console.log('Creating session...');
     
     try {
       // Create session (no authToken needed)
@@ -278,9 +281,11 @@ const JobSearchConvex: React.FC = () => {
         filters,
       });
       
+      console.log('Session created:', newSessionId);
       setSessionId(newSessionId);
       
       // Trigger search action (no authToken needed)
+      console.log('Starting job search...');
       await searchJobs({
         sessionId: newSessionId,
         query: searchQuery,
@@ -290,9 +295,10 @@ const JobSearchConvex: React.FC = () => {
         numJobs: 100, // Get best value
       });
       
+      console.log('Search completed successfully');
       toast.success('Search started! Jobs will appear as they\'re processed.');
     } catch (error: any) {
-      console.error('Search error:', error);
+      console.error('Search error details:', error);
       
       // Check if it's a rate limit error
       try {
