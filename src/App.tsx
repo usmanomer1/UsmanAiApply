@@ -18,6 +18,7 @@ import SettingsPage from './components/SettingsPage';
 import Dashboard from './components/dashboard/Dashboard';
 import ApplicationsPage from './components/applications/ApplicationsPage';
 import NotificationsPage from './components/NotificationsPage';
+import { Navbar } from './components/layout/Navbar';
 
 function App() {
   return (
@@ -25,7 +26,7 @@ function App() {
       <AuthProvider>
         <ConvexAuthProvider>
           <Router>
-            <div className="min-h-screen bg-gray-50">
+            <div className="min-h-screen bg-[linear-gradient(180deg,#fafaf9_0%,#f5f7fb_40%,#eef7f5_100%)]">
               <Routes>
                 <Route path="/auth" element={<CustomAuthPage />} />
                 <Route path="/reset-password" element={<PasswordResetPage />} />
@@ -37,6 +38,9 @@ function App() {
                       <div className="flex">
                         <Sidebar />
                         <main className="flex-1 ml-[240px]">
+                          <div className="sticky top-0 z-20">
+                            <Navbar />
+                          </div>
                           <div className="p-8 relative z-0">
                             <Routes>
                               <Route path="/dashboard" element={<Dashboard />} />
