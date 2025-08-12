@@ -420,10 +420,16 @@ const Dashboard: React.FC = () => {
                   </div>
                 )}
                 {stat.hasChart && (
-                  <div className="mt-4 h-12">
+                  <div className="mt-4 h-14">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={stats.monthlyTrend.slice(-7)}>
-                        <Line type="monotone" dataKey="applications" stroke="#8b5cf6" strokeWidth={2} dot={false} />
+                        <defs>
+                          <linearGradient id="kpiLine" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.9} />
+                            <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.2} />
+                          </linearGradient>
+                        </defs>
+                        <Line type="monotone" dataKey="applications" stroke="url(#kpiLine)" strokeWidth={2} dot={false} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -498,11 +504,12 @@ const Dashboard: React.FC = () => {
                         <stop offset="95%" stopColor="#14b8a6" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                    <CartesianGrid strokeDasharray="2 4" stroke="#eaeef2" />
                     <XAxis dataKey="date" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
                     <YAxis stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
                     <Tooltip contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
                     <Area type="monotone" dataKey="applications" stroke="#14b8a6" strokeWidth={2} fillOpacity={1} fill="url(#colorApplications)" />
+                    <Line type="monotone" dataKey="applications" stroke="#0ea5e9" strokeWidth={1.5} dot={false} opacity={0.6} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
