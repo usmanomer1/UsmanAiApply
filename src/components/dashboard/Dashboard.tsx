@@ -35,9 +35,7 @@ import {
   YAxis,
   CartesianGrid,
   Area,
-  AreaChart,
-  RadialBarChart,
-  RadialBar
+  AreaChart
 } from 'recharts';
 
 interface DashboardStats {
@@ -367,10 +365,10 @@ const Dashboard: React.FC = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="bg-white rounded-xl border border-gray-100 p-6 hover:shadow-lg transition-all duration-200"
+                className="card p-6"
               >
                 <div className="flex items-start justify-between mb-4">
-                  <div className={`p-3 rounded-xl ${stat.bgColor}`}>
+                  <div className={`p-3 rounded-xl bg-gradient-to-br from-white/70 to-white/30 shadow-inner border border-white/60`}>
                     <stat.icon className={`h-6 w-6 ${stat.iconColor}`} />
                   </div>
                   {stat.change !== null && (
@@ -388,7 +386,7 @@ const Dashboard: React.FC = () => {
                 </div>
                 {stat.isPercentage && stat.progress !== undefined && (
                   <div className="mt-4">
-                    <div className="relative w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="relative w-full h-2 bg-gradient-to-r from-gray-100 to-gray-50 rounded-full overflow-hidden">
                       <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${stat.progress}%` }}
@@ -420,7 +418,7 @@ const Dashboard: React.FC = () => {
           {/* Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Application Status Distribution (Pie) */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-white rounded-xl border border-gray-100 p-6">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="card p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-6">Application Status Distribution</h2>
               {stats.statusDistribution.length > 0 ? (
                 <div className="h-64">
@@ -442,7 +440,7 @@ const Dashboard: React.FC = () => {
             </motion.div>
 
             {/* Application Trend - Last 30 Days */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-white rounded-xl border border-gray-100 p-6">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="card p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-6">Application Trend - Last 30 Days</h2>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
@@ -466,8 +464,8 @@ const Dashboard: React.FC = () => {
           </div>
 
           {/* Recent Applications - premium table */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="card overflow-hidden">
+            <div className="p-6 border-b border-white/60 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900">Recent Applications</h2>
               <Link to="/applications" className="text-sm text-teal-600 hover:text-teal-700 font-medium">View all →</Link>
             </div>

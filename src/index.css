@@ -64,7 +64,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Clean Card Styles */
 .card {
-  @apply bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow;
+  @apply bg-white/80 backdrop-blur-sm rounded-xl border border-white/60 shadow-[0_10px_30px_-10px_rgba(2,6,23,0.12)] hover:shadow-[0_12px_40px_-12px_rgba(2,6,23,0.18)] transition-all;
 }
 
 /* Button Styles */
