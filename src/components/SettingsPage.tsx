@@ -1,11 +1,11 @@
 import React from 'react';
 import { User, Bell, Shield, CreditCard } from 'lucide-react';
+import { PageHeader } from './ui/PageHeader';
 
 const SettingsPage: React.FC = () => {
   return (
     <div className="max-w-4xl">
-      <h1 className="text-2xl font-bold text-gray-900 mb-8">Settings</h1>
-      
+      <PageHeader title="Settings" subtitle="Manage your account, notifications and privacy" />
       <div className="space-y-6">
         {/* Account Settings */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">

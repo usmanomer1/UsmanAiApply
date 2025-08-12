@@ -40,6 +40,8 @@ interface Notification {
   updated_at: string;
 }
 
+import { PageHeader } from './ui/PageHeader';
+
 const NotificationsPage: React.FC = () => {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -196,8 +198,11 @@ const NotificationsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
+      <div>
+        <PageHeader title="Notifications" subtitle="Stay on top of updates and job insights" />
+        <div className="flex items-center justify-center min-h-[300px]">
+          <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
+        </div>
       </div>
     );
   }
@@ -205,28 +210,15 @@ const NotificationsPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-[28px] font-semibold text-gray-900 dark:text-white">
-                Notifications
-              </h1>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
-                <Bell className="h-4 w-4" />
-                Stay updated with your job search activity
-              </p>
-            </div>
-            
-            {unreadCount > 0 && (
-              <div className="bg-teal-50 dark:bg-teal-900/20 px-4 py-2 rounded-lg">
-                <p className="text-sm font-medium text-teal-700 dark:text-teal-300">
-                  {unreadCount} unread
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <PageHeader
+          title="Notifications"
+          subtitle={`Stay updated with your job search activity${unreadCount ? ` • ${unreadCount} unread` : ''}`}
+          actions={[
+            { label: 'Mark all as read', onClick: markAllAsRead },
+            { label: 'Clear read', onClick: deleteAllRead },
+          ]}
+        />
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

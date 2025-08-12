@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { PageHeader } from '../ui/PageHeader';
 import {
   Briefcase,
   Plus,
@@ -326,25 +327,12 @@ export const ApplicationsPage: React.FC = () => {
   return (
     <div>
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Applications</h1>
-            <p className="text-gray-600">Track your job applications</p>
-          </div>
-          <button
-            onClick={() => {
-              setEditingApplication(null);
-              resetForm();
-              setShowAddModal(true);
-            }}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="h-5 w-5 mr-2" />
-            Add Application
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Applications"
+        subtitle="Track and manage all your applications"
+        primaryAction={{ label: 'Add Application', icon: Plus, onClick: () => { setEditingApplication(null); resetForm(); setShowAddModal(true); } }}
+        actions={[{ label: 'Discover Jobs', icon: Search, href: '/jobs' }]}
+      />
 
       {/* Search and Filters */}
       <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
