@@ -11,7 +11,11 @@ import {
   Building2,
   ChevronLeft,
   ChevronRight,
-  MoreHorizontal
+  MoreHorizontal,
+  Zap,
+  FileText,
+  Search,
+  Plus
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -296,22 +300,28 @@ const Dashboard: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Welcome back, {user?.user_metadata?.full_name || 'there'}! 👋
-          </h1>
-          <p className="text-gray-600 mt-1">Here's your job search overview</p>
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-50 via-white to-teal-50 p-6 border border-gray-100">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Welcome back, {user?.user_metadata?.full_name || 'there'}! 👋
+            </h1>
+            <p className="text-gray-600 mt-1">Your personalized job search overview</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link to="/jobs" className="inline-flex items-center gap-2 px-3 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition-colors">
+              <Search className="h-4 w-4" /> Discover Jobs
+            </Link>
+            <Link to="/resume" className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+              <FileText className="h-4 w-4" /> Improve Resume
+            </Link>
+            <button className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+              <Calendar className="h-4 w-4" />
+              {dateRange}
+            </button>
+          </div>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-          <Calendar className="h-4 w-4" />
-          {dateRange}
-        </button>
-      </div>
-
-      {/* Quick Stats Bar */}
-      <div className="bg-gradient-to-r from-teal-50 to-blue-50 rounded-xl p-4">
-        <div className="flex items-center justify-between text-sm">
+        <div className="mt-4 flex items-center justify-between text-sm">
           <div className="flex items-center gap-6">
             <span className="text-gray-600">This week:</span>
             <div className="flex items-center gap-2">
@@ -331,12 +341,19 @@ const Dashboard: React.FC = () => {
               ) : null}
             </div>
           </div>
-          <Link to="/jobs" className="text-teal-600 hover:text-teal-700 font-medium">
-            Find more jobs →
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link to="/auto-apply" className="inline-flex items-center gap-2 px-3 py-2 bg-black text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors">
+              <Zap className="h-4 w-4" /> Launch AI Agent
+            </Link>
+            <Link to="/applications" className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+              <Plus className="h-4 w-4" /> Add Application
+            </Link>
+          </div>
         </div>
       </div>
 
+      {/* Quick Stats Bar */}
+      <div className="hidden"/>
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {statCards.map((stat, index) => (
