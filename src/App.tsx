@@ -18,7 +18,7 @@ import SettingsPage from './components/SettingsPage';
 import Dashboard from './components/dashboard/Dashboard';
 import ApplicationsPage from './components/applications/ApplicationsPage';
 import NotificationsPage from './components/NotificationsPage';
-import { Navbar } from './components/layout/Navbar';
+
 
 function App() {
   return (
@@ -38,9 +38,6 @@ function App() {
                       <div className="flex">
                         <Sidebar />
                         <main className="flex-1 ml-[240px]">
-                          <div className="sticky top-0 z-20">
-                            <Navbar />
-                          </div>
                           <div className="p-8 relative z-0">
                             <Routes>
                               <Route path="/dashboard" element={<Dashboard />} />
