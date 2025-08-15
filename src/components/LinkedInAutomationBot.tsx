@@ -430,16 +430,27 @@ const LinkedInAutomationBot: React.FC = () => {
       }
     };
 
+    // Use a ref to track if we've already logged the visibility change
+    const visibilityLoggedRef = useRef(false);
+    
     // Handle visibility change (tab switching, minimizing)
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden' && isRunning && currentTask) {
-        // Just save state when tab becomes hidden, don't stop the task
-        saveAutomationState(currentTask);
-        console.log('Tab hidden - automation continues running in background');
-      } else if (document.visibilityState === 'visible' && isRunning && currentTask && !pollInterval) {
-        // Resume polling if it was somehow lost when tab became visible again
-        console.log('Tab visible again - ensuring polling is active');
-        startPolling(currentTask.id);
+        // Only log once when tab becomes hidden
+        if (!visibilityLoggedRef.current) {
+          saveAutomationState(currentTask);
+          console.log('Tab hidden - automation continues running in background');
+          visibilityLoggedRef.current = true;
+        }
+      } else if (document.visibilityState === 'visible') {
+        // Reset the flag when tab becomes visible
+        visibilityLoggedRef.current = false;
+        
+        // Ensure polling is active if task is running
+        if (isRunning && currentTask && !pollInterval) {
+          console.log('Tab visible again - resuming status updates');
+          startPolling(currentTask.id);
+        }
       }
     };
 
@@ -2441,13 +2452,18 @@ This is the #1 issue that needs to be fixed immediately.`;
     // Store the task ID in a ref to ensure it persists
     const currentTaskId = taskId;
     
-    // Start polling for task status
+    // Start polling for task status - use shorter interval to combat browser throttling
     const interval = setInterval(async () => {
       try {
         // Check if we still have the same task
         if (!browserClient || !currentTaskId) {
           console.error('Browser client not initialized or task ID lost during polling');
           return;
+        }
+        
+        // Log that polling is still active (helps debug tab visibility issues)
+        if (document.visibilityState === 'hidden') {
+          console.log(`Polling continues in background for task ${currentTaskId}`);
         }
         
         // Fetch full task details during polling, not just status
@@ -2466,8 +2482,9 @@ This is the #1 issue that needs to be fixed immediately.`;
         console.log('Polling - Steps:', updatedTask.steps?.length);
         setCurrentTask(updatedTask);
         
-        // Log live URL when it first appears
-        if (updatedTask.live_url && (!currentTask || !currentTask.live_url)) {
+        // Log live URL only when it first appears (not on every poll)
+        const prevLiveUrl = currentTask?.live_url;
+        if (updatedTask.live_url && !prevLiveUrl) {
           addLog(`🌐 Live preview now available: ${updatedTask.live_url}`);
         }
 
