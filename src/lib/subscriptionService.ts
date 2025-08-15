@@ -357,11 +357,12 @@ class SubscriptionService {
       }
 
       // Try the proper check_feature_access function first
+      // Database expects parameters without 'p_' prefix
       try {
         const { data: accessData, error: accessError } = await supabase.rpc('check_feature_access', {
-          p_user_id: userId,
-          p_feature_name: dbFeatureName,
-          p_estimated_usage: estimatedUsage
+          user_uuid: userId,
+          feature_name: dbFeatureName,
+          estimated_usage: estimatedUsage
         });
         
         if (!accessError && accessData) {
@@ -398,7 +399,7 @@ class SubscriptionService {
       if (feature === 'auto_apply') {
         try {
           const { data: usageData, error: usageError } = await supabase.rpc('get_user_linkedin_usage', {
-            p_user_id: userId
+            user_id: userId
           });
           
           if (!usageError && usageData) {
