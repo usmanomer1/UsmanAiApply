@@ -411,10 +411,11 @@ const LinkedInAutomationBot: React.FC = () => {
 
   // Separate useEffect for state restoration after browser client is ready
   useEffect(() => {
-    if (browserClient && user) {
+    // Only restore if we don't already have an active task
+    if (browserClient && user && !currentTask && !isRunning) {
       restoreAutomationState();
     }
-  }, [browserClient, user]);
+  }, [browserClient, user]); // Remove currentTask and isRunning from deps to prevent loops
 
   // Handle page close/refresh to warn user and stop tasks
   useEffect(() => {
@@ -844,6 +845,11 @@ const LinkedInAutomationBot: React.FC = () => {
 
   const restoreAutomationState = async () => {
     if (!user || !browserClient) return;
+    
+    // Prevent duplicate restoration attempts
+    if (isRunning || currentTask) {
+      return; // Already have an active task
+    }
     
     try {
       const savedState = localStorage.getItem(`automation_state_${user.id}`);
@@ -2599,26 +2605,35 @@ This is the #1 issue that needs to be fixed immediately.`;
           }
           }
 
-        // Check for login requirement
+        // Check for login requirement/intervention
         if (!isPaused && updatedTask.status === 'running') {
           const detection = await browserClient.detectLoginRequirement(taskId);
           
           if (detection.loginRequired && detection.confidence >= 0.8) {
-            // Pause the task
-            await browserClient.pauseTask(taskId);
+            // Only pause if we haven't already paused for this intervention
+            const lastInterventionKey = `last_intervention_${taskId}`;
+            const lastIntervention = sessionStorage.getItem(lastInterventionKey);
+            const currentInterventionId = `${taskId}_${updatedTask.steps?.length || 0}`;
             
-            setIsPaused(true);
-            setLoginDetection(detection);
-            setShowResumeButton(true);
-            
-            // Add comprehensive login message
-            addLog('🔐 LOGIN REQUIRED - Automation paused', 'info');
-            addLog('⏱️ You have 30 seconds to complete the login', 'warning');
-            addLog('👉 If you need more time:', 'info');
-            addLog('   1. Click the "Pause" button to stop the timer', 'info');
-            addLog('   2. Complete your login in the browser window', 'info');
-            addLog('   3. Click "Resume" when ready to continue', 'info');
-            addLog(`📊 Detection confidence: ${(detection.confidence * 100).toFixed(0)}%`, 'info');
+            if (lastIntervention !== currentInterventionId) {
+              sessionStorage.setItem(lastInterventionKey, currentInterventionId);
+              
+              // Pause the task
+              await browserClient.pauseTask(taskId);
+              
+              setIsPaused(true);
+              setLoginDetection(detection);
+              setShowResumeButton(true);
+              
+              // Add comprehensive login message
+              addLog('🔐 LOGIN REQUIRED - Automation paused', 'info');
+              addLog('⏱️ Manual intervention needed', 'warning');
+              addLog('👉 Instructions:', 'info');
+              addLog('   1. Complete the action in the browser window', 'info');
+              addLog('   2. Click "Resume" when ready to continue', 'info');
+              addLog(`📊 Detection: ${detection.description}`, 'info');
+              addLog(`📊 Confidence: ${(detection.confidence * 100).toFixed(0)}%`, 'info');
+            }
           }
         }
 
