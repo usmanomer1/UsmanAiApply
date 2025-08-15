@@ -468,12 +468,18 @@ export async function updateAutomationSession(
   }
 
   try {
+    // Map Browser Use status to our database enum values
+    const mappedUpdates = { ...updates };
+    if (mappedUpdates.status === 'finished') {
+      mappedUpdates.status = 'completed';
+    }
+    
     const updateData: any = {
-      ...updates,
+      ...mappedUpdates,
       updated_at: new Date().toISOString()
     };
 
-    if (updates.status && ['finished', 'failed', 'stopped'].includes(updates.status)) {
+    if (mappedUpdates.status && ['completed', 'failed', 'stopped'].includes(mappedUpdates.status)) {
       updateData.completed_at = new Date().toISOString();
     }
 
@@ -497,12 +503,12 @@ export async function updateAutomationSession(
 
       if (session) {
         // Track automation steps using the proper MAX tracking function
-        // Pass the status if it's being updated
-        const taskStatus = updates.status as 'running' | 'completed' | 'failed' | 'stopped' | undefined;
+        // Pass the status if it's being updated (use mapped status)
+        const taskStatus = mappedUpdates.status as 'running' | 'completed' | 'failed' | 'stopped' | undefined;
         const tracked = await trackAutomationSteps(
           session.user_id, 
           taskId, 
-          updates.step_count,
+          mappedUpdates.step_count || updates.step_count,
           taskStatus || 'running'
         );
         
