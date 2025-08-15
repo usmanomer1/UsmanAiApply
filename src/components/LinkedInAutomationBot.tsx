@@ -19,7 +19,9 @@ import {
   CheckCircle,
   BarChart3,
   Cpu,
-  ChevronDown
+  ChevronDown,
+  Monitor,
+  Briefcase
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
