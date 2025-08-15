@@ -117,11 +117,37 @@ export class BrowserUseClient {
   }
 
   /**
-   * Upload a file to browser-use storage
+   * Upload a file to browser-use storage with retry logic
    * @param file The file to upload
+   * @param maxRetries Maximum number of retry attempts (default: 3)
    * @returns The filename that can be used in included_file_names
    */
-  async uploadFile(file: File): Promise<string> {
+  async uploadFile(file: File, maxRetries: number = 3): Promise<string> {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await this.uploadFileInternal(file, attempt);
+      } catch (error) {
+        lastError = error as Error;
+        console.error(`Upload attempt ${attempt}/${maxRetries} failed:`, error);
+        
+        if (attempt < maxRetries) {
+          // Exponential backoff: 1s, 2s, 4s
+          const delay = Math.pow(2, attempt - 1) * 1000;
+          console.log(`Retrying upload in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    
+    throw lastError || new Error('Failed to upload file after multiple attempts');
+  }
+  
+  /**
+   * Internal method to upload a file (single attempt)
+   */
+  private async uploadFileInternal(file: File, attemptNumber: number = 1): Promise<string> {
     try {
       // Validate file size (max 10MB per Browser Use docs)
       const maxSize = 10 * 1024 * 1024; // 10MB
@@ -129,20 +155,40 @@ export class BrowserUseClient {
         throw new Error(`File too large: ${(file.size / 1024 / 1024).toFixed(2)}MB (max 10MB)`);
       }
 
-      // Validate file type
-      const supportedTypes = [
-        '.txt', '.csv', '.json', '.xml', '.html', '.md',
-        '.jpg', '.jpeg', '.png', '.gif', '.webp',
-        '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx'
-      ];
+      // Validate file type and get proper content-type
+      const supportedTypes: Record<string, string> = {
+        '.txt': 'text/plain',
+        '.csv': 'text/csv',
+        '.json': 'application/json',
+        '.xml': 'application/xml',
+        '.html': 'text/html',
+        '.md': 'text/markdown',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+        '.pdf': 'application/pdf',
+        '.doc': 'application/msword',
+        '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        '.xls': 'application/vnd.ms-excel',
+        '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        '.ppt': 'application/vnd.ms-powerpoint',
+        '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      };
+      
       const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
-      if (!supportedTypes.includes(fileExtension)) {
-        throw new Error(`Unsupported file type: ${fileExtension}`);
+      if (!supportedTypes[fileExtension]) {
+        throw new Error(`Unsupported file type: ${fileExtension}. Supported types: ${Object.keys(supportedTypes).join(', ')}`);
       }
-
-      console.log(`Uploading file: ${file.name} (${(file.size / 1024).toFixed(2)}KB, type: ${file.type})`);
+      
+      // Get proper content-type, with fallback to extension-based type
+      const contentType = file.type || supportedTypes[fileExtension];
+      
+      console.log(`Uploading file: ${file.name} (${(file.size / 1024).toFixed(2)}KB, type: ${contentType}, extension: ${fileExtension})`);
 
       // Step 1: Get presigned URL
+      console.log('Step 1: Requesting presigned URL from Browser Use...');
       const presignedResponse = await fetch(`${this.baseUrl}/uploads/presigned-url`, {
         method: 'POST',
         headers: {
@@ -151,13 +197,18 @@ export class BrowserUseClient {
         },
         body: JSON.stringify({
           file_name: file.name,
-          content_type: file.type || 'application/octet-stream',
+          content_type: contentType,
         }),
       });
 
       if (!presignedResponse.ok) {
         const errorText = await presignedResponse.text();
         console.error(`Presigned URL request failed (${presignedResponse.status}):`, errorText);
+        console.error('Request details:', {
+          fileName: file.name,
+          contentType: contentType,
+          fileSize: file.size,
+        });
         throw new Error(`Failed to get presigned URL (${presignedResponse.status}): ${errorText}`);
       }
 
@@ -168,29 +219,37 @@ export class BrowserUseClient {
         throw new Error('No upload URL received from server');
       }
 
-      console.log('Got presigned URL, uploading file...');
+      console.log('Step 2: Got presigned URL, uploading file to storage...');
+      console.log('Upload URL:', upload_url.substring(0, 50) + '...');
 
       // Step 2: Upload file to presigned URL
       const uploadResponse = await fetch(upload_url, {
         method: 'PUT',
         body: file,
         headers: {
-          'Content-Type': file.type || 'application/octet-stream',
+          'Content-Type': contentType,
         },
       });
 
       if (!uploadResponse.ok) {
         const errorText = await uploadResponse.text().catch(() => 'Unknown error');
         console.error(`File upload failed (${uploadResponse.status}):`, errorText);
-        throw new Error(`Failed to upload file (${uploadResponse.status}): ${uploadResponse.statusText}`);
+        console.error('Upload details:', {
+          url: upload_url.substring(0, 50) + '...',
+          contentType: contentType,
+          fileSize: file.size,
+          fileName: file.name,
+        });
+        throw new Error(`Failed to upload file (${uploadResponse.status}): ${uploadResponse.statusText || errorText}`);
       }
 
-      console.log('File uploaded successfully');
+      console.log(`Step 3: File uploaded successfully${attemptNumber > 1 ? ` (attempt ${attemptNumber})` : ''}`);
+      console.log('File ready to use with included_file_names:', file.name);
 
       // Return the filename to use in included_file_names
       return file.name;
     } catch (error) {
-      console.error('Error uploading file:', error);
+      console.error(`Error uploading file (attempt ${attemptNumber}):`, error);
       throw error;
     }
   }

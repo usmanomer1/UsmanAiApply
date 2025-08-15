@@ -1759,10 +1759,26 @@ This is the #1 issue that needs to be fixed immediately.`;
               if (response.ok) {
                 const blob = await response.blob();
                 const fileName = profile.resume_url.split('/').pop() || 'resume.pdf';
-                const file = new File([blob], fileName, { type: blob.type });
+                
+                // Ensure correct content-type for PDF files
+                let contentType = blob.type;
+                if (!contentType || contentType === 'application/octet-stream') {
+                  // Determine content-type from file extension
+                  if (fileName.toLowerCase().endsWith('.pdf')) {
+                    contentType = 'application/pdf';
+                  } else if (fileName.toLowerCase().endsWith('.doc')) {
+                    contentType = 'application/msword';
+                  } else if (fileName.toLowerCase().endsWith('.docx')) {
+                    contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+                  } else {
+                    contentType = 'application/pdf'; // Default to PDF as most resumes are PDFs
+                  }
+                }
+                
+                const file = new File([blob], fileName, { type: contentType });
                 
                 // Upload to browser-use
-                addLog(`📤 Uploading resume: ${fileName} (${(file.size / 1024).toFixed(2)}KB)...`);
+                addLog(`📤 Uploading resume: ${fileName} (${(file.size / 1024).toFixed(2)}KB, type: ${contentType})...`);
                 const uploadedFileName = await browserClient.uploadFile(file);
                 uploadedFileNames.push(uploadedFileName);
                 addLog('✅ Resume uploaded successfully for external applications');
