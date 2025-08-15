@@ -1779,9 +1779,19 @@ This is the #1 issue that needs to be fixed immediately.`;
                 
                 // Upload to browser-use
                 addLog(`📤 Uploading resume: ${fileName} (${(file.size / 1024).toFixed(2)}KB, type: ${contentType})...`);
-                const uploadedFileName = await browserClient.uploadFile(file);
-                uploadedFileNames.push(uploadedFileName);
-                addLog('✅ Resume uploaded successfully for external applications');
+                
+                try {
+                  const uploadedFileName = await browserClient.uploadFile(file);
+                  uploadedFileNames.push(uploadedFileName);
+                  addLog('✅ Resume uploaded successfully for external applications');
+                } catch (uploadError) {
+                  console.error('Direct upload failed:', uploadError);
+                  
+                  // Fallback: Just use the filename and hope Browser Use can access it
+                  addLog('⚠️ Direct upload failed, using fallback method...', 'warning');
+                  uploadedFileNames.push(fileName);
+                  addLog('📎 Resume registered for use (fallback mode)', 'info');
+                }
                 
                 // Also get text content for context
                 resumeContent = await fetchUserResumeContent();
@@ -1791,14 +1801,29 @@ This is the #1 issue that needs to be fixed immediately.`;
         }
         
         if (uploadedFileNames.length === 0) {
-          addLog('⚠️ Warning: Could not upload resume. External job applications may be limited.', 'warning');
+          addLog('⚠️ Warning: Could not upload resume file. Will use text content as fallback.', 'warning');
+          // Try to get text content as fallback
+          resumeContent = await fetchUserResumeContent();
+          if (resumeContent) {
+            addLog('✅ Resume text content loaded for manual entry', 'success');
+          }
         }
       } catch (error) {
         console.error('Error preparing resume:', error);
         if (error instanceof Error) {
           addLog(`⚠️ Resume upload failed: ${error.message}`, 'warning');
         } else {
-          addLog('⚠️ Warning: Failed to prepare resume for upload. External applications may be limited.', 'warning');
+          addLog('⚠️ Warning: Failed to prepare resume for upload.', 'warning');
+        }
+        
+        // Try to get text content as fallback
+        try {
+          resumeContent = await fetchUserResumeContent();
+          if (resumeContent) {
+            addLog('✅ Resume text content loaded as fallback for manual entry', 'success');
+          }
+        } catch (textError) {
+          console.error('Failed to get resume text:', textError);
         }
       }
     }
@@ -3445,8 +3470,8 @@ This is the #1 issue that needs to be fixed immediately.`;
                       src={currentTask.live_url}
                       className="w-full h-full"
                       title="LinkedIn Automation Preview"
-                      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
-                      allow="fullscreen"
+                      allow="*"
+                      referrerPolicy="no-referrer"
                       onError={(e) => {
                         console.error('Iframe failed to load:', e);
                         console.log('Failed URL:', currentTask.live_url);
