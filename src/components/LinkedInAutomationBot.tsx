@@ -3429,8 +3429,27 @@ This is the #1 issue that needs to be fixed immediately.`;
                       src={currentTask.live_url}
                       className="w-full h-full"
                       title="LinkedIn Automation Preview"
-                      sandbox="allow-scripts allow-same-origin"
+                      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+                      allow="fullscreen"
+                      onError={(e) => {
+                        console.error('Iframe failed to load:', e);
+                        console.log('Failed URL:', currentTask.live_url);
+                      }}
                     />
+                    {/* Fallback message */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                      <div className="bg-white/90 backdrop-blur-sm rounded-lg p-6 text-center hidden" id="iframe-fallback">
+                        <p className="text-gray-600 mb-4">If the preview doesn't load, you can view it directly:</p>
+                        <a
+                          href={currentTask.live_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-700 font-medium pointer-events-auto"
+                        >
+                          Open in new tab →
+                        </a>
+                      </div>
+                    </div>
                     <div className="absolute top-4 right-4 bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center gap-2">
                       <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
                       Live
