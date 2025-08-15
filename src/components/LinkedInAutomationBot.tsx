@@ -436,6 +436,10 @@ const LinkedInAutomationBot: React.FC = () => {
         // Just save state when tab becomes hidden, don't stop the task
         saveAutomationState(currentTask);
         console.log('Tab hidden - automation continues running in background');
+      } else if (document.visibilityState === 'visible' && isRunning && currentTask && !pollInterval) {
+        // Resume polling if it was somehow lost when tab became visible again
+        console.log('Tab visible again - ensuring polling is active');
+        startPolling(currentTask.id);
       }
     };
 
@@ -1717,12 +1721,25 @@ This is the #1 issue that needs to be fixed immediately.`;
     } catch (error) {
       // Log detailed error for debugging
       console.error('Failed to clear browser profile:', error);
-      if (error instanceof Error) {
-        addLog(`⚠️ Could not clear browser profile: ${error.message}`, 'warning');
+      
+      // This is a critical security failure - we MUST abort
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      if (errorMessage.includes('504') || errorMessage.includes('timeout')) {
+        addLog(`❌ Browser profile clearing timed out - cannot proceed`, 'error');
+        addLog(`🔒 For your security, automation requires a clean browser profile`, 'error');
       } else {
-        addLog('⚠️ Could not clear browser profile, proceeding with caution', 'warning');
+        addLog(`❌ Could not clear browser profile: ${errorMessage}`, 'error');
+        addLog(`🔒 Aborting automation for security reasons`, 'error');
       }
-      // Don't fail - the automation can still proceed
+      
+      // Reset UI state
+      setIsRunning(false);
+      setCurrentTask(null);
+      clearAutomationState();
+      
+      // Abort the automation - throw error to exit the function
+      throw new Error('Browser profile clearing failed - automation aborted for security');
     }
 
     const linkedinUrl = buildLinkedInJobsURL();
@@ -2421,16 +2438,20 @@ This is the #1 issue that needs to be fixed immediately.`;
       clearInterval(pollInterval);
     }
 
+    // Store the task ID in a ref to ensure it persists
+    const currentTaskId = taskId;
+    
     // Start polling for task status
     const interval = setInterval(async () => {
       try {
-        if (!browserClient) {
-          console.error('Browser client not initialized during polling');
+        // Check if we still have the same task
+        if (!browserClient || !currentTaskId) {
+          console.error('Browser client not initialized or task ID lost during polling');
           return;
         }
         
         // Fetch full task details during polling, not just status
-        const fullTaskDetails = await browserClient.getTask(taskId);
+        const fullTaskDetails = await browserClient.getTask(currentTaskId);
         const updatedTask: TaskStatus = {
           id: taskId,
           status: fullTaskDetails.status,
