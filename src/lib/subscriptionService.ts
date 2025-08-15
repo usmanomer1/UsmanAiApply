@@ -357,12 +357,11 @@ class SubscriptionService {
       }
 
       // Try the proper check_feature_access function first
-      // Database function signature: check_feature_access(estimated_usage, feature_name, user_uuid)
       try {
         const { data: accessData, error: accessError } = await supabase.rpc('check_feature_access', {
-          estimated_usage: estimatedUsage,
-          feature_name: dbFeatureName,
-          user_uuid: userId
+          p_user_id: userId,
+          p_feature_name: dbFeatureName,
+          p_estimated_usage: estimatedUsage
         });
         
         if (!accessError && accessData) {
