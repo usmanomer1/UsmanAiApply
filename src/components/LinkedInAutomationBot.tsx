@@ -1779,19 +1779,9 @@ This is the #1 issue that needs to be fixed immediately.`;
                 
                 // Upload to browser-use
                 addLog(`📤 Uploading resume: ${fileName} (${(file.size / 1024).toFixed(2)}KB, type: ${contentType})...`);
-                
-                try {
-                  const uploadedFileName = await browserClient.uploadFile(file);
-                  uploadedFileNames.push(uploadedFileName);
-                  addLog('✅ Resume uploaded successfully for external applications');
-                } catch (uploadError) {
-                  console.error('Direct upload failed:', uploadError);
-                  
-                  // Fallback: Just use the filename and hope Browser Use can access it
-                  addLog('⚠️ Direct upload failed, using fallback method...', 'warning');
-                  uploadedFileNames.push(fileName);
-                  addLog('📎 Resume registered for use (fallback mode)', 'info');
-                }
+                const uploadedFileName = await browserClient.uploadFile(file);
+                uploadedFileNames.push(uploadedFileName);
+                addLog('✅ Resume uploaded successfully for external applications');
                 
                 // Also get text content for context
                 resumeContent = await fetchUserResumeContent();
@@ -3465,35 +3455,61 @@ This is the #1 issue that needs to be fixed immediately.`;
                       </a>
                     </div>
                   </div>
-                  <div className="relative bg-gray-50" style={{ height: '600px' }}>
-                    <iframe
-                      src={currentTask.live_url}
-                      className="w-full h-full"
-                      title="LinkedIn Automation Preview"
-                      allow="*"
-                      referrerPolicy="no-referrer"
-                      onError={(e) => {
-                        console.error('Iframe failed to load:', e);
-                        console.log('Failed URL:', currentTask.live_url);
-                      }}
-                    />
-                    {/* Fallback message */}
-                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                      <div className="bg-white/90 backdrop-blur-sm rounded-lg p-6 text-center hidden" id="iframe-fallback">
-                        <p className="text-gray-600 mb-4">If the preview doesn't load, you can view it directly:</p>
-                        <a
-                          href={currentTask.live_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-700 font-medium pointer-events-auto"
-                        >
-                          Open in new tab →
-                        </a>
+                  <div className="relative bg-gradient-to-br from-gray-50 to-gray-100 p-12" style={{ minHeight: '400px' }}>
+                    <div className="flex flex-col items-center justify-center space-y-6">
+                      {/* Icon */}
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-teal-500 opacity-20 blur-2xl rounded-full"></div>
+                        <div className="relative bg-white p-6 rounded-2xl shadow-lg">
+                          <Monitor className="h-12 w-12 text-teal-600" />
+                        </div>
                       </div>
-                    </div>
-                    <div className="absolute top-4 right-4 bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center gap-2">
-                      <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                      Live
+                      
+                      {/* Status */}
+                      <div className="text-center space-y-2">
+                        <div className="inline-flex items-center gap-2 bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-medium">
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                          Browser Session Active
+                        </div>
+                        <h4 className="text-xl font-semibold text-gray-900">Live Automation Running</h4>
+                        <p className="text-gray-600 max-w-md">
+                          Your LinkedIn automation is running in a secure browser. Click below to watch it in real-time.
+                        </p>
+                      </div>
+                      
+                      {/* Action Button */}
+                      <a
+                        href={currentTask.live_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group relative inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-xl font-semibold hover:from-teal-700 hover:to-teal-800 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                        onClick={() => {
+                          addLog('🌐 Opening live browser view in new tab...', 'info');
+                        }}
+                      >
+                        <ExternalLink className="h-5 w-5 transition-transform group-hover:scale-110" />
+                        <span>Watch Live Browser</span>
+                        <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+                        </span>
+                      </a>
+                      
+                      {/* Info */}
+                      <div className="flex items-center gap-6 text-sm text-gray-500">
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          <span>Steps: {stepCount}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Briefcase className="h-4 w-4" />
+                          <span>Applied: {appliedCount}</span>
+                        </div>
+                      </div>
+                      
+                      <p className="text-xs text-gray-400 text-center max-w-sm">
+                        The browser window opens in a new tab for security reasons. Keep it open to monitor progress.
+                      </p>
                     </div>
                   </div>
                 </motion.div>
