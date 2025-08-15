@@ -223,33 +223,14 @@ export class BrowserUseClient {
       console.log('Upload URL:', upload_url.substring(0, 50) + '...');
 
       // Step 2: Upload file to presigned URL
-      // Use no-cors mode to handle S3 CORS issues
-      let uploadResponse: Response;
-      try {
-        uploadResponse = await fetch(upload_url, {
-          method: 'PUT',
-          body: file,
-          headers: {
-            'Content-Type': contentType,
-            'x-amz-acl': 'public-read', // Sometimes needed for S3
-          },
-        });
-      } catch (corsError) {
-        // If CORS fails, try without custom headers
-        console.log('CORS error on first attempt, trying simplified request...');
-        uploadResponse = await fetch(upload_url, {
-          method: 'PUT',
-          body: file,
-          mode: 'no-cors', // This might help with S3 CORS
-        });
-        
-        // With no-cors mode, we can't read the response status
-        // So we'll assume success if no exception was thrown
-        console.log('Upload completed with no-cors mode (status unknown)');
-        console.log('Step 3: File uploaded successfully (no-cors mode)');
-        console.log('File ready to use with included_file_names:', file.name);
-        return file.name;
-      }
+      // According to Browser Use docs, only send Content-Type header
+      const uploadResponse = await fetch(upload_url, {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': contentType,
+        },
+      });
 
       if (!uploadResponse.ok) {
         const errorText = await uploadResponse.text().catch(() => 'Unknown error');
