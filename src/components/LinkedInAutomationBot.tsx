@@ -377,6 +377,8 @@ const LinkedInAutomationBot: React.FC = () => {
   // Session ID for heartbeat tracking
   const sessionId = useRef<string>(crypto.randomUUID());
   const heartbeatInterval = useRef<number | null>(null);
+  // Ref to track if we've already logged the visibility change
+  const visibilityLoggedRef = useRef(false);
 
   const isSupabaseConfigured = () => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -429,9 +431,6 @@ const LinkedInAutomationBot: React.FC = () => {
         return message;
       }
     };
-
-    // Use a ref to track if we've already logged the visibility change
-    const visibilityLoggedRef = useRef(false);
     
     // Handle visibility change (tab switching, minimizing)
     const handleVisibilityChange = () => {
