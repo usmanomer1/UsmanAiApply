@@ -356,10 +356,34 @@ class SubscriptionService {
         };
       }
 
-      // Skip check_feature_access function and go directly to working functions
-      console.warn('Bypassing check_feature_access function - using direct approach');
+      // Try the proper check_feature_access function first
+      try {
+        const { data: accessData, error: accessError } = await supabase.rpc('check_feature_access', {
+          p_user_id: userId,
+          p_feature_name: dbFeatureName,
+          p_estimated_usage: estimatedUsage
+        });
+        
+        if (!accessError && accessData) {
+          return {
+            hasAccess: accessData.has_access || false,
+            reason: accessData.reason || (accessData.has_access ? 'allowed' : 'limit_exceeded'),
+            currentUsage: accessData.current_usage || 0,
+            monthlyLimit: accessData.monthly_limit || 0,
+            remaining: accessData.remaining || 0,
+            requiredPlan: accessData.required_plan
+          };
+        }
+        
+        // If the RPC fails, log it but continue with fallback
+        if (accessError) {
+          console.warn('check_feature_access RPC failed, using fallback:', accessError);
+        }
+      } catch (rpcError) {
+        console.warn('check_feature_access RPC error, using fallback:', rpcError);
+      }
       
-      // Check if user has an active subscription
+      // Fallback: Check if user has an active subscription
       const hasActiveSub = await this.hasActiveSubscription(userId);
       
       if (!hasActiveSub) {
@@ -368,6 +392,31 @@ class SubscriptionService {
           reason: 'no_subscription',
           requiredPlan: 'any'
         };
+      }
+      
+      // For LinkedIn automation, check usage limits
+      if (feature === 'auto_apply') {
+        try {
+          const { data: usageData, error: usageError } = await supabase.rpc('get_user_linkedin_usage', {
+            p_user_id: userId
+          });
+          
+          if (!usageError && usageData) {
+            const monthlyLimit = 100; // Default limit for automation steps
+            const currentUsage = usageData.monthly_steps || 0;
+            const hasAccess = currentUsage + estimatedUsage <= monthlyLimit;
+            
+            return {
+              hasAccess,
+              reason: hasAccess ? 'within_limits' : 'limit_exceeded',
+              currentUsage,
+              monthlyLimit,
+              remaining: Math.max(0, monthlyLimit - currentUsage)
+            };
+          }
+        } catch (error) {
+          console.error('Error checking LinkedIn usage:', error);
+        }
       }
       
       // For AI tools, use the working can_user_make_ai_request function
