@@ -267,67 +267,70 @@ export const LinkedInAutomationV2: React.FC = () => {
       );
       
       eventSourceRef.current = eventSource;
-    
-    eventSource.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        
-        switch(message.type) {
-          case 'connected':
-            addLog('Connected to automation stream', 'success');
-            break;
-            
-          case 'status':
-            const taskData = message.data;
-            setCurrentTask(prev => ({
-              ...prev,
-              ...taskData
-            }));
-            
-            // Log significant updates
-            if (taskData.has_new_steps) {
-              addLog(`Progress: ${taskData.step_count} steps completed`, 'info');
-            }
-            break;
-            
-          case 'intervention':
-            if (message.data.type === 'login_required') {
-              setShowLoginPrompt(true);
-              addLog('Manual login required - please complete login in the browser', 'warning');
-              toast.warning('Manual login required');
-            }
-            break;
-            
-          case 'complete':
-            const result = message.data;
-            if (result.status === 'completed' || result.status === 'finished') {
-              addLog(`Automation completed successfully! ${result.total_steps} steps executed`, 'success');
-              toast.success('Automation completed!');
-            } else if (result.status === 'failed') {
-              addLog(`Automation failed: ${result.error || 'Unknown error'}`, 'error');
-              toast.error('Automation failed');
-            }
-            setIsRunning(false);
-            eventSource.close();
-            break;
-            
-          case 'error':
-            addLog(`Stream error: ${message.error}`, 'error');
-            break;
+      
+      eventSource.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          
+          switch(message.type) {
+            case 'connected':
+              addLog('Connected to automation stream', 'success');
+              break;
+              
+            case 'status':
+              const taskData = message.data;
+              setCurrentTask(prev => ({
+                ...prev,
+                ...taskData
+              }));
+              
+              // Log significant updates
+              if (taskData.has_new_steps) {
+                addLog(`Progress: ${taskData.step_count} steps completed`, 'info');
+              }
+              break;
+              
+            case 'intervention':
+              if (message.data.type === 'login_required') {
+                setShowLoginPrompt(true);
+                addLog('Manual login required - please complete login in the browser', 'warning');
+                toast.warning('Manual login required');
+              }
+              break;
+              
+            case 'complete':
+              const result = message.data;
+              if (result.status === 'completed' || result.status === 'finished') {
+                addLog(`Automation completed successfully! ${result.total_steps} steps executed`, 'success');
+                toast.success('Automation completed!');
+              } else if (result.status === 'failed') {
+                addLog(`Automation failed: ${result.error || 'Unknown error'}`, 'error');
+                toast.error('Automation failed');
+              }
+              setIsRunning(false);
+              eventSource.close();
+              break;
+              
+            case 'error':
+              addLog(`Stream error: ${message.error}`, 'error');
+              break;
+          }
+        } catch (error) {
+          console.error('Failed to parse SSE message:', error);
         }
-      } catch (error) {
-        console.error('Failed to parse SSE message:', error);
-      }
-    };
+      };
     
-    eventSource.onerror = (error) => {
-      console.error('SSE error:', error);
-      addLog('Connection to automation stream lost', 'warning');
-      eventSource.close();
-      setIsRunning(false);
-    };
-    
-    eventSourceRef.current = eventSource;
+      eventSource.onerror = (error) => {
+        console.error('SSE error:', error);
+        addLog('Connection to automation stream lost', 'warning');
+        eventSource.close();
+        setIsRunning(false);
+      };
+      
+    } catch (error) {
+      console.error('Failed to start streaming:', error);
+      addLog('Failed to connect to stream', 'error');
+    }
   };
   
   // Handle pause
