@@ -11,6 +11,7 @@ import Sidebar from './components/layout/Sidebar';
 import ProfilePage from './components/ProfilePage';
 import { ResumePage } from './components/ResumePage';
 import LinkedInAutomationBot from './components/LinkedInAutomationBot';
+import { LinkedInAutomationV2 } from './components/LinkedInAutomationV2';
 import { SuccessPage } from './components/SuccessPage';
 import JobSearchConvex from './components/JobSearchConvex';
 import { BillingPage } from './components/billing/BillingPage';
@@ -44,6 +45,7 @@ function App() {
                               <Route path="/applications" element={<ApplicationsPage />} />
                               <Route path="/profile" element={<ProfilePage />} />
                               <Route path="/auto-apply" element={<LinkedInAutomationBot />} />
+                              <Route path="/auto-apply-v2" element={<LinkedInAutomationV2 />} />
                               <Route path="/resume" element={<ResumePage />} />
                               <Route path="/billing" element={<BillingPage />} />
                               <Route path="/settings" element={<SettingsPage />} />

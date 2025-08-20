@@ -16,10 +16,11 @@ import {
   StopCircle,
   RefreshCw
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { invokeFunction, getStreamUrl, getAuthHeaders } from '../lib/edgeFunctions';
 
 // Configuration interface matching existing LinkedInAutomationBot
 interface BrowserUseConfig {
@@ -108,7 +109,7 @@ export const LinkedInAutomationV2: React.FC = () => {
     setIsParsing(true);
     
     try {
-      const { data, error } = await supabase.functions.invoke('gemini-parser', {
+      const { data, error } = await invokeFunction('gemini-parser', {
         body: { 
           prompt: jobPrompt,
           currentConfig: config
@@ -198,7 +199,7 @@ export const LinkedInAutomationV2: React.FC = () => {
     
     try {
       // Start automation via edge function
-      const { data, error } = await supabase.functions.invoke('automation-controller', {
+      const { data, error } = await invokeFunction('automation-controller', {
         body: {
           action: 'start',
           userId: user?.id,
@@ -241,17 +242,31 @@ export const LinkedInAutomationV2: React.FC = () => {
   };
   
   // Start SSE streaming
-  const startStreaming = (taskId: string) => {
+  const startStreaming = async (taskId: string) => {
     // Close existing stream if any
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
     }
     
-    // Create new EventSource for SSE
-    const functionsUrl = supabase.supabaseUrl.replace('/rest/v1', '/functions/v1');
-    const eventSource = new EventSource(
-      `${functionsUrl}/automation-stream?taskId=${taskId}`
-    );
+    try {
+      // Get auth headers
+      const authHeaders = await getAuthHeaders();
+      
+      // Create new EventSource for SSE with auth
+      const streamUrl = getStreamUrl('automation-stream', { taskId });
+      
+      // Note: EventSource doesn't support custom headers directly
+      // We need to append the token as a query parameter for SSE
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No session for streaming');
+      }
+      
+      const eventSource = new EventSource(
+        `${streamUrl}&access_token=${session.access_token}`
+      );
+      
+      eventSourceRef.current = eventSource;
     
     eventSource.onmessage = (event) => {
       try {
@@ -320,7 +335,7 @@ export const LinkedInAutomationV2: React.FC = () => {
     if (!currentTask) return;
     
     try {
-      const { error } = await supabase.functions.invoke('automation-controller', {
+      const { error } = await invokeFunction('automation-controller', {
         body: {
           action: 'pause',
           userId: user?.id,
@@ -343,7 +358,7 @@ export const LinkedInAutomationV2: React.FC = () => {
     if (!currentTask) return;
     
     try {
-      const { error } = await supabase.functions.invoke('automation-controller', {
+      const { error } = await invokeFunction('automation-controller', {
         body: {
           action: 'resume',
           userId: user?.id,
@@ -370,7 +385,7 @@ export const LinkedInAutomationV2: React.FC = () => {
     if (!currentTask) return;
     
     try {
-      const { error } = await supabase.functions.invoke('automation-controller', {
+      const { error } = await invokeFunction('automation-controller', {
         body: {
           action: 'stop',
           userId: user?.id,
