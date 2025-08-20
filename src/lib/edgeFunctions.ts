@@ -18,44 +18,34 @@ export async function invokeFunction<T = any>(
       return { data: null, error: new Error('No session') };
     }
 
-    if (isLocal) {
-      // For local testing, make direct fetch call
-      const response = await fetch(`${LOCAL_FUNCTIONS_URL}/${functionName}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          ...options?.headers,
-        },
-        body: JSON.stringify(options?.body || {}),
-      });
+    // Use direct fetch for both local and production to ensure headers are sent correctly
+    const baseUrl = isLocal 
+      ? LOCAL_FUNCTIONS_URL 
+      : `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
+    
+    const response = await fetch(`${baseUrl}/${functionName}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY, // Required for Supabase edge functions
+        ...options?.headers,
+      },
+      body: JSON.stringify(options?.body || {}),
+    });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        return { 
-          data: null, 
-          error: new Error(`Function error: ${response.status} - ${errorText}`) 
-        };
-      }
-
-      const data = await response.json();
-      return { data, error: null };
-    } else {
-      // For production, use supabase.functions.invoke with explicit auth header
-      const { data, error } = await supabase.functions.invoke(functionName, {
-        ...options,
-        headers: {
-          ...options?.headers,
-          'Authorization': `Bearer ${session.access_token}`,
-        }
-      });
-      
-      if (error) {
-        console.error(`Error calling ${functionName}:`, error);
-      }
-      
-      return { data, error };
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Function ${functionName} error:`, response.status, errorText);
+      return { 
+        data: null, 
+        error: new Error(`Function error: ${response.status} - ${errorText}`) 
+      };
     }
+
+    const data = await response.json();
+    return { data, error: null };
+    
   } catch (error) {
     console.error(`Exception in invokeFunction for ${functionName}:`, error);
     return { data: null, error };
