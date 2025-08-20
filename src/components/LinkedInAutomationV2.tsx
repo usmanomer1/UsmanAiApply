@@ -202,8 +202,10 @@ export const LinkedInAutomationV2: React.FC = () => {
       const { data, error } = await invokeFunction('automation-controller', {
         body: {
           action: 'start',
-          userId: user?.id,
-          data: { config }
+          data: { 
+            config,
+            userId: user?.id
+          }
         }
       });
       
@@ -341,8 +343,10 @@ export const LinkedInAutomationV2: React.FC = () => {
       const { error } = await invokeFunction('automation-controller', {
         body: {
           action: 'pause',
-          userId: user?.id,
-          data: { taskId: currentTask.id }
+          data: { 
+            taskId: currentTask.id,
+            userId: user?.id
+          }
         }
       });
       
@@ -364,8 +368,10 @@ export const LinkedInAutomationV2: React.FC = () => {
       const { error } = await invokeFunction('automation-controller', {
         body: {
           action: 'resume',
-          userId: user?.id,
-          data: { taskId: currentTask.id }
+          data: { 
+            taskId: currentTask.id,
+            userId: user?.id
+          }
         }
       });
       
@@ -391,8 +397,10 @@ export const LinkedInAutomationV2: React.FC = () => {
       const { error } = await invokeFunction('automation-controller', {
         body: {
           action: 'stop',
-          userId: user?.id,
-          data: { taskId: currentTask.id }
+          data: { 
+            taskId: currentTask.id,
+            userId: user?.id
+          }
         }
       });
       
