@@ -15,7 +15,7 @@ import { SuccessPage } from './components/SuccessPage';
 import JobSearchConvex from './components/JobSearchConvex';
 import { BillingPage } from './components/billing/BillingPage';
 import SettingsPage from './components/SettingsPage';
-import Dashboard from './components/dashboard/Dashboard';
+import FuturisticDashboard from './components/FuturisticDashboard';
 import ApplicationsPage from './components/applications/ApplicationsPage';
 import NotificationsPage from './components/NotificationsPage';
 
@@ -39,7 +39,7 @@ function App() {
                         <main className="flex-1 ml-[240px]">
                           <div className="p-8 relative z-0">
                             <Routes>
-                              <Route path="/dashboard" element={<Dashboard />} />
+                              <Route path="/dashboard" element={<FuturisticDashboard />} />
                               <Route path="/jobs" element={<JobSearchConvex />} />
                               <Route path="/applications" element={<ApplicationsPage />} />
                               <Route path="/profile" element={<ProfilePage />} />
