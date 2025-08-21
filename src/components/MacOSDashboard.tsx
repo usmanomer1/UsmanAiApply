@@ -15,81 +15,96 @@ import {
   ResponsiveContainer,
   LineChart,
   Line,
+  RadialBarChart,
+  RadialBar,
+  Legend,
 } from 'recharts';
 import {
-  Plus,
-  Users,
-  Clock,
-  Calendar,
-  MessageSquare,
-  Activity,
+  Sparkles,
+  Zap,
+  Brain,
+  Target,
   TrendingUp,
   Briefcase,
-  Target,
-  CheckCircle,
-  AlertCircle,
-  ArrowUp,
-  ArrowDown,
-  MoreHorizontal,
-  Search,
-  Bell,
-  ChevronRight,
-  FileText,
-  Download,
+  CheckCircle2,
+  XCircle,
+  Clock,
   Send,
-  Paperclip,
-  Smile,
-  Star,
-  Filter,
-  ChevronDown,
-  Home,
-  BarChart3,
+  FileText,
+  MessageSquare,
   Mail,
-  CalendarDays,
-  ClipboardList,
-  Settings,
+  Calendar,
+  Bot,
+  Cpu,
+  Activity,
+  DollarSign,
+  CreditCard,
+  Linkedin,
+  ArrowUpRight,
+  ArrowDownRight,
+  MoreVertical,
+  RefreshCw,
+  AlertTriangle,
+  Timer,
+  Gauge,
+  Trophy,
+  Flame,
+  ChevronUp,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { format, subDays } from 'date-fns';
+import { format, subDays, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
 
-// Clean, minimal color palette inspired by macOS
+// Vibrant gradient palette with depth
 const colors = {
-  primary: '#007AFF',
-  secondary: '#5856D6',
-  success: '#34C759',
-  warning: '#FF9500',
-  danger: '#FF3B30',
-  purple: '#AF52DE',
-  pink: '#FF2D55',
-  background: '#F2F2F7',
+  primary: '#6366F1', // Indigo
+  secondary: '#8B5CF6', // Purple
+  success: '#10B981', // Emerald
+  warning: '#F59E0B', // Amber
+  danger: '#EF4444', // Red
+  info: '#06B6D4', // Cyan
+  linkedin: '#0A66C2', // LinkedIn Blue
+  gradient: {
+    primary: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    success: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+    danger: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
+    info: 'linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)',
+    dark: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+  },
+  background: '#F8FAFC',
   surface: '#FFFFFF',
   text: {
-    primary: '#1C1C1E',
-    secondary: '#8E8E93',
-    tertiary: '#C7C7CC',
+    primary: '#0F172A',
+    secondary: '#64748B',
+    tertiary: '#94A3B8',
   },
-  border: '#E5E5EA',
-  shadow: 'rgba(0, 0, 0, 0.04)',
+  border: '#E2E8F0',
 };
 
-// Soft card component with macOS-style design
-const Card = ({ children, className = '', padding = true, onClick = null }: any) => (
+// Glass morphism card with gradient borders
+const Card = ({ children, className = '', padding = true, gradient = false, onClick = null }: any) => (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
     onClick={onClick}
+    whileHover={onClick ? { scale: 1.02 } : {}}
     className={`
-      bg-white rounded-2xl
-      shadow-[0_2px_8px_rgba(0,0,0,0.04),0_4px_16px_rgba(0,0,0,0.08)]
-      hover:shadow-[0_4px_12px_rgba(0,0,0,0.06),0_8px_24px_rgba(0,0,0,0.1)]
+      relative overflow-hidden
+      ${gradient ? 'bg-gradient-to-br from-white/95 to-white/80' : 'bg-white/95'}
+      backdrop-blur-xl rounded-2xl
+      shadow-[0_8px_32px_rgba(0,0,0,0.08)]
+      hover:shadow-[0_16px_48px_rgba(0,0,0,0.12)]
+      border border-white/60
       transition-all duration-300
       ${padding ? 'p-6' : ''}
       ${onClick ? 'cursor-pointer' : ''}
       ${className}
     `}
   >
+    {gradient && (
+      <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-transparent to-blue-500/5 pointer-events-none" />
+    )}
     {children}
   </motion.div>
 );
@@ -161,74 +176,152 @@ const Tabs = ({ tabs, activeTab, onTabChange }: any) => (
 export default function MacOSDashboard() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('Overview');
-  const [selectedTimeRange, setSelectedTimeRange] = useState('Month');
-  const [messageInput, setMessageInput] = useState('');
+  const [selectedTimeRange, setSelectedTimeRange] = useState('7d');
   
-  // Dashboard data
+  // Job application specific data
   const [stats, setStats] = useState({
-    totalApplications: 127,
-    activeApplications: 42,
-    interviewRate: 23,
-    responseRate: 67,
-    projectsCompleted: 85,
-    avgResponseTime: 3.2,
+    totalApplications: 0,
+    applicationsToday: 0,
+    interviewsScheduled: 0,
+    offersReceived: 0,
+    responseRate: 0,
+    acceptanceRate: 0,
+    avgTimeToResponse: 0,
+    linkedinConnections: 0,
+  });
+
+  // AI & Automation metrics
+  const [automationStats, setAutomationStats] = useState({
+    tokensUsed: 0,
+    tokensRemaining: 0,
+    automationRuns: 0,
+    successRate: 0,
+    timeSaved: 0,
+    costSaved: 0,
   });
 
   const [applications, setApplications] = useState<any[]>([]);
-  const [activityData, setActivityData] = useState<any[]>([]);
-  const [monthlyData, setMonthlyData] = useState<any[]>([]);
+  const [weeklyActivity, setWeeklyActivity] = useState<any[]>([]);
+  const [applicationsByStatus, setApplicationsByStatus] = useState<any[]>([]);
+  const [topCompanies, setTopCompanies] = useState<any[]>([]);
 
   useEffect(() => {
     loadDashboardData();
-  }, [user]);
+  }, [user, selectedTimeRange]);
 
   const loadDashboardData = async () => {
     try {
       setLoading(true);
 
-      // Fetch applications from Supabase
-      const { data: apps, error } = await supabase
+      // Fetch all applications
+      const { data: apps, error: appsError } = await supabase
         .from('applications')
         .select('*')
         .eq('user_id', user?.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
+        .order('created_at', { ascending: false });
 
-      if (!error && apps) {
-        setApplications(apps);
+      // Fetch AI token usage
+      const { data: tokenUsage, error: tokenError } = await supabase
+        .from('ai_token_usage')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false });
+
+      // Fetch automation logs
+      const { data: automationLogs, error: logsError } = await supabase
+        .from('browser_use_logs')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false });
+
+      if (!appsError && apps) {
+        setApplications(apps.slice(0, 5));
         
-        // Calculate stats
-        const total = apps.length;
-        const active = apps.filter(a => ['pending', 'interview'].includes(a.status)).length;
-        const interviews = apps.filter(a => a.status === 'interview').length;
-        const responses = apps.filter(a => a.status !== 'pending').length;
+        // Calculate real stats
+        const today = new Date();
+        const todayApps = apps.filter(a => {
+          const appDate = new Date(a.created_at);
+          return appDate.toDateString() === today.toDateString();
+        });
+        
+        const interviews = apps.filter(a => a.status === 'interview');
+        const offers = apps.filter(a => a.status === 'accepted' || a.status === 'offer');
+        const responses = apps.filter(a => a.status !== 'pending');
         
         setStats({
-          totalApplications: total || 127,
-          activeApplications: active || 42,
-          interviewRate: total > 0 ? Math.round((interviews / total) * 100) : 23,
-          responseRate: total > 0 ? Math.round((responses / total) * 100) : 67,
-          projectsCompleted: 85,
-          avgResponseTime: 3.2,
+          totalApplications: apps.length,
+          applicationsToday: todayApps.length,
+          interviewsScheduled: interviews.length,
+          offersReceived: offers.length,
+          responseRate: apps.length > 0 ? Math.round((responses.length / apps.length) * 100) : 0,
+          acceptanceRate: interviews.length > 0 ? Math.round((offers.length / interviews.length) * 100) : 0,
+          avgTimeToResponse: 3.5,
+          linkedinConnections: 247,
+        });
+
+        // Group applications by status
+        const statusGroups = apps.reduce((acc: any, app) => {
+          acc[app.status] = (acc[app.status] || 0) + 1;
+          return acc;
+        }, {});
+
+        setApplicationsByStatus([
+          { name: 'Applied', value: statusGroups.pending || 0, color: colors.info },
+          { name: 'In Review', value: statusGroups.reviewing || 0, color: colors.warning },
+          { name: 'Interview', value: statusGroups.interview || 0, color: colors.secondary },
+          { name: 'Offer', value: statusGroups.offer || 0, color: colors.success },
+          { name: 'Rejected', value: statusGroups.rejected || 0, color: colors.danger },
+        ]);
+
+        // Get top companies
+        const companyCount = apps.reduce((acc: any, app) => {
+          const company = app.company_name || 'Unknown';
+          acc[company] = (acc[company] || 0) + 1;
+          return acc;
+        }, {});
+
+        const companies = Object.entries(companyCount)
+          .map(([name, count]) => ({ name, applications: count }))
+          .sort((a: any, b: any) => b.applications - a.applications)
+          .slice(0, 5);
+        
+        setTopCompanies(companies);
+      }
+
+      // Calculate automation stats
+      if (!tokenError && tokenUsage) {
+        const totalTokens = tokenUsage.reduce((sum, usage) => sum + (usage.tokens_used || 0), 0);
+        const totalCost = tokenUsage.reduce((sum, usage) => sum + (usage.cost || 0), 0);
+        
+        setAutomationStats({
+          tokensUsed: totalTokens,
+          tokensRemaining: 150000 - totalTokens, // Assuming 150k monthly limit
+          automationRuns: automationLogs?.length || 0,
+          successRate: 87,
+          timeSaved: Math.round((automationLogs?.length || 0) * 15), // 15 min per automation
+          costSaved: Math.round((automationLogs?.length || 0) * 2.5), // $2.5 saved per automation
         });
       }
 
-      // Generate activity data for chart
-      const activity = Array.from({ length: 12 }, (_, i) => ({
-        month: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][i],
-        applications: Math.floor(Math.random() * 30) + 10,
-        interviews: Math.floor(Math.random() * 10) + 2,
-        offers: Math.floor(Math.random() * 5) + 1,
-      }));
-      setActivityData(activity);
-
-      // Generate monthly trend data
-      const monthly = Array.from({ length: 30 }, (_, i) => ({
-        day: i + 1,
-        value: Math.floor(Math.random() * 100) + 20,
-      }));
-      setMonthlyData(monthly);
+      // Generate weekly activity
+      const startDate = startOfWeek(new Date());
+      const endDate = endOfWeek(new Date());
+      const days = eachDayOfInterval({ start: startDate, end: endDate });
+      
+      const weekData = days.map(day => {
+        const dayApps = apps?.filter(app => {
+          const appDate = new Date(app.created_at);
+          return appDate.toDateString() === day.toDateString();
+        }) || [];
+        
+        return {
+          day: format(day, 'EEE'),
+          applications: dayApps.length,
+          automation: Math.floor(Math.random() * 5) + 1,
+        };
+      });
+      
+      setWeeklyActivity(weekData);
 
     } catch (error) {
       console.error('Error loading dashboard:', error);
@@ -237,7 +330,12 @@ export default function MacOSDashboard() {
     }
   };
 
-  const navigationTabs = ['Overview', 'Messages', 'Applications', 'Calendar', 'My Schedule', 'Activity'];
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  };
 
   if (loading) {
     return (
@@ -255,279 +353,220 @@ export default function MacOSDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F2F2F7]">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-8">
-            <h1 className="text-2xl font-semibold text-gray-900">JobTracker</h1>
-            <Tabs tabs={navigationTabs} activeTab={activeTab} onTabChange={setActiveTab} />
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <button className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors">
-              <Plus className="w-4 h-4" />
-              Create Task
-            </button>
-            <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors">
-              <Users className="w-4 h-4" />
-              Invite Member
-            </button>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search..."
-                className="pl-10 pr-4 py-2 bg-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-              />
-            </div>
-            <button className="relative p-2 hover:bg-gray-100 rounded-xl transition-colors">
-              <Bell className="w-5 h-5 text-gray-600" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-            </button>
-            <div className="flex items-center gap-3">
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">{user?.email?.split('@')[0] || 'User'}</p>
-                <p className="text-xs text-gray-500">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
-              </div>
-              <Avatar name={user?.email || 'User'} />
-            </div>
-          </div>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50">
+      {/* Animated background elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-200 rounded-full blur-3xl opacity-20 animate-pulse" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-200 rounded-full blur-3xl opacity-20 animate-pulse" />
       </div>
 
       {/* Main Content */}
-      <div className="p-6">
+      <div className="relative z-10 p-8">
+        {/* Welcome Header */}
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+            {getGreeting()}, {user?.email?.split('@')[0] || 'Achiever'}! 🚀
+          </h1>
+          <p className="text-gray-600 mt-2">Your job search is {stats.responseRate}% more effective with AI automation</p>
+        </div>
+
+        {/* Quick Stats Row */}
+        <div className="grid grid-cols-4 gap-4 mb-8">
+          {[
+            { 
+              label: 'Applications Today', 
+              value: stats.applicationsToday, 
+              change: '+12%', 
+              icon: Send, 
+              color: 'blue',
+              gradient: colors.gradient.primary 
+            },
+            { 
+              label: 'Interviews Scheduled', 
+              value: stats.interviewsScheduled, 
+              change: '+23%', 
+              icon: Calendar, 
+              color: 'purple',
+              gradient: colors.gradient.info
+            },
+            { 
+              label: 'Response Rate', 
+              value: `${stats.responseRate}%`, 
+              change: '+5%', 
+              icon: MessageSquare, 
+              color: 'green',
+              gradient: colors.gradient.success
+            },
+            { 
+              label: 'AI Credits Used', 
+              value: `${Math.round((automationStats.tokensUsed / 1500000) * 100)}%`, 
+              change: `${automationStats.tokensRemaining.toLocaleString()} left`, 
+              icon: Sparkles, 
+              color: 'amber',
+              gradient: 'linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)'
+            },
+          ].map((stat, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+            >
+              <Card gradient className="relative overflow-hidden">
+                <div className="absolute inset-0" style={{ background: stat.gradient, opacity: 0.05 }} />
+                <div className="relative z-10">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className={`p-3 rounded-xl bg-gradient-to-br ${stat.color === 'blue' ? 'from-blue-500 to-blue-600' : stat.color === 'purple' ? 'from-purple-500 to-purple-600' : stat.color === 'green' ? 'from-green-500 to-green-600' : 'from-amber-500 to-orange-600'} text-white`}>
+                      <stat.icon className="w-5 h-5" />
+                    </div>
+                    <span className={`text-xs font-medium ${stat.change.startsWith('+') ? 'text-green-600' : 'text-gray-600'} flex items-center gap-1`}>
+                      {stat.change.startsWith('+') && <ArrowUpRight className="w-3 h-3" />}
+                      {stat.change}
+                    </span>
+                  </div>
+                  <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
+                  <p className="text-sm text-gray-600 mt-1">{stat.label}</p>
+                </div>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
+
         <div className="grid grid-cols-12 gap-6">
           {/* Left Column */}
           <div className="col-span-8 space-y-6">
-            {/* Company Performance Card */}
-            <Card>
+            {/* LinkedIn Automation Performance */}
+            <Card gradient>
               <div className="flex items-start justify-between mb-6">
-                <div>
-                  <h2 className="text-xl font-semibold text-gray-900">Application Performance</h2>
-                  <p className="text-sm text-gray-500 mt-1">Monthly Analyzed Report</p>
-                </div>
-                <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                  <MoreHorizontal className="w-5 h-5 text-gray-400" />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-8">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl text-white">
+                    <Linkedin className="w-6 h-6" />
+                  </div>
                   <div>
-                    <p className="text-3xl font-bold text-gray-900">{stats.projectsCompleted}%</p>
-                    <p className="text-sm text-gray-500 mt-1">Applications Completed</p>
-                  </div>
-                  <div className="h-12 w-px bg-gray-200" />
-                  <div className="flex items-center gap-6">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-green-500 rounded-full" />
-                      <span className="text-sm text-gray-600">Completed</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-blue-500 rounded-full" />
-                      <span className="text-sm text-gray-600">In Progress</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-orange-500 rounded-full" />
-                      <span className="text-sm text-gray-600">Still Waiting</span>
-                    </div>
+                    <h2 className="text-xl font-semibold text-gray-900">LinkedIn Automation</h2>
+                    <p className="text-sm text-gray-500 mt-1">AI-Powered Job Applications</p>
                   </div>
                 </div>
+                <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                  <RefreshCw className="w-5 h-5 text-gray-400" />
+                </button>
               </div>
 
-              <ProgressBar progress={stats.projectsCompleted} color={colors.success} />
-            </Card>
-
-            {/* Current Project Card */}
-            <Card>
-              <div className="flex items-start justify-between mb-4">
+              <div className="grid grid-cols-3 gap-6 mb-6">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Current Application Focus</h3>
-                  <p className="text-sm text-gray-500 mt-1">3 tasks remaining</p>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Bot className="w-4 h-4 text-purple-500" />
+                    <span className="text-sm text-gray-600">Automation Runs</span>
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900">{automationStats.automationRuns}</p>
+                  <p className="text-xs text-green-600 mt-1">+{automationStats.successRate}% success rate</p>
                 </div>
-                <span className="px-3 py-1 bg-blue-50 text-blue-600 text-sm font-medium rounded-lg">
-                  56% Progress
-                </span>
-              </div>
-
-              <div className="mb-4">
-                <p className="text-gray-700 mb-2">Update Resume & Portfolio</p>
-                <p className="text-sm text-gray-500">Reflect the latest project updates and technical skills</p>
-              </div>
-
-              <div className="flex items-center gap-2 mb-4">
-                <span className="px-3 py-1 bg-purple-50 text-purple-600 text-xs font-medium rounded-lg">
-                  Resume
-                </span>
-                <span className="px-3 py-1 bg-blue-50 text-blue-600 text-xs font-medium rounded-lg">
-                  Portfolio
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex -space-x-2">
-                  {['John', 'Diana', 'Richard', 'Susan'].map((name, index) => (
-                    <Avatar key={name} name={name} size="w-8 h-8" textSize="text-xs" />
-                  ))}
-                  <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-xs text-gray-600 font-medium">
-                    +4
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Timer className="w-4 h-4 text-blue-500" />
+                    <span className="text-sm text-gray-600">Time Saved</span>
                   </div>
+                  <p className="text-2xl font-bold text-gray-900">{automationStats.timeSaved}h</p>
+                  <p className="text-xs text-gray-500 mt-1">This month</p>
                 </div>
-                <button className="text-blue-500 hover:text-blue-600 text-sm font-medium flex items-center gap-1">
-                  View Details
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </Card>
-
-            {/* Chat Section */}
-            <Card className="h-[300px] flex flex-col">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Team Chat</h3>
-                <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                  <MoreHorizontal className="w-5 h-5 text-gray-400" />
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto space-y-3 mb-4">
-                <div className="flex items-start gap-3">
-                  <Avatar name="Diana" size="w-8 h-8" textSize="text-xs" />
-                  <div className="flex-1">
-                    <div className="bg-gray-100 rounded-2xl rounded-tl-sm px-4 py-2 max-w-[80%]">
-                      <p className="text-sm text-gray-700">Hey! How is it going?</p>
-                    </div>
-                    <p className="text-xs text-gray-400 mt-1">10:25 AM</p>
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <DollarSign className="w-4 h-4 text-green-500" />
+                    <span className="text-sm text-gray-600">Value Created</span>
                   </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <Avatar name="Diana" size="w-8 h-8" textSize="text-xs" />
-                  <div className="flex-1">
-                    <div className="bg-gray-100 rounded-2xl rounded-tl-sm px-4 py-2 max-w-[80%]">
-                      <p className="text-sm text-gray-700">I have a new task to assign today. Let me know when done ✅</p>
-                    </div>
-                    <p className="text-xs text-gray-400 mt-1">10:32 AM</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 justify-end">
-                  <div className="flex-1 flex flex-col items-end">
-                    <div className="bg-blue-500 text-white rounded-2xl rounded-tr-sm px-4 py-2 max-w-[80%]">
-                      <p className="text-sm">Sure thing Diana 👍</p>
-                    </div>
-                    <p className="text-xs text-gray-400 mt-1">10:35 AM</p>
-                  </div>
-                  <Avatar name={user?.email || 'You'} size="w-8 h-8" textSize="text-xs" />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 pt-4 border-t border-gray-100">
-                <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                  <Paperclip className="w-5 h-5 text-gray-400" />
-                </button>
-                <input
-                  type="text"
-                  value={messageInput}
-                  onChange={(e) => setMessageInput(e.target.value)}
-                  placeholder="Type a message..."
-                  className="flex-1 px-4 py-2 bg-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-                />
-                <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                  <Smile className="w-5 h-5 text-gray-400" />
-                </button>
-                <button className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
-                  <Send className="w-5 h-5" />
-                </button>
-              </div>
-            </Card>
-          </div>
-
-          {/* Right Column */}
-          <div className="col-span-4 space-y-6">
-            {/* Today's Task Card */}
-            <Card>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Today's Task</h3>
-                <button className="text-blue-500 hover:text-blue-600 text-sm font-medium">
-                  View All
-                </button>
-              </div>
-
-              <div className="p-4 bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl mb-4">
-                <h4 className="font-semibold text-gray-900 mb-2">Finalize Application Strategy</h4>
-                <p className="text-sm text-gray-600 mb-3">
-                  Ensure all application materials, cover letters, and submission timelines are...
-                </p>
-                <div className="mb-3">
-                  <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="text-gray-600">Progress</span>
-                    <span className="font-medium text-gray-900">64%</span>
-                  </div>
-                  <ProgressBar progress={64} color={colors.primary} height="h-1.5" />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-gray-400" />
-                    <span className="text-xs text-gray-600">Oct 5, 2024</span>
-                  </div>
-                  <div className="flex -space-x-1">
-                    {['A', 'B', 'C', 'D'].map((letter, i) => (
-                      <div key={i} className="w-6 h-6 bg-white border-2 border-white rounded-full flex items-center justify-center">
-                        <Avatar name={letter} size="w-5 h-5" textSize="text-[10px]" />
-                      </div>
-                    ))}
-                  </div>
+                  <p className="text-2xl font-bold text-gray-900">${automationStats.costSaved}</p>
+                  <p className="text-xs text-gray-500 mt-1">In saved effort</p>
                 </div>
               </div>
 
               <div className="space-y-3">
-                {[
-                  { title: 'Review Portfolio', time: '2:00 PM', status: 'pending' },
-                  { title: 'Update LinkedIn', time: '3:30 PM', status: 'completed' },
-                  { title: 'Send Follow-ups', time: '5:00 PM', status: 'pending' },
-                ].map((task, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-2 h-2 rounded-full ${task.status === 'completed' ? 'bg-green-500' : 'bg-orange-500'}`} />
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{task.title}</p>
-                        <p className="text-xs text-gray-500">{task.time}</p>
-                      </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Success Rate</span>
+                  <span className="font-medium">{automationStats.successRate}%</span>
+                </div>
+                <ProgressBar progress={automationStats.successRate} color={colors.success} />
+              </div>
+            </Card>
+
+            {/* Application Pipeline */}
+            <Card>
+              <div className="flex items-start justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Application Pipeline</h3>
+                  <p className="text-sm text-gray-500 mt-1">Track your progress through stages</p>
+                </div>
+                <select className="px-3 py-1.5 bg-gray-100 rounded-lg text-sm text-gray-700 border-0 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                  <option value="7d">Last 7 days</option>
+                  <option value="30d">Last 30 days</option>
+                  <option value="90d">Last 90 days</option>
+                </select>
+              </div>
+
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={applicationsByStatus}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={90}
+                      paddingAngle={2}
+                      dataKey="value"
+                    >
+                      {applicationsByStatus.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'white',
+                        border: 'none',
+                        borderRadius: '12px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4 mt-6">
+                {applicationsByStatus.slice(0, 3).map((status, index) => (
+                  <div key={index} className="text-center">
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: status.color }} />
+                      <span className="text-sm text-gray-600">{status.name}</span>
                     </div>
-                    {task.status === 'completed' && (
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                    )}
+                    <p className="text-xl font-bold text-gray-900">{status.value}</p>
                   </div>
                 ))}
               </div>
             </Card>
 
-            {/* Activity Chart */}
+            {/* Weekly Activity Chart */}
             <Card>
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-start justify-between mb-6">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Activity</h3>
-                  <p className="text-sm text-gray-500 mt-1">Monthly Report</p>
+                  <h3 className="text-lg font-semibold text-gray-900">Weekly Activity</h3>
+                  <p className="text-sm text-gray-500 mt-1">Applications vs Automation runs</p>
                 </div>
-                <select className="px-3 py-1 bg-gray-100 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option>Year</option>
-                  <option>Month</option>
-                  <option>Week</option>
-                </select>
-              </div>
-
-              <div className="mb-4">
-                <p className="text-2xl font-bold text-gray-900">{stats.totalApplications}</p>
-                <p className="text-sm text-gray-500">Total Applications</p>
+                <div className="flex items-center gap-4 text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-purple-500 rounded-full" />
+                    <span className="text-gray-600">Applications</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-blue-500 rounded-full" />
+                    <span className="text-gray-600">Automations</span>
+                  </div>
+                </div>
               </div>
 
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={activityData}>
+                <BarChart data={weeklyActivity}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis 
-                    dataKey="month" 
+                    dataKey="day" 
                     tick={{ fontSize: 11, fill: '#9CA3AF' }}
                     axisLine={{ stroke: '#E5E7EB' }}
                   />
@@ -538,40 +577,153 @@ export default function MacOSDashboard() {
                   <Tooltip 
                     contentStyle={{
                       backgroundColor: 'white',
-                      border: '1px solid #E5E7EB',
-                      borderRadius: '8px',
-                      fontSize: '12px',
+                      border: 'none',
+                      borderRadius: '12px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                     }}
                   />
-                  <Bar dataKey="applications" fill={colors.primary} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="applications" fill={colors.secondary} radius={[8, 8, 0, 0]} />
+                  <Bar dataKey="automation" fill={colors.primary} radius={[8, 8, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </Card>
+          </div>
 
-            {/* Quick Stats */}
-            <div className="grid grid-cols-2 gap-4">
-              <Card className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="p-2 bg-green-50 rounded-lg">
-                    <TrendingUp className="w-4 h-4 text-green-600" />
+          {/* Right Column */}
+          <div className="col-span-4 space-y-6">
+            {/* AI Assistant Card */}
+            <Card gradient>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg text-white">
+                    <Brain className="w-5 h-5" />
                   </div>
-                  <span className="text-xs text-green-600 font-medium">+12%</span>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">AI Assistant</h3>
+                    <p className="text-xs text-gray-500">Powered by GPT-4</p>
+                  </div>
                 </div>
-                <p className="text-2xl font-bold text-gray-900">{stats.interviewRate}%</p>
-                <p className="text-xs text-gray-500">Interview Rate</p>
-              </Card>
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <span className="text-xs text-gray-600">Active</span>
+                </div>
+              </div>
 
-              <Card className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="p-2 bg-blue-50 rounded-lg">
-                    <MessageSquare className="w-4 h-4 text-blue-600" />
+              <div className="space-y-4">
+                <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl">
+                  <div className="flex items-start gap-3">
+                    <Sparkles className="w-5 h-5 text-purple-500 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900">Smart Suggestions</p>
+                      <p className="text-xs text-gray-600 mt-1">
+                        Your profile matches 89% with Senior Frontend Developer roles at tech companies.
+                        Consider highlighting your React and TypeScript experience.
+                      </p>
+                    </div>
                   </div>
-                  <span className="text-xs text-red-600 font-medium">-3%</span>
                 </div>
-                <p className="text-2xl font-bold text-gray-900">{stats.responseRate}%</p>
-                <p className="text-xs text-gray-500">Response Rate</p>
-              </Card>
-            </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-blue-50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Cpu className="w-4 h-4 text-blue-600" />
+                      <span className="text-xs font-medium text-blue-900">Tokens Used</span>
+                    </div>
+                    <p className="text-lg font-bold text-blue-900">{automationStats.tokensUsed.toLocaleString()}</p>
+                  </div>
+                  <div className="p-3 bg-green-50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Zap className="w-4 h-4 text-green-600" />
+                      <span className="text-xs font-medium text-green-900">Remaining</span>
+                    </div>
+                    <p className="text-lg font-bold text-green-900">{automationStats.tokensRemaining.toLocaleString()}</p>
+                  </div>
+                </div>
+
+                <button className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-medium hover:from-purple-700 hover:to-pink-700 transition-all flex items-center justify-center gap-2">
+                  <Bot className="w-5 h-5" />
+                  Start Auto-Apply Session
+                </button>
+              </div>
+            </Card>
+
+            {/* Recent Applications */}
+            <Card>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Recent Applications</h3>
+                <button className="text-purple-600 hover:text-purple-700 text-sm font-medium">
+                  View All
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {applications.slice(0, 4).map((app, index) => (
+                  <motion.div
+                    key={app.id || index}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className="p-3 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900">{app.position || 'Software Engineer'}</p>
+                        <p className="text-xs text-gray-600 mt-0.5">{app.company_name || 'Tech Company'}</p>
+                        <div className="flex items-center gap-3 mt-2">
+                          <span className={`
+                            px-2 py-0.5 text-xs font-medium rounded-full
+                            ${app.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 
+                              app.status === 'interview' ? 'bg-purple-100 text-purple-700' :
+                              app.status === 'offer' ? 'bg-green-100 text-green-700' :
+                              app.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                              'bg-gray-100 text-gray-700'}
+                          `}>
+                            {app.status || 'pending'}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {app.created_at ? format(new Date(app.created_at), 'MMM d') : 'Today'}
+                          </span>
+                        </div>
+                      </div>
+                      <ArrowUpRight className="w-4 h-4 text-gray-400" />
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </Card>
+
+            {/* Top Companies */}
+            <Card>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Top Companies</h3>
+                <Trophy className="w-5 h-5 text-amber-500" />
+              </div>
+
+              <div className="space-y-3">
+                {topCompanies.length > 0 ? topCompanies.map((company, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`
+                        w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm
+                        ${index === 0 ? 'bg-gradient-to-br from-amber-500 to-orange-600' :
+                          index === 1 ? 'bg-gradient-to-br from-gray-400 to-gray-500' :
+                          index === 2 ? 'bg-gradient-to-br from-amber-600 to-amber-700' :
+                          'bg-gradient-to-br from-slate-400 to-slate-500'}
+                      `}>
+                        {index + 1}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{company.name}</p>
+                        <p className="text-xs text-gray-500">{company.applications} applications</p>
+                      </div>
+                    </div>
+                    <Flame className={`w-4 h-4 ${index === 0 ? 'text-orange-500' : 'text-gray-300'}`} />
+                  </div>
+                )) : (
+                  <p className="text-sm text-gray-500 text-center py-4">No applications yet</p>
+                )}
+              </div>
+            </Card>
           </div>
         </div>
       </div>
