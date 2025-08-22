@@ -144,21 +144,47 @@ export default function MacOSDashboard() {
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
 
-      // (Automation token usage and logs omitted for minimal view)
+      // Fetch job campaigns for additional stats
+      const { data: campaigns } = await supabase
+        .from('job_campaigns')
+        .select('*')
+        .eq('user_id', user?.id);
+
+      // Fetch AI token usage for insights
+      const { data: tokenUsage } = await supabase
+        .from('ai_token_usage')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false })
+        .limit(100);
 
       if (!appsError && apps) {
         setApplications(apps.slice(0, 5));
         
         // Calculate real stats
         const today = new Date();
+        today.setHours(0, 0, 0, 0);
         const todayApps = apps.filter(a => {
           const appDate = new Date(a.created_at);
-          return appDate.toDateString() === today.toDateString();
+          appDate.setHours(0, 0, 0, 0);
+          return appDate.getTime() === today.getTime();
         });
         
-        const interviews = apps.filter(a => a.status === 'interview');
+        const interviews = apps.filter(a => a.status === 'interview' || a.status === 'interviewing');
         const offers = apps.filter(a => a.status === 'accepted' || a.status === 'offer');
-        const responses = apps.filter(a => a.status !== 'pending');
+        const responses = apps.filter(a => a.status !== 'pending' && a.status !== 'applied');
+        
+        // Calculate average response time if we have response dates
+        let avgResponseTime = 0;
+        const appsWithResponses = apps.filter(a => a.status !== 'pending' && a.status !== 'applied' && a.created_at);
+        if (appsWithResponses.length > 0) {
+          const responseTimes = appsWithResponses.map(a => {
+            const created = new Date(a.created_at).getTime();
+            const now = new Date().getTime();
+            return (now - created) / (1000 * 60 * 60 * 24); // Days
+          });
+          avgResponseTime = Math.round(responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length);
+        }
         
         setStats({
           totalApplications: apps.length,
@@ -167,27 +193,28 @@ export default function MacOSDashboard() {
           offersReceived: offers.length,
           responseRate: apps.length > 0 ? Math.round((responses.length / apps.length) * 100) : 0,
           acceptanceRate: interviews.length > 0 ? Math.round((offers.length / interviews.length) * 100) : 0,
-          avgTimeToResponse: 3.5,
-          linkedinConnections: 247,
+          avgTimeToResponse: avgResponseTime || 3,
+          linkedinConnections: campaigns?.length || 0,
         });
 
         // Group applications by status
         const statusGroups = apps.reduce((acc: any, app) => {
-          acc[app.status] = (acc[app.status] || 0) + 1;
+          const status = app.status || 'pending';
+          acc[status] = (acc[status] || 0) + 1;
           return acc;
         }, {});
 
         setApplicationsByStatus([
-          { name: 'Applied', value: statusGroups.pending || 0, color: colors.info },
-          { name: 'In Review', value: statusGroups.reviewing || 0, color: colors.warning },
-          { name: 'Interview', value: statusGroups.interview || 0, color: colors.primary },
-          { name: 'Offer', value: statusGroups.offer || 0, color: colors.emerald },
+          { name: 'Applied', value: (statusGroups.applied || 0) + (statusGroups.pending || 0), color: colors.info },
+          { name: 'In Review', value: statusGroups.reviewing || statusGroups.in_review || 0, color: colors.warning },
+          { name: 'Interview', value: (statusGroups.interview || 0) + (statusGroups.interviewing || 0), color: colors.primary },
+          { name: 'Offer', value: (statusGroups.offer || 0) + (statusGroups.accepted || 0), color: colors.emerald },
           { name: 'Rejected', value: statusGroups.rejected || 0, color: colors.danger },
         ]);
 
         // Get top companies
         const companyCount = apps.reduce((acc: any, app) => {
-          const company = app.company_name || 'Unknown';
+          const company = app.company_name || app.company || 'Unknown';
           acc[company] = (acc[company] || 0) + 1;
           return acc;
         }, {});
@@ -200,21 +227,28 @@ export default function MacOSDashboard() {
         setTopCompanies(companies);
       }
 
-      // (Automation stats calculation removed)
-
-      // Generate weekly activity
+      // Generate weekly activity with real data
       const startDate = startOfWeek(new Date());
       const endDate = endOfWeek(new Date());
       const days = eachDayOfInterval({ start: startDate, end: endDate });
       
       const weekData = days.map(day => {
+        const dayStart = new Date(day);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(day);
+        dayEnd.setHours(23, 59, 59, 999);
+        
         const dayApps = apps?.filter(app => {
           const appDate = new Date(app.created_at);
-          return appDate.toDateString() === day.toDateString();
+          return appDate >= dayStart && appDate <= dayEnd;
         }) || [];
 
-        const dayResponses = dayApps.filter(a => a.status && a.status !== 'pending');
-        const dayInterviews = dayApps.filter(a => a.status === 'interview');
+        const dayResponses = dayApps.filter(a => 
+          a.status && a.status !== 'pending' && a.status !== 'applied'
+        );
+        const dayInterviews = dayApps.filter(a => 
+          a.status === 'interview' || a.status === 'interviewing'
+        );
 
         return {
           day: format(day, 'EEE'),
@@ -284,15 +318,33 @@ export default function MacOSDashboard() {
         {/* Key stats */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           {[
-            { label: 'Applications Today', value: stats.applicationsToday, icon: Send },
-            { label: 'Interviews Scheduled', value: stats.interviewsScheduled, icon: Calendar },
-            { label: 'Response Rate', value: `${stats.responseRate}%`, icon: MessageSquare },
+            { 
+              label: 'Applications Today', 
+              value: stats.applicationsToday || 0, 
+              icon: Send,
+              subtext: stats.totalApplications > 0 ? `${stats.totalApplications} total` : null 
+            },
+            { 
+              label: 'Interviews Scheduled', 
+              value: stats.interviewsScheduled || 0, 
+              icon: Calendar,
+              subtext: stats.offersReceived > 0 ? `${stats.offersReceived} offers` : null 
+            },
+            { 
+              label: 'Response Rate', 
+              value: stats.totalApplications > 0 ? `${stats.responseRate}%` : '0%', 
+              icon: MessageSquare,
+              subtext: stats.avgTimeToResponse > 0 ? `~${stats.avgTimeToResponse}d avg` : null 
+            },
           ].map((stat, index) => (
             <Card key={index} accent>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">{stat.label}</p>
                   <p className="mt-1 text-2xl font-semibold text-gray-900">{stat.value}</p>
+                  {stat.subtext && (
+                    <p className="text-xs text-gray-500 mt-0.5">{stat.subtext}</p>
+                  )}
                 </div>
                 <div className="p-2 rounded-lg bg-gray-100 text-gray-700 shadow-sm">
                   <stat.icon className="w-5 h-5" />
@@ -345,20 +397,27 @@ export default function MacOSDashboard() {
                 <h3 className="text-lg font-medium text-gray-900">Recent Applications</h3>
               </div>
               <div className="divide-y divide-gray-100">
-                {applications.slice(0, 5).map((app, index) => (
+                {applications.length > 0 ? applications.slice(0, 5).map((app, index) => (
                   <div key={app.id || index} className="py-3 flex items-center justify-between">
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">{app.position || 'Software Engineer'}</p>
-                      <p className="text-xs text-gray-600 mt-0.5">{app.company_name || 'Tech Company'}</p>
+                      <p className="text-sm font-medium text-gray-900">
+                        {app.job_title || app.position || 'Software Engineer'}
+                      </p>
+                      <p className="text-xs text-gray-600 mt-0.5">
+                        {app.company_name || app.company || 'Tech Company'}
+                        {app.location && ` • ${app.location}`}
+                      </p>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                        app.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                        app.status === 'interview' ? 'bg-indigo-100 text-indigo-700' :
+                        app.status === 'pending' || app.status === 'applied' ? 'bg-yellow-100 text-yellow-700' :
+                        app.status === 'reviewing' || app.status === 'in_review' ? 'bg-blue-100 text-blue-700' :
+                        app.status === 'interview' || app.status === 'interviewing' ? 'bg-indigo-100 text-indigo-700' :
                         app.status === 'offer' ? 'bg-green-100 text-green-700' :
+                        app.status === 'accepted' ? 'bg-emerald-100 text-emerald-700' :
                         app.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
                       }`}>
-                        {app.status || 'pending'}
+                        {app.status === 'applied' ? 'pending' : app.status || 'pending'}
                       </span>
                       <span className="text-xs text-gray-500">
                         {app.created_at ? format(new Date(app.created_at), 'MMM d') : 'Today'}
@@ -366,7 +425,12 @@ export default function MacOSDashboard() {
                       <ArrowUpRight className="w-4 h-4 text-gray-400" />
                     </div>
                   </div>
-                ))}
+                )) : (
+                  <div className="py-8 text-center">
+                    <p className="text-sm text-gray-500">No applications yet</p>
+                    <p className="text-xs text-gray-400 mt-1">Start applying to see your progress here</p>
+                  </div>
+                )}
               </div>
             </Card>
           </div>
