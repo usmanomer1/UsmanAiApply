@@ -1,182 +1,114 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import {
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  LineChart,
-  Line,
-  RadialBarChart,
-  RadialBar,
-  Legend,
 } from 'recharts';
-import {
-  Sparkles,
-  Zap,
-  Brain,
-  Target,
-  TrendingUp,
-  Briefcase,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  Send,
-  FileText,
-  MessageSquare,
-  Mail,
-  Calendar,
-  Bot,
-  Cpu,
-  Activity,
-  DollarSign,
-  CreditCard,
-  Linkedin,
-  ArrowUpRight,
-  ArrowDownRight,
-  MoreVertical,
-  RefreshCw,
-  AlertTriangle,
-  Timer,
-  Gauge,
-  Trophy,
-  Flame,
-  ChevronUp,
-} from 'lucide-react';
+import { Send, MessageSquare, Calendar, ArrowUpRight, Trophy } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { format, subDays, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
+import { format, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
 
-// Vibrant gradient palette with depth
+// Brand-aligned minimal palette with subtle accents
 const colors = {
-  primary: '#6366F1', // Indigo
-  secondary: '#8B5CF6', // Purple
-  success: '#10B981', // Emerald
-  warning: '#F59E0B', // Amber
-  danger: '#EF4444', // Red
-  info: '#06B6D4', // Cyan
-  linkedin: '#0A66C2', // LinkedIn Blue
-  gradient: {
-    primary: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    success: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
-    danger: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
-    info: 'linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)',
-    dark: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-  },
-  background: '#F8FAFC',
-  surface: '#FFFFFF',
-  text: {
-    primary: '#0F172A',
-    secondary: '#64748B',
-    tertiary: '#94A3B8',
-  },
-  border: '#E2E8F0',
+  primary: '#2563eb', // blue-600
+  primaryLight: '#60a5fa', // blue-400
+  emerald: '#10b981', // emerald-500
+  emeraldDark: '#059669', // emerald-600
+  slate: '#64748b', // slate-500
+  slateLight: '#94a3b8', // slate-400
+  warning: '#f59e0b',
+  danger: '#ef4444',
+  info: '#60a5fa', // soft info accent aligning to brand blues
 };
 
-// Glass morphism card with gradient borders
-const Card = ({ children, className = '', padding = true, gradient = false, onClick = null }: any) => (
+// Minimal card with optional subtle gradient accent
+const Card = ({ children, className = '', padding = true, onClick = null, accent = false }: any) => (
   <motion.div
-    initial={{ opacity: 0, y: 20 }}
+    initial={{ opacity: 0, y: 16 }}
     animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+    transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
     onClick={onClick}
-    whileHover={onClick ? { scale: 1.02 } : {}}
+    whileHover={onClick ? { scale: 1.01 } : {}}
     className={`
-      relative overflow-hidden
-      ${gradient ? 'bg-gradient-to-br from-white/95 to-white/80' : 'bg-white/95'}
-      backdrop-blur-xl rounded-2xl
-      shadow-[0_8px_32px_rgba(0,0,0,0.08)]
-      hover:shadow-[0_16px_48px_rgba(0,0,0,0.12)]
-      border border-white/60
-      transition-all duration-300
+      relative overflow-hidden bg-white
+      rounded-xl border border-gray-200
+      shadow-sm hover:shadow-md transition-all duration-200
       ${padding ? 'p-6' : ''}
       ${onClick ? 'cursor-pointer' : ''}
       ${className}
     `}
   >
-    {gradient && (
-      <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-transparent to-blue-500/5 pointer-events-none" />
+    {accent && (
+      <div
+        className="absolute inset-x-0 top-0 h-0.5"
+        style={{
+          background: `linear-gradient(to right, ${colors.primaryLight}, ${colors.emerald})`,
+        }}
+      />
+    )}
+    {accent && (
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            `radial-gradient(1200px 200px at 0% 0%, ${colors.primaryLight}24 0%, transparent 40%),` +
+            `radial-gradient(1000px 200px at 100% 100%, ${colors.emerald}22 0%, transparent 40%)`,
+        }}
+      />
     )}
     {children}
   </motion.div>
 );
 
-// Progress bar component
-const ProgressBar = ({ progress, color = colors.primary, height = 'h-2' }: any) => (
-  <div className={`w-full bg-gray-100 rounded-full ${height} overflow-hidden`}>
-    <motion.div
-      className={`h-full rounded-full`}
-      style={{ backgroundColor: color }}
-      initial={{ width: 0 }}
-      animate={{ width: `${progress}%` }}
-      transition={{ duration: 1, ease: 'easeOut' }}
-    />
-  </div>
-);
-
-// Avatar component
-const Avatar = ({ name, size = 'w-10 h-10', textSize = 'text-sm' }: any) => {
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
-  const getColor = (name: string) => {
-    const colors = [
-      'bg-blue-500',
-      'bg-purple-500',
-      'bg-pink-500',
-      'bg-orange-500',
-      'bg-green-500',
-      'bg-indigo-500',
-    ];
-    return colors[name.length % colors.length];
-  };
-
-  return (
-    <div className={`${size} ${getColor(name)} rounded-full flex items-center justify-center text-white font-medium ${textSize}`}>
-      {getInitials(name)}
-    </div>
-  );
+// Custom tooltip for line chart
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    const apps = payload.find((p: any) => p.dataKey === 'applications');
+    const responses = payload.find((p: any) => p.dataKey === 'responses');
+    const interviews = payload.find((p: any) => p.dataKey === 'interviews');
+    return (
+      <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
+        <div className="text-xs text-gray-500 mb-1">{label}</div>
+        <div className="flex items-center justify-between gap-6 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: colors.primary }} />
+            <span className="text-gray-600">Applications</span>
+            <span className="font-medium text-gray-900">{apps?.value ?? 0}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: colors.emerald }} />
+            <span className="text-gray-600">Responses</span>
+            <span className="font-medium text-gray-900">{responses?.value ?? 0}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: colors.slateLight }} />
+            <span className="text-gray-600">Interviews</span>
+            <span className="font-medium text-gray-900">{interviews?.value ?? 0}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return null;
 };
 
-// Tab component
-const Tabs = ({ tabs, activeTab, onTabChange }: any) => (
-  <div className="flex items-center gap-1 p-1 bg-gray-100 rounded-xl">
-    {tabs.map((tab: string) => (
-      <button
-        key={tab}
-        onClick={() => onTabChange(tab)}
-        className={`
-          px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200
-          ${activeTab === tab
-            ? 'bg-white text-gray-900 shadow-sm'
-            : 'text-gray-600 hover:text-gray-900'
-          }
-        `}
-      >
-        {tab}
-      </button>
-    ))}
-  </div>
-);
+// (Removed unused components for minimalism)
 
 export default function MacOSDashboard() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [selectedTimeRange, setSelectedTimeRange] = useState('7d');
+  
+  const getDisplayName = () => {
+    const meta: any = user?.user_metadata || {};
+    const name = meta.name || meta.full_name || meta.fullName;
+    return name || user?.email?.split('@')[0] || 'there';
+  };
   
   // Job application specific data
   const [stats, setStats] = useState({
@@ -190,15 +122,7 @@ export default function MacOSDashboard() {
     linkedinConnections: 0,
   });
 
-  // AI & Automation metrics
-  const [automationStats, setAutomationStats] = useState({
-    tokensUsed: 0,
-    tokensRemaining: 0,
-    automationRuns: 0,
-    successRate: 0,
-    timeSaved: 0,
-    costSaved: 0,
-  });
+  // (Automation metrics removed for minimalist view)
 
   const [applications, setApplications] = useState<any[]>([]);
   const [weeklyActivity, setWeeklyActivity] = useState<any[]>([]);
@@ -207,7 +131,7 @@ export default function MacOSDashboard() {
 
   useEffect(() => {
     loadDashboardData();
-  }, [user, selectedTimeRange]);
+  }, [user]);
 
   const loadDashboardData = async () => {
     try {
@@ -220,19 +144,7 @@ export default function MacOSDashboard() {
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
 
-      // Fetch AI token usage
-      const { data: tokenUsage, error: tokenError } = await supabase
-        .from('ai_token_usage')
-        .select('*')
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false });
-
-      // Fetch automation logs
-      const { data: automationLogs, error: logsError } = await supabase
-        .from('browser_use_logs')
-        .select('*')
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false });
+      // (Automation token usage and logs omitted for minimal view)
 
       if (!appsError && apps) {
         setApplications(apps.slice(0, 5));
@@ -268,8 +180,8 @@ export default function MacOSDashboard() {
         setApplicationsByStatus([
           { name: 'Applied', value: statusGroups.pending || 0, color: colors.info },
           { name: 'In Review', value: statusGroups.reviewing || 0, color: colors.warning },
-          { name: 'Interview', value: statusGroups.interview || 0, color: colors.secondary },
-          { name: 'Offer', value: statusGroups.offer || 0, color: colors.success },
+          { name: 'Interview', value: statusGroups.interview || 0, color: colors.primary },
+          { name: 'Offer', value: statusGroups.offer || 0, color: colors.emerald },
           { name: 'Rejected', value: statusGroups.rejected || 0, color: colors.danger },
         ]);
 
@@ -288,20 +200,7 @@ export default function MacOSDashboard() {
         setTopCompanies(companies);
       }
 
-      // Calculate automation stats
-      if (!tokenError && tokenUsage) {
-        const totalTokens = tokenUsage.reduce((sum, usage) => sum + (usage.tokens_used || 0), 0);
-        const totalCost = tokenUsage.reduce((sum, usage) => sum + (usage.cost || 0), 0);
-        
-        setAutomationStats({
-          tokensUsed: totalTokens,
-          tokensRemaining: 150000 - totalTokens, // Assuming 150k monthly limit
-          automationRuns: automationLogs?.length || 0,
-          successRate: 87,
-          timeSaved: Math.round((automationLogs?.length || 0) * 15), // 15 min per automation
-          costSaved: Math.round((automationLogs?.length || 0) * 2.5), // $2.5 saved per automation
-        });
-      }
+      // (Automation stats calculation removed)
 
       // Generate weekly activity
       const startDate = startOfWeek(new Date());
@@ -313,11 +212,15 @@ export default function MacOSDashboard() {
           const appDate = new Date(app.created_at);
           return appDate.toDateString() === day.toDateString();
         }) || [];
-        
+
+        const dayResponses = dayApps.filter(a => a.status && a.status !== 'pending');
+        const dayInterviews = dayApps.filter(a => a.status === 'interview');
+
         return {
           day: format(day, 'EEE'),
           applications: dayApps.length,
-          automation: Math.floor(Math.random() * 5) + 1,
+          responses: dayResponses.length,
+          interviews: dayInterviews.length,
         };
       });
       
@@ -353,374 +256,153 @@ export default function MacOSDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50">
-      {/* Animated background elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-200 rounded-full blur-3xl opacity-20 animate-pulse" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-200 rounded-full blur-3xl opacity-20 animate-pulse" />
-      </div>
-
-      {/* Main Content */}
-      <div className="relative z-10 p-8">
-        {/* Welcome Header */}
+    <div className="min-h-screen bg-gray-50">
+      {/* Subtle page background accents */}
+      <div
+        className="fixed inset-0 pointer-events-none opacity-80"
+        style={{
+          background:
+            `radial-gradient(700px 160px at 8% -12%, ${colors.primaryLight}24 0%, transparent 60%),` +
+            `radial-gradient(560px 130px at 110% 112%, ${colors.emerald}22 0%, transparent 60%)`,
+        }}
+      />
+      <div className="relative max-w-7xl mx-auto p-6">
+        {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-            {getGreeting()}, {user?.email?.split('@')[0] || 'Achiever'}! 🚀
-          </h1>
-          <p className="text-gray-600 mt-2">Your job search is {stats.responseRate}% more effective with AI automation</p>
+          <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white">
+            <div className="absolute inset-x-0 top-0 h-1" style={{ background: `linear-gradient(to right, ${colors.primaryLight}, ${colors.emerald})` }} />
+            <div className="absolute inset-0" style={{ background: `radial-gradient(900px 180px at 0% 0%, ${colors.primaryLight}22 0%, transparent 45%), radial-gradient(900px 180px at 100% 100%, ${colors.emerald}1f 0%, transparent 45%)` }} />
+            <div className="relative p-6">
+              <h1 className="text-3xl font-semibold text-gray-900">
+                {getGreeting()}, {getDisplayName()}.
+              </h1>
+              <p className="text-gray-600 mt-2">Here’s a quick look at your job search.</p>
+            </div>
+          </div>
         </div>
 
-        {/* Quick Stats Row */}
-        <div className="grid grid-cols-4 gap-4 mb-8">
+        {/* Key stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           {[
-            { 
-              label: 'Applications Today', 
-              value: stats.applicationsToday, 
-              change: '+12%', 
-              icon: Send, 
-              color: 'blue',
-              gradient: colors.gradient.primary 
-            },
-            { 
-              label: 'Interviews Scheduled', 
-              value: stats.interviewsScheduled, 
-              change: '+23%', 
-              icon: Calendar, 
-              color: 'purple',
-              gradient: colors.gradient.info
-            },
-            { 
-              label: 'Response Rate', 
-              value: `${stats.responseRate}%`, 
-              change: '+5%', 
-              icon: MessageSquare, 
-              color: 'green',
-              gradient: colors.gradient.success
-            },
-            { 
-              label: 'AI Credits Used', 
-              value: `${Math.round((automationStats.tokensUsed / 1500000) * 100)}%`, 
-              change: `${automationStats.tokensRemaining.toLocaleString()} left`, 
-              icon: Sparkles, 
-              color: 'amber',
-              gradient: 'linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)'
-            },
+            { label: 'Applications Today', value: stats.applicationsToday, icon: Send },
+            { label: 'Interviews Scheduled', value: stats.interviewsScheduled, icon: Calendar },
+            { label: 'Response Rate', value: `${stats.responseRate}%`, icon: MessageSquare },
           ].map((stat, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <Card gradient className="relative overflow-hidden">
-                <div className="absolute inset-0" style={{ background: stat.gradient, opacity: 0.05 }} />
-                <div className="relative z-10">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className={`p-3 rounded-xl bg-gradient-to-br ${stat.color === 'blue' ? 'from-blue-500 to-blue-600' : stat.color === 'purple' ? 'from-purple-500 to-purple-600' : stat.color === 'green' ? 'from-green-500 to-green-600' : 'from-amber-500 to-orange-600'} text-white`}>
-                      <stat.icon className="w-5 h-5" />
-                    </div>
-                    <span className={`text-xs font-medium ${stat.change.startsWith('+') ? 'text-green-600' : 'text-gray-600'} flex items-center gap-1`}>
-                      {stat.change.startsWith('+') && <ArrowUpRight className="w-3 h-3" />}
-                      {stat.change}
-                    </span>
-                  </div>
-                  <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
-                  <p className="text-sm text-gray-600 mt-1">{stat.label}</p>
+            <Card key={index} accent>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">{stat.label}</p>
+                  <p className="mt-1 text-2xl font-semibold text-gray-900">{stat.value}</p>
                 </div>
-              </Card>
-            </motion.div>
+                <div className="p-2 rounded-lg bg-gray-100 text-gray-700 shadow-sm">
+                  <stat.icon className="w-5 h-5" />
+                </div>
+              </div>
+            </Card>
           ))}
         </div>
 
-        <div className="grid grid-cols-12 gap-6">
-          {/* Left Column */}
-          <div className="col-span-8 space-y-6">
-            {/* LinkedIn Automation Performance */}
-            <Card gradient>
-              <div className="flex items-start justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl text-white">
-                    <Linkedin className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-semibold text-gray-900">LinkedIn Automation</h2>
-                    <p className="text-sm text-gray-500 mt-1">AI-Powered Job Applications</p>
-                  </div>
-                </div>
-                <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                  <RefreshCw className="w-5 h-5 text-gray-400" />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            {/* Weekly Activity */}
+            <Card accent>
+              <div className="flex items-center justify-between mb-4">
                 <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Bot className="w-4 h-4 text-purple-500" />
-                    <span className="text-sm text-gray-600">Automation Runs</span>
-                  </div>
-                  <p className="text-2xl font-bold text-gray-900">{automationStats.automationRuns}</p>
-                  <p className="text-xs text-green-600 mt-1">+{automationStats.successRate}% success rate</p>
+                  <h3 className="text-lg font-medium text-gray-900">Weekly Activity</h3>
+                  <p className="text-sm text-gray-500">Applications, responses, and interviews</p>
                 </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Timer className="w-4 h-4 text-blue-500" />
-                    <span className="text-sm text-gray-600">Time Saved</span>
+                <div className="hidden sm:flex items-center gap-4 text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: colors.primary }} />
+                    <span className="text-gray-600">Applications</span>
                   </div>
-                  <p className="text-2xl font-bold text-gray-900">{automationStats.timeSaved}h</p>
-                  <p className="text-xs text-gray-500 mt-1">This month</p>
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <DollarSign className="w-4 h-4 text-green-500" />
-                    <span className="text-sm text-gray-600">Value Created</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: colors.emerald }} />
+                    <span className="text-gray-600">Responses</span>
                   </div>
-                  <p className="text-2xl font-bold text-gray-900">${automationStats.costSaved}</p>
-                  <p className="text-xs text-gray-500 mt-1">In saved effort</p>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: colors.slateLight }} />
+                    <span className="text-gray-600">Interviews</span>
+                  </div>
                 </div>
               </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Success Rate</span>
-                  <span className="font-medium">{automationStats.successRate}%</span>
-                </div>
-                <ProgressBar progress={automationStats.successRate} color={colors.success} />
-              </div>
+              <ResponsiveContainer width="100%" height={260}>
+                <LineChart data={weeklyActivity}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="day" tick={{ fontSize: 12, fill: colors.slate }} axisLine={{ stroke: '#e5e7eb' }} />
+                  <YAxis tick={{ fontSize: 12, fill: colors.slate }} axisLine={{ stroke: '#e5e7eb' }} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Line type="monotone" dataKey="applications" name="Applications" stroke={colors.primary} strokeWidth={2.25} dot={{ r: 3 }} activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2 }} />
+                  <Line type="monotone" dataKey="responses" name="Responses" stroke={colors.emerald} strokeWidth={2.25} dot={{ r: 3 }} activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2 }} />
+                  <Line type="monotone" dataKey="interviews" name="Interviews" stroke={colors.slateLight} strokeWidth={2.25} dot={{ r: 3 }} activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2 }} />
+                </LineChart>
+              </ResponsiveContainer>
             </Card>
 
-            {/* Application Pipeline */}
-            <Card>
-              <div className="flex items-start justify-between mb-6">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Application Pipeline</h3>
-                  <p className="text-sm text-gray-500 mt-1">Track your progress through stages</p>
-                </div>
-                <select className="px-3 py-1.5 bg-gray-100 rounded-lg text-sm text-gray-700 border-0 focus:outline-none focus:ring-2 focus:ring-purple-500">
-                  <option value="7d">Last 7 days</option>
-                  <option value="30d">Last 30 days</option>
-                  <option value="90d">Last 90 days</option>
-                </select>
+            {/* Recent Applications */}
+            <Card accent>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Recent Applications</h3>
               </div>
-
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={applicationsByStatus}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={90}
-                      paddingAngle={2}
-                      dataKey="value"
-                    >
-                      {applicationsByStatus.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'white',
-                        border: 'none',
-                        borderRadius: '12px',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4 mt-6">
-                {applicationsByStatus.slice(0, 3).map((status, index) => (
-                  <div key={index} className="text-center">
-                    <div className="flex items-center justify-center gap-2 mb-1">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: status.color }} />
-                      <span className="text-sm text-gray-600">{status.name}</span>
+              <div className="divide-y divide-gray-100">
+                {applications.slice(0, 5).map((app, index) => (
+                  <div key={app.id || index} className="py-3 flex items-center justify-between">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900">{app.position || 'Software Engineer'}</p>
+                      <p className="text-xs text-gray-600 mt-0.5">{app.company_name || 'Tech Company'}</p>
                     </div>
-                    <p className="text-xl font-bold text-gray-900">{status.value}</p>
+                    <div className="flex items-center gap-3">
+                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                        app.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                        app.status === 'interview' ? 'bg-indigo-100 text-indigo-700' :
+                        app.status === 'offer' ? 'bg-green-100 text-green-700' :
+                        app.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
+                      }`}>
+                        {app.status || 'pending'}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {app.created_at ? format(new Date(app.created_at), 'MMM d') : 'Today'}
+                      </span>
+                      <ArrowUpRight className="w-4 h-4 text-gray-400" />
+                    </div>
                   </div>
                 ))}
               </div>
             </Card>
-
-            {/* Weekly Activity Chart */}
-            <Card>
-              <div className="flex items-start justify-between mb-6">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Weekly Activity</h3>
-                  <p className="text-sm text-gray-500 mt-1">Applications vs Automation runs</p>
-                </div>
-                <div className="flex items-center gap-4 text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-purple-500 rounded-full" />
-                    <span className="text-gray-600">Applications</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-blue-500 rounded-full" />
-                    <span className="text-gray-600">Automations</span>
-                  </div>
-                </div>
-              </div>
-
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={weeklyActivity}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis 
-                    dataKey="day" 
-                    tick={{ fontSize: 11, fill: '#9CA3AF' }}
-                    axisLine={{ stroke: '#E5E7EB' }}
-                  />
-                  <YAxis 
-                    tick={{ fontSize: 11, fill: '#9CA3AF' }}
-                    axisLine={{ stroke: '#E5E7EB' }}
-                  />
-                  <Tooltip 
-                    contentStyle={{
-                      backgroundColor: 'white',
-                      border: 'none',
-                      borderRadius: '12px',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                    }}
-                  />
-                  <Bar dataKey="applications" fill={colors.secondary} radius={[8, 8, 0, 0]} />
-                  <Bar dataKey="automation" fill={colors.primary} radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </Card>
           </div>
 
-          {/* Right Column */}
-          <div className="col-span-4 space-y-6">
-            {/* AI Assistant Card */}
-            <Card gradient>
+          <div className="space-y-6">
+            {/* Pipeline summary */}
+            <Card accent>
               <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg text-white">
-                    <Brain className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">AI Assistant</h3>
-                    <p className="text-xs text-gray-500">Powered by GPT-4</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                  <span className="text-xs text-gray-600">Active</span>
-                </div>
+                <h3 className="text-lg font-medium text-gray-900">Pipeline</h3>
               </div>
-
-              <div className="space-y-4">
-                <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl">
-                  <div className="flex items-start gap-3">
-                    <Sparkles className="w-5 h-5 text-purple-500 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">Smart Suggestions</p>
-                      <p className="text-xs text-gray-600 mt-1">
-                        Your profile matches 89% with Senior Frontend Developer roles at tech companies.
-                        Consider highlighting your React and TypeScript experience.
-                      </p>
-                    </div>
+              <div className="grid grid-cols-2 gap-3">
+                {applicationsByStatus.slice(0, 4).map((s, i) => (
+                  <div key={i} className="p-3 rounded-lg border border-gray-100 bg-gray-50">
+                    <p className="text-xs text-gray-600">{s.name}</p>
+                    <p className="text-lg font-semibold text-gray-900 mt-1">{s.value}</p>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 bg-blue-50 rounded-lg">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Cpu className="w-4 h-4 text-blue-600" />
-                      <span className="text-xs font-medium text-blue-900">Tokens Used</span>
-                    </div>
-                    <p className="text-lg font-bold text-blue-900">{automationStats.tokensUsed.toLocaleString()}</p>
-                  </div>
-                  <div className="p-3 bg-green-50 rounded-lg">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Zap className="w-4 h-4 text-green-600" />
-                      <span className="text-xs font-medium text-green-900">Remaining</span>
-                    </div>
-                    <p className="text-lg font-bold text-green-900">{automationStats.tokensRemaining.toLocaleString()}</p>
-                  </div>
-                </div>
-
-                <button className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-medium hover:from-purple-700 hover:to-pink-700 transition-all flex items-center justify-center gap-2">
-                  <Bot className="w-5 h-5" />
-                  Start Auto-Apply Session
-                </button>
-              </div>
-            </Card>
-
-            {/* Recent Applications */}
-            <Card>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Recent Applications</h3>
-                <button className="text-purple-600 hover:text-purple-700 text-sm font-medium">
-                  View All
-                </button>
-              </div>
-
-              <div className="space-y-3">
-                {applications.slice(0, 4).map((app, index) => (
-                  <motion.div
-                    key={app.id || index}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    className="p-3 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">{app.position || 'Software Engineer'}</p>
-                        <p className="text-xs text-gray-600 mt-0.5">{app.company_name || 'Tech Company'}</p>
-                        <div className="flex items-center gap-3 mt-2">
-                          <span className={`
-                            px-2 py-0.5 text-xs font-medium rounded-full
-                            ${app.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 
-                              app.status === 'interview' ? 'bg-purple-100 text-purple-700' :
-                              app.status === 'offer' ? 'bg-green-100 text-green-700' :
-                              app.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                              'bg-gray-100 text-gray-700'}
-                          `}>
-                            {app.status || 'pending'}
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            {app.created_at ? format(new Date(app.created_at), 'MMM d') : 'Today'}
-                          </span>
-                        </div>
-                      </div>
-                      <ArrowUpRight className="w-4 h-4 text-gray-400" />
-                    </div>
-                  </motion.div>
                 ))}
               </div>
             </Card>
 
             {/* Top Companies */}
-            <Card>
+            <Card accent>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Top Companies</h3>
-                <Trophy className="w-5 h-5 text-amber-500" />
+                <h3 className="text-lg font-medium text-gray-900">Top Companies</h3>
+                <Trophy className="w-5 h-5 text-gray-500" />
               </div>
-
               <div className="space-y-3">
-                {topCompanies.length > 0 ? topCompanies.map((company, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`
-                        w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm
-                        ${index === 0 ? 'bg-gradient-to-br from-amber-500 to-orange-600' :
-                          index === 1 ? 'bg-gradient-to-br from-gray-400 to-gray-500' :
-                          index === 2 ? 'bg-gradient-to-br from-amber-600 to-amber-700' :
-                          'bg-gradient-to-br from-slate-400 to-slate-500'}
-                      `}>
-                        {index + 1}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{company.name}</p>
-                        <p className="text-xs text-gray-500">{company.applications} applications</p>
-                      </div>
+                {topCompanies.length > 0 ? (
+                  topCompanies.map((company, index) => (
+                    <div key={index} className="flex items-center justify-between">
+                      <p className="text-sm text-gray-900">{company.name}</p>
+                      <p className="text-xs text-gray-600">{company.applications} apps</p>
                     </div>
-                    <Flame className={`w-4 h-4 ${index === 0 ? 'text-orange-500' : 'text-gray-300'}`} />
-                  </div>
-                )) : (
-                  <p className="text-sm text-gray-500 text-center py-4">No applications yet</p>
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500">No applications yet</p>
                 )}
               </div>
             </Card>
