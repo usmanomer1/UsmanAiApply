@@ -28,7 +28,6 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { usePaywall } from '../hooks/usePaywall';
 import PaywallModal from './ui/PaywallModal';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -55,7 +54,7 @@ interface TaskStatus {
 export default function LinkedInAutomationBotV2() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { checkPaywall, PaywallComponent } = usePaywall();
+  const [showPaywall, setShowPaywall] = useState(false);
   
   // Core state
   const [isRunning, setIsRunning] = useState(false);
@@ -269,14 +268,11 @@ export default function LinkedInAutomationBotV2() {
       return;
     }
 
-    // Check paywall
-    const canProceed = await checkPaywall('automation');
-    if (!canProceed) return;
-
     // Check usage limits
-    const canUse = await canPerformAction(user!.id, 'automation');
+    const canUse = await canPerformAction(user!.id, 'auto_apply');
     if (!canUse) {
       toast.error('You have reached your automation limit for this billing period');
+      setShowPaywall(true);
       return;
     }
 
@@ -294,12 +290,13 @@ export default function LinkedInAutomationBotV2() {
       startStreaming(result.task_id);
       
       // Track usage
-      await createAutomationSession(user!.id, {
-        taskId: result.task_id,
-        jobTitle: config.jobTitle,
-        location: config.location,
-        targetCount: config.targetCount
-      });
+      await createAutomationSession(
+        user!.id,
+        result.task_id,
+        config.jobTitle,
+        config.location,
+        config.targetCount
+      );
       
       addActivity('Automation started', 'success', {
         task_id: result.task_id,
@@ -357,10 +354,9 @@ export default function LinkedInAutomationBotV2() {
       }
       
       // Update session
-      if (sessionId) {
-        await updateAutomationSession(sessionId, {
-          status: 'stopped',
-          completedAt: new Date().toISOString()
+      if (taskId) {
+        await updateAutomationSession(taskId, {
+          status: 'stopped'
         });
       }
       
@@ -389,7 +385,13 @@ export default function LinkedInAutomationBotV2() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
-      <PaywallComponent />
+      {showPaywall && (
+        <PaywallModal 
+          isOpen={showPaywall}
+          onClose={() => setShowPaywall(false)}
+          feature="auto_apply"
+        />
+      )}
       
       {/* Header */}
       <div className="mb-8">
