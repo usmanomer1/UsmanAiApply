@@ -5,9 +5,12 @@ export interface BrowserUseConfig {
   location: string;
   targetCount: number;
   linkedinEmail: string;
-  linkedinPassword: string;
+  linkedinPassword?: string;
   customInstructions?: string;
   extractJobs?: boolean;
+  resumeContent?: string;
+  applyToExternalJobs?: boolean;
+  uploadedFileName?: string;
 }
 
 export interface BrowserUseSession {
@@ -52,16 +55,23 @@ class BrowserUseSDK {
     // Build the task prompt with password handling
     const task = this.buildTaskPrompt(config);
     
+    // Include uploaded file if provided
+    const taskConfig: any = {
+      ...config,
+      task,
+      extractJobs: true,
+    };
+    
+    if (config.uploadedFileName) {
+      taskConfig.included_file_names = [config.uploadedFileName];
+    }
+    
     const response = await fetch(`${this.baseUrl}/browser-use-controller`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
         action: 'create',
-        config: {
-          ...config,
-          task,
-          extractJobs: true,
-        },
+        config: taskConfig,
       }),
     });
 
@@ -74,7 +84,7 @@ class BrowserUseSDK {
   }
 
   private buildTaskPrompt(config: BrowserUseConfig): string {
-    const { jobTitle, location, targetCount, linkedinEmail, linkedinPassword, customInstructions } = config;
+    const { jobTitle, location, targetCount, linkedinEmail, customInstructions, resumeContent, applyToExternalJobs, uploadedFileName } = config;
     
     let prompt = `You are an intelligent LinkedIn job application assistant. Your task is to help apply for jobs on LinkedIn.
 
@@ -87,14 +97,58 @@ Instructions:
 2. Login using the provided credentials automatically
 3. If you encounter 2FA, output "INTERVENTION:2FA_REQUIRED" and wait for 30 seconds for the user to enter the code
 4. Once logged in, search for "${jobTitle}" jobs in "${location}"
-5. Apply to ${targetCount} relevant positions using Easy Apply
+5. Apply to ${targetCount} relevant positions using ${applyToExternalJobs ? 'Easy Apply or external applications' : 'Easy Apply only'}
 6. For each job you apply to, extract the job details in structured format
+
+${uploadedFileName ? `
+RESUME FILE:
+- A resume file "${uploadedFileName}" has been uploaded and is available for use
+- The file is already uploaded and ready to use - you don't need to upload it again
+- If the site has a "Choose File" or "Upload Resume" button, click it and select the available file
+${resumeContent ? `- Additionally, here's the resume content for reference when filling forms:\n[Resume content provided below in context]` : ''}
+` : resumeContent ? `
+RESUME CONTENT:
+- Use the following resume content to answer questions and fill forms:
+` : ''}
+
+${resumeContent ? `
+USER'S RESUME CONTENT FOR REFERENCE:
+${resumeContent}
+
+Use this resume information to:
+- Answer questions about experience, skills, and qualifications
+- Fill in work history and education sections
+- Provide accurate information about the candidate's background
+- Make informed decisions when answering screening questions
+` : ''}
 
 ${customInstructions ? `Additional Instructions: ${customInstructions}` : ''}
 
+PROGRESS TRACKING:
+- Keep count of how many applications you've submitted
+- Announce progress: "APPLICATION #X of ${targetCount} COMPLETED"
+- Continue until you reach exactly ${targetCount} applications
+
+CRITICAL APPLICATION TRACKING - YOU MUST DO THIS FOR EVERY APPLICATION:
+1. BEFORE clicking Easy Apply: 
+   - Extract the job URL from the browser address bar or the job posting
+   - Announce "APPLYING TO: [COMPANY NAME] - [JOB TITLE]"
+   - Also note the job URL for tracking
+
+2. BEFORE clicking Submit: 
+   - Announce "SUBMITTING APPLICATION TO: [COMPANY NAME] - [JOB TITLE]"
+   - Include the job URL if available
+
+IMPORTANT FORMAT RULES:
+- Use EXACT format: "APPLYING TO: Company - Job Title" (no quotes, dash separator)
+- Extract the REAL company name from the job posting (not "LinkedIn Company" or generic terms)
+- Extract the EXACT job title from the posting header
+- Company comes FIRST, then dash, then job title
+- Capture the job URL from the address bar when on the job details page
+- Example: "APPLYING TO: Google - Senior Software Engineer"
+
 IMPORTANT: 
-- Use the Easy Apply feature only
-- Skip jobs that require external applications
+- ${applyToExternalJobs ? 'Apply through Easy Apply when available, or external sites if needed' : 'Use the Easy Apply feature only, skip jobs that require external applications'}
 - Extract job details for all applied positions
 - If login fails, output "INTERVENTION:LOGIN_REQUIRED"`;
 
@@ -119,6 +173,43 @@ IMPORTANT:
     }
 
     return response.json();
+  }
+
+  async uploadFile(file: File): Promise<string> {
+    const headers = await this.getAuthHeaders();
+    
+    // Get presigned URL from Browser-use API
+    const presignedResponse = await fetch(`${this.baseUrl}/browser-use-controller`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        action: 'upload-file',
+        file_name: file.name,
+        content_type: file.type,
+      }),
+    });
+
+    if (!presignedResponse.ok) {
+      const error = await presignedResponse.json();
+      throw new Error(error.error || 'Failed to get upload URL');
+    }
+
+    const { upload_url } = await presignedResponse.json();
+    
+    // Upload the file to the presigned URL
+    const uploadResponse = await fetch(upload_url, {
+      method: 'PUT',
+      body: file,
+      headers: {
+        'Content-Type': file.type,
+      },
+    });
+
+    if (!uploadResponse.ok) {
+      throw new Error('Failed to upload file');
+    }
+
+    return file.name;
   }
 
   async pauseTask(taskId: string) {
@@ -218,12 +309,12 @@ IMPORTANT:
       }
 
       // Create EventSource with auth token
+      // Note: Standard EventSource doesn't support headers, so we'll use fetch-based SSE
       const url = `${this.baseUrl}/browser-use-stream?task_id=${taskId}`;
-      this.eventSource = new EventSource(url, {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-        } as any, // EventSource doesn't have official headers support but some implementations do
-      });
+      // EventSource doesn't support headers in standard implementation
+      // Fall back to fetch-based SSE
+      this.streamWithFetch(taskId, session.access_token, onMessage, onError);
+      return;
 
       // If EventSource doesn't support headers, fall back to fetch-based SSE
       if (!this.eventSource) {

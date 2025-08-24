@@ -810,7 +810,7 @@ const LinkedInAutomationBot: React.FC = () => {
     }
   };
 
-  const addLog = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
+  const addLog = (message: string, type: 'info' | 'success' | 'error' | 'warning' = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
     setLogs(prev => [...prev, { message, type, timestamp }]);
     
@@ -1770,8 +1770,7 @@ This is the #1 issue that needs to be fixed immediately.`;
                 
                 // Upload to browser-use
                 addLog(`📤 Uploading resume: ${fileName} (${(file.size / 1024).toFixed(2)}KB, type: ${contentType})...`);
-                // File upload not supported in new SDK - would need to handle differently
-                const uploadedFileName = file.name; // Placeholder
+                const uploadedFileName = await browserUseSDK.uploadFile(file);
                 uploadedFileNames.push(uploadedFileName);
                 addLog('✅ Resume uploaded successfully for external applications');
                 
@@ -1830,7 +1829,10 @@ This is the #1 issue that needs to be fixed immediately.`;
       linkedinEmail: config.linkedinEmail,
       linkedinPassword: config.linkedinPassword || '',
       customInstructions: config.customInstructions,
-      extractJobs: true
+      extractJobs: true,
+      resumeContent: resumeContent || undefined,
+      applyToExternalJobs: effectiveConfig.applyToExternalJobs,
+      uploadedFileName: uploadedFileNames.length > 0 ? uploadedFileNames[0] : undefined
     };
 
     addLog(`🚀 Starting LinkedIn automation with Browser-Use SDK`, 'success');
@@ -2441,7 +2443,7 @@ This is the #1 issue that needs to be fixed immediately.`;
       case 'intervention':
         if (event.data.type === '2fa_required') {
           addLog('🔐 Two-factor authentication required - please enter code within 30 seconds', 'warning');
-          toast.warning('2FA required - enter code in browser window');
+          toast('2FA required - enter code in browser window', { icon: '⚠️' });
         } else if (event.data.type === 'login_required') {
           addLog('🔐 Manual login required - please complete login in browser', 'warning');
           setLoginDetection({ detected: true, message: 'Manual login required' });
@@ -2501,7 +2503,7 @@ This is the #1 issue that needs to be fixed immediately.`;
     }
     
     // Mark task as completed in database
-    await markTaskCompleted(taskId, stepCount, status);
+    await markTaskCompleted(taskId, stepCount, status as 'finished' | 'failed' | 'stopped');
     
     // Clear automation state
     clearAutomationState();
@@ -2734,7 +2736,7 @@ This is the #1 issue that needs to be fixed immediately.`;
               addLog('👉 Instructions:', 'info');
               addLog('   1. Complete the action in the browser window', 'info');
               addLog('   2. Click "Resume" when ready to continue', 'info');
-              addLog(`📊 Detection: ${detection.description}`, 'info');
+              addLog(`📊 Detection: Login may be required`, 'info');
               addLog(`📊 Confidence: ${(detection.confidence * 100).toFixed(0)}%`, 'info');
             }
           }
