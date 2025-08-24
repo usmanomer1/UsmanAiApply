@@ -308,34 +308,8 @@ IMPORTANT:
         return;
       }
 
-      // Create EventSource with auth token
-      // Note: Standard EventSource doesn't support headers, so we'll use fetch-based SSE
-      const url = `${this.baseUrl}/browser-use-stream?task_id=${taskId}`;
-      // EventSource doesn't support headers in standard implementation
-      // Fall back to fetch-based SSE
+      // Use fetch-based SSE since EventSource doesn't support custom headers
       this.streamWithFetch(taskId, session.access_token, onMessage, onError);
-      return;
-
-      // If EventSource doesn't support headers, fall back to fetch-based SSE
-      if (!this.eventSource) {
-        this.streamWithFetch(taskId, session.access_token, onMessage, onError);
-        return;
-      }
-
-      this.eventSource.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          onMessage(data);
-        } catch (error) {
-          console.error('Error parsing SSE message:', error);
-        }
-      };
-
-      this.eventSource.onerror = (error) => {
-        console.error('SSE error:', error);
-        onError?.(new Error('Stream connection error'));
-        this.eventSource?.close();
-      };
     });
 
     // Return cleanup function
@@ -357,6 +331,7 @@ IMPORTANT:
       const response = await fetch(`${this.baseUrl}/browser-use-stream?task_id=${taskId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
         },
       });
 
