@@ -864,10 +864,74 @@ const LinkedInAutomationBot: React.FC = () => {
     }
     
     try {
+      addLog('🔍 Checking for active automation sessions...');
+      
+      // First check for active session from database/backend
+      try {
+        const activeSessionData = await browserUseSDK.getActiveSession();
+        
+        if (activeSessionData.active && activeSessionData.task) {
+          const currentTaskStatus = activeSessionData.task;
+          
+          // Restore the active session from backend
+          if (currentTaskStatus.status === 'running' || currentTaskStatus.status === 'paused') {
+            // Restore task details
+            setCurrentTask(currentTaskStatus);
+            setIsRunning(currentTaskStatus.status === 'running');
+            setIsPaused(currentTaskStatus.status === 'paused');
+            
+            // Try to restore counts from localStorage for better UX
+            const savedState = localStorage.getItem(`automation_state_${user.id}`);
+            if (savedState) {
+              const state = JSON.parse(savedState);
+              if (state.taskId === currentTaskStatus.id) {
+                setStepCount(state.stepCount || 0);
+                setAppliedCount(state.appliedCount || 0);
+                setErrorCount(state.errorCount || 0);
+                if (state.logs && Array.isArray(state.logs)) {
+                  setLogs(state.logs);
+                }
+              }
+            }
+            
+            addLog(`🔄 Restored active automation session - Task ${currentTaskStatus.id} is ${currentTaskStatus.status}`);
+            
+            // Always show browser preview after restoration
+            if (currentTaskStatus.live_url) {
+              addLog(`🌐 Live preview restored: ${currentTaskStatus.live_url}`);
+            } else {
+              addLog(`🌐 Browser preview will be available shortly...`);
+            }
+            
+            // Resume polling and streaming if task is running
+            if (currentTaskStatus.status === 'running') {
+              startPolling(currentTaskStatus.id);
+              startHeartbeat(currentTaskStatus.id);
+              // Also start streaming for real-time updates
+              const cleanup = browserUseSDK.streamTaskUpdates(
+                currentTaskStatus.id,
+                handleStreamEvent,
+                (error) => {
+                  console.error('Stream error during restoration:', error);
+                  addLog(`⚠️ Stream connection issue: ${error.message}`, 'error');
+                }
+              );
+              streamCleanupRef.current = cleanup;
+              addLog(`▶️ Resumed monitoring task progress with real-time updates`);
+            } else if (currentTaskStatus.status === 'paused') {
+              addLog(`⏸️ Task is paused - you can resume it anytime`);
+            }
+            
+            return; // Successfully restored from backend
+          }
+        }
+      } catch (error) {
+        console.log('No active session from backend, checking localStorage fallback');
+      }
+      
+      // Fallback to localStorage if backend doesn't have active session
       const savedState = localStorage.getItem(`automation_state_${user.id}`);
       if (!savedState) return;
-      
-      addLog('🔍 Checking for previous automation session...');
       
       const state = JSON.parse(savedState);
       
@@ -911,11 +975,21 @@ const LinkedInAutomationBot: React.FC = () => {
               addLog(`🌐 Browser preview will be available shortly...`);
             }
             
-            // Resume polling if task is running
+            // Resume polling and streaming if task is running
             if (currentTaskStatus.status === 'running') {
               startPolling(state.taskId);
               startHeartbeat(state.taskId);
-              addLog(`▶️ Resumed monitoring task progress`);
+              // Also start streaming for real-time updates
+              const cleanup = browserUseSDK.streamTaskUpdates(
+                state.taskId,
+                handleStreamEvent,
+                (error) => {
+                  console.error('Stream error during restoration:', error);
+                  addLog(`⚠️ Stream connection issue: ${error.message}`, 'error');
+                }
+              );
+              streamCleanupRef.current = cleanup;
+              addLog(`▶️ Resumed monitoring task progress with real-time updates`);
               
               // Force an immediate status update to ensure we have the latest live_url
               setTimeout(async () => {
