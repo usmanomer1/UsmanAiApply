@@ -95,8 +95,13 @@ IMPORTANT: You have been provided with credentials to login automatically:
 Instructions:
 1. Go to LinkedIn (linkedin.com)
 2. Login using the provided credentials automatically
-3. If you encounter 2FA, output "INTERVENTION:2FA_REQUIRED" and wait for 30 seconds for the user to enter the code
-4. Once logged in, search for "${jobTitle}" jobs in "${location}"
+3. If you encounter 2FA/two-factor authentication:
+   - DO NOT mark the task as failed or done
+   - Wait on the 2FA page for the user to manually enter the code
+   - The user will enter the code manually in the live browser view
+   - After waiting 30 seconds, check if you're logged in and continue
+   - If still on 2FA page after 30 seconds, wait another 30 seconds
+4. Once logged in (either directly or after 2FA), search for "${jobTitle}" jobs in "${location}"
 5. Apply to ${targetCount} relevant positions using ${applyToExternalJobs ? 'Easy Apply or external applications' : 'Easy Apply only'}
 6. For each job you apply to, extract the job details in structured format
 
@@ -150,7 +155,9 @@ IMPORTANT FORMAT RULES:
 IMPORTANT: 
 - ${applyToExternalJobs ? 'Apply through Easy Apply when available, or external sites if needed' : 'Use the Easy Apply feature only, skip jobs that require external applications'}
 - Extract job details for all applied positions
-- If login fails, output "INTERVENTION:LOGIN_REQUIRED"`;
+- If login fails with wrong credentials, output "INTERVENTION:LOGIN_REQUIRED"
+- If 2FA is required, DO NOT fail the task - wait for user to enter the code manually in the browser
+- NEVER mark the task as done(success=False) when encountering 2FA - always wait and continue`;
 
     return prompt;
   }
