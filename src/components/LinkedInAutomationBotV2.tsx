@@ -84,15 +84,15 @@ export default function LinkedInAutomationBotV2() {
   
   // UI state
   const [showConfig, setShowConfig] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Changed from true since we're not checking active session
   const [showPasswordInput, setShowPasswordInput] = useState(false);
   const activityFeedRef = useRef<HTMLDivElement>(null);
   const streamCleanupRef = useRef<(() => void) | null>(null);
 
-  // Check for active session on mount
-  useEffect(() => {
-    checkActiveSession();
-  }, []);
+  // Session persistence disabled per user request
+  // useEffect(() => {
+  //   checkActiveSession();
+  // }, []);
 
   // Cleanup stream on unmount
   useEffect(() => {
