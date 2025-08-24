@@ -2422,6 +2422,11 @@ This is the #1 issue that needs to be fixed immediately.`;
   const handleStreamEvent = (event: StreamEvent, taskId: string) => {
     switch (event.type) {
       case 'status':
+        // Status updates (running, paused, etc) - only log if changed
+        break;
+        
+      case 'live_url':
+        // Live URL update - only sent when URL is new or changed
         if (event.data.live_url && !currentTask?.live_url) {
           setCurrentTask(prev => prev ? { ...prev, live_url: event.data.live_url } : null);
           addLog(`🌐 Live preview available: ${event.data.live_url}`);
@@ -2429,6 +2434,7 @@ This is the #1 issue that needs to be fixed immediately.`;
         break;
         
       case 'step':
+        // Agent step update - show what the agent is doing
         addLog(`📝 ${event.data.goal || event.data.step}`, 'info');
         setStepCount(prev => prev + 1);
         
@@ -2441,13 +2447,10 @@ This is the #1 issue that needs to be fixed immediately.`;
         break;
         
       case 'intervention':
+        // Only show 2FA intervention, not login (since we're doing auto-login)
         if (event.data.type === '2fa_required') {
           addLog('🔐 Two-factor authentication required - please enter code within 30 seconds', 'warning');
           toast('2FA required - enter code in browser window', { icon: '⚠️' });
-        } else if (event.data.type === 'login_required') {
-          addLog('🔐 Manual login required - please complete login in browser', 'warning');
-          setLoginDetection({ detected: true, message: 'Manual login required' });
-          setShowResumeButton(true);
         }
         break;
         
