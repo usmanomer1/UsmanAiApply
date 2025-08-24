@@ -41,6 +41,7 @@ class BrowserUseSDK {
     
     return {
       'Authorization': `Bearer ${session.access_token}`,
+      'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
       'Content-Type': 'application/json',
     };
   }
