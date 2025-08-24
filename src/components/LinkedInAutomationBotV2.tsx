@@ -85,7 +85,6 @@ export default function LinkedInAutomationBotV2() {
   // UI state
   const [showConfig, setShowConfig] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [showPasswordInput, setShowPasswordInput] = useState(false);
   const activityFeedRef = useRef<HTMLDivElement>(null);
   const streamCleanupRef = useRef<(() => void) | null>(null);
 
@@ -265,13 +264,8 @@ export default function LinkedInAutomationBotV2() {
   };
 
   const handleStart = async () => {
-    if (!config.jobTitle || !config.location || !config.linkedinEmail) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
-
-    if (!config.linkedinPassword) {
-      setShowPasswordInput(true);
+    if (!config.jobTitle || !config.location || !config.linkedinEmail || !config.linkedinPassword) {
+      toast.error('Please fill in all required fields including password');
       return;
     }
 
@@ -384,14 +378,6 @@ export default function LinkedInAutomationBotV2() {
     }
   };
 
-  const handlePasswordSubmit = () => {
-    if (!config.linkedinPassword) {
-      toast.error('Please enter your LinkedIn password');
-      return;
-    }
-    setShowPasswordInput(false);
-    handleStart();
-  };
 
   if (loading) {
     return (
@@ -531,6 +517,25 @@ export default function LinkedInAutomationBotV2() {
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
+                      LinkedIn Password *
+                    </label>
+                    <div className="relative">
+                      <Input
+                        type="password"
+                        value={config.linkedinPassword}
+                        onChange={(e) => setConfig({ ...config, linkedinPassword: e.target.value })}
+                        placeholder="Enter your password"
+                        disabled={isRunning}
+                      />
+                      <div className="mt-1 flex items-center gap-1 text-xs text-gray-500">
+                        <Lock className="w-3 h-3" />
+                        <span>Password is encrypted and never stored</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       Target Applications
                     </label>
                     <Input
@@ -542,6 +547,11 @@ export default function LinkedInAutomationBotV2() {
                       disabled={isRunning}
                     />
                   </div>
+                </div>
+                
+                <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
+                  <Info className="w-4 h-4 shrink-0" />
+                  <span>If 2FA is enabled on your LinkedIn account, you'll have 30 seconds to enter the code when prompted</span>
                 </div>
                 
                 <div>
@@ -559,71 +569,6 @@ export default function LinkedInAutomationBotV2() {
                 </div>
               </CardContent>
             </Card>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Password Input Modal */}
-      <AnimatePresence>
-        {showPasswordInput && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-xl max-w-md w-full p-6"
-            >
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Lock className="w-5 h-5 text-blue-600" />
-                </div>
-                <h3 className="text-xl font-semibold">Enter LinkedIn Password</h3>
-              </div>
-              
-              <p className="text-gray-600 mb-4">
-                Your password is encrypted and used only for this automation session. 
-                It is never stored permanently.
-              </p>
-              
-              <Input
-                type="password"
-                value={config.linkedinPassword}
-                onChange={(e) => setConfig({ ...config, linkedinPassword: e.target.value })}
-                placeholder="Enter your LinkedIn password"
-                className="mb-4"
-                autoFocus
-                onKeyPress={(e) => e.key === 'Enter' && handlePasswordSubmit()}
-              />
-              
-              <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
-                <Info className="w-4 h-4" />
-                <span>If 2FA is enabled, you'll have 30 seconds to enter the code</span>
-              </div>
-              
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowPasswordInput(false);
-                    setConfig({ ...config, linkedinPassword: '' });
-                  }}
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handlePasswordSubmit}
-                  className="flex-1"
-                >
-                  Start Automation
-                </Button>
-              </div>
-            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
