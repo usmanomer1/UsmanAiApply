@@ -10,7 +10,7 @@ import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import Sidebar from './components/layout/Sidebar';
 import ProfilePage from './components/ProfilePage';
 import { ResumePage } from './components/ResumePage';
-import LinkedInAutomationBotV2 from './components/LinkedInAutomationBotV2';
+import LinkedInAutomationBot from './components/LinkedInAutomationBot';
 import { SuccessPage } from './components/SuccessPage';
 import JobSearchConvex from './components/JobSearchConvex';
 import { BillingPage } from './components/billing/BillingPage';
@@ -43,7 +43,7 @@ function App() {
                               <Route path="/jobs" element={<JobSearchConvex />} />
                               <Route path="/applications" element={<ApplicationsPage />} />
                               <Route path="/profile" element={<ProfilePage />} />
-                              <Route path="/auto-apply" element={<LinkedInAutomationBotV2 />} />
+                              <Route path="/auto-apply" element={<LinkedInAutomationBot />} />
                               <Route path="/resume" element={<ResumePage />} />
                               <Route path="/billing" element={<BillingPage />} />
                               <Route path="/settings" element={<SettingsPage />} />
