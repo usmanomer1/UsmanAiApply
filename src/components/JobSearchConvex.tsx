@@ -372,13 +372,24 @@ const JobSearchConvex: React.FC = () => {
         ? `${searchQuery} in ${location}`
         : searchQuery;
       
+      // Map employment types to match backend API expectations
+      const mappedFilters = {
+        ...filters,
+        employmentTypes: filters.employmentTypes?.map(type => {
+          // Map frontend values to backend API values
+          if (type === 'INTERNSHIP') return 'INTERN';
+          if (type === 'CONTRACT') return 'CONTRACTOR';
+          return type; // FULLTIME and PARTTIME remain the same
+        })
+      };
+      
       // Stream jobs directly from backend
       await jobStreamClient.streamJobs(
         {
           resumeText,
           query: combinedQuery,
           // Don't send location separately - it's in the query now
-          filters,
+          filters: mappedFilters,
           numJobs: 100,
         },
         {
@@ -813,22 +824,27 @@ const JobSearchConvex: React.FC = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Employment Type</label>
                     <div className="space-y-2">
-                      {['FULLTIME', 'PARTTIME', 'CONTRACT', 'INTERNSHIP'].map((type) => (
-                        <label key={type} className="flex items-center text-gray-700 hover:text-gray-900 cursor-pointer">
+                      {[
+                        { value: 'FULLTIME', label: 'Full Time' },
+                        { value: 'PARTTIME', label: 'Part Time' },
+                        { value: 'CONTRACT', label: 'Contract' },
+                        { value: 'INTERNSHIP', label: 'Internship' }
+                      ].map((type) => (
+                        <label key={type.value} className="flex items-center text-gray-700 hover:text-gray-900 cursor-pointer">
                           <input
                             type="checkbox"
-                            checked={filters.employmentTypes?.includes(type) || false}
+                            checked={filters.employmentTypes?.includes(type.value) || false}
                             onChange={(e) => {
                               const types = filters.employmentTypes || [];
                               if (e.target.checked) {
-                                setFilters({ ...filters, employmentTypes: [...types, type] });
+                                setFilters({ ...filters, employmentTypes: [...types, type.value] });
                               } else {
-                                setFilters({ ...filters, employmentTypes: types.filter(t => t !== type) });
+                                setFilters({ ...filters, employmentTypes: types.filter(t => t !== type.value) });
                               }
                             }}
                             className="mr-2 text-[#1DE0DD] focus:ring-[#1DE0DD] rounded"
                           />
-                          <span className="text-sm">{type.charAt(0) + type.slice(1).toLowerCase()}</span>
+                          <span className="text-sm">{type.label}</span>
                         </label>
                       ))}
                     </div>
