@@ -54,7 +54,6 @@ import toast from 'react-hot-toast';
 import { Badge } from '../ui/badge';
 // import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { getUserUsage, getAutomationSessions, UserUsage } from '../../lib/usageTracking';
-import { getJobSearchUsage, JobSearchUsageStats } from '../../lib/jobSearchUsage';
 import { Search } from 'lucide-react';
 
 interface UserSubscription {
@@ -171,7 +170,11 @@ export const BillingPage: React.FC = () => {
       if (!user) {
         setSubscription(null);
         setUsage({ total_steps: 0, total_cost: 0, job_tokens: 0, applications_count: 0, ai_requests_count: 0, job_search_matches: 0, resume_optimizations: 0, cover_letters: 0 });
-        setJobSearchUsage(null);
+        setJobSearchUsage({
+          used: 0,
+          limit: -1, // Unlimited
+          percentage: 0
+        });
         return;
       }
 
@@ -186,7 +189,11 @@ export const BillingPage: React.FC = () => {
         console.error('Error fetching subscription:', subError);
         setSubscription(null);
         setUsage({ total_steps: 0, total_cost: 0, job_tokens: 0, applications_count: 0, ai_requests_count: 0, job_search_matches: 0, resume_optimizations: 0, cover_letters: 0 });
-        setJobSearchUsage(null);
+        setJobSearchUsage({
+          used: 0,
+          limit: -1, // Unlimited
+          percentage: 0
+        });
         return;
       }
 
@@ -251,42 +258,18 @@ export const BillingPage: React.FC = () => {
         // console.log('Full currentUsage object:', currentUsage);
         setUsage(currentUsage);
         
-        // Fetch job search usage with error handling
-        try {
-          console.log('Fetching job search usage...');
-          const jobSearchStats = await getJobSearchUsage(user.id);
-          if (jobSearchStats) {
-            console.log('Job search usage fetched successfully:', jobSearchStats);
-            setJobSearchUsage({
-              used: jobSearchStats.monthly_used,
-              limit: jobSearchStats.monthly_limit,
-              percentage: jobSearchStats.percentage_used
-            });
-          } else {
-            console.log('No job search usage data returned');
-            // Set default values to show UI properly
-            setJobSearchUsage({
-              used: 0,
-              limit: -1, // Unlimited
-              percentage: 0
-            });
-          }
-        } catch (error: any) {
-          console.error('Failed to fetch job search usage:', error);
-          // Set default values on error to show UI properly
-          setJobSearchUsage({
-            used: 0,
-            limit: -1, // Unlimited
-            percentage: 0
-          });
-          // Don't show error toast as the function already handles errors gracefully
-        }
+        // Job search is unlimited for all plans - no need to fetch
+        setJobSearchUsage({
+          used: 0,
+          limit: -1, // Unlimited
+          percentage: 0
+        });
       }
     } catch (error) {
       console.error('Error fetching billing data:', error);
       setSubscription(null);
-      setUsage({ total_steps: 0, total_cost: 0, job_tokens: 0, applications_count: 0, ai_requests_count: 0, ai_tokens_used: 0, job_search_matches: 0, resume_optimizations: 0, cover_letters: 0 });
-      // Set default job search usage instead of null to show UI properly
+      setUsage({ total_steps: 0, total_cost: 0, job_tokens: 0, applications_count: 0, ai_requests_count: 0, job_search_matches: 0, resume_optimizations: 0, cover_letters: 0 });
+      // Job search is unlimited - set default
       setJobSearchUsage({
         used: 0,
         limit: -1, // Unlimited
