@@ -17,6 +17,7 @@ import {
   ArrowRight,
   Bot,
   Brain,
+  Briefcase,
   Package,
   ShoppingCart,
   Coins,
