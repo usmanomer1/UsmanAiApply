@@ -146,19 +146,22 @@ export default function MacOSDashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  useEffect(() => {
-    loadDashboardData();
-  }, [user]);
-
   const loadDashboardData = async () => {
+    if (!user?.id) {
+      console.log('No user ID available');
+      setLoading(false);
+      return;
+    }
+    
     try {
       setLoading(true);
+      console.log('Loading dashboard for user:', user.id);
 
       // Fetch all applications
       const { data: apps, error: appsError } = await supabase
         .from('applications')
         .select('*')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       // Fetch job campaigns for additional stats
@@ -167,15 +170,11 @@ export default function MacOSDashboard() {
         .select('*')
         .eq('user_id', user?.id);
 
-      // Fetch AI token usage for insights
-      const { data: tokenUsage } = await supabase
-        .from('ai_token_usage')
-        .select('*')
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false })
-        .limit(100);
 
+      console.log('Dashboard data fetched:', { apps, campaigns, appsError });
+      
       if (!appsError && apps) {
+        console.log('Raw application statuses:', apps.map(a => a.status));
         setApplications(apps); // Store all applications for pagination
         
         // Calculate real stats
@@ -187,9 +186,19 @@ export default function MacOSDashboard() {
           return appDate.getTime() === today.getTime();
         });
         
-        const interviews = apps.filter(a => a.status === 'interview' || a.status === 'interviewing');
-        const offers = apps.filter(a => a.status === 'accepted' || a.status === 'offer');
-        const responses = apps.filter(a => a.status !== 'pending' && a.status !== 'applied');
+        // Handle both uppercase and lowercase status values like main branch
+        const interviews = apps.filter(a => {
+          const status = a.status?.toUpperCase();
+          return status === 'INTERVIEW' || status === 'OA' || status === 'INTERVIEWING' || status === 'OFFERED';
+        });
+        const offers = apps.filter(a => {
+          const status = a.status?.toUpperCase();
+          return status === 'ACCEPTED' || status === 'OFFERED' || status === 'OFFER';
+        });
+        const responses = apps.filter(a => {
+          const status = a.status?.toUpperCase();
+          return status !== 'SENT' && status !== 'PENDING' && status !== 'APPLIED';
+        });
         
         // Calculate average response time if we have response dates
         let avgResponseTime = 0;
@@ -203,7 +212,7 @@ export default function MacOSDashboard() {
           avgResponseTime = Math.round(responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length);
         }
         
-        setStats({
+        const calculatedStats = {
           totalApplications: apps.length,
           applicationsToday: todayApps.length,
           interviewsScheduled: interviews.length,
@@ -212,22 +221,41 @@ export default function MacOSDashboard() {
           acceptanceRate: interviews.length > 0 ? Math.round((offers.length / interviews.length) * 100) : 0,
           avgTimeToResponse: avgResponseTime || 3,
           linkedinConnections: campaigns?.length || 0,
-        });
+        };
+        
+        console.log('Calculated stats:', calculatedStats);
+        console.log('Interviews found:', interviews);
+        console.log('Today apps:', todayApps);
+        
+        setStats(calculatedStats);
 
-        // Group applications by status
-        const statusGroups = apps.reduce((acc: any, app) => {
-          const status = app.status || 'pending';
-          acc[status] = (acc[status] || 0) + 1;
-          return acc;
-        }, {});
+        // Calculate status distribution - handle various status values case-insensitively
+        const statusCounts = {
+          applied: apps.filter(a => {
+            const status = a.status?.toUpperCase();
+            return status === 'SENT' || status === 'PENDING' || status === 'APPLIED' || status === 'SUCCESS';
+          }).length,
+          interviewing: apps.filter(a => {
+            const status = a.status?.toUpperCase();
+            return status === 'INTERVIEW' || status === 'OA' || status === 'INTERVIEWING';
+          }).length,
+          rejected: apps.filter(a => {
+            const status = a.status?.toUpperCase();
+            return status === 'REJECTED' || status === 'FAILED';
+          }).length,
+          offered: apps.filter(a => {
+            const status = a.status?.toUpperCase();
+            return status === 'ACCEPTED' || status === 'OFFERED' || status === 'OFFER';
+          }).length
+        };
 
         setApplicationsByStatus([
-          { name: 'Applied', value: (statusGroups.applied || 0) + (statusGroups.pending || 0), color: colors.info },
-          { name: 'In Review', value: statusGroups.reviewing || statusGroups.in_review || 0, color: colors.warning },
-          { name: 'Interview', value: (statusGroups.interview || 0) + (statusGroups.interviewing || 0), color: colors.primary },
-          { name: 'Offer', value: (statusGroups.offer || 0) + (statusGroups.accepted || 0), color: colors.emerald },
-          { name: 'Rejected', value: statusGroups.rejected || 0, color: colors.danger },
-        ]);
+          { name: 'Applied', value: statusCounts.applied, color: colors.info },
+          { name: 'In Review', value: 0, color: colors.warning }, // Not in current data model
+          { name: 'Interview', value: statusCounts.interviewing, color: colors.primary },
+          { name: 'Offer', value: statusCounts.offered, color: colors.emerald },
+          { name: 'Rejected', value: statusCounts.rejected, color: colors.danger },
+        ].filter(item => item.value > 0));
 
         // Get top companies
         const companyCount = apps.reduce((acc: any, app) => {
@@ -245,37 +273,53 @@ export default function MacOSDashboard() {
       }
 
       // Generate weekly activity with real data
-      const startDate = startOfWeek(new Date());
-      const endDate = endOfWeek(new Date());
-      const days = eachDayOfInterval({ start: startDate, end: endDate });
-      
-      const weekData = days.map(day => {
-        const dayStart = new Date(day);
-        dayStart.setHours(0, 0, 0, 0);
-        const dayEnd = new Date(day);
-        dayEnd.setHours(23, 59, 59, 999);
+      if (apps && apps.length > 0) {
+        const startDate = startOfWeek(new Date());
+        const endDate = endOfWeek(new Date());
+        const days = eachDayOfInterval({ start: startDate, end: endDate });
         
-        const dayApps = apps?.filter(app => {
-          const appDate = new Date(app.created_at);
-          return appDate >= dayStart && appDate <= dayEnd;
-        }) || [];
+        const weekData = days.map(day => {
+          const dayStart = new Date(day);
+          dayStart.setHours(0, 0, 0, 0);
+          const dayEnd = new Date(day);
+          dayEnd.setHours(23, 59, 59, 999);
+          
+          const dayApps = apps.filter(app => {
+            const appDate = new Date(app.created_at);
+            return appDate >= dayStart && appDate <= dayEnd;
+          });
 
-        const dayResponses = dayApps.filter(a => 
-          a.status && a.status !== 'pending' && a.status !== 'applied'
-        );
-        const dayInterviews = dayApps.filter(a => 
-          a.status === 'interview' || a.status === 'interviewing'
-        );
+          const dayResponses = dayApps.filter(a => {
+            const status = a.status?.toUpperCase();
+            return status && status !== 'PENDING' && status !== 'APPLIED' && status !== 'SENT';
+          });
+          const dayInterviews = dayApps.filter(a => {
+            const status = a.status?.toUpperCase();
+            return status === 'INTERVIEW' || status === 'INTERVIEWING' || status === 'OA';
+          });
 
-        return {
+          return {
+            day: format(day, 'EEE'),
+            applications: dayApps.length,
+            responses: dayResponses.length,
+            interviews: dayInterviews.length,
+          };
+        });
+        
+        setWeeklyActivity(weekData);
+      } else {
+        // Set empty week data if no applications
+        const startDate = startOfWeek(new Date());
+        const endDate = endOfWeek(new Date());
+        const days = eachDayOfInterval({ start: startDate, end: endDate });
+        const emptyWeekData = days.map(day => ({
           day: format(day, 'EEE'),
-          applications: dayApps.length,
-          responses: dayResponses.length,
-          interviews: dayInterviews.length,
-        };
-      });
-      
-      setWeeklyActivity(weekData);
+          applications: 0,
+          responses: 0,
+          interviews: 0,
+        }));
+        setWeeklyActivity(emptyWeekData);
+      }
 
     } catch (error) {
       console.error('Error loading dashboard:', error);
@@ -290,6 +334,24 @@ export default function MacOSDashboard() {
     if (hour < 18) return 'Good afternoon';
     return 'Good evening';
   };
+
+  useEffect(() => {
+    if (user) {
+      loadDashboardData();
+    }
+  }, [user]);
+
+  // Refresh dashboard data when the page gains focus (e.g., after adding an application)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (user) {
+        loadDashboardData();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [user]);
 
   if (loading) {
     return (
