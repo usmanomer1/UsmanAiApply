@@ -117,7 +117,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export default function MacOSDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
   
   const getDisplayName = () => {
     const meta: any = user?.user_metadata || {};
@@ -325,6 +326,7 @@ export default function MacOSDashboard() {
       console.error('Error loading dashboard:', error);
     } finally {
       setLoading(false);
+      setDataLoaded(true);
     }
   };
 
@@ -349,7 +351,9 @@ export default function MacOSDashboard() {
     }
   }, [user]);
 
-  if (loading) {
+  // Only show loading spinner when we're actively loading data
+  // Don't show it during initial auth check
+  if (loading && user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -362,6 +366,12 @@ export default function MacOSDashboard() {
         </div>
       </div>
     );
+  }
+  
+  // If no user or data not loaded yet, render the dashboard with default values
+  // This prevents the flash of loading state
+  if (!user && !dataLoaded) {
+    return null; // Let the auth redirect handle this
   }
 
   return (
