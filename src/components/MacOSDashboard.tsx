@@ -338,19 +338,15 @@ export default function MacOSDashboard() {
   useEffect(() => {
     if (user) {
       loadDashboardData();
-    }
-  }, [user]);
-
-  // Refresh dashboard data when the page gains focus (e.g., after adding an application)
-  useEffect(() => {
-    const handleFocus = () => {
-      if (user) {
+      
+      // Refresh dashboard data when the page gains focus (e.g., after adding an application)
+      const handleFocus = () => {
         loadDashboardData();
-      }
-    };
+      };
 
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
+      window.addEventListener('focus', handleFocus);
+      return () => window.removeEventListener('focus', handleFocus);
+    }
   }, [user]);
 
   if (loading) {
