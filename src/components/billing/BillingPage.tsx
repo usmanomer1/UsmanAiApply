@@ -1127,7 +1127,7 @@ This will create the default configuration needed for the billing portal to work
 
         {/* Subscription Plans */}
         {activeTab === 'subscriptions' && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
             {subscriptionProducts.map((product, index) => {
               const isCurrentPlan = subscription?.price_id === product.priceId;
               const isPopular = product.name.includes('Pro');
@@ -1136,132 +1136,194 @@ This will create the default configuration needed for the billing portal to work
               return (
                 <motion.div
                   key={product.id}
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  whileHover={{ y: -8, transition: { duration: 0.2 } }}
-                  className={`relative bg-white dark:bg-gray-800 rounded-2xl transition-all duration-300 overflow-hidden ${
-                    isCurrentPlan
-                      ? 'shadow-2xl ring-2 ring-blue-500/50'
-                      : isPopular
-                      ? 'shadow-2xl ring-2 ring-purple-500/50 scale-[1.02]'
-                      : 'shadow-lg hover:shadow-2xl border border-gray-200 dark:border-gray-700'
-                  } ${!isPriceValid ? 'opacity-60' : ''}`}
+                  transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1], delay: index * 0.05 }}
+                  className="relative"
                 >
-
-
+                  {/* Current Plan Indicator */}
                   {isCurrentPlan && (
                     <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="absolute -top-5 left-1/2 transform -translate-x-1/2 z-50"
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="absolute -top-3 left-6 z-10"
                     >
-                      <Badge className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white px-6 py-2 text-sm font-bold shadow-xl border-0">
-                        <CheckCircle className="w-4 h-4 mr-2" />
+                      <div className="flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-xs font-medium rounded-full shadow-lg">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+                        </span>
                         Current Plan
-                      </Badge>
+                      </div>
                     </motion.div>
                   )}
 
-                  <div className="p-8">
-                    {/* Plan Header */}
-                    <div className="text-center mb-8">
-                      <motion.h3 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: 0.1 + index * 0.1 }}
-                        className="text-2xl font-bold text-gray-900 dark:text-white mb-4"
-                      >
-                        {product.name}
-                      </motion.h3>
-                      
-                      <div className="mb-2">
-                        <div className="flex items-baseline justify-center">
-                          <span className="text-5xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
+                  {/* Popular Badge */}
+                  {isPopular && !isCurrentPlan && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="absolute -top-3 right-6 z-10"
+                    >
+                      <div className="flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white text-xs font-medium rounded-full shadow-lg">
+                        <Star className="w-3 h-3" />
+                        Most Popular
+                      </div>
+                    </motion.div>
+                  )}
+
+                  <div 
+                    className={`
+                      relative overflow-hidden bg-white rounded-xl border 
+                      ${isCurrentPlan ? 'border-blue-500' : isPopular ? 'border-emerald-500' : 'border-gray-200'}
+                      shadow-sm hover:shadow-lg transition-all duration-200
+                      ${!isPriceValid ? 'opacity-60' : ''}
+                      h-full
+                    `}
+                  >
+                    {/* Gradient accent for current/popular plans */}
+                    {(isCurrentPlan || isPopular) && (
+                      <div
+                        className="absolute inset-x-0 top-0 h-1"
+                        style={{
+                          background: isCurrentPlan 
+                            ? 'linear-gradient(to right, #2563eb, #60a5fa)'
+                            : 'linear-gradient(to right, #10b981, #34d399)',
+                        }}
+                      />
+                    )}
+
+                    {/* Subtle background gradient */}
+                    {(isCurrentPlan || isPopular) && (
+                      <div
+                        className="absolute inset-0 pointer-events-none opacity-50"
+                        style={{
+                          background: isCurrentPlan
+                            ? 'radial-gradient(600px 150px at 50% 0%, #2563eb15 0%, transparent 50%)'
+                            : 'radial-gradient(600px 150px at 50% 0%, #10b98115 0%, transparent 50%)'
+                        }}
+                      />
+                    )}
+
+                    <div className="relative p-8 flex flex-col h-full">
+                      {/* Plan Header */}
+                      <div className="text-center mb-8">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                          {product.name.replace('Jobotic ', '')}
+                        </h3>
+                        
+                        <div className="flex items-baseline justify-center gap-1">
+                          <span className="text-4xl font-bold text-gray-900">
                             ${product.price}
                           </span>
-                          <span className="text-gray-500 dark:text-gray-400 ml-2 text-lg">
+                          <span className="text-gray-500 text-sm font-medium">
                             /{product.interval}
                           </span>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Includes Section */}
-                    <div className="mb-8">
-                      <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 uppercase tracking-wide">
-                        What's Included
-                      </h4>
-                      <ul className="space-y-3">
-                        {[
-                          `${product.applicationCount} job applications/month`,
-                          `${product.aiTokenCount?.toLocaleString()} AI tokens/month`,
-                          'Resume & cover letter tools',
-                          ...(product.name.includes('Pro') ? ['Priority support'] : []),
-                          ...(product.name.includes('Max') ? ['Priority support', 'Early feature access'] : [])
-                        ].map((feature, idx) => (
-                          <motion.li 
-                            key={idx}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.2 + index * 0.1 + idx * 0.05 }}
-                            className="group flex items-start text-sm text-gray-700 dark:text-gray-300"
-                          >
-                            <motion.div
-                              whileHover={{ scale: 1.2, rotate: 360 }}
-                              transition={{ duration: 0.3 }}
-                              className="mr-3 mt-0.5"
-                            >
-                              <Check className="w-5 h-5 text-green-500 group-hover:text-green-600 transition-colors" />
-                            </motion.div>
-                            <span className="group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
-                              {feature}
+                      {/* Main Features - Always same height */}
+                      <div className="mb-8 flex-grow">
+                        <div className="space-y-4">
+                          {/* Applications */}
+                          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-white rounded-lg shadow-sm">
+                                <Briefcase className="w-4 h-4 text-blue-600" />
+                              </div>
+                              <span className="text-sm font-medium text-gray-700">Applications</span>
+                            </div>
+                            <span className="text-sm font-semibold text-gray-900">
+                              {product.applicationCount}/mo
                             </span>
-                          </motion.li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    {/* CTA Button */}
-                    <motion.button
-                      whileHover={!isCurrentPlan && isPriceValid ? { scale: 1.02 } : {}}
-                      whileTap={!isCurrentPlan && isPriceValid ? { scale: 0.98 } : {}}
-                      onClick={() => handlePurchase(product.priceId)}
-                      disabled={isCurrentPlan || purchasing === product.priceId || !isPriceValid}
-                      className={`relative w-full py-3.5 px-6 rounded-xl font-semibold transition-all duration-200 overflow-hidden ${
-                        isCurrentPlan
-                          ? 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-                          : !isPriceValid
-                          ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-                          : isPopular
-                          ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-xl hover:shadow-2xl'
-                          : product.name.includes('Plus')
-                          ? 'border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white'
-                          : 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-xl hover:shadow-2xl'
-                      }`}
-                    >
-                      {!isCurrentPlan && isPriceValid && isPopular && (
-                        <motion.span 
-                          className="absolute inset-0 bg-white/20"
-                          animate={{ x: ['-100%', '100%'] }}
-                          transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                        />
-                      )}
-                      <span className="relative z-10">
-                        {purchasing === product.priceId ? (
-                          <div className="flex items-center justify-center">
-                            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                            Loading...
                           </div>
+
+                          {/* AI Tokens */}
+                          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-white rounded-lg shadow-sm">
+                                <Brain className="w-4 h-4 text-emerald-600" />
+                              </div>
+                              <span className="text-sm font-medium text-gray-700">AI Tokens</span>
+                            </div>
+                            <span className="text-sm font-semibold text-gray-900">
+                              {product.aiTokenCount?.toLocaleString()}
+                            </span>
+                          </div>
+
+                          {/* Automation Steps */}
+                          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-white rounded-lg shadow-sm">
+                                <Bot className="w-4 h-4 text-purple-600" />
+                              </div>
+                              <span className="text-sm font-medium text-gray-700">Bot Steps</span>
+                            </div>
+                            <span className="text-sm font-semibold text-gray-900">
+                              {(product.applicationCount * 10).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Additional Features - Always same items */}
+                      <div className="mb-8 space-y-3 border-t pt-6">
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
+                          <span>Resume optimization tools</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
+                          <span>AI-powered job matching</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
+                          <span>
+                            {product.name.includes('Plus') ? 'Email support' : 
+                             product.name.includes('Pro') ? 'Priority support' :
+                             'Priority support + Early access'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* CTA Button */}
+                      <button
+                        onClick={() => handlePurchase(product.priceId)}
+                        disabled={isCurrentPlan || purchasing === product.priceId || !isPriceValid}
+                        className={`
+                          w-full py-3 px-6 rounded-lg font-medium transition-all duration-200
+                          flex items-center justify-center gap-2
+                          ${
+                            isCurrentPlan
+                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                              : !isPriceValid
+                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                              : isPopular
+                              ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white shadow-sm hover:shadow'
+                              : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                          }
+                        `}
+                      >
+                        {purchasing === product.priceId ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Processing...</span>
+                          </>
                         ) : isCurrentPlan ? (
-                          'Current Plan'
+                          <>
+                            <CheckCircle className="w-4 h-4" />
+                            <span>Current Plan</span>
+                          </>
                         ) : !isPriceValid ? (
-                          'Coming Soon'
+                          <span>Coming Soon</span>
                         ) : (
-                          'Get Started'
+                          <>
+                            <span>{isPopular ? 'Get Started' : 'Select Plan'}</span>
+                            <ArrowRight className="w-4 h-4" />
+                          </>
                         )}
-                      </span>
-                    </motion.button>
+                      </button>
+                    </div>
                   </div>
                 </motion.div>
               );
