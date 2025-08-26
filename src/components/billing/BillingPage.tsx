@@ -817,7 +817,7 @@ This will create the default configuration needed for the billing portal to work
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Automation Steps</h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400">
-                          Bot automation steps this month
+                          Agent automation steps this month
                         </p>
                       </div>
                     </div>
@@ -1003,18 +1003,14 @@ This will create the default configuration needed for the billing portal to work
                   <div className="space-y-2">
                     <div className="flex items-end justify-between">
                       <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {usage?.resume_optimizations || 0}
+                        Unlimited
                       </span>
                       <span className="text-xs text-gray-600 dark:text-gray-400">
-                        ({(usage?.resume_optimizations || 0) * 6000} tokens)
+                        All plans included
                       </span>
                     </div>
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${Math.min(100, ((usage?.resume_optimizations || 0) / 10) * 100)}%` }}
-                        className="h-full bg-gradient-to-r from-indigo-500 to-purple-600"
-                      />
+                      <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-600 w-full" />
                     </div>
                   </div>
                 </div>
@@ -1231,7 +1227,7 @@ This will create the default configuration needed for the billing portal to work
                               <span className="text-sm font-medium text-gray-700">AI Tokens</span>
                             </div>
                             <span className="text-sm font-semibold text-gray-900">
-                              {product.aiTokenCount?.toLocaleString()}
+                              Unlimited
                             </span>
                           </div>
 
@@ -1241,7 +1237,7 @@ This will create the default configuration needed for the billing portal to work
                               <div className="p-2 bg-white rounded-lg shadow-sm">
                                 <Bot className="w-4 h-4 text-purple-600" />
                               </div>
-                              <span className="text-sm font-medium text-gray-700">Bot Steps</span>
+                              <span className="text-sm font-medium text-gray-700">Agent Steps</span>
                             </div>
                             <span className="text-sm font-semibold text-gray-900">
                               {(product.applicationCount * 10).toLocaleString()}
