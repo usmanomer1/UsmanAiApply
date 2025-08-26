@@ -792,7 +792,7 @@ This will create the default configuration needed for the billing portal to work
 
             {/* Usage Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Automation Steps Usage */}
+              {/* Agent Steps Usage */}
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -815,9 +815,9 @@ This will create the default configuration needed for the billing portal to work
                         />
                       </motion.div>
                       <div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Automation Steps</h3>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Agent Steps</h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400">
-                          Agent automation steps this month
+                          AI agent steps used this month
                         </p>
                       </div>
                     </div>
@@ -1231,7 +1231,7 @@ This will create the default configuration needed for the billing portal to work
                             </span>
                           </div>
 
-                          {/* Automation Steps */}
+                          {/* Agent Steps */}
                           <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                             <div className="flex items-center gap-3">
                               <div className="p-2 bg-white rounded-lg shadow-sm">
@@ -1498,7 +1498,7 @@ This will create the default configuration needed for the billing portal to work
                 <p className="text-sm text-gray-600 dark:text-gray-300">Total Usage</p>
               </motion.div>
 
-              {/* Automation Steps Card */}
+              {/* Agent Steps Card */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1539,7 +1539,7 @@ This will create the default configuration needed for the billing portal to work
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
                   {(usage?.job_tokens || 0).toLocaleString()}
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-300">Automation Steps</p>
+                <p className="text-sm text-gray-600 dark:text-gray-300">Agent Steps</p>
                 <div className="mt-4 text-xs text-gray-500 dark:text-gray-400">
                   {limits.applications > 0 ? `${Math.max(0, (limits.applications * 10) - (usage?.job_tokens || 0))} remaining` : 'No plan limits'}
                 </div>
@@ -1598,7 +1598,7 @@ This will create the default configuration needed for the billing portal to work
                       stackId="1"
                       stroke="#10b981" 
                       fill="url(#colorAutomation)"
-                      name="Automation Steps"
+                      name="Agent Steps"
                     />
                   </AreaChart>
                 </ResponsiveContainer>
