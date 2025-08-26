@@ -9,10 +9,24 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { Send, MessageSquare, Calendar, ArrowUpRight, Trophy } from 'lucide-react';
+import { 
+  Send, 
+  MessageSquare, 
+  Calendar, 
+  ArrowUpRight, 
+  Trophy,
+  Briefcase,
+  ChevronLeft,
+  ChevronRight,
+  ArrowRight,
+  Search,
+  Zap,
+  FileText
+} from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
+import { Link, useNavigate } from 'react-router-dom';
 
 // Brand-aligned minimal palette with subtle accents
 const colors = {
@@ -102,6 +116,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export default function MacOSDashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   
   const getDisplayName = () => {
@@ -128,6 +143,8 @@ export default function MacOSDashboard() {
   const [weeklyActivity, setWeeklyActivity] = useState<any[]>([]);
   const [applicationsByStatus, setApplicationsByStatus] = useState<any[]>([]);
   const [topCompanies, setTopCompanies] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
   useEffect(() => {
     loadDashboardData();
@@ -159,7 +176,7 @@ export default function MacOSDashboard() {
         .limit(100);
 
       if (!appsError && apps) {
-        setApplications(apps.slice(0, 5));
+        setApplications(apps); // Store all applications for pagination
         
         // Calculate real stats
         const today = new Date();
@@ -307,11 +324,65 @@ export default function MacOSDashboard() {
             <div className="absolute inset-x-0 top-0 h-1" style={{ background: `linear-gradient(to right, ${colors.primaryLight}, ${colors.emerald})` }} />
             <div className="absolute inset-0" style={{ background: `radial-gradient(900px 180px at 0% 0%, ${colors.primaryLight}22 0%, transparent 45%), radial-gradient(900px 180px at 100% 100%, ${colors.emerald}1f 0%, transparent 45%)` }} />
             <div className="relative p-6">
-              <h1 className="text-3xl font-semibold text-gray-900">
-                {getGreeting()}, {getDisplayName()}.
-              </h1>
-              <p className="text-gray-600 mt-2">Here’s a quick look at your job search.</p>
+              <div className="flex justify-between items-start">
+                <div>
+                  <h1 className="text-3xl font-semibold text-gray-900">
+                    {getGreeting()}, {getDisplayName()}.
+                  </h1>
+                  <p className="text-gray-600 mt-2">Here's a quick look at your job search.</p>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => navigate('/jobs')}
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-lg hover:from-blue-700 hover:to-blue-600 transition-all duration-200 shadow-sm hover:shadow"
+                  >
+                    <Search className="w-4 h-4" />
+                    Find Jobs
+                  </button>
+                  <button
+                    onClick={() => navigate('/auto-apply')}
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-lg hover:from-emerald-700 hover:to-emerald-600 transition-all duration-200 shadow-sm hover:shadow"
+                  >
+                    <Zap className="w-4 h-4" />
+                    Auto Apply
+                  </button>
+                </div>
+              </div>
             </div>
+          </div>
+        </div>
+
+        {/* Quick Actions Bar */}
+        <div className="mb-6">
+          <div className="flex gap-3 overflow-x-auto pb-2">
+            <Link
+              to="/applications"
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap"
+            >
+              <Briefcase className="w-4 h-4" />
+              View All Applications
+            </Link>
+            <Link
+              to="/resume"
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap"
+            >
+              <FileText className="w-4 h-4" />
+              Resume Builder
+            </Link>
+            <Link
+              to="/cover-letter"
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap"
+            >
+              <FileText className="w-4 h-4" />
+              Cover Letters
+            </Link>
+            <Link
+              to="/profile"
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap"
+            >
+              <Calendar className="w-4 h-4" />
+              Profile Settings
+            </Link>
           </div>
         </div>
 
@@ -395,40 +466,88 @@ export default function MacOSDashboard() {
             <Card accent>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium text-gray-900">Recent Applications</h3>
+                <Link
+                  to="/applications"
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+                >
+                  View all
+                  <ArrowRight className="w-3 h-3" />
+                </Link>
               </div>
               <div className="divide-y divide-gray-100">
-                {applications.length > 0 ? applications.slice(0, 5).map((app, index) => (
-                  <div key={app.id || index} className="py-3 flex items-center justify-between">
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">
-                        {app.job_title || app.position || 'Software Engineer'}
-                      </p>
-                      <p className="text-xs text-gray-600 mt-0.5">
-                        {app.company_name || app.company || 'Tech Company'}
-                        {app.location && ` • ${app.location}`}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                        app.status === 'pending' || app.status === 'applied' ? 'bg-yellow-100 text-yellow-700' :
-                        app.status === 'reviewing' || app.status === 'in_review' ? 'bg-blue-100 text-blue-700' :
-                        app.status === 'interview' || app.status === 'interviewing' ? 'bg-indigo-100 text-indigo-700' :
-                        app.status === 'offer' ? 'bg-green-100 text-green-700' :
-                        app.status === 'accepted' ? 'bg-emerald-100 text-emerald-700' :
-                        app.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
-                      }`}>
-                        {app.status === 'applied' ? 'pending' : app.status || 'pending'}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {app.created_at ? format(new Date(app.created_at), 'MMM d') : 'Today'}
-                      </span>
-                      <ArrowUpRight className="w-4 h-4 text-gray-400" />
-                    </div>
-                  </div>
-                )) : (
+                {applications.length > 0 ? (
+                  <>
+                    {applications.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((app, index) => (
+                      <div 
+                        key={app.id || index} 
+                        className="py-3 flex items-center justify-between hover:bg-gray-50 transition-colors cursor-pointer rounded-lg px-2 -mx-2"
+                        onClick={() => app.job_url && window.open(app.job_url, '_blank')}
+                      >
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-900">
+                            {app.job_title || app.position || 'Software Engineer'}
+                          </p>
+                          <p className="text-xs text-gray-600 mt-0.5">
+                            {app.company_name || app.company || 'Tech Company'}
+                            {app.location && ` • ${app.location}`}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                            app.status === 'pending' || app.status === 'applied' ? 'bg-yellow-100 text-yellow-700' :
+                            app.status === 'reviewing' || app.status === 'in_review' ? 'bg-blue-100 text-blue-700' :
+                            app.status === 'interview' || app.status === 'interviewing' ? 'bg-indigo-100 text-indigo-700' :
+                            app.status === 'offer' ? 'bg-green-100 text-green-700' :
+                            app.status === 'accepted' ? 'bg-emerald-100 text-emerald-700' :
+                            app.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
+                          }`}>
+                            {app.status === 'applied' ? 'pending' : app.status || 'pending'}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {app.created_at ? format(new Date(app.created_at), 'MMM d') : 'Today'}
+                          </span>
+                          <ArrowUpRight className="w-4 h-4 text-gray-400" />
+                        </div>
+                      </div>
+                    ))}
+                    {applications.length > itemsPerPage && (
+                      <div className="pt-4 flex items-center justify-between">
+                        <p className="text-xs text-gray-500">
+                          Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, applications.length)} of {applications.length}
+                        </p>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                            disabled={currentPage === 1}
+                            className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </button>
+                          <span className="px-2 text-xs text-gray-600">
+                            {currentPage} / {Math.ceil(applications.length / itemsPerPage)}
+                          </span>
+                          <button
+                            onClick={() => setCurrentPage(prev => Math.min(Math.ceil(applications.length / itemsPerPage), prev + 1))}
+                            disabled={currentPage === Math.ceil(applications.length / itemsPerPage)}
+                            className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
                   <div className="py-8 text-center">
+                    <Briefcase className="h-12 w-12 text-gray-300 mx-auto mb-4" />
                     <p className="text-sm text-gray-500">No applications yet</p>
-                    <p className="text-xs text-gray-400 mt-1">Start applying to see your progress here</p>
+                    <Link
+                      to="/jobs"
+                      className="inline-flex items-center gap-1 mt-3 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-lg hover:from-blue-700 hover:to-blue-600 transition-all duration-200 text-sm font-medium"
+                    >
+                      Start applying
+                      <ArrowRight className="w-3 h-3" />
+                    </Link>
                   </div>
                 )}
               </div>
@@ -440,13 +559,23 @@ export default function MacOSDashboard() {
             <Card accent>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium text-gray-900">Pipeline</h3>
+                <Link
+                  to="/applications"
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  Manage →
+                </Link>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 {applicationsByStatus.slice(0, 4).map((s, i) => (
-                  <div key={i} className="p-3 rounded-lg border border-gray-100 bg-gray-50">
+                  <button
+                    key={i}
+                    onClick={() => navigate('/applications')}
+                    className="p-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+                  >
                     <p className="text-xs text-gray-600">{s.name}</p>
                     <p className="text-lg font-semibold text-gray-900 mt-1">{s.value}</p>
-                  </div>
+                  </button>
                 ))}
               </div>
             </Card>
