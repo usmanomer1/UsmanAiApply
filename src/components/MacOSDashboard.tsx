@@ -156,7 +156,7 @@ export default function MacOSDashboard() {
     
     try {
       setLoading(true);
-      console.log('Loading dashboard for user:', user.id);
+      console.log(`[${new Date().toISOString()}] Loading dashboard for user:`, user.id);
 
       // Fetch all applications
       const { data: apps, error: appsError } = await supabase
@@ -338,7 +338,7 @@ export default function MacOSDashboard() {
   };
 
   useEffect(() => {
-    if (user) {
+    if (user?.id) {
       loadDashboardData();
       
       // Refresh dashboard data when the page gains focus (e.g., after adding an application)
@@ -349,7 +349,7 @@ export default function MacOSDashboard() {
       window.addEventListener('focus', handleFocus);
       return () => window.removeEventListener('focus', handleFocus);
     }
-  }, [user]);
+  }, [user?.id]);
 
   // Only show loading spinner when we're actively loading data
   // Don't show it during initial auth check
