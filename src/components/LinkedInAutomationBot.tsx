@@ -3587,7 +3587,7 @@ This is the #1 issue that needs to be fixed immediately.`;
                     className="w-full px-6 py-4 bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-xl font-semibold text-lg hover:from-teal-700 hover:to-teal-800 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
                   >
                     <Play className="h-6 w-6" />
-                    Start Automation
+                    Start Agent
                   </button>
                 ) : isPaused ? (
                   <div className="space-y-3">
