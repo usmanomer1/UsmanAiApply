@@ -262,17 +262,54 @@ export const BillingPageImproved: React.FC = () => {
         }),
       });
 
+      const data = await response.json();
+      
       if (!response.ok) {
-        throw new Error('Failed to create billing portal session');
+        throw new Error(data.error || 'Failed to create billing portal session');
       }
 
-      const { url } = await response.json();
-      if (url) {
-        window.location.href = url;
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No portal URL received');
       }
     } catch (error) {
       console.error('Error opening billing portal:', error);
-      toast.error('Unable to open billing portal');
+      
+      // Check if this is the specific Stripe configuration error
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      if (errorMessage.includes('Customer Portal not configured') || 
+          errorMessage.includes('No configuration provided') || 
+          errorMessage.includes('customer portal settings')) {
+        // Show specific guidance for Stripe configuration issue
+        toast.error(
+          'Stripe Customer Portal not configured. Please set up your customer portal settings in the Stripe dashboard.',
+          { 
+            duration: 8000,
+            style: {
+              maxWidth: '500px',
+            }
+          }
+        );
+        
+        // Show additional help in console for developers
+        console.warn(`
+🔧 Stripe Configuration Required:
+
+To fix this error, you need to configure your Stripe Customer Portal:
+
+1. Go to: https://dashboard.stripe.com/settings/billing/portal
+   (For test mode: https://dashboard.stripe.com/test/settings/billing/portal)
+2. Click "Configure portal" or "Activate test link"
+3. Configure your customer portal settings
+4. Save the configuration
+
+This will create the default configuration needed for the billing portal to work.
+        `);
+      } else {
+        toast.error(errorMessage || 'Unable to open billing portal');
+      }
     }
   };
 
