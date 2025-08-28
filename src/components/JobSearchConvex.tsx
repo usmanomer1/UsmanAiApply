@@ -800,7 +800,7 @@ const JobSearchConvex: React.FC = () => {
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.3 }}
-              className="border-t border-gray-200 bg-white shadow-sm overflow-hidden"
+              className="glass-card border-t border-gray-200 overflow-hidden"
             >
               <div className="max-w-7xl mx-auto px-6 py-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
@@ -1051,7 +1051,7 @@ const JobSearchConvex: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
-            className="flex flex-col items-center justify-center py-8"
+            className="glass-card flex flex-col items-center justify-center py-8"
           >
             {/* Minimalist Icon */}
             <motion.div 
@@ -1292,7 +1292,7 @@ const JobSearchConvex: React.FC = () => {
                         ease: 'easeOut'
                       }}
                       whileHover={isMeasured ? { y: -2, transition: { duration: 0.2 } } : undefined}
-                      className={`glass-card p-4 mx-2 border ${getMatchScoreColor(job.match_score)}`}
+                      className={`glass-card p-4 mx-2 border hover:shadow-lg transition-all ${getMatchScoreColor(job.match_score)} ${job.match_score ? (job.match_score >= 80 ? 'border-l-4 border-l-emerald-500' : (job.match_score >= 60 ? 'border-l-4 border-l-amber-500' : 'border-l-4 border-l-rose-500')) : ''}`}
                       style={{ 
                         minHeight: Math.max(160, averageHeightRef.current - 20) + 'px',
                         willChange: isNewItem ? 'opacity' : 'auto',
