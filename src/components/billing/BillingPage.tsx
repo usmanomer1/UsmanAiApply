@@ -106,45 +106,6 @@ export const BillingPage: React.FC = () => {
   const [lastFetchTime, setLastFetchTime] = useState<Date | null>(null);
   const itemsPerPage = 10;
 
-  useEffect(() => {
-    // Check Stripe configuration on mount
-    const configValidation = validateStripeConfig();
-    if (!configValidation.isValid) {
-      setStripeConfigError(`Missing Stripe configuration: ${configValidation.missingVars.join(', ')}`);
-    }
-    
-    fetchBillingData();
-
-    // Listen for billing refresh events from automation completion
-    const handleBillingRefresh = () => {
-      fetchBillingData(true);
-    };
-
-    // Refresh data when page gains focus (user switches tabs)
-    const handleFocus = () => {
-      // console.log('Billing page gained focus, refreshing data...');
-      fetchBillingData(true);
-    };
-
-    window.addEventListener('billing-refresh-needed', handleBillingRefresh);
-    window.addEventListener('focus', handleFocus);
-
-    // Auto-refresh data every 30 seconds while page is visible (reduced from 5 seconds)
-    const intervalId = setInterval(() => {
-      if (!document.hidden) {
-        // console.log('Auto-refreshing billing data...');
-        fetchBillingData(true);
-      }
-    }, 30000);
-
-    // Cleanup event listeners
-    return () => {
-      window.removeEventListener('billing-refresh-needed', handleBillingRefresh);
-      window.removeEventListener('focus', handleFocus);
-      clearInterval(intervalId);
-    };
-  }, [fetchBillingData]);
-
   const isSupabaseConfigured = () => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -282,6 +243,45 @@ export const BillingPage: React.FC = () => {
       setRefreshing(false);
     }
   }, [user]);
+
+  useEffect(() => {
+    // Check Stripe configuration on mount
+    const configValidation = validateStripeConfig();
+    if (!configValidation.isValid) {
+      setStripeConfigError(`Missing Stripe configuration: ${configValidation.missingVars.join(', ')}`);
+    }
+    
+    fetchBillingData();
+
+    // Listen for billing refresh events from automation completion
+    const handleBillingRefresh = () => {
+      fetchBillingData(true);
+    };
+
+    // Refresh data when page gains focus (user switches tabs)
+    const handleFocus = () => {
+      // console.log('Billing page gained focus, refreshing data...');
+      fetchBillingData(true);
+    };
+
+    window.addEventListener('billing-refresh-needed', handleBillingRefresh);
+    window.addEventListener('focus', handleFocus);
+
+    // Auto-refresh data every 30 seconds while page is visible (reduced from 5 seconds)
+    const intervalId = setInterval(() => {
+      if (!document.hidden) {
+        // console.log('Auto-refreshing billing data...');
+        fetchBillingData(true);
+      }
+    }, 30000);
+
+    // Cleanup event listeners
+    return () => {
+      window.removeEventListener('billing-refresh-needed', handleBillingRefresh);
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(intervalId);
+    };
+  }, [fetchBillingData]);
 
   const handleRefresh = async () => {
     await fetchBillingData(true);
