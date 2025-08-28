@@ -67,6 +67,11 @@ h1, h2, h3, h4, h5, h6 {
   @apply bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow;
 }
 
+/* Glass Card - premium minimal surface */
+.glass-card {
+  @apply relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow;
+}
+
 /* Button Styles */
 .btn {
   @apply inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium text-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
@@ -82,6 +87,15 @@ h1, h2, h3, h4, h5, h6 {
 
 .btn-ghost {
   @apply btn text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:ring-gray-500;
+}
+
+/* Minimal navigation link styles */
+.nav-link {
+  @apply flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-200;
+}
+
+.nav-link-active {
+  @apply bg-gray-100 text-gray-900 border border-gray-200;
 }
 
 /* Input Styles */
@@ -244,6 +258,10 @@ h1, h2, h3, h4, h5, h6 {
   @apply border-t border-gray-200;
 }
 
+.subtle-divider {
+  @apply border-t border-gray-100;
+}
+
 /* Empty States */
 .empty-state {
   @apply text-center py-12 text-gray-500;
@@ -257,6 +275,10 @@ h1, h2, h3, h4, h5, h6 {
 /* Utility Classes */
 .text-muted {
   @apply text-gray-600;
+}
+
+.text-muted-soft {
+  @apply text-gray-500;
 }
 
 .text-link {

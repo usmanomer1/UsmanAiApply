@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Briefcase,
   Plus,
@@ -50,6 +50,7 @@ export const ApplicationsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'manual' | 'automated'>('all');
 
   // Form state
   const [formData, setFormData] = useState({
@@ -68,7 +69,7 @@ export const ApplicationsPage: React.FC = () => {
 
   useEffect(() => {
     filterApplications();
-  }, [applications, searchTerm, statusFilter]);
+  }, [applications, searchTerm, statusFilter, sourceFilter]);
 
   const fetchApplications = async () => {
     try {
@@ -124,6 +125,13 @@ export const ApplicationsPage: React.FC = () => {
       );
     }
 
+    // Source filter
+    if (sourceFilter !== 'all') {
+      filtered = filtered.filter(app =>
+        sourceFilter === 'automated' ? app.is_automated : !app.is_automated
+      );
+    }
+
     // Status filter
     if (statusFilter !== 'all') {
       filtered = filtered.filter(app => app.status === statusFilter);
@@ -131,6 +139,23 @@ export const ApplicationsPage: React.FC = () => {
 
     setFilteredApplications(filtered);
   };
+
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      TOTAL: applications.length,
+      SENT: 0,
+      PENDING: 0,
+      INTERVIEW: 0,
+      OA: 0,
+      ACCEPTED: 0,
+      REJECTED: 0,
+    };
+    applications.forEach(a => {
+      const key = (a.status || '').toUpperCase();
+      if (counts[key] !== undefined) counts[key] += 1;
+    });
+    return counts;
+  }, [applications]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -302,35 +327,49 @@ export const ApplicationsPage: React.FC = () => {
   };
 
   const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'success':
+    switch ((status || '').toUpperCase()) {
+      case 'ACCEPTED':
         return <CheckCircle className="h-5 w-5 text-green-600" />;
-      case 'rejected':
+      case 'REJECTED':
         return <XCircle className="h-5 w-5 text-red-600" />;
+      case 'INTERVIEW':
+        return <Briefcase className="h-5 w-5 text-indigo-600" />;
+      case 'OA':
+        return <FileText className="h-5 w-5 text-purple-600" />;
+      case 'PENDING':
+        return <Clock className="h-5 w-5 text-yellow-600" />;
+      case 'SENT':
       default:
         return <Clock className="h-5 w-5 text-amber-600" />;
     }
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'success':
+    switch ((status || '').toUpperCase()) {
+      case 'ACCEPTED':
         return 'bg-green-100 text-green-800';
-      case 'rejected':
+      case 'REJECTED':
         return 'bg-red-100 text-red-800';
+      case 'INTERVIEW':
+        return 'bg-indigo-100 text-indigo-800';
+      case 'OA':
+        return 'bg-purple-100 text-purple-800';
+      case 'PENDING':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'SENT':
       default:
         return 'bg-amber-100 text-amber-800';
     }
   };
 
   return (
-    <div>
+    <div className="min-h-screen">
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Applications</h1>
-            <p className="text-gray-600">Track your job applications</p>
+            <h1 className="text-[28px] font-semibold text-gray-900 mb-1">Applications</h1>
+            <p className="text-sm text-gray-600">Track your job applications</p>
           </div>
           <button
             onClick={() => {
@@ -338,7 +377,7 @@ export const ApplicationsPage: React.FC = () => {
               resetForm();
               setShowAddModal(true);
             }}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="inline-flex items-center px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors shadow-sm"
           >
             <Plus className="h-5 w-5 mr-2" />
             Add Application
@@ -346,8 +385,36 @@ export const ApplicationsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Overview Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 mb-6">
+        <div className="glass-card p-4">
+          <p className="text-xs text-gray-500">Total</p>
+          <p className="text-2xl font-semibold text-gray-900">{statusCounts.TOTAL}</p>
+        </div>
+        <div className="glass-card p-4">
+          <p className="text-xs text-gray-500">Sent</p>
+          <p className="text-2xl font-semibold text-amber-700">{statusCounts.SENT}</p>
+        </div>
+        <div className="glass-card p-4">
+          <p className="text-xs text-gray-500">Pending</p>
+          <p className="text-2xl font-semibold text-yellow-700">{statusCounts.PENDING}</p>
+        </div>
+        <div className="glass-card p-4">
+          <p className="text-xs text-gray-500">Interviews</p>
+          <p className="text-2xl font-semibold text-indigo-700">{statusCounts.INTERVIEW}</p>
+        </div>
+        <div className="glass-card p-4">
+          <p className="text-xs text-gray-500">Assessments</p>
+          <p className="text-2xl font-semibold text-purple-700">{statusCounts.OA}</p>
+        </div>
+        <div className="glass-card p-4">
+          <p className="text-xs text-gray-500">Accepted</p>
+          <p className="text-2xl font-semibold text-green-700">{statusCounts.ACCEPTED}</p>
+        </div>
+      </div>
+
       {/* Search and Filters */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
+      <div className="glass-card p-4 mb-6">
         <div className="flex flex-col lg:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -356,7 +423,7 @@ export const ApplicationsPage: React.FC = () => {
               placeholder="Search applications..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10 pr-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
             />
           </div>
           
@@ -364,7 +431,7 @@ export const ApplicationsPage: React.FC = () => {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
             >
               <option value="all">All Status</option>
               <option value="SENT">Sent</option>
@@ -377,13 +444,41 @@ export const ApplicationsPage: React.FC = () => {
             
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="inline-flex items-center px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
             >
               <Filter className="h-5 w-5 mr-2" />
               Filters
               <ChevronDown className={`h-4 w-4 ml-2 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
             </button>
           </div>
+        </div>
+
+        {/* Quick Source Filters */}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            onClick={() => setSourceFilter('all')}
+            className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+              sourceFilter === 'all' ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            All
+          </button>
+          <button
+            onClick={() => setSourceFilter('automated')}
+            className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+              sourceFilter === 'automated' ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            Automated
+          </button>
+          <button
+            onClick={() => setSourceFilter('manual')}
+            className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+              sourceFilter === 'manual' ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            Manual
+          </button>
         </div>
       </div>
 
@@ -400,7 +495,7 @@ export const ApplicationsPage: React.FC = () => {
               key={application.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-white rounded-lg border border-gray-200 p-6"
+              className="glass-card p-6"
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
@@ -452,7 +547,7 @@ export const ApplicationsPage: React.FC = () => {
                         href={application.job_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center text-sm text-blue-600 hover:text-blue-700"
+                        className="inline-flex items-center text-sm text-gray-700 hover:text-gray-900"
                       >
                         <ExternalLink className="h-4 w-4 mr-1" />
                         View Job Posting
@@ -483,7 +578,7 @@ export const ApplicationsPage: React.FC = () => {
           ))}
         </div>
       ) : (
-        <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
+        <div className="text-center py-12 glass-card">
           <Briefcase className="h-12 w-12 text-gray-300 mx-auto mb-4" />
           <p className="text-gray-500 mb-4">No applications found</p>
           <p className="text-sm text-gray-400">Applications will appear here when you use the Auto Apply Agent</p>
@@ -504,7 +599,7 @@ export const ApplicationsPage: React.FC = () => {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-lg max-w-md w-full p-6"
+              className="glass-card max-w-md w-full p-6"
               onClick={(e) => e.stopPropagation()}
             >
               <h2 className="text-xl font-bold text-gray-900 mb-4">
@@ -520,7 +615,7 @@ export const ApplicationsPage: React.FC = () => {
                     id="job_title"
                     value={formData.job_title}
                     onChange={(e) => setFormData({ ...formData, job_title: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
                     required
                   />
                 </div>
@@ -534,7 +629,7 @@ export const ApplicationsPage: React.FC = () => {
                     id="company_name"
                     value={formData.company_name}
                     onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
                     required
                   />
                 </div>
@@ -548,7 +643,7 @@ export const ApplicationsPage: React.FC = () => {
                     id="location"
                     value={formData.location}
                     onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
                     required
                   />
                 </div>
@@ -561,7 +656,7 @@ export const ApplicationsPage: React.FC = () => {
                     id="status"
                     value={formData.status}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
                   >
                     <option value="SENT">Sent</option>
                     <option value="PENDING">Pending</option>
@@ -581,7 +676,7 @@ export const ApplicationsPage: React.FC = () => {
                     id="applied_date"
                     value={formData.applied_date}
                     onChange={(e) => setFormData({ ...formData, applied_date: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
                     required
                   />
                 </div>
@@ -595,7 +690,7 @@ export const ApplicationsPage: React.FC = () => {
                     id="job_url"
                     value={formData.job_url}
                     onChange={(e) => setFormData({ ...formData, job_url: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
                   />
                 </div>
                 
@@ -608,14 +703,14 @@ export const ApplicationsPage: React.FC = () => {
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
                   />
                 </div>
                 
                 <div className="flex gap-3 pt-4">
                   <button
                     type="submit"
-                    className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+                    className="flex-1 bg-gray-900 text-white py-2 px-4 rounded-lg hover:bg-gray-800 transition-colors"
                   >
                     {editingApplication ? 'Update' : 'Add'} Application
                   </button>
@@ -626,7 +721,7 @@ export const ApplicationsPage: React.FC = () => {
                       setEditingApplication(null);
                       resetForm();
                     }}
-                    className="flex-1 bg-gray-200 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors"
+                    className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors"
                   >
                     Cancel
                   </button>
