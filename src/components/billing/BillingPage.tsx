@@ -464,18 +464,21 @@ This will create the default configuration needed for the billing portal to work
     }
 
     // 2) try derive from product object resolved elsewhere
-    const prod = getCurrentProduct();
-    if (prod) {
-      return {
-        applications: prod.applicationCount || 0,
-        aiTokens: prod.aiTokenCount || 0,
-        isSubscription: prod.mode === 'subscription'
-      };
+    // Instead of calling getCurrentProduct, inline the logic to avoid circular dependency
+    if (subscription.price_id) {
+      const prod = getProductByPriceId(subscription.price_id);
+      if (prod) {
+        return {
+          applications: prod.applicationCount || 0,
+          aiTokens: prod.aiTokenCount || 0,
+          isSubscription: prod.mode === 'subscription'
+        };
+      }
     }
 
     // 3) final default
     return { applications: 0, aiTokens: 0, isSubscription: false };
-  }, [subscription, getCurrentProduct]);
+  }, [subscription]);
 
   const getUsageProgress = (used: number, limit: number) => {
     if (limit === 0) return 0;
