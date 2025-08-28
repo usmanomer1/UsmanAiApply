@@ -60,6 +60,7 @@ export const BillingPageImproved: React.FC = () => {
   // Debounce and caching refs
   const lastRefreshTime = useRef<number>(0);
   const refreshDebounceTime = 5000; // 5 seconds
+  const isCurrentlyFetching = useRef(false); // Prevent concurrent fetches
   
   // Memoized values to reduce recalculations
   const subscriptionProducts = useMemo(() => getSubscriptionProducts(), []);
@@ -78,6 +79,12 @@ export const BillingPageImproved: React.FC = () => {
   }, []);
 
   const fetchBillingData = useCallback(async (isRefresh = false) => {
+    // Prevent concurrent fetches
+    if (isCurrentlyFetching.current) {
+      console.log('Fetch already in progress, skipping');
+      return;
+    }
+
     // Debounce check
     const now = Date.now();
     if (isRefresh && (now - lastRefreshTime.current) < refreshDebounceTime) {
@@ -85,6 +92,7 @@ export const BillingPageImproved: React.FC = () => {
       return;
     }
     lastRefreshTime.current = now;
+    isCurrentlyFetching.current = true;
 
     try {
       if (isRefresh) {
@@ -118,8 +126,12 @@ export const BillingPageImproved: React.FC = () => {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      isCurrentlyFetching.current = false;
     }
   }, [user, isSupabaseConfigured]);
+
+  // Use a ref to track if initial load has completed
+  const hasInitialLoadCompleted = useRef(false);
 
   useEffect(() => {
     // Check Stripe configuration on mount
@@ -128,7 +140,11 @@ export const BillingPageImproved: React.FC = () => {
       setStripeConfigError(`Missing Stripe configuration: ${configValidation.missingVars.join(', ')}`);
     }
     
-    fetchBillingData();
+    // Only fetch data once on initial mount
+    if (!hasInitialLoadCompleted.current) {
+      hasInitialLoadCompleted.current = true;
+      fetchBillingData();
+    }
 
     // Listen for billing refresh events from automation completion
     const handleBillingRefresh = () => {
@@ -136,8 +152,17 @@ export const BillingPageImproved: React.FC = () => {
     };
 
     // Refresh data when page gains focus (user switches tabs)
+    // Use a timeout to prevent immediate trigger on mount
+    let focusTimeout: NodeJS.Timeout;
     const handleFocus = () => {
-      fetchBillingData(true);
+      // Clear any existing timeout
+      clearTimeout(focusTimeout);
+      // Only refresh if we've been on the page for at least 500ms
+      focusTimeout = setTimeout(() => {
+        if (hasInitialLoadCompleted.current) {
+          fetchBillingData(true);
+        }
+      }, 500);
     };
 
     window.addEventListener('billing-refresh-needed', handleBillingRefresh);
@@ -145,7 +170,7 @@ export const BillingPageImproved: React.FC = () => {
 
     // Auto-refresh data every 30 seconds while page is visible
     const intervalId = setInterval(() => {
-      if (!document.hidden) {
+      if (!document.hidden && hasInitialLoadCompleted.current) {
         fetchBillingData(true);
       }
     }, 30000);
@@ -154,6 +179,7 @@ export const BillingPageImproved: React.FC = () => {
     return () => {
       window.removeEventListener('billing-refresh-needed', handleBillingRefresh);
       window.removeEventListener('focus', handleFocus);
+      clearTimeout(focusTimeout);
       clearInterval(intervalId);
     };
   }, [fetchBillingData]);
