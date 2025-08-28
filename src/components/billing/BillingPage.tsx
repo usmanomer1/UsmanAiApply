@@ -431,6 +431,7 @@ This will create the default configuration needed for the billing portal to work
     }
   };
 
+  // Helper functions - defined as regular functions to avoid hook ordering issues
   const formatDate = (timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleDateString('en-US', {
       month: '2-digit',
@@ -438,47 +439,6 @@ This will create the default configuration needed for the billing portal to work
       year: 'numeric'
     });
   };
-
-  const getCurrentProduct = useCallback(() => {
-    if (!subscription?.price_id) return null;
-    
-    // First try exact match
-    const product = getProductByPriceId(subscription.price_id);
-    if (product) return product;
-    
-    // If no exact match, log for debugging
-    console.warn('No product found for price_id:', subscription.price_id);
-    // console.log('Available price IDs:', getSubscriptionProducts().map(p => ({ name: p.name, priceId: p.priceId })));
-    
-    return null;
-  }, [subscription]);
-
-  // Get plan limits based on current subscription using the helper function
-  const getPlanUsageLimits = useCallback(() => {
-    if (!subscription) return { applications: 0, aiTokens: 0, isSubscription: false };
-
-    // 1) try strict priceId match
-    if (subscription.price_id) {
-      const direct = getPlanLimits(subscription.price_id.trim());
-      if (direct) return direct;
-    }
-
-    // 2) try derive from product object resolved elsewhere
-    // Instead of calling getCurrentProduct, inline the logic to avoid circular dependency
-    if (subscription.price_id) {
-      const prod = getProductByPriceId(subscription.price_id);
-      if (prod) {
-        return {
-          applications: prod.applicationCount || 0,
-          aiTokens: prod.aiTokenCount || 0,
-          isSubscription: prod.mode === 'subscription'
-        };
-      }
-    }
-
-    // 3) final default
-    return { applications: 0, aiTokens: 0, isSubscription: false };
-  }, [subscription]);
 
   const getUsageProgress = (used: number, limit: number) => {
     if (limit === 0) return 0;
@@ -691,9 +651,46 @@ This will create the default configuration needed for the billing portal to work
     );
   }
 
+  // Memoized values
   const subscriptionProducts = useMemo(() => getSubscriptionProducts(), []);
   const tokenProducts = useMemo(() => getTokenProducts(), []);
-  const limits = useMemo(() => getPlanUsageLimits(), [getPlanUsageLimits]);
+  
+  // Get current product - computed inline to avoid function dependencies
+  const currentProduct = useMemo(() => {
+    if (!subscription?.price_id) return null;
+    const product = getProductByPriceId(subscription.price_id);
+    if (!product) {
+      console.warn('No product found for price_id:', subscription.price_id);
+    }
+    return product;
+  }, [subscription]);
+
+  // Get plan limits - computed inline to avoid circular dependencies
+  const limits = useMemo(() => {
+    if (!subscription) return { applications: 0, aiTokens: 0, isSubscription: false };
+
+    // 1) try strict priceId match
+    if (subscription.price_id) {
+      const direct = getPlanLimits(subscription.price_id.trim());
+      if (direct) return direct;
+    }
+
+    // 2) try derive from product object
+    if (subscription.price_id) {
+      const prod = getProductByPriceId(subscription.price_id);
+      if (prod) {
+        return {
+          applications: prod.applicationCount || 0,
+          aiTokens: prod.aiTokenCount || 0,
+          isSubscription: prod.mode === 'subscription'
+        };
+      }
+    }
+
+    // 3) final default
+    return { applications: 0, aiTokens: 0, isSubscription: false };
+  }, [subscription]);
+
   const applicationProgress = useMemo(() => 
     getUsageProgress(usage?.job_tokens || 0, limits.applications * 10), 
     [usage?.job_tokens, limits.applications]
@@ -767,7 +764,7 @@ This will create the default configuration needed for the billing portal to work
                   </motion.div>
                   <div>
                     <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {getCurrentProduct()?.name?.replace('Jobotic ', '') || 
+                      {currentProduct?.name?.replace('Jobotic ', '') || 
                        (subscription?.price_id ? getPlanNameByPriceId(subscription.price_id) : 'Free')}
                     </div>
                     <div className="flex items-center gap-2">
