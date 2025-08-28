@@ -243,10 +243,19 @@ export const BillingPageImproved: React.FC = () => {
     }
 
     try {
-      // Call the new edge function without authentication header
+      // Get the user's session for authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast.error('Please sign in to manage your billing');
+        return;
+      }
+
+      // Call edge function WITH authentication for security
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create_stripe_portal_link_v2`, {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
