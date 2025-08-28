@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   CreditCard, 
@@ -103,6 +103,7 @@ export const BillingPage: React.FC = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<'7d' | '30d' | '90d'>('30d');
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'automation' | 'ai'>('all');
   const [jobSearchUsage, setJobSearchUsage] = useState<{ used: number; limit: number; percentage: number } | null>(null);
+  const [lastFetchTime, setLastFetchTime] = useState<Date | null>(null);
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -128,13 +129,13 @@ export const BillingPage: React.FC = () => {
     window.addEventListener('billing-refresh-needed', handleBillingRefresh);
     window.addEventListener('focus', handleFocus);
 
-    // Auto-refresh data every 5 seconds while page is visible
+    // Auto-refresh data every 30 seconds while page is visible (reduced from 5 seconds)
     const intervalId = setInterval(() => {
       if (!document.hidden) {
         // console.log('Auto-refreshing billing data...');
         fetchBillingData(true);
       }
-    }, 5000);
+    }, 30000);
 
     // Cleanup event listeners
     return () => {
@@ -142,7 +143,7 @@ export const BillingPage: React.FC = () => {
       window.removeEventListener('focus', handleFocus);
       clearInterval(intervalId);
     };
-  }, [user]);
+  }, [fetchBillingData]);
 
   const isSupabaseConfigured = () => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -156,7 +157,7 @@ export const BillingPage: React.FC = () => {
     );
   };
 
-  const fetchBillingData = async (isRefresh = false) => {
+  const fetchBillingData = useCallback(async (isRefresh = false) => {
     try {
       if (isRefresh) {
         setRefreshing(true);
@@ -228,8 +229,8 @@ export const BillingPage: React.FC = () => {
 
         const applicationsCount = applicationsData?.length || 0;
         
-        // Get automation sessions for detailed stats
-        const sessions = await getAutomationSessions(user.id, 100);
+        // Get automation sessions for detailed stats (reduced from 100 to 20)
+        const sessions = await getAutomationSessions(user.id, 20);
         
         // Calculate total steps and cost from sessions in current month
         let totalSteps = 0;
@@ -280,7 +281,7 @@ export const BillingPage: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [user]);
 
   const handleRefresh = async () => {
     await fetchBillingData(true);
@@ -438,7 +439,7 @@ This will create the default configuration needed for the billing portal to work
     });
   };
 
-  const getCurrentProduct = () => {
+  const getCurrentProduct = useCallback(() => {
     if (!subscription?.price_id) return null;
     
     // First try exact match
@@ -450,10 +451,10 @@ This will create the default configuration needed for the billing portal to work
     // console.log('Available price IDs:', getSubscriptionProducts().map(p => ({ name: p.name, priceId: p.priceId })));
     
     return null;
-  };
+  }, [subscription]);
 
   // Get plan limits based on current subscription using the helper function
-  const getPlanUsageLimits = () => {
+  const getPlanUsageLimits = useCallback(() => {
     if (!subscription) return { applications: 0, aiTokens: 0, isSubscription: false };
 
     // 1) try strict priceId match
@@ -474,7 +475,7 @@ This will create the default configuration needed for the billing portal to work
 
     // 3) final default
     return { applications: 0, aiTokens: 0, isSubscription: false };
-  };
+  }, [subscription, getCurrentProduct]);
 
   const getUsageProgress = (used: number, limit: number) => {
     if (limit === 0) return 0;
@@ -496,10 +497,16 @@ This will create the default configuration needed for the billing portal to work
   };
 
   // Fetch detailed usage data for the usage tab
-  const fetchUsageData = async () => {
+  const fetchUsageData = useCallback(async () => {
     if (!user) return;
     
+    // Skip fetching if we've fetched recently (within 10 seconds)
+    if (lastFetchTime && new Date().getTime() - lastFetchTime.getTime() < 10000) {
+      return;
+    }
+    
     setLoadingUsageData(true);
+    setLastFetchTime(new Date());
     try {
       // Calculate date range based on selected period
       const now = new Date();
@@ -513,8 +520,8 @@ This will create the default configuration needed for the billing portal to work
         startDate.setDate(now.getDate() - 90);
       }
 
-      // Get automation sessions from new tracking system
-      const automationLogs = await getAutomationSessions(user.id, 1000);
+      // Get automation sessions from new tracking system (reduced from 1000 to 100)
+      const automationLogs = await getAutomationSessions(user.id, 100);
       
       // Filter by date range
       const filteredLogs = automationLogs.filter(log => {
@@ -625,7 +632,7 @@ This will create the default configuration needed for the billing portal to work
     } finally {
       setLoadingUsageData(false);
     }
-  };
+  }, [user, selectedPeriod, selectedFilter, currentPage, lastFetchTime]);
 
   // Load usage data when component mounts or filters change
   useEffect(() => {
@@ -681,10 +688,13 @@ This will create the default configuration needed for the billing portal to work
     );
   }
 
-  const subscriptionProducts = getSubscriptionProducts();
-  const tokenProducts = getTokenProducts();
-  const limits = getPlanUsageLimits();
-  const applicationProgress = getUsageProgress(usage?.job_tokens || 0, limits.applications * 10); // Convert application limit to step limit
+  const subscriptionProducts = useMemo(() => getSubscriptionProducts(), []);
+  const tokenProducts = useMemo(() => getTokenProducts(), []);
+  const limits = useMemo(() => getPlanUsageLimits(), [getPlanUsageLimits]);
+  const applicationProgress = useMemo(() => 
+    getUsageProgress(usage?.job_tokens || 0, limits.applications * 10), 
+    [usage?.job_tokens, limits.applications]
+  ); // Convert application limit to step limit
 
   return (
     <>
