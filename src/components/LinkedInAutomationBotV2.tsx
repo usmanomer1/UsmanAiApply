@@ -551,7 +551,7 @@ export default function LinkedInAutomationBotV2() {
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
+                <div className="flex items-center gap-2 p-3 bg-[#23a972]/10 rounded-lg text-sm text-[#1e9463]">
                   <Info className="w-4 h-4 shrink-0" />
                   <span>If 2FA is enabled on your LinkedIn account, you'll have 30 seconds to enter the code when prompted</span>
                 </div>
@@ -563,7 +563,7 @@ export default function LinkedInAutomationBotV2() {
                   <textarea
                     value={config.customInstructions}
                     onChange={(e) => setConfig({ ...config, customInstructions: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#23a972] focus:border-[#23a972]"
                     rows={3}
                     placeholder="Add any specific preferences or instructions..."
                     disabled={isRunning}
