@@ -695,7 +695,7 @@ This will create the default configuration needed for the billing portal to work
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="text-center mb-16"
+          className="glass-card p-8 text-center mb-16"
         >
           <h1 className="text-5xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent mb-4">
             Choose Your Plan
@@ -727,7 +727,7 @@ This will create the default configuration needed for the billing portal to work
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.3 }}
-              className="relative overflow-hidden bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300"
+              className="glass-card relative overflow-hidden hover:shadow-xl transition-all duration-300"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5" />
               <div className="relative p-6">
@@ -797,7 +797,7 @@ This will create the default configuration needed for the billing portal to work
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: 0.2 }}
-                className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-2xl border border-blue-200/50 dark:border-blue-700/50 backdrop-blur-xl shadow-xl"
+                className="glass-card relative overflow-hidden shadow-xl"
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-cyan-500/5" />
                 <div className="relative p-6">
@@ -888,7 +888,7 @@ This will create the default configuration needed for the billing portal to work
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: 0.4 }}
-                className="relative overflow-hidden bg-gradient-to-br from-teal-50 to-green-50 dark:from-teal-900/20 dark:to-green-900/20 rounded-2xl border border-teal-200/50 dark:border-teal-700/50 backdrop-blur-xl shadow-xl"
+                className="glass-card relative overflow-hidden shadow-xl"
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-teal-500/5 to-green-500/5" />
                 <div className="relative p-6">
@@ -1154,9 +1154,9 @@ This will create the default configuration needed for the billing portal to work
 
                   <div 
                     className={`
-                      relative overflow-hidden bg-white rounded-xl border 
+                      glass-card relative overflow-hidden rounded-xl border 
                       ${isCurrentPlan ? 'border-blue-500' : isPopular ? 'border-emerald-500' : 'border-gray-200'}
-                      shadow-sm hover:shadow-lg transition-all duration-200
+                      hover:shadow-lg transition-all duration-200
                       ${!isPriceValid ? 'opacity-60' : ''}
                       h-full
                     `}
@@ -1324,7 +1324,7 @@ This will create the default configuration needed for the billing portal to work
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1 }}
                   whileHover={{ y: -8, transition: { duration: 0.2 } }}
-                  className={`relative bg-white dark:bg-gray-800 rounded-2xl transition-all duration-300 shadow-lg hover:shadow-2xl border border-gray-200 dark:border-gray-700 ${
+                  className={`relative glass-card rounded-2xl transition-all duration-300 hover:shadow-2xl ${
                     !isPriceValid ? 'opacity-60' : ''
                   }`}
                 >
