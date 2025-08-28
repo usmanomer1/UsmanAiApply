@@ -204,7 +204,7 @@ export const ResumeAnalyzer: React.FC<ResumeAnalyzerProps> = ({
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <div className="flex items-center space-x-3">
-                <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg">
+                <div className="p-2 bg-[#23a972] rounded-lg">
                   <Sparkles className="h-6 w-6 text-white" />
                 </div>
                 <div>
@@ -227,7 +227,7 @@ export const ResumeAnalyzer: React.FC<ResumeAnalyzerProps> = ({
               {loading && (
                 <div className="flex items-center justify-center py-12">
                   <div className="text-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+                    <Loader2 className="h-8 w-8 animate-spin text-[#23a972] mx-auto mb-4" />
                     <p className="text-gray-600">
                       {localState.step === 'analyze' ? 'Analyzing your resume...' : 'Generating optimized resume...'}
                     </p>
@@ -259,9 +259,9 @@ export const ResumeAnalyzer: React.FC<ResumeAnalyzerProps> = ({
                 <div className="space-y-6">
                   {/* Score Overview */}
                   <div className="grid grid-cols-2 gap-4 mb-6">
-                    <div className="text-center p-4 bg-blue-50 rounded-lg">
-                      <div className="text-3xl font-bold text-blue-600">{currentScore.toFixed(1)}</div>
-                      <div className="text-sm text-blue-700">Current Score</div>
+                    <div className="text-center p-4 bg-[#23a972]/10 rounded-lg">
+                      <div className="text-3xl font-bold text-[#23a972]">{currentScore.toFixed(1)}</div>
+                      <div className="text-sm text-[#1e9463]">Current Score</div>
                     </div>
                     <div className="text-center p-4 bg-green-50 rounded-lg">
                       <div className="text-3xl font-bold text-green-600">{potentialScore.toFixed(1)}</div>
@@ -293,10 +293,10 @@ export const ResumeAnalyzer: React.FC<ResumeAnalyzerProps> = ({
                     </div>
 
                     {/* Suggested Skills */}
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="bg-[#23a972]/10 border border-[#23a972]/30 rounded-lg p-4">
                       <div className="flex items-center mb-3">
-                        <Target className="h-4 w-4 text-blue-600 mr-2" />
-                        <h3 className="font-medium text-blue-900">Suggested Skills to Add</h3>
+                        <Target className="h-4 w-4 text-[#23a972] mr-2" />
+                        <h3 className="font-medium text-gray-900">Suggested Skills to Add</h3>
                       </div>
                       <div className="space-y-2">
                         {suggestedSkills.length > 0 ? (
@@ -307,7 +307,7 @@ export const ResumeAnalyzer: React.FC<ResumeAnalyzerProps> = ({
                                 onClick={() => toggleSkill(skill)}
                                 className={`w-5 h-5 rounded ${
                                   localState.selectedSkills.includes(skill)
-                                    ? 'bg-blue-600 text-white flex items-center justify-center'
+                                    ? 'bg-[#23a972] text-white flex items-center justify-center'
                                     : 'border-2 border-gray-300'
                                 }`}
                               >
@@ -318,7 +318,7 @@ export const ResumeAnalyzer: React.FC<ResumeAnalyzerProps> = ({
                             </div>
                           ))
                         ) : (
-                          <p className="text-sm text-blue-700">Your skills look good!</p>
+                          <p className="text-sm text-[#1e9463]">Your skills look good!</p>
                         )}
                       </div>
                     </div>
@@ -391,7 +391,7 @@ export const ResumeAnalyzer: React.FC<ResumeAnalyzerProps> = ({
                     <button
                       onClick={handleGenerate}
                       disabled={loading || !localState.editType}
-                      className="flex items-center justify-center px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center justify-center px-6 py-2 bg-[#23a972] text-white rounded-md hover:bg-[#1e9463] disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Wand2 className="h-4 w-4 mr-2" />
                       Generate Optimized Resume

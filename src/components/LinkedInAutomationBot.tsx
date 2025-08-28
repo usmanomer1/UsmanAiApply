@@ -2659,7 +2659,6 @@ This is the #1 issue that needs to be fixed immediately.`;
             const targetApplications = parseInt(config.targetCount) || 10;
             if (appliedCount >= targetApplications) {
               addLog(`🎯 Target reached: Applied to ${appliedCount}/${targetApplications} jobs!`, 'success');
-              }
             }
             
             setStepCount(actualStepCount);
@@ -2909,9 +2908,9 @@ This is the #1 issue that needs to be fixed immediately.`;
               // Force billing page to refresh by dispatching a custom event
               window.dispatchEvent(new CustomEvent('billing-refresh-needed'));
             }, 2000);
-            }
           }
-        } catch (error) {
+        }
+      } catch (error) {
           if (error instanceof Error && error.name !== 'AbortError') {
           // Error checking task status
           }

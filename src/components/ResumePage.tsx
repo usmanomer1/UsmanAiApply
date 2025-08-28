@@ -927,8 +927,8 @@ export const ResumePage: React.FC = () => {
                           </p>
                           <p className="text-xs text-gray-500 dark:text-gray-400">Skills to Add</p>
                         </div>
-                        <div className="bg-blue-50 dark:bg-blue-900/10 rounded-xl p-4 text-center">
-                          <p className="text-2xl font-light text-blue-600 dark:text-blue-500 mb-1">
+                        <div className="bg-[#23a972]/10 dark:bg-[#23a972]/10 rounded-xl p-4 text-center">
+                          <p className="text-2xl font-light text-[#23a972] mb-1">
                             {analysisResult.data.summary.suggestions.length}
                           </p>
                           <p className="text-xs text-gray-500 dark:text-gray-400">Suggestions</p>
@@ -1388,8 +1388,8 @@ export const ResumePage: React.FC = () => {
                 className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800 p-8 hover:shadow-xl transition-all"
               >
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500/20 to-blue-600/20 rounded-lg flex items-center justify-center">
-                    <Upload className="w-5 h-5 text-blue-600" />
+                  <div className="w-10 h-10 bg-[#23a972]/10 rounded-lg flex items-center justify-center">
+                    <Upload className="w-5 h-5 text-[#23a972]" />
                   </div>
                   <div>
                     <h2 className="text-lg font-medium text-gray-900 dark:text-white">
@@ -1412,8 +1412,8 @@ export const ResumePage: React.FC = () => {
                         className="flex items-center justify-between p-5 bg-gradient-to-r from-gray-50 to-gray-100/50 dark:from-gray-800/50 dark:to-gray-800/30 rounded-2xl border border-gray-100 dark:border-gray-700"
                       >
                         <div className="flex items-center gap-4">
-                          <div className="p-3 bg-gradient-to-br from-blue-500/20 to-cyan-600/20 rounded-xl">
-                            <FileType className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                          <div className="p-3 bg-[#23a972]/10 rounded-xl">
+                            <FileType className="w-5 h-5 text-[#23a972]" />
                           </div>
                           <div>
                             <p className="font-medium text-gray-900 dark:text-white">

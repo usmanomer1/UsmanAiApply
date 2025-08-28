@@ -883,7 +883,7 @@ const JobSearchConvex: React.FC = () => {
                         type="checkbox"
                         checked={filters.remote || false}
                         onChange={(e) => setFilters({ ...filters, remote: e.target.checked })}
-                        className="mr-2 text-indigo-600 focus:ring-indigo-500"
+                        className="mr-2 text-[#23a972] focus:ring-[#23a972]"
                       />
                       <span className="text-sm">Remote Only</span>
                     </label>
@@ -1303,11 +1303,11 @@ const JobSearchConvex: React.FC = () => {
                         <div className="flex-1">
                           <div className="flex items-start gap-4">
                             {/* Company Logo or Initial */}
-                            <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center flex-shrink-0">
+                            <div className="w-12 h-12 rounded-lg bg-[#23a972]/10 flex items-center justify-center flex-shrink-0">
                               {job.employer_logo ? (
                                 <img src={job.employer_logo} alt={job.employer_name || 'Company'} className="w-full h-full object-contain rounded-lg" />
                               ) : (
-                                <span className="text-xl font-bold text-indigo-600">
+                                <span className="text-xl font-bold text-[#23a972]">
                                   {job.employer_name ? job.employer_name.charAt(0) : '?'}
                                 </span>
                               )}
@@ -1329,7 +1329,7 @@ const JobSearchConvex: React.FC = () => {
                                   </span>
                                 )}
                                 {job.job_is_remote && (
-                                  <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                                  <span className="px-2 py-1 bg-[#23a972]/10 text-[#23a972] rounded-full text-xs font-medium">
                                     Remote
                                   </span>
                                 )}
@@ -1416,7 +1416,7 @@ const JobSearchConvex: React.FC = () => {
                               onClick={() => handleOptimizeResume(job)}
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
-                              className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg text-sm font-medium flex items-center gap-2"
+                              className="px-4 py-2 bg-[#23a972] text-white rounded-lg text-sm font-medium flex items-center gap-2 hover:opacity-90 transition-colors"
                             >
                               <Sparkles className="h-4 w-4" />
                               Optimize Resume

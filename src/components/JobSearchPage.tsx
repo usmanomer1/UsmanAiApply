@@ -663,8 +663,8 @@ const JobSearchPage: React.FC = () => {
   };
 
   const getMatchScoreColor = (score: number) => {
-    if (score >= 80) return 'text-teal-600 bg-teal-50 border-teal-200';
-    if (score >= 60) return 'text-blue-600 bg-blue-50 border-blue-200';
+    if (score >= 80) return 'text-[#23a972] bg-[#23a972]/10 border-[#23a972]/30';
+    if (score >= 60) return 'text-[#23a972] bg-[#23a972]/10 border-[#23a972]/30';
     if (score >= 40) return 'text-amber-600 bg-amber-50 border-amber-200';
     return 'text-gray-600 bg-gray-50 border-gray-200';
   };
@@ -891,49 +891,49 @@ const JobSearchPage: React.FC = () => {
               onClick={() => setActiveTab('recommended')}
               className={`pb-4 px-1 text-sm font-medium transition-all relative ${
                 activeTab === 'recommended'
-                  ? 'text-teal-600'
+                  ? 'text-[#23a972]'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               Recommended
               {activeTab === 'recommended' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-600" />
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#23a972]" />
               )}
             </button>
             <button
               onClick={() => setActiveTab('liked')}
               className={`pb-4 px-1 text-sm font-medium transition-all relative ${
                 activeTab === 'liked'
-                  ? 'text-teal-600'
+                  ? 'text-[#23a972]'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               Liked
               {savedJobs.size > 0 && (
-                <span className="ml-2 px-2 py-0.5 bg-teal-100 text-teal-600 rounded-full text-xs">
+                <span className="ml-2 px-2 py-0.5 bg-[#23a972]/10 text-[#23a972] rounded-full text-xs">
                   {savedJobs.size}
                 </span>
               )}
               {activeTab === 'liked' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-600" />
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#23a972]" />
               )}
             </button>
             <button
               onClick={() => setActiveTab('applied')}
               className={`pb-4 px-1 text-sm font-medium transition-all relative ${
                 activeTab === 'applied'
-                  ? 'text-teal-600'
+                  ? 'text-[#23a972]'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               Applied
               {appliedJobs.size > 0 && (
-                <span className="ml-2 px-2 py-0.5 bg-teal-100 text-teal-600 rounded-full text-xs">
+                <span className="ml-2 px-2 py-0.5 bg-[#23a972]/10 text-[#23a972] rounded-full text-xs">
                   {appliedJobs.size}
                 </span>
               )}
               {activeTab === 'applied' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-600" />
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#23a972]" />
               )}
             </button>
           </div>
@@ -949,7 +949,7 @@ const JobSearchPage: React.FC = () => {
               setFilters(prev => ({ ...prev, remote_jobs_only: !prev.remote_jobs_only }));
               setShouldSearch(true);
             }}
-            className={`px-4 py-2 border ${filters.remote_jobs_only ? 'bg-teal-600 border-teal-600 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'} rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-2`}
+            className={`px-4 py-2 border ${filters.remote_jobs_only ? 'bg-[#23a972] border-[#23a972] text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'} rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-2`}
           >
             <MapPin className="h-4 w-4" />
             Remote Only
@@ -963,7 +963,7 @@ const JobSearchPage: React.FC = () => {
               setFilters(prev => ({ ...prev, employment_types: newTypes }));
               setShouldSearch(true);
             }}
-            className={`px-4 py-2 border ${filters.employment_types.includes('FULLTIME') ? 'bg-teal-600 border-teal-600 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'} rounded-full text-sm font-medium transition-all duration-200`}
+            className={`px-4 py-2 border ${filters.employment_types.includes('FULLTIME') ? 'bg-[#23a972] border-[#23a972] text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'} rounded-full text-sm font-medium transition-all duration-200`}
           >
             Full-time
           </button>
@@ -976,7 +976,7 @@ const JobSearchPage: React.FC = () => {
               setFilters(prev => ({ ...prev, employment_types: newTypes }));
               setShouldSearch(true);
             }}
-            className={`px-4 py-2 border ${filters.employment_types.includes('PARTTIME') ? 'bg-teal-600 border-teal-600 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'} rounded-full text-sm font-medium transition-all duration-200`}
+            className={`px-4 py-2 border ${filters.employment_types.includes('PARTTIME') ? 'bg-[#23a972] border-[#23a972] text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'} rounded-full text-sm font-medium transition-all duration-200`}
           >
             Part-time
           </button>
@@ -989,7 +989,7 @@ const JobSearchPage: React.FC = () => {
               setFilters(prev => ({ ...prev, employment_types: newTypes }));
               setShouldSearch(true);
             }}
-            className={`px-4 py-2 border ${filters.employment_types.includes('INTERN') ? 'bg-teal-600 border-teal-600 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'} rounded-full text-sm font-medium transition-all duration-200`}
+            className={`px-4 py-2 border ${filters.employment_types.includes('INTERN') ? 'bg-[#23a972] border-[#23a972] text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'} rounded-full text-sm font-medium transition-all duration-200`}
           >
             Internship
           </button>
@@ -1001,7 +1001,7 @@ const JobSearchPage: React.FC = () => {
               setFilters(prev => ({ ...prev, job_requirements: newReqs }));
               setShouldSearch(true);
             }}
-            className={`px-4 py-2 border ${(filters.job_requirements.includes('no_exp') || filters.job_requirements.includes('under_3_years_exp')) ? 'bg-teal-600 border-teal-600 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'} rounded-full text-sm font-medium transition-all duration-200`}
+            className={`px-4 py-2 border ${(filters.job_requirements.includes('no_exp') || filters.job_requirements.includes('under_3_years_exp')) ? 'bg-[#23a972] border-[#23a972] text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'} rounded-full text-sm font-medium transition-all duration-200`}
           >
             Entry Level
           </button>
@@ -1026,7 +1026,7 @@ const JobSearchPage: React.FC = () => {
               <Filter className="h-4 w-4" />
               Filters
               {(filters.employment_types.length > 0 || filters.remote_jobs_only || filters.date_posted || filters.job_requirements.length > 0 || location || searchQuery) && (
-                <span className="bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full text-xs">
+                <span className="bg-[#23a972]/10 text-[#23a972] px-2 py-0.5 rounded-full text-xs">
                   {[
                     filters.employment_types.length,
                     filters.remote_jobs_only ? 1 : 0,
@@ -1082,7 +1082,7 @@ const JobSearchPage: React.FC = () => {
         {/* Loading State */}
         {(loading || initializing) && (
           <div className="flex flex-col items-center justify-center py-20">
-            <Loader2 className="h-12 w-12 animate-spin text-teal-600 mb-4" />
+            <Loader2 className="h-12 w-12 animate-spin text-[#23a972] mb-4" />
             <p className="text-gray-600 font-medium">
               {initializing ? 'Loading your profile and preferences...' : 'Searching for jobs...'}
             </p>
@@ -1102,7 +1102,7 @@ const JobSearchPage: React.FC = () => {
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div 
-                className="bg-teal-600 h-2 rounded-full transition-all duration-300"
+                className="bg-[#23a972] h-2 rounded-full transition-all duration-300"
                 style={{ width: `${streamProgress}%` }}
               />
             </div>
@@ -1118,10 +1118,10 @@ const JobSearchPage: React.FC = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="bg-white rounded-xl border border-gray-100 hover:border-teal-200 hover:shadow-xl hover:scale-[1.02] transition-all duration-300 overflow-hidden group cursor-pointer relative"
+                className="bg-white rounded-xl border border-gray-100 hover:border-[#23a972]/30 hover:shadow-xl hover:scale-[1.02] transition-all duration-300 overflow-hidden group cursor-pointer relative"
               >
                 {/* Hover overlay gradient */}
-                <div className="absolute inset-0 bg-gradient-to-br from-teal-50/0 to-teal-50/0 group-hover:from-teal-50/5 group-hover:to-teal-100/5 transition-all duration-300 pointer-events-none" />
+                <div className="absolute inset-0 bg-gradient-to-br from-[#23a972]/0 to-[#23a972]/0 group-hover:from-[#23a972]/5 group-hover:to-[#23a972]/10 transition-all duration-300 pointer-events-none" />
                 
                 <div className="p-6 relative">
                   <div className="flex items-start justify-between mb-4">
@@ -1135,8 +1135,8 @@ const JobSearchPage: React.FC = () => {
                             className="w-14 h-14 rounded-xl object-contain bg-gray-50 p-2 border border-gray-100"
                           />
                         ) : (
-                          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-teal-50 to-teal-100 flex items-center justify-center border border-teal-100">
-                            <Building2 className="h-6 w-6 text-teal-600" />
+                          <div className="w-14 h-14 rounded-xl bg-[#23a972]/10 flex items-center justify-center border border-[#23a972]/20">
+                            <Building2 className="h-6 w-6 text-[#23a972]" />
                           </div>
                         )}
                       </div>
@@ -1144,15 +1144,15 @@ const JobSearchPage: React.FC = () => {
                       {/* Job Info */}
                       <div className="flex-1">
                         <div className="flex items-start justify-between mb-1">
-                          <h3 className="text-lg font-semibold text-gray-900 group-hover:text-teal-600 transition-colors">
+                          <h3 className="text-lg font-semibold text-gray-900 group-hover:text-[#23a972] transition-colors">
                             {job.job_title}
                           </h3>
                           <button
                             onClick={() => toggleSaveJob(job.job_id)}
-                            className="ml-4 p-2 text-gray-400 hover:text-teal-600 hover:scale-110 transition-all duration-200"
+                            className="ml-4 p-2 text-gray-400 hover:text-[#23a972] hover:scale-110 transition-all duration-200"
                           >
                             {savedJobs.has(job.job_id) ? (
-                              <Heart className="h-5 w-5 fill-current text-teal-600" />
+                              <Heart className="h-5 w-5 fill-current text-[#23a972]" />
                             ) : (
                               <Heart className="h-5 w-5 hover:fill-current" />
                             )}
@@ -1239,7 +1239,7 @@ const JobSearchPage: React.FC = () => {
                     {job.job_required_skills && job.job_required_skills.length > 0 && (
                       <div className="flex flex-wrap gap-2">
                         {job.job_required_skills.slice(0, 4).map((skill, index) => (
-                          <span key={index} className="px-3 py-1 bg-gray-50 text-gray-700 rounded-full text-xs font-medium border border-gray-100 group-hover:bg-teal-50 group-hover:border-teal-200 group-hover:text-teal-700 transition-all duration-200">
+                          <span key={index} className="px-3 py-1 bg-gray-50 text-gray-700 rounded-full text-xs font-medium border border-gray-100 group-hover:bg-[#23a972]/10 group-hover:border-[#23a972]/30 group-hover:text-[#23a972] transition-all duration-200">
                             {skill}
                           </span>
                         ))}
@@ -1260,9 +1260,9 @@ const JobSearchPage: React.FC = () => {
 
                   {/* Match Insights */}
                   {job.match_reasons && job.match_reasons.length > 0 && !job.match_reasons[0].toLowerCase().includes('unable to') && (
-                    <div className="mb-4 p-3 bg-teal-50 rounded-lg border border-teal-100">
-                      <p className="text-xs font-medium text-teal-700 mb-1">Why you're a match:</p>
-                      <p className="text-xs text-teal-600 line-clamp-2">{job.match_reasons[0]}</p>
+                    <div className="mb-4 p-3 bg-[#23a972]/10 rounded-lg border border-[#23a972]/20">
+                      <p className="text-xs font-medium text-[#23a972] mb-1">Why you're a match:</p>
+                      <p className="text-xs text-[#23a972] line-clamp-2">{job.match_reasons[0]}</p>
                     </div>
                   )}
                   
@@ -1293,7 +1293,7 @@ const JobSearchPage: React.FC = () => {
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleOptimizeResume(job)}
-                        className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 hover:shadow-lg hover:scale-105 transition-all duration-200 text-sm font-medium flex items-center gap-2"
+                        className="px-4 py-2 bg-[#23a972] text-white rounded-lg hover:bg-[#1e9463] hover:shadow-lg hover:scale-105 transition-all duration-200 text-sm font-medium flex items-center gap-2"
                       >
                         Optimize Resume
                       </button>
@@ -1309,7 +1309,7 @@ const JobSearchPage: React.FC = () => {
                       href={job.job_apply_link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-sm font-medium text-teal-600 hover:text-teal-700 transition-colors group"
+                      className="inline-flex items-center gap-1.5 text-sm font-medium text-[#23a972] hover:text-[#1e9463] transition-colors group"
                     >
                       {job.job_apply_is_direct ? 'Apply on Company Site' : 'View on Job Board'}
                       <ArrowUpRight className="h-4 w-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
@@ -1427,7 +1427,7 @@ const JobSearchPage: React.FC = () => {
                 value={modalFilters.searchQuery}
                 onChange={(e) => setModalFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
                 placeholder="Search job title, company, or keywords..."
-                className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#23a972] focus:border-transparent"
               />
             </div>
           </div>
@@ -1442,7 +1442,7 @@ const JobSearchPage: React.FC = () => {
                 value={modalFilters.location}
                 onChange={(e) => setModalFilters(prev => ({ ...prev, location: e.target.value }))}
                 placeholder="San Francisco, CA"
-                className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#23a972] focus:border-transparent"
               />
             </div>
           </div>
@@ -1462,7 +1462,7 @@ const JobSearchPage: React.FC = () => {
                       setModalFilters(prev => ({ ...prev, employment_types: prev.employment_types.filter(t => t !== 'FULLTIME') }));
                     }
                   }}
-                  className="text-teal-600"
+                  className="text-[#23a972]"
                 />
                 <span className="text-sm">Full-time</span>
               </label>
@@ -1477,7 +1477,7 @@ const JobSearchPage: React.FC = () => {
                       setModalFilters(prev => ({ ...prev, employment_types: prev.employment_types.filter(t => t !== 'PARTTIME') }));
                     }
                   }}
-                  className="text-teal-600"
+                  className="text-[#23a972]"
                 />
                 <span className="text-sm">Part-time</span>
               </label>
@@ -1492,7 +1492,7 @@ const JobSearchPage: React.FC = () => {
                       setModalFilters(prev => ({ ...prev, employment_types: prev.employment_types.filter(t => t !== 'CONTRACTOR') }));
                     }
                   }}
-                  className="text-teal-600"
+                  className="text-[#23a972]"
                 />
                 <span className="text-sm">Contract</span>
               </label>
@@ -1507,7 +1507,7 @@ const JobSearchPage: React.FC = () => {
                       setModalFilters(prev => ({ ...prev, employment_types: prev.employment_types.filter(t => t !== 'INTERN') }));
                     }
                   }}
-                  className="text-teal-600"
+                  className="text-[#23a972]"
                 />
                 <span className="text-sm">Internship</span>
               </label>
@@ -1520,7 +1520,7 @@ const JobSearchPage: React.FC = () => {
             <select
               value={modalFilters.date_posted || ""}
               onChange={(e) => setModalFilters(prev => ({ ...prev, date_posted: e.target.value }))}
-              className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#23a972] focus:border-transparent"
             >
               <option value="">All time</option>
               <option value="today">Today</option>
@@ -1539,7 +1539,7 @@ const JobSearchPage: React.FC = () => {
                 const value = e.target.value;
                 setModalFilters(prev => ({ ...prev, job_requirements: value ? [value] : [] }));
               }}
-              className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#23a972] focus:border-transparent"
             >
               <option value="">Any experience</option>
               <option value="no_exp">No Experience Required</option>
@@ -1556,7 +1556,7 @@ const JobSearchPage: React.FC = () => {
               type="checkbox"
               checked={modalFilters.remote_jobs_only}
               onChange={(e) => setModalFilters(prev => ({ ...prev, remote_jobs_only: e.target.checked }))}
-              className="text-teal-600"
+              className="text-[#23a972]"
             />
             <span className="text-sm font-medium text-gray-700">Remote jobs only</span>
           </label>
@@ -1595,7 +1595,7 @@ const JobSearchPage: React.FC = () => {
               setShowFilterModal(false);
               setShouldSearch(true);
             }}
-            className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors"
+            className="px-4 py-2 bg-[#23a972] hover:bg-[#1e9463] text-white rounded-lg transition-colors"
           >
             Update
           </button>
