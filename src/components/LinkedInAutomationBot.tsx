@@ -2524,7 +2524,7 @@ This is the #1 issue that needs to be fixed immediately.`;
         // Only show 2FA intervention, not login (since we're doing auto-login)
         if (event.data.type === '2fa_required') {
           addLog('🔐 Two-factor authentication required - please enter code within 30 seconds', 'warning');
-          toast('2FA required - enter code in browser window', { icon: '⚠️' });
+          toast('Two‑factor verification needed — check the LinkedIn window for the code prompt.', { icon: '🔐' });
         }
         break;
         
@@ -3008,6 +3008,14 @@ This is the #1 issue that needs to be fixed immediately.`;
                   <span className="font-medium">{isRunning ? 'Active' : 'Inactive'}</span>
                 </motion.div>
               </div>
+            </div>
+
+            {/* 2FA Heads-up */}
+            <div className="glass-card p-4 mb-8 flex items-center gap-3">
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-teal-100 text-teal-700 text-xs font-bold shrink-0">i</span>
+              <p className="text-sm text-gray-700 leading-6">
+                For the smoothest run, temporarily turn off LinkedIn two‑factor or be ready to approve a 2FA prompt during the session when asked.
+              </p>
             </div>
 
             {/* Quick Stats */}

@@ -55,7 +55,7 @@ function App() {
                               <Route path="/auto-apply" element={<LinkedInAutomationBot />} />
                               <Route path="/resume" element={<ResumePage />} />
                               <Route path="/billing" element={<BillingPage />} />
-                              <Route path="/settings" element={<SettingsPage />} />
+                              {/* Removed legacy settings route to avoid confusing page */}
                               <Route path="/notifications" element={<NotificationsPage />} />
                               <Route path="/" element={<Navigate to="/dashboard" replace />} />
                             </Routes>
