@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   CreditCard, 
@@ -651,50 +651,43 @@ This will create the default configuration needed for the billing portal to work
     );
   }
 
-  // Memoized values
-  const subscriptionProducts = useMemo(() => getSubscriptionProducts(), []);
-  const tokenProducts = useMemo(() => getTokenProducts(), []);
+  // Calculate values directly - no memoization to avoid initialization issues
+  const subscriptionProducts = getSubscriptionProducts();
+  const tokenProducts = getTokenProducts();
   
-  // Get current product - computed inline to avoid function dependencies
-  const currentProduct = useMemo(() => {
-    if (!subscription?.price_id) return null;
-    const product = getProductByPriceId(subscription.price_id);
-    if (!product) {
+  // Get current product
+  let currentProduct = null;
+  if (subscription?.price_id) {
+    currentProduct = getProductByPriceId(subscription.price_id);
+    if (!currentProduct) {
       console.warn('No product found for price_id:', subscription.price_id);
     }
-    return product;
-  }, [subscription]);
+  }
 
-  // Get plan limits - computed inline to avoid circular dependencies
-  const limits = useMemo(() => {
-    if (!subscription) return { applications: 0, aiTokens: 0, isSubscription: false };
-
+  // Get plan limits
+  let limits = { applications: 0, aiTokens: 0, isSubscription: false };
+  if (subscription) {
     // 1) try strict priceId match
     if (subscription.price_id) {
       const direct = getPlanLimits(subscription.price_id.trim());
-      if (direct) return direct;
-    }
-
-    // 2) try derive from product object
-    if (subscription.price_id) {
-      const prod = getProductByPriceId(subscription.price_id);
-      if (prod) {
-        return {
-          applications: prod.applicationCount || 0,
-          aiTokens: prod.aiTokenCount || 0,
-          isSubscription: prod.mode === 'subscription'
-        };
+      if (direct) {
+        limits = direct;
+      } else {
+        // 2) try derive from product object
+        const prod = getProductByPriceId(subscription.price_id);
+        if (prod) {
+          limits = {
+            applications: prod.applicationCount || 0,
+            aiTokens: prod.aiTokenCount || 0,
+            isSubscription: prod.mode === 'subscription'
+          };
+        }
       }
     }
+  }
 
-    // 3) final default
-    return { applications: 0, aiTokens: 0, isSubscription: false };
-  }, [subscription]);
-
-  const applicationProgress = useMemo(() => 
-    getUsageProgress(usage?.job_tokens || 0, limits.applications * 10), 
-    [usage?.job_tokens, limits.applications]
-  ); // Convert application limit to step limit
+  // Calculate application progress
+  const applicationProgress = getUsageProgress(usage?.job_tokens || 0, limits.applications * 10); // Convert application limit to step limit
 
   return (
     <>
