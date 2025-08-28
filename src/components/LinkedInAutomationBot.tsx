@@ -2194,29 +2194,9 @@ This is the #1 issue that needs to be fixed immediately.`;
       return;
     }
 
-    try {
-      // Validate subscription and usage limits
-      const product = userSubscription?.prices ? getProductByPriceId(userSubscription.prices.id) : null;
-      const limits = product ? getPlanLimits(product.name) : null;
-      const currentUsage = userUsage?.automation_steps.used || 0 || 0;
-      const maxSteps = limits ? limits.applications * 10 : 0;
-      
-      // Check if user has an active subscription
-      if (!userSubscription || userSubscription.subscription_status !== 'active') {
-        toast.error('Please upgrade to a paid plan to use automation features');
-        setShowPaywall(true);
-        return;
-      }
-      
-      // Check usage limits for active subscribers
-      if (maxSteps > 0 && currentUsage >= maxSteps) {
-        toast.error('You have reached your monthly automation limit. Upgrade for more applications or wait until next month');
-        return;
-      }
-    } catch (error) {
-      toast.error('Unable to validate access - please try again');
-      return;
-    }
+    // Frontend no longer enforces subscription/limit checks
+    // Backend will handle all security and limit enforcement
+    // This prevents bypassing security by modifying frontend code
 
     if (!config.jobTitle.trim()) {
       toast.error('Please enter a job title or keywords to search for');
@@ -2243,15 +2223,7 @@ This is the #1 issue that needs to be fixed immediately.`;
       return;
     }
 
-    if (!canStartAutomation()) {
-      const limit = getTokenLimit() * 10;
-      if (limit === 0) {
-        toast.error(`No steps available. Current plan: ${getPlanName()}. Please upgrade your subscription.`);
-      } else {
-        toast.error(`Usage limit reached! You have used ${userUsage?.automation_steps.used || 0}/${limit} steps this month.`);
-      }
-      return;
-    }
+    // Removed frontend limit check - backend will enforce limits
 
     setIsRunning(true);
     setIsPaused(false);
@@ -2510,7 +2482,7 @@ This is the #1 issue that needs to be fixed immediately.`;
       case 'step':
         // Agent step update - show what the agent is doing
         addLog(`📝 ${event.data.goal || event.data.step}`, 'info');
-        setStepCount(prev => prev + 1);
+        // Don't manually increment - we'll get actual count from the task
         
         // Check for job applications in the step
         const stepText = `${event.data.goal} ${event.data.evaluation || ''}`;
@@ -2632,11 +2604,11 @@ This is the #1 issue that needs to be fixed immediately.`;
         }
 
         if (updatedTask.steps) {
-          const newStepCount = updatedTask.steps.length;
+          const actualStepCount = updatedTask.steps.length;
             
-            if (newStepCount > stepCount) {
+            if (actualStepCount !== stepCount) {
               // Process new steps and filter out repetitive updates
-              for (let i = stepCount; i < newStepCount; i++) {
+              for (let i = stepCount; i < actualStepCount; i++) {
                 const step = updatedTask.steps[i];
                 if (step.next_goal) {
                   const goal = step.next_goal;
@@ -2679,22 +2651,8 @@ This is the #1 issue that needs to be fixed immediately.`;
                 }
               }
               
-              // Track the TOTAL steps (not incremental) - this will upsert in the database
-            // await trackUsage(newStepCount, taskId);
-              
-              // Calculate total steps used for limit checking
-            const limit = getTokenLimit(); // getTokenLimit() already returns step limit (applications * 10)
-            
-            // Only check limit if we have a meaningful limit (not 0)
-            if (limit > 0 && newStepCount >= limit) {
-              clearInterval(interval);
-              setPollInterval(null);
-                setIsRunning(false);
-              await stopTask(taskId);
-                addLog(`🛑 Automation stopped: Monthly limit of ${limit} steps reached!`, 'error');
-                toast.error('Automation stopped due to usage limit');
-              clearAutomationState();
-                return;
+              // No longer tracking usage or checking limits from frontend
+              // Backend handles all security and limit enforcement
             }
             
             // Also check if we've reached the target application count
@@ -2704,15 +2662,15 @@ This is the #1 issue that needs to be fixed immediately.`;
               }
             }
             
-            setStepCount(newStepCount);
+            setStepCount(actualStepCount);
             
-            // Update automation session with latest step count
+            // Update automation session with actual step count from browser-use
             await updateAutomationSession(taskId, {
-              step_count: newStepCount,
+              step_count: actualStepCount,
               applications_submitted: appliedCount
             });
             
-            console.log(`Updated usage tracking - Task: ${taskId}, Steps: ${newStepCount}`);
+            console.log(`Updated usage tracking - Task: ${taskId}, Actual Steps: ${actualStepCount}`);
             
             // Refresh usage display to show updated numbers
             if (user) {
@@ -3591,7 +3549,7 @@ This is the #1 issue that needs to be fixed immediately.`;
                 {!isRunning ? (
                   <button
                     onClick={startAutomation}
-                    disabled={!canStartAutomation() || !config.linkedinEmail}
+                    disabled={!config.linkedinEmail}
                     className="w-full px-6 py-4 bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-xl font-semibold text-lg hover:from-teal-700 hover:to-teal-800 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
                   >
                     <Play className="h-6 w-6" />
