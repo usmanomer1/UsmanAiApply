@@ -243,17 +243,10 @@ export const BillingPageImproved: React.FC = () => {
     }
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        toast.error('Authentication required.');
-        return;
-      }
-
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create_stripe_portal_link`, {
+      // Call the new edge function without authentication header
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create_stripe_portal_link_v2`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -265,51 +258,28 @@ export const BillingPageImproved: React.FC = () => {
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to create billing portal session');
+        // Check if it's a portal configuration issue
+        if (data.setup_url) {
+          toast.error('Stripe portal not configured. Check console for setup link.', {
+            duration: 8000,
+          });
+          console.error('Setup Stripe Portal at:', data.setup_url);
+        } else {
+          throw new Error(data.error || 'Failed to create billing portal session');
+        }
+        return;
       }
 
       if (data.url) {
+        // Successfully got portal URL - redirect
+        toast.success('Redirecting to billing portal...', { duration: 2000 });
         window.location.href = data.url;
       } else {
         throw new Error('No portal URL received');
       }
     } catch (error) {
       console.error('Error opening billing portal:', error);
-      
-      // Check if this is the specific Stripe configuration error
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      
-      if (errorMessage.includes('Customer Portal not configured') || 
-          errorMessage.includes('No configuration provided') || 
-          errorMessage.includes('customer portal settings')) {
-        // Show specific guidance for Stripe configuration issue
-        toast.error(
-          'Stripe Customer Portal not configured. Please set up your customer portal settings in the Stripe dashboard.',
-          { 
-            duration: 8000,
-            style: {
-              maxWidth: '500px',
-            }
-          }
-        );
-        
-        // Show additional help in console for developers
-        console.warn(`
-🔧 Stripe Configuration Required:
-
-To fix this error, you need to configure your Stripe Customer Portal:
-
-1. Go to: https://dashboard.stripe.com/settings/billing/portal
-   (For test mode: https://dashboard.stripe.com/test/settings/billing/portal)
-2. Click "Configure portal" or "Activate test link"
-3. Configure your customer portal settings
-4. Save the configuration
-
-This will create the default configuration needed for the billing portal to work.
-        `);
-      } else {
-        toast.error(errorMessage || 'Unable to open billing portal');
-      }
+      toast.error('Failed to open billing portal. Please try again.');
     }
   };
 
