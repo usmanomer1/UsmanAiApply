@@ -517,7 +517,7 @@ export const ResumePage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-900">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-900 shadow-sm">
+      <div className="glass-card">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -1248,7 +1248,7 @@ export const ResumePage: React.FC = () => {
                     animate={{ opacity: 1, y: 0 }}
                     className="max-w-md mx-auto text-center"
                   >
-                    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800 p-8">
+                    <div className="glass-card p-8">
                       <motion.div
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
