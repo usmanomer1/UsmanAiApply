@@ -37,6 +37,15 @@ function App() {
                       <div className="flex">
                         <Sidebar />
                         <main className="flex-1 ml-[240px]">
+                          {/* Subtle global background accents */}
+                          <div
+                            className="fixed inset-0 -z-10 pointer-events-none opacity-90"
+                            style={{
+                              background:
+                                'radial-gradient(700px 160px at 8% -12%, #14b8a61a 0%, transparent 60%),' +
+                                'radial-gradient(560px 130px at 110% 112%, #3b82f61a 0%, transparent 60%)'
+                            }}
+                          />
                           <div className="p-8 relative z-0">
                             <Routes>
                               <Route path="/dashboard" element={<MacOSDashboard />} />
