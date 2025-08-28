@@ -13,7 +13,7 @@ import { ResumePage } from './components/ResumePage';
 import LinkedInAutomationBot from './components/LinkedInAutomationBot';
 import { SuccessPage } from './components/SuccessPage';
 import JobSearchConvex from './components/JobSearchConvex';
-import { BillingPageOptimized as BillingPage } from './components/billing/BillingPageOptimized';
+import BillingPageImproved from './components/billing/BillingPageImproved';
 import SettingsPage from './components/SettingsPage';
 import MacOSDashboard from './components/MacOSDashboard';
 import ApplicationsPage from './components/applications/ApplicationsPage';
@@ -54,7 +54,7 @@ function App() {
                               <Route path="/profile" element={<ProfilePage />} />
                               <Route path="/auto-apply" element={<LinkedInAutomationBot />} />
                               <Route path="/resume" element={<ResumePage />} />
-                              <Route path="/billing" element={<BillingPage />} />
+                              <Route path="/billing" element={<BillingPageImproved />} />
                               {/* Removed legacy settings route to avoid confusing page */}
                               <Route path="/notifications" element={<NotificationsPage />} />
                               <Route path="/" element={<Navigate to="/dashboard" replace />} />
