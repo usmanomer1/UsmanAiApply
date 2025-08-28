@@ -271,6 +271,8 @@ export const ResumePage: React.FC = () => {
     }
 
     setAnalyzing(true);
+    // brief delay so the button shows its loading state before transitioning
+    await new Promise(resolve => setTimeout(resolve, 200));
     setCurrentStep('analysis');
     
     try {
@@ -541,7 +543,7 @@ export const ResumePage: React.FC = () => {
           <div className="relative">
             <div className="h-1 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
               <motion.div
-                className="h-full bg-gradient-to-r from-[#1DE0DD] to-[#00C4CC]"
+                className="h-full bg-[#23a972]"
                 initial={{ width: 0 }}
                 animate={{ width: `${progress}%` }}
                 transition={{ duration: 0.5, ease: "easeOut" }}
@@ -551,7 +553,7 @@ export const ResumePage: React.FC = () => {
               {['Upload', 'Job Details', 'Analysis', 'Generate'].map((step, index) => (
                 <div key={step} className="flex items-center gap-1">
                   <div className={`w-2 h-2 rounded-full ${
-                    (index + 1) * 25 <= progress ? 'bg-[#1DE0DD]' : 'bg-gray-300 dark:bg-gray-700'
+                    (index + 1) * 25 <= progress ? 'bg-[#23a972]' : 'bg-gray-300 dark:bg-gray-700'
                   }`} />
                   <span className={`text-xs ${
                     (index + 1) * 25 <= progress ? 'text-gray-700 dark:text-gray-300' : 'text-gray-400 dark:text-gray-600'
@@ -570,7 +572,7 @@ export const ResumePage: React.FC = () => {
             onClick={() => setActiveTab('upload')}
             className={`flex-1 px-4 py-2 rounded-full text-sm font-medium transition-all ${
               activeTab === 'upload'
-                ? 'bg-[#1DE0DD] text-white shadow-lg'
+                ? 'bg-[#23a972] text-white shadow-lg'
                 : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:shadow-md border border-gray-200 dark:border-gray-700'
             }`}
           >
@@ -580,7 +582,7 @@ export const ResumePage: React.FC = () => {
             onClick={() => setActiveTab('history')}
             className={`flex-1 px-4 py-2 rounded-full text-sm font-medium transition-all ${
               activeTab === 'history'
-                ? 'bg-[#1DE0DD] text-white shadow-lg'
+                ? 'bg-[#23a972] text-white shadow-lg'
                 : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:shadow-md border border-gray-200 dark:border-gray-700'
             }`}
           >
@@ -630,7 +632,7 @@ export const ResumePage: React.FC = () => {
                       selectedFile
                         ? 'border-green-500 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20'
                         : isDragging
-                        ? 'border-[#1DE0DD] bg-gray-50 dark:bg-gray-800/50 border-solid'
+                        ? 'border-[#23a972] bg-gray-50 dark:bg-gray-800/50 border-solid'
                         : 'border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600 border-dashed'
                     }`}
                   >
@@ -648,12 +650,12 @@ export const ResumePage: React.FC = () => {
                       
                       {uploading ? (
                         <div className="space-y-3">
-                          <Loader2 className="w-8 h-8 text-[#1DE0DD] mx-auto animate-spin" />
+                          <Loader2 className="w-8 h-8 text-[#23a972] mx-auto animate-spin" />
                           <p className="text-sm text-gray-600 dark:text-gray-400">Processing...</p>
                         </div>
                       ) : selectedFile ? (
                         <div className="space-y-3">
-                          <CheckCircle className="w-8 h-8 text-[#1DE0DD] mx-auto" />
+                          <CheckCircle className="w-8 h-8 text-[#23a972] mx-auto" />
                           <div>
                             <p className="text-sm text-gray-900 dark:text-white">
                               {selectedFile.name}
@@ -679,7 +681,7 @@ export const ResumePage: React.FC = () => {
                           <div>
                             <p className="text-sm text-gray-600 dark:text-gray-300">
                               Drop your resume here or{' '}
-                              <span className="text-[#1DE0DD] hover:text-[#00C4CC]">
+                              <span className="text-[#23a972] hover:text-[#1e9463]">
                                 browse
                               </span>
                             </p>
@@ -703,8 +705,8 @@ export const ResumePage: React.FC = () => {
                 }`}
               >
                 {/* Step Number */}
-                <div className="absolute top-6 right-6 w-8 h-8 bg-gradient-to-br from-[#1DE0DD]/10 to-[#00C4CC]/10 rounded-full flex items-center justify-center">
-                  <span className="text-sm font-medium text-[#1DE0DD]">2</span>
+                <div className="absolute top-6 right-6 w-8 h-8 bg-[#23a972]/10 rounded-full flex items-center justify-center">
+                  <span className="text-sm font-medium text-[#23a972]">2</span>
                 </div>
                 
                 <div className="flex items-center gap-3 mb-6">
@@ -733,7 +735,7 @@ export const ResumePage: React.FC = () => {
                         toast.error('Failed to paste from clipboard');
                       }
                     }}
-                    className="absolute top-6 right-14 p-2 text-gray-400 hover:text-[#1DE0DD] transition-colors rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+                    className="absolute top-6 right-14 p-2 text-gray-400 hover:text-[#23a972] transition-colors rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
                     title="Paste from clipboard"
                   >
                     <Copy className="w-4 h-4" />
@@ -748,7 +750,7 @@ export const ResumePage: React.FC = () => {
                         type="text"
                         value={jobTitle}
                         onChange={(e) => setJobTitle(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1DE0DD] focus:border-[#1DE0DD] dark:bg-gray-800 dark:text-white transition-all"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#23a972] focus:border-[#23a972] dark:bg-gray-800 dark:text-white transition-all"
                         placeholder="e.g., Senior Software Engineer"
                       />
                     </div>
@@ -761,7 +763,7 @@ export const ResumePage: React.FC = () => {
                         type="text"
                         value={companyName}
                         onChange={(e) => setCompanyName(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1DE0DD] focus:border-[#1DE0DD] dark:bg-gray-800 dark:text-white transition-all"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#23a972] focus:border-[#23a972] dark:bg-gray-800 dark:text-white transition-all"
                         placeholder="e.g., Google"
                       />
                     </div>
@@ -779,7 +781,7 @@ export const ResumePage: React.FC = () => {
                         value={jobDescription}
                         onChange={(e) => setJobDescription(e.target.value)}
                         rows={6}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1DE0DD] focus:border-[#1DE0DD] dark:bg-gray-800 dark:text-white transition-all resize-none"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#23a972] focus:border-[#23a972] dark:bg-gray-800 dark:text-white transition-all resize-none"
                         placeholder="Paste the job description here..."
                       />
                     </div>
@@ -788,7 +790,7 @@ export const ResumePage: React.FC = () => {
                   <button
                     onClick={handleAnalyze}
                     disabled={!selectedFile || !jobTitle || !companyName || !jobDescription || analyzing}
-                    className="mt-6 w-full bg-gradient-to-r from-[#1DE0DD] to-[#00C4CC] hover:from-[#00C4CC] hover:to-[#00B4BC] text-white font-medium py-3 px-6 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-[#1DE0DD] disabled:hover:to-[#00C4CC] flex items-center justify-center gap-2 shadow-lg"
+                    className="mt-6 w-full bg-[#23a972] hover:bg-[#1e9463] text-white font-medium py-3 px-6 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg"
                   >
                     {analyzing ? (
                       <>
@@ -812,8 +814,8 @@ export const ResumePage: React.FC = () => {
                     animate={{ opacity: 1, scale: 1 }}
                     className="flex flex-col items-center justify-center py-32"
                   >
-                    <div className="w-20 h-20 bg-gradient-to-br from-[#1DE0DD]/20 to-[#00C4CC]/20 rounded-full flex items-center justify-center mb-6 animate-pulse">
-                      <Brain className="w-10 h-10 text-[#1DE0DD] animate-pulse" />
+                    <div className="w-20 h-20 bg-[#23a972]/10 rounded-full flex items-center justify-center mb-6 animate-pulse">
+                      <Brain className="w-10 h-10 text-[#23a972] animate-pulse" />
                     </div>
                     <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">
                       Analyzing Your Resume
@@ -823,7 +825,7 @@ export const ResumePage: React.FC = () => {
                     </p>
                     <div className="w-64 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                       <motion.div
-                        className="h-full bg-gradient-to-r from-[#1DE0DD] to-[#00C4CC]"
+                        className="h-full bg-[#23a972]"
                         initial={{ width: 0 }}
                         animate={{ width: '100%' }}
                         transition={{ duration: 3, ease: "easeInOut" }}
@@ -852,14 +854,14 @@ export const ResumePage: React.FC = () => {
                       </button>
                       
                       {/* Step Number */}
-                      <div className="absolute top-6 right-6 w-8 h-8 bg-gradient-to-br from-[#1DE0DD]/10 to-[#00C4CC]/10 rounded-full flex items-center justify-center">
-                        <span className="text-sm font-medium text-[#1DE0DD]">3</span>
+                      <div className="absolute top-6 right-6 w-8 h-8 bg-[#23a972]/10 rounded-full flex items-center justify-center">
+                        <span className="text-sm font-medium text-[#23a972]">3</span>
                       </div>
                       
                       <div className="mb-6">
                         <div className="flex items-center gap-3 mb-4">
-                          <div className="w-10 h-10 bg-gradient-to-br from-[#1DE0DD]/20 to-[#00C4CC]/20 rounded-lg flex items-center justify-center">
-                            <BarChart3 className="w-5 h-5 text-[#1DE0DD]" />
+                          <div className="w-10 h-10 bg-[#23a972]/10 rounded-lg flex items-center justify-center">
+                            <BarChart3 className="w-5 h-5 text-[#23a972]" />
                           </div>
                           <div>
                             <h2 className="text-lg font-medium text-gray-900 dark:text-white">
@@ -1329,12 +1331,12 @@ export const ResumePage: React.FC = () => {
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.1 }}
-                        className="group flex items-center justify-between p-5 bg-gradient-to-r from-gray-50 to-gray-100/50 dark:from-gray-800/50 dark:to-gray-800/30 rounded-2xl hover:shadow-lg transition-all cursor-pointer border border-gray-100 dark:border-gray-700 hover:border-[#1DE0DD]/30 dark:hover:border-[#1DE0DD]/30"
+                        className="group flex items-center justify-between p-5 bg-gradient-to-r from-gray-50 to-gray-100/50 dark:from-gray-800/50 dark:to-gray-800/30 rounded-2xl hover:shadow-lg transition-all cursor-pointer border border-gray-100 dark:border-gray-700 hover:border-[#23a972]/30 dark:hover:border-[#23a972]/30"
                         onClick={() => loadPreviousAnalysis(analysis)}
                       >
                         <div className="flex items-center gap-4">
-                          <div className="p-3 bg-gradient-to-br from-[#1DE0DD]/20 to-[#00C4CC]/20 rounded-xl group-hover:scale-110 transition-transform">
-                            <FileText className="w-5 h-5 text-[#1DE0DD]" />
+                          <div className="p-3 bg-[#23a972]/10 rounded-xl group-hover:scale-110 transition-transform">
+                            <FileText className="w-5 h-5 text-[#23a972]" />
                           </div>
                           <div>
                             <p className="font-medium text-gray-900 dark:text-white">
@@ -1347,7 +1349,7 @@ export const ResumePage: React.FC = () => {
                               {analysis.analysis_result?.data?.summary?.overallScore && (
                                 <Badge className={`text-xs ${
                                   analysis.analysis_result.data.summary.overallScore >= 70
-                                    ? 'bg-[#1DE0DD]/10 text-[#1DE0DD]'
+                                    ? 'bg-[#23a972]/10 text-[#23a972]'
                                     : analysis.analysis_result.data.summary.overallScore >= 30
                                     ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
                                     : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
@@ -1362,7 +1364,7 @@ export const ResumePage: React.FC = () => {
                           animate={{ x: [0, 5, 0] }}
                           transition={{ repeat: Infinity, duration: 1.5 }}
                         >
-                          <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-[#1DE0DD] transition-colors" />
+                          <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-[#23a972] transition-colors" />
                         </motion.div>
                       </motion.div>
                     ))}
