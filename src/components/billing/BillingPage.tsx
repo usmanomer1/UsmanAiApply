@@ -697,10 +697,10 @@ This will create the default configuration needed for the billing portal to work
           transition={{ duration: 0.5 }}
           className="glass-card p-8 text-center mb-16"
         >
-          <h1 className="text-5xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent mb-4">
+          <h1 className="text-[32px] font-semibold text-gray-900 dark:text-white mb-2">
             Choose Your Plan
           </h1>
-          <p className="text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+          <p className="text-sm text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
             Select the perfect plan for your job search automation needs
           </p>
           {!isSupabaseConfigured() && (
@@ -729,7 +729,7 @@ This will create the default configuration needed for the billing portal to work
               transition={{ duration: 0.3 }}
               className="glass-card relative overflow-hidden hover:shadow-xl transition-all duration-300"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5" />
+              {/* simplified background for minimal style */}
               <div className="relative p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Current Plan</h3>
@@ -799,7 +799,7 @@ This will create the default configuration needed for the billing portal to work
                 transition={{ duration: 0.3, delay: 0.2 }}
                 className="glass-card relative overflow-hidden shadow-xl"
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-cyan-500/5" />
+                {/* simplified background for minimal style */}
                 <div className="relative p-6">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center space-x-4">
@@ -890,7 +890,7 @@ This will create the default configuration needed for the billing portal to work
                 transition={{ duration: 0.3, delay: 0.4 }}
                 className="glass-card relative overflow-hidden shadow-xl"
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-teal-500/5 to-green-500/5" />
+                {/* simplified background for minimal style */}
                 <div className="relative p-6">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center space-x-4">
@@ -1067,23 +1067,21 @@ This will create the default configuration needed for the billing portal to work
           transition={{ duration: 0.3, delay: 0.2 }}
           className="flex justify-center mb-12 relative z-10"
         >
-          <div className="relative bg-gray-100 dark:bg-gray-800 rounded-2xl p-1.5 shadow-inner">
+          <div className="relative bg-white dark:bg-gray-800 rounded-full p-1 shadow-sm border border-gray-200 dark:border-gray-700">
             <motion.div
-              className="absolute inset-0 bg-blue-600 rounded-xl"
+              className="absolute top-1 bottom-1 bg-gray-900 dark:bg-white rounded-full"
               animate={{ 
-                x: activeTab === 'subscriptions' ? 0 : '100%',
-                width: activeTab === 'subscriptions' ? '50%' : '50%'
+                left: activeTab === 'subscriptions' ? '4px' : 'calc(50% + 4px)',
+                width: 'calc(50% - 8px)'
               }}
-              transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+              transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
             />
-            <div className="relative flex gap-1">
+            <div className="relative flex gap-1 z-10">
               <button
                 type="button"
                 onClick={() => setActiveTab('subscriptions')}
-                className={`px-8 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center gap-2 relative z-10 ${
-                  activeTab === 'subscriptions'
-                    ? 'text-white'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                className={`px-8 py-2 rounded-full font-medium transition-all duration-200 flex items-center gap-2 ${
+                  activeTab === 'subscriptions' ? 'text-white dark:text-gray-900' : 'text-gray-700 dark:text-gray-300'
                 }`}
               >
                 <Crown className="w-5 h-5" />
@@ -1092,10 +1090,8 @@ This will create the default configuration needed for the billing portal to work
               <button
                 type="button"
                 onClick={() => setActiveTab('tokens')}
-                className={`px-8 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center gap-2 relative z-10 ${
-                  activeTab === 'tokens'
-                    ? 'text-white'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                className={`px-8 py-2 rounded-full font-medium transition-all duration-200 flex items-center gap-2 ${
+                  activeTab === 'tokens' ? 'text-white dark:text-gray-900' : 'text-gray-700 dark:text-gray-300'
                 }`}
               >
                 <Coins className="w-5 h-5" />
@@ -1188,15 +1184,15 @@ This will create the default configuration needed for the billing portal to work
                     <div className="relative p-8 flex flex-col h-full">
                       {/* Plan Header */}
                       <div className="text-center mb-8">
-                        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-1">
                           {product.name.replace('Jobotic ', '')}
                         </h3>
                         
                         <div className="flex items-baseline justify-center gap-1">
-                          <span className="text-4xl font-bold text-gray-900">
+                          <span className="text-3xl font-bold text-gray-900">
                             ${product.price}
                           </span>
-                          <span className="text-gray-500 text-sm font-medium">
+                          <span className="text-gray-500 text-xs font-medium">
                             /{product.interval}
                           </span>
                         </div>
@@ -1206,7 +1202,7 @@ This will create the default configuration needed for the billing portal to work
                       <div className="mb-8 flex-grow">
                         <div className="space-y-4">
                           {/* Applications */}
-                          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
                             <div className="flex items-center gap-3">
                               <div className="p-2 bg-white rounded-lg shadow-sm">
                                 <Briefcase className="w-4 h-4 text-blue-600" />
@@ -1219,7 +1215,7 @@ This will create the default configuration needed for the billing portal to work
                           </div>
 
                           {/* AI Tokens */}
-                          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
                             <div className="flex items-center gap-3">
                               <div className="p-2 bg-white rounded-lg shadow-sm">
                                 <Brain className="w-4 h-4 text-emerald-600" />
@@ -1232,7 +1228,7 @@ This will create the default configuration needed for the billing portal to work
                           </div>
 
                           {/* Agent Steps */}
-                          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
                             <div className="flex items-center gap-3">
                               <div className="p-2 bg-white rounded-lg shadow-sm">
                                 <Bot className="w-4 h-4 text-purple-600" />
