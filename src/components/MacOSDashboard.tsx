@@ -166,10 +166,21 @@ export default function MacOSDashboard() {
         .order('created_at', { ascending: false });
 
       // Fetch job campaigns for additional stats
-      const { data: campaigns } = await supabase
-        .from('job_campaigns')
-        .select('*')
-        .eq('user_id', user?.id);
+      // First get the profile_id for this user
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', user?.id)
+        .single();
+      
+      let campaigns = null;
+      if (profile?.id) {
+        const { data: campaignsData } = await supabase
+          .from('job_campaigns')
+          .select('*')
+          .eq('profile_id', profile.id);
+        campaigns = campaignsData;
+      }
 
 
       console.log('Dashboard data fetched:', { apps, campaigns, appsError });
