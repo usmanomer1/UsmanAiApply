@@ -229,10 +229,10 @@ const Sidebar: React.FC = () => {
           </button>
         </div>
 
-        {/* Settings */}
+        {/* Settings -> Profile Privacy */}
         <div className="px-3.5 pb-1.5">
           <Link
-            to="/settings"
+            to="/profile?tab=privacy"
             className="group nav-link"
           >
             <Settings className="h-5 w-5 text-gray-500 group-hover:text-gray-700" />

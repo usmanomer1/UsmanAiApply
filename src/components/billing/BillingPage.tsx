@@ -826,7 +826,6 @@ This will create the default configuration needed for the billing portal to work
                   <div className="space-y-4">
                     <div className="flex items-end justify-between">
                       <motion.span 
-                        key={usage?.job_tokens || 0}
                         initial={{ scale: 0.5, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent"
@@ -917,7 +916,6 @@ This will create the default configuration needed for the billing portal to work
                   <div className="space-y-4">
                     <div className="flex items-end justify-between">
                       <motion.span 
-                        key={jobSearchUsage?.used || 0}
                         initial={{ scale: 0.5, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         className="text-5xl font-bold bg-gradient-to-r from-teal-600 to-green-600 bg-clip-text text-transparent"
@@ -1108,6 +1106,11 @@ This will create the default configuration needed for the billing portal to work
               const isCurrentPlan = subscription?.price_id === product.priceId;
               const isPopular = product.name.includes('Pro');
               const isPriceValid = !product.priceId.startsWith('price_missing');
+              const isFeatured = index === 1;
+              const displayName = index === 0 ? 'Starter' : index === 1 ? 'Pro' : 'Max';
+              const badgeLabel = index === 0 ? 'FREE' : index === 1 ? 'PRO' : 'ADVANCE';
+              const badgeColor = index === 0 ? 'bg-gray-100 text-gray-700' : index === 1 ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700';
+              const badgeDot = index === 0 ? 'bg-emerald-400' : index === 1 ? 'bg-orange-500' : 'bg-emerald-500';
               
               return (
                 <motion.div
@@ -1150,116 +1153,59 @@ This will create the default configuration needed for the billing portal to work
 
                   <div 
                     className={`
-                      glass-card relative overflow-hidden rounded-xl border 
-                      ${isCurrentPlan ? 'border-blue-500' : isPopular ? 'border-emerald-500' : 'border-gray-200'}
-                      hover:shadow-lg transition-all duration-200
+                      relative overflow-hidden rounded-2xl border 
+                      ${isFeatured ? 'bg-gradient-to-b from-gray-900 to-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-200'}
+                      transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg
                       ${!isPriceValid ? 'opacity-60' : ''}
-                      h-full
+                      h-full min-h-[480px]
                     `}
                   >
-                    {/* Gradient accent for current/popular plans */}
-                    {(isCurrentPlan || isPopular) && (
-                      <div
-                        className="absolute inset-x-0 top-0 h-1"
-                        style={{
-                          background: isCurrentPlan 
-                            ? 'linear-gradient(to right, #2563eb, #60a5fa)'
-                            : 'linear-gradient(to right, #10b981, #34d399)',
-                        }}
-                      />
-                    )}
+                    {/* Corner dots */}
+                    <span className={`absolute top-3 left-3 h-2 w-2 rounded-full ${isFeatured ? 'bg-white/20' : 'bg-gray-200'}`}></span>
+                    <span className={`absolute top-3 right-3 h-2 w-2 rounded-full ${isFeatured ? 'bg-white/20' : 'bg-gray-200'}`}></span>
+                    <span className={`absolute bottom-3 left-3 h-2 w-2 rounded-full ${isFeatured ? 'bg-white/20' : 'bg-gray-200'}`}></span>
+                    <span className={`absolute bottom-3 right-3 h-2 w-2 rounded-full ${isFeatured ? 'bg-white/20' : 'bg-gray-200'}`}></span>
+                    {/* Plan badge */}
+                    <div className={`absolute top-4 right-4 inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold ${badgeColor}`}>
+                      <span className={`h-2 w-2 rounded-full ${badgeDot}`}></span>
+                      {badgeLabel}
+                    </div>
 
-                    {/* Subtle background gradient */}
-                    {(isCurrentPlan || isPopular) && (
-                      <div
-                        className="absolute inset-0 pointer-events-none opacity-50"
-                        style={{
-                          background: isCurrentPlan
-                            ? 'radial-gradient(600px 150px at 50% 0%, #2563eb15 0%, transparent 50%)'
-                            : 'radial-gradient(600px 150px at 50% 0%, #10b98115 0%, transparent 50%)'
-                        }}
-                      />
-                    )}
+                    {/* Minimal surface - no extra spotlight */}
 
                     <div className="relative p-8 flex flex-col h-full">
                       {/* Plan Header */}
-                      <div className="text-center mb-8">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                          {product.name.replace('Jobotic ', '')}
-                        </h3>
-                        
-                        <div className="flex items-baseline justify-center gap-1">
-                          <span className="text-3xl font-bold text-gray-900">
-                            ${product.price}
-                          </span>
-                          <span className="text-gray-500 text-xs font-medium">
-                            /{product.interval}
-                          </span>
+                      <div className="text-center mb-6">
+                        <h3 className={`text-sm font-semibold mb-1 ${isFeatured ? 'text-white' : 'text-gray-900'}`}>{displayName} Plan</h3>
+                        <div className="flex items-baseline justify-center gap-2">
+                          <span className={`text-4xl font-bold ${isFeatured ? 'text-white' : 'text-gray-900'}`}>${product.price}</span>
+                          <span className={`text-xs font-medium ${isFeatured ? 'text-gray-300' : 'text-gray-500'}`}>/month</span>
                         </div>
                       </div>
 
-                      {/* Main Features - Always same height */}
+                      {/* Minimal Features */}
                       <div className="mb-8 flex-grow">
-                        <div className="space-y-4">
-                          {/* Applications */}
-                          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-white rounded-lg shadow-sm">
-                                <Briefcase className="w-4 h-4 text-blue-600" />
-                              </div>
-                              <span className="text-sm font-medium text-gray-700">Applications</span>
-                            </div>
-                            <span className="text-sm font-semibold text-gray-900">
-                              {product.applicationCount}/mo
+                        <ul className={`space-y-2 ${isFeatured ? 'text-gray-200' : 'text-gray-700'}`}>
+                          <li className="flex items-center justify-between text-sm">
+                            <span>Applications</span>
+                            <span className={`${isFeatured ? 'text-white' : 'text-gray-900'} font-medium`}>
+                              {(product.applicationCount ?? 0)}/mo
                             </span>
-                          </div>
-
-                          {/* AI Tokens */}
-                          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-white rounded-lg shadow-sm">
-                                <Brain className="w-4 h-4 text-emerald-600" />
-                              </div>
-                              <span className="text-sm font-medium text-gray-700">AI Tokens</span>
-                            </div>
-                            <span className="text-sm font-semibold text-gray-900">
-                              Unlimited
+                          </li>
+                          <li className="flex items-center justify-between text-sm">
+                            <span>Agent steps</span>
+                            <span className={`${isFeatured ? 'text-white' : 'text-gray-900'} font-medium`}>
+                              {(((product.applicationCount ?? 0) * 10)).toLocaleString()}
                             </span>
-                          </div>
-
-                          {/* Agent Steps */}
-                          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-white rounded-lg shadow-sm">
-                                <Bot className="w-4 h-4 text-purple-600" />
-                              </div>
-                              <span className="text-sm font-medium text-gray-700">Agent Steps</span>
-                            </div>
-                            <span className="text-sm font-semibold text-gray-900">
-                              {(product.applicationCount * 10).toLocaleString()}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Additional Features - Always same items */}
-                      <div className="mb-8 space-y-3 border-t pt-6">
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
-                          <span>Resume optimization tools</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
-                          <span>AI-powered job matching</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
-                          <span>
-                            {product.name.includes('Plus') ? 'Email support' : 
-                             product.name.includes('Pro') ? 'Priority support' :
-                             'Priority support + Early access'}
-                          </span>
-                        </div>
+                          </li>
+                          <li className="flex items-center justify-between text-sm">
+                            <span>AI tokens</span>
+                            <span className={`${isFeatured ? 'text-white' : 'text-gray-900'} font-medium`}>Unlimited</span>
+                          </li>
+                          <li className="text-sm">Resume optimization tools</li>
+                          <li className="text-sm">AI‑powered job matching</li>
+                          <li className="text-sm">{product.name.includes('Plus') ? 'Email support' : product.name.includes('Pro') ? 'Priority support' : 'Priority support + Early access'}</li>
+                        </ul>
                       </div>
 
                       {/* CTA Button */}
@@ -1267,16 +1213,16 @@ This will create the default configuration needed for the billing portal to work
                         onClick={() => handlePurchase(product.priceId)}
                         disabled={isCurrentPlan || purchasing === product.priceId || !isPriceValid}
                         className={`
-                          w-full py-3 px-6 rounded-lg font-medium transition-all duration-200
+                          w-full py-3 px-6 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-teal-500
                           flex items-center justify-center gap-2
                           ${
                             isCurrentPlan
                               ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                               : !isPriceValid
                               ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                              : isPopular
-                              ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white shadow-sm hover:shadow'
-                              : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                              : isFeatured
+                              ? 'bg-white text-gray-900 hover:bg-gray-100'
+                              : 'bg-gray-900 text-white hover:bg-black'
                           }
                         `}
                       >
