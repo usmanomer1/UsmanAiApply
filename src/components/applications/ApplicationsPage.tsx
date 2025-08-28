@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Briefcase,
   Plus,
@@ -50,6 +50,7 @@ export const ApplicationsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'manual' | 'automated'>('all');
 
   // Form state
   const [formData, setFormData] = useState({
@@ -68,7 +69,7 @@ export const ApplicationsPage: React.FC = () => {
 
   useEffect(() => {
     filterApplications();
-  }, [applications, searchTerm, statusFilter]);
+  }, [applications, searchTerm, statusFilter, sourceFilter]);
 
   const fetchApplications = async () => {
     try {
@@ -124,6 +125,13 @@ export const ApplicationsPage: React.FC = () => {
       );
     }
 
+    // Source filter
+    if (sourceFilter !== 'all') {
+      filtered = filtered.filter(app =>
+        sourceFilter === 'automated' ? app.is_automated : !app.is_automated
+      );
+    }
+
     // Status filter
     if (statusFilter !== 'all') {
       filtered = filtered.filter(app => app.status === statusFilter);
@@ -131,6 +139,23 @@ export const ApplicationsPage: React.FC = () => {
 
     setFilteredApplications(filtered);
   };
+
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      TOTAL: applications.length,
+      SENT: 0,
+      PENDING: 0,
+      INTERVIEW: 0,
+      OA: 0,
+      ACCEPTED: 0,
+      REJECTED: 0,
+    };
+    applications.forEach(a => {
+      const key = (a.status || '').toUpperCase();
+      if (counts[key] !== undefined) counts[key] += 1;
+    });
+    return counts;
+  }, [applications]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -302,22 +327,36 @@ export const ApplicationsPage: React.FC = () => {
   };
 
   const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'success':
+    switch ((status || '').toUpperCase()) {
+      case 'ACCEPTED':
         return <CheckCircle className="h-5 w-5 text-green-600" />;
-      case 'rejected':
+      case 'REJECTED':
         return <XCircle className="h-5 w-5 text-red-600" />;
+      case 'INTERVIEW':
+        return <Briefcase className="h-5 w-5 text-indigo-600" />;
+      case 'OA':
+        return <FileText className="h-5 w-5 text-purple-600" />;
+      case 'PENDING':
+        return <Clock className="h-5 w-5 text-yellow-600" />;
+      case 'SENT':
       default:
         return <Clock className="h-5 w-5 text-amber-600" />;
     }
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'success':
+    switch ((status || '').toUpperCase()) {
+      case 'ACCEPTED':
         return 'bg-green-100 text-green-800';
-      case 'rejected':
+      case 'REJECTED':
         return 'bg-red-100 text-red-800';
+      case 'INTERVIEW':
+        return 'bg-indigo-100 text-indigo-800';
+      case 'OA':
+        return 'bg-purple-100 text-purple-800';
+      case 'PENDING':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'SENT':
       default:
         return 'bg-amber-100 text-amber-800';
     }
@@ -343,6 +382,34 @@ export const ApplicationsPage: React.FC = () => {
             <Plus className="h-5 w-5 mr-2" />
             Add Application
           </button>
+        </div>
+      </div>
+
+      {/* Overview Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 mb-6">
+        <div className="glass-card p-4">
+          <p className="text-xs text-gray-500">Total</p>
+          <p className="text-2xl font-semibold text-gray-900">{statusCounts.TOTAL}</p>
+        </div>
+        <div className="glass-card p-4">
+          <p className="text-xs text-gray-500">Sent</p>
+          <p className="text-2xl font-semibold text-amber-700">{statusCounts.SENT}</p>
+        </div>
+        <div className="glass-card p-4">
+          <p className="text-xs text-gray-500">Pending</p>
+          <p className="text-2xl font-semibold text-yellow-700">{statusCounts.PENDING}</p>
+        </div>
+        <div className="glass-card p-4">
+          <p className="text-xs text-gray-500">Interviews</p>
+          <p className="text-2xl font-semibold text-indigo-700">{statusCounts.INTERVIEW}</p>
+        </div>
+        <div className="glass-card p-4">
+          <p className="text-xs text-gray-500">Assessments</p>
+          <p className="text-2xl font-semibold text-purple-700">{statusCounts.OA}</p>
+        </div>
+        <div className="glass-card p-4">
+          <p className="text-xs text-gray-500">Accepted</p>
+          <p className="text-2xl font-semibold text-green-700">{statusCounts.ACCEPTED}</p>
         </div>
       </div>
 
@@ -384,6 +451,34 @@ export const ApplicationsPage: React.FC = () => {
               <ChevronDown className={`h-4 w-4 ml-2 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
             </button>
           </div>
+        </div>
+
+        {/* Quick Source Filters */}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            onClick={() => setSourceFilter('all')}
+            className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+              sourceFilter === 'all' ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            All
+          </button>
+          <button
+            onClick={() => setSourceFilter('automated')}
+            className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+              sourceFilter === 'automated' ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            Automated
+          </button>
+          <button
+            onClick={() => setSourceFilter('manual')}
+            className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+              sourceFilter === 'manual' ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            Manual
+          </button>
         </div>
       </div>
 

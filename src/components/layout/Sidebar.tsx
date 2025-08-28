@@ -184,7 +184,7 @@ const Sidebar: React.FC = () => {
               <li key={item.path}>
                 <Link
                   to={item.path}
-                  className={`nav-link ${isActive ? 'nav-link-active' : ''}`}
+                  className={`group nav-link ${isActive ? 'nav-link-active' : ''}`}
                 >
                   <div className="relative">
                     <Icon className={`h-5 w-5 ${isActive ? 'text-gray-900' : 'text-gray-500 group-hover:text-gray-700'}`} />
@@ -215,7 +215,7 @@ const Sidebar: React.FC = () => {
         <div className="px-3.5 py-3">
           <button
             onClick={() => navigate('/notifications')}
-            className="w-full nav-link justify-between"
+            className="group w-full nav-link justify-between"
           >
             <div className="flex items-center gap-3">
               <Bell className="h-5 w-5 text-gray-500 group-hover:text-gray-700" />
@@ -233,7 +233,7 @@ const Sidebar: React.FC = () => {
         <div className="px-3.5 pb-1.5">
           <Link
             to="/settings"
-            className="nav-link"
+            className="group nav-link"
           >
             <Settings className="h-5 w-5 text-gray-500 group-hover:text-gray-700" />
             <span className="text-sm font-medium">Settings</span>

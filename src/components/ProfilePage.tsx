@@ -677,16 +677,16 @@ const ProfilePage: React.FC = () => {
   const profileCompletion = calculateProfileCompletion();
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+      <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-[28px] font-semibold text-gray-900 dark:text-white">
+              <h1 className="text-[28px] font-semibold text-gray-900">
                 Profile Settings
               </h1>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
+              <p className="mt-1 text-sm text-gray-500 flex items-center gap-2">
                 <span className="text-lg">🎯</span>
                 Complete your profile to improve job matches
               </p>
@@ -742,7 +742,7 @@ const ProfilePage: React.FC = () => {
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Left Column - Profile Preview */}
           <div className="lg:w-[30%]">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 sticky top-8">
+            <div className="glass-card p-6 sticky top-8">
               {/* Avatar Upload */}
               <div className="flex flex-col items-center">
                 <div className="relative group">
@@ -789,7 +789,7 @@ const ProfilePage: React.FC = () => {
               </div>
 
               {/* Quick Stats */}
-              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+              <div className="mt-6 pt-6 border-t border-gray-200">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-500 dark:text-gray-400">Applications</span>
@@ -807,7 +807,7 @@ const ProfilePage: React.FC = () => {
               </div>
 
               {/* Actions */}
-              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700 space-y-2">
+              <div className="mt-6 pt-6 border-t border-gray-200 space-y-2">
                 <button className="w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors flex items-center gap-2">
                   <Download className="h-4 w-4" />
                   Export Profile Data
@@ -825,9 +825,9 @@ const ProfilePage: React.FC = () => {
 
           {/* Right Column - Settings */}
           <div className="lg:w-[70%]">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700">
+            <div className="glass-card">
               {/* Tabs */}
-              <div className="border-b border-gray-200 dark:border-gray-700">
+              <div className="border-b border-gray-200">
                 <nav className="flex space-x-8 px-6" aria-label="Tabs">
                   {tabs.map((tab) => {
                     const Icon = tab.icon;
