@@ -2985,7 +2985,7 @@ This is the #1 issue that needs to be fixed immediately.`;
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm text-gray-600">Applications Sent</span>
-                  <CheckCircle className="h-5 w-5 text-teal-600" />
+                  <CheckCircle className="h-5 w-5 text-[#23a972]" />
                 </div>
                 <motion.div
                   key={appliedCount}
@@ -3005,7 +3005,7 @@ This is the #1 issue that needs to be fixed immediately.`;
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm text-gray-600">Success Rate</span>
-                  <TrendingUp className="h-5 w-5 text-blue-600" />
+                  <TrendingUp className="h-5 w-5 text-[#23a972]" />
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="text-3xl font-bold text-gray-900">{stats.successRate}%</div>
@@ -3015,7 +3015,7 @@ This is the #1 issue that needs to be fixed immediately.`;
                         initial={{ width: 0 }}
                         animate={{ width: `${stats.successRate}%` }}
                         transition={{ duration: 1, delay: 0.5 }}
-                        className="h-full bg-blue-600"
+                        className="h-full bg-[#23a972]"
                       />
                     </div>
                   </div>
@@ -3114,7 +3114,7 @@ This is the #1 issue that needs to be fixed immediately.`;
                                 <div className="text-xs text-gray-500">{model.description}</div>
                               </div>
                               {selectedModel === key && (
-                                <CheckCircle className="h-5 w-5 text-teal-600" />
+                                <CheckCircle className="h-5 w-5 text-[#23a972]" />
                               )}
                             </button>
                           ))}
@@ -3140,7 +3140,7 @@ This is the #1 issue that needs to be fixed immediately.`;
                     </div>
                     <button
                       onClick={() => setShowConfigPanel(!showConfigPanel)}
-                      className="text-sm text-teal-600 hover:text-teal-700 font-medium"
+                      className="text-sm text-[#23a972] hover:text-[#1e9463] font-medium"
                     >
                       {showConfigPanel ? 'Hide' : 'Edit'}
                     </button>
@@ -3155,7 +3155,7 @@ This is the #1 issue that needs to be fixed immediately.`;
                           type="email"
                           value={config.linkedinEmail}
                           onChange={(e) => setConfig({ ...config, linkedinEmail: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#23a972]"
                           placeholder="your@email.com"
                         />
                       </div>
@@ -3167,7 +3167,7 @@ This is the #1 issue that needs to be fixed immediately.`;
                           type="password"
                           value={config.linkedinPassword || ''}
                           onChange={(e) => setConfig({ ...config, linkedinPassword: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#23a972]"
                           placeholder="Your password (encrypted, never stored)"
                         />
                         <p className="text-xs text-gray-500 mt-1">Password is encrypted and used only for this session</p>
@@ -3299,7 +3299,7 @@ This is the #1 issue that needs to be fixed immediately.`;
                                 type="checkbox"
                                 checked={config.applyToExternalJobs}
                                 onChange={(e) => setConfig({ ...config, applyToExternalJobs: e.target.checked })}
-                                className="h-4 w-4 text-teal-600 rounded border-gray-300 focus:ring-teal-500"
+                                className="h-4 w-4 text-[#23a972] rounded border-gray-300 focus:ring-[#23a972]"
                               />
                               <span className="text-sm font-medium text-gray-700">Apply to external jobs (non-Easy Apply)</span>
                             </label>
@@ -3433,7 +3433,7 @@ This is the #1 issue that needs to be fixed immediately.`;
 
                       <button
                         onClick={saveConfiguration}
-                        className="w-full px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+                        className="w-full px-4 py-2 bg-[#23a972] text-white rounded-lg hover:bg-[#1e9463] transition-colors"
                       >
                         Save Configuration
                       </button>
@@ -3519,7 +3519,7 @@ This is the #1 issue that needs to be fixed immediately.`;
 
                     <div className="flex items-center justify-between pt-2">
                       <span className="text-sm text-gray-600">Remaining Applications</span>
-                      <span className="text-sm font-bold text-teal-600">
+                      <span className="text-sm font-bold text-[#23a972]">
                         {getRemainingApplications() === 'Unlimited' ? '∞' : getRemainingApplications()}
                       </span>
                     </div>
@@ -3549,7 +3549,7 @@ This is the #1 issue that needs to be fixed immediately.`;
                   <button
                     onClick={startAutomation}
                     disabled={!config.linkedinEmail}
-                    className="w-full px-6 py-4 bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-xl font-semibold text-lg hover:from-teal-700 hover:to-teal-800 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                    className="w-full px-6 py-4 bg-[#23a972] hover:bg-[#1e9463] text-white rounded-xl font-semibold text-lg transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
                   >
                     <Play className="h-6 w-6" />
                     Start Agent
@@ -3625,7 +3625,7 @@ This is the #1 issue that needs to be fixed immediately.`;
                         href={currentTask.live_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-sm text-teal-600 hover:text-teal-700 font-medium"
+                        className="flex items-center gap-2 text-sm text-[#23a972] hover:text-[#1e9463] font-medium"
                       >
                         Open Full View
                         <ExternalLink className="h-4 w-4" />
@@ -3638,7 +3638,7 @@ This is the #1 issue that needs to be fixed immediately.`;
                       <div className="relative">
                         <div className="absolute inset-0 bg-teal-500 opacity-20 blur-2xl rounded-full"></div>
                         <div className="relative bg-white p-6 rounded-2xl shadow-lg">
-                          <Monitor className="h-12 w-12 text-teal-600" />
+                          <Monitor className="h-12 w-12 text-[#23a972]" />
                         </div>
                       </div>
                       
@@ -3659,7 +3659,7 @@ This is the #1 issue that needs to be fixed immediately.`;
                         href={currentTask.live_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="group relative inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-xl font-semibold hover:from-teal-700 hover:to-teal-800 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                        className="group relative inline-flex items-center gap-3 px-8 py-4 bg-[#23a972] hover:bg-[#1e9463] text-white rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                         onClick={() => {
                           addLog('🌐 Opening live browser view in new tab...', 'info');
                         }}
