@@ -82,6 +82,7 @@ const ProfilePage: React.FC = () => {
     confirmPassword: ''
   });
   const [passwordLoading, setPasswordLoading] = useState(false);
+  const [newSkill, setNewSkill] = useState('');
   
   // Stats state
   const [profileStats, setProfileStats] = useState({
@@ -118,9 +119,9 @@ const ProfilePage: React.FC = () => {
     profileVisibility: 'public'
   });
 
-  // Profile completion calculation (resume optional)
+  // Profile completion calculation (resume counts toward completion)
   const calculateProfileCompletion = () => {
-    const required = [
+    const fields = [
       formData.fullName,
       formData.email,
       formData.phone,
@@ -128,10 +129,11 @@ const ProfilePage: React.FC = () => {
       formData.linkedinUrl,
       formData.currentJobTitle,
       formData.yearsOfExperience > 0,
-      formData.skills.length > 0
+      formData.skills.length > 0,
+      !!profile?.resume_url
     ];
-    const completed = required.filter(Boolean).length;
-    return Math.round((completed / required.length) * 100);
+    const completed = fields.filter(Boolean).length;
+    return Math.round((completed / fields.length) * 100);
   };
 
   // Handle URL query parameters to set active tab
@@ -1166,6 +1168,64 @@ const ProfilePage: React.FC = () => {
                               <span className="font-medium text-teal-600">{formData.yearsOfExperience} years</span>
                               <span>30+</span>
                             </div>
+                          </div>
+                        </div>
+
+                        {/* Skills (chips) */}
+                        <div className="mb-6">
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Skills
+                          </label>
+                          <div className="flex flex-wrap gap-2 mb-3">
+                            {formData.skills.map((skill, idx) => (
+                              <span key={`${skill}-${idx}`} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-600">
+                                {skill}
+                                <button
+                                  type="button"
+                                  className="hover:text-red-600"
+                                  onClick={() => {
+                                    const next = formData.skills.filter((_, i) => i !== idx);
+                                    handleInputChange('skills', next);
+                                  }}
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </span>
+                            ))}
+                            {formData.skills.length === 0 && (
+                              <span className="text-xs text-gray-500 dark:text-gray-400">Add at least one skill</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={newSkill}
+                              onChange={(e) => setNewSkill(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  const val = newSkill.trim();
+                                  if (val && !formData.skills.includes(val)) {
+                                    handleInputChange('skills', [...formData.skills, val]);
+                                  }
+                                  setNewSkill('');
+                                }
+                              }}
+                              placeholder="Type a skill and press Enter"
+                              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const val = newSkill.trim();
+                                if (val && !formData.skills.includes(val)) {
+                                  handleInputChange('skills', [...formData.skills, val]);
+                                }
+                                setNewSkill('');
+                              }}
+                              className="px-3 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition-colors"
+                            >
+                              Add
+                            </button>
                           </div>
                         </div>
                       </div>
