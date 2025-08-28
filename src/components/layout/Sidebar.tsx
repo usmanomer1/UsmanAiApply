@@ -160,51 +160,45 @@ const Sidebar: React.FC = () => {
   ];
 
   return (
-    <div className="fixed left-0 top-0 h-full w-[240px] bg-white border-r border-gray-100 flex flex-col">
+    <div className="fixed left-0 top-0 h-full w-[240px] bg-white/90 backdrop-blur-sm border-r border-gray-100 flex flex-col">
       {/* Logo Area */}
-      <div className="h-16 px-6 flex items-center border-b border-gray-100">
-        <div className="flex items-center space-x-3">
-          <img 
-            src="/images/logos/light.png" 
-            alt="Jobotic" 
-            className="h-7 w-7"
+      <div className="h-16 px-5 flex items-center border-b border-gray-100">
+        <div className="flex items-center gap-2.5">
+          <img
+            src="/images/logos/light.png"
+            alt="Jobotic"
+            className="h-7 w-7 rounded-md shadow-sm"
           />
-          <span className="text-lg font-semibold text-gray-900">Jobotic</span>
+          <span className="text-[15px] font-semibold tracking-tight text-gray-900">Jobotic</span>
         </div>
       </div>
 
       {/* Main Navigation */}
-      <nav className="flex-1 px-3 py-4">
-        <ul className="space-y-1">
+      <nav className="flex-1 px-3.5 py-4">
+        <ul className="space-y-1.5">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
-            
+
             return (
               <li key={item.path}>
                 <Link
                   to={item.path}
-                  className={`
-                    group flex items-center gap-3 px-3 py-2.5 rounded-2xl transition-all duration-200
-                    ${isActive 
-                      ? 'bg-teal-500 text-white shadow-sm' 
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                    }
-                  `}
+                  className={`nav-link ${isActive ? 'nav-link-active' : ''}`}
                 >
                   <div className="relative">
-                    <Icon className={`h-5 w-5 ${isActive ? 'text-white' : 'text-gray-500 group-hover:text-gray-700'}`} />
+                    <Icon className={`h-5 w-5 ${isActive ? 'text-gray-900' : 'text-gray-500 group-hover:text-gray-700'}`} />
                     {item.showIndicator && (
-                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full flex items-center justify-center">
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full flex items-center justify-center">
                         <Check className="h-2 w-2 text-white" strokeWidth={3} />
                       </div>
                     )}
                   </div>
-                  <div className="flex-1">
-                    <p className={`text-sm font-medium ${isActive ? 'text-white' : ''}`}>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">
                       {item.label}
                     </p>
-                    <p className={`text-xs ${isActive ? 'text-teal-100' : 'text-gray-500 group-hover:text-gray-600'}`}>
+                    <p className="text-[11px] text-gray-500 truncate">
                       {item.description}
                     </p>
                   </div>
@@ -218,17 +212,17 @@ const Sidebar: React.FC = () => {
       {/* Bottom Section */}
       <div className="border-t border-gray-100">
         {/* Notifications */}
-        <div className="px-3 py-3">
-          <button 
+        <div className="px-3.5 py-3">
+          <button
             onClick={() => navigate('/notifications')}
-            className="w-full flex items-center justify-between px-3 py-2.5 rounded-2xl hover:bg-gray-50 transition-all duration-200 group"
+            className="w-full nav-link justify-between"
           >
             <div className="flex items-center gap-3">
               <Bell className="h-5 w-5 text-gray-500 group-hover:text-gray-700" />
-              <span className="text-sm font-medium text-gray-600 group-hover:text-gray-900">Notifications</span>
+              <span className="text-sm font-medium">Notifications</span>
             </div>
             {notifications > 0 && (
-              <span className="bg-teal-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full">
+              <span className="bg-emerald-500 text-white text-[11px] font-semibold px-2 py-0.5 rounded-full">
                 {notifications}
               </span>
             )}
@@ -236,19 +230,19 @@ const Sidebar: React.FC = () => {
         </div>
 
         {/* Settings */}
-        <div className="px-3">
+        <div className="px-3.5 pb-1.5">
           <Link
             to="/settings"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-gray-50 transition-all duration-200 group"
+            className="nav-link"
           >
             <Settings className="h-5 w-5 text-gray-500 group-hover:text-gray-700" />
-            <span className="text-sm font-medium text-gray-600 group-hover:text-gray-900">Settings</span>
+            <span className="text-sm font-medium">Settings</span>
           </Link>
         </div>
 
         {/* User Profile */}
-        <div className="p-3 border-t border-gray-100">
-          <div className="flex items-center gap-3 px-3 py-2">
+        <div className="p-3.5 border-t subtle-divider">
+          <div className="flex items-center gap-3 px-2.5 py-2">
             <div className="w-10 h-10 bg-gradient-to-br from-teal-400 to-teal-600 rounded-full flex items-center justify-center shadow-sm">
               <span className="text-white text-sm font-semibold">
                 {userProfile?.full_name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'U'}
@@ -264,7 +258,7 @@ const Sidebar: React.FC = () => {
             </div>
             <button
               onClick={handleLogout}
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-xl transition-all duration-200"
+              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
               title="Sign out"
             >
               <LogOut className="h-4 w-4" />
