@@ -517,7 +517,7 @@ export const ResumePage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-900">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-900 shadow-sm">
+      <div className="glass-card">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -609,7 +609,7 @@ export const ResumePage: React.FC = () => {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 }}
-                  className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6"
+                  className="glass-card p-6"
                 >
                   <div className="mb-6">
                     <h2 className="text-lg font-light text-gray-900 dark:text-white mb-1">
@@ -698,7 +698,7 @@ export const ResumePage: React.FC = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className={`bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800 p-6 relative overflow-hidden transition-opacity ${
+                className={`glass-card p-6 relative overflow-hidden transition-opacity ${
                   !selectedFile ? 'opacity-50 pointer-events-none' : ''
                 }`}
               >
@@ -838,9 +838,7 @@ export const ResumePage: React.FC = () => {
                     className="grid grid-cols-1 lg:grid-cols-2 gap-6"
                   >
                     {/* Analysis Card */}
-                    <motion.div
-                      className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800 p-6 relative overflow-hidden"
-                    >
+                    <motion.div className="glass-card p-6 relative overflow-hidden">
                       {/* Back Button */}
                       <button
                         onClick={() => {
@@ -1073,7 +1071,7 @@ export const ResumePage: React.FC = () => {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.4 }}
-                      className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800 p-6 relative overflow-hidden"
+                      className="glass-card p-6 relative overflow-hidden"
                     >
                       {/* Step Number */}
                       <div className="absolute top-6 right-6 w-8 h-8 bg-gradient-to-br from-[#1DE0DD]/10 to-[#00C4CC]/10 rounded-full flex items-center justify-center">
@@ -1250,7 +1248,7 @@ export const ResumePage: React.FC = () => {
                     animate={{ opacity: 1, y: 0 }}
                     className="max-w-md mx-auto text-center"
                   >
-                    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800 p-8">
+                    <div className="glass-card p-8">
                       <motion.div
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}

@@ -37,7 +37,7 @@ import {
   Linkedin
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, uploadResume, uploadAvatar } from '../lib/supabase';
+import { supabase, uploadResume, uploadAvatar, getSignedResumeUrl } from '../lib/supabase';
 import { getPlanNameByPriceId } from '../stripe-config';
 import { extractTextFromPDF } from '../lib/pdfExtractor';
 import toast from 'react-hot-toast';
@@ -70,7 +70,7 @@ const ProfilePage: React.FC = () => {
   const [uploadingResume, setUploadingResume] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  
   const [resumeAnalysis, setResumeAnalysis] = useState<{
     score: number;
     keySkills: string[];
@@ -82,6 +82,7 @@ const ProfilePage: React.FC = () => {
     confirmPassword: ''
   });
   const [passwordLoading, setPasswordLoading] = useState(false);
+  const [newSkill, setNewSkill] = useState('');
   
   // Stats state
   const [profileStats, setProfileStats] = useState({
@@ -118,7 +119,7 @@ const ProfilePage: React.FC = () => {
     profileVisibility: 'public'
   });
 
-  // Profile completion calculation
+  // Profile completion calculation (resume counts toward completion)
   const calculateProfileCompletion = () => {
     const fields = [
       formData.fullName,
@@ -129,7 +130,7 @@ const ProfilePage: React.FC = () => {
       formData.currentJobTitle,
       formData.yearsOfExperience > 0,
       formData.skills.length > 0,
-      profile?.resume_url
+      !!profile?.resume_url
     ];
     const completed = fields.filter(Boolean).length;
     return Math.round((completed / fields.length) * 100);
@@ -151,18 +152,21 @@ const ProfilePage: React.FC = () => {
     }
   }, [location]);
 
+  // Initial data load on mount only
   useEffect(() => {
     fetchProfile();
     fetchProfileStats();
     fetchSubscription();
     fetchJobPreferences();
-    // Set up autosave
+  }, []);
+
+  // Autosave interval; re-create only when hasUnsavedChanges toggles
+  useEffect(() => {
     const autosaveInterval = setInterval(() => {
       if (hasUnsavedChanges) {
         handleSave(true);
       }
-    }, 30000); // Auto-save every 30 seconds
-
+    }, 30000);
     return () => clearInterval(autosaveInterval);
   }, [hasUnsavedChanges]);
 
@@ -340,25 +344,25 @@ const ProfilePage: React.FC = () => {
 
       // First check if profile exists
       if (profile) {
-        // Use update to preserve existing fields like resume_url
+        // Update the specific row by id
         const { error } = await supabase
           .from('profiles')
           .update(updateData)
-          .eq('user_id', user!.id);
-          
+          .eq('id', profile.id);
         if (error) throw error;
       } else {
-        // Create new profile if it doesn't exist
-        const { error } = await supabase
+        // Create new profile if it doesn't exist (no upsert to avoid duplicates)
+        const { data: inserted, error } = await supabase
           .from('profiles')
-          .upsert({
+          .insert({
             ...updateData,
             user_id: user!.id
-          }, {
-            onConflict: 'user_id'
-          });
-          
+          })
+          .select()
+          .limit(1);
         if (error) throw error;
+        const newRow = Array.isArray(inserted) ? inserted[0] : inserted;
+        if (newRow) setProfile(newRow);
       }
 
       // Save job preferences
@@ -405,6 +409,42 @@ const ProfilePage: React.FC = () => {
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setHasUnsavedChanges(true);
+  };
+
+  // Skills helpers with autosave
+  const saveSkills = async (nextSkills: string[]) => {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ skills: nextSkills })
+        .eq('id', profile?.id || '');
+      if (error) {
+        console.error('Supabase update skills error:', error);
+        toast.error('Failed to save skills');
+      }
+    } catch (error) {
+      console.error('Error saving skills:', error);
+      toast.error('Failed to save skills');
+    }
+  };
+
+  const addSkill = (value: string) => {
+    const trimmed = (value || '').trim();
+    if (!trimmed) return;
+    const exists = formData.skills.some(s => s.toLowerCase() === trimmed.toLowerCase());
+    if (exists) return;
+    const next = [...formData.skills, trimmed];
+    setFormData(prev => ({ ...prev, skills: next }));
+    setHasUnsavedChanges(true);
+    void saveSkills(next);
+  };
+
+  const removeSkillAt = (index: number) => {
+    const next = formData.skills.filter((_, i) => i !== index);
+    setFormData(prev => ({ ...prev, skills: next }));
+    setHasUnsavedChanges(true);
+    void saveSkills(next);
   };
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -493,7 +533,7 @@ const ProfilePage: React.FC = () => {
         const { data: updateData, error: updateError } = await supabase
           .from('profiles')
           .update({ resume_url: resumePath })
-          .eq('user_id', user!.id)
+          .eq('id', profile.id)
           .select();
 
         if (updateError) throw updateError;
@@ -561,27 +601,52 @@ const ProfilePage: React.FC = () => {
     if (file) handleResumeUpload(file);
   };
 
+  const normalizeResumePath = (urlOrPath: string): string => {
+    try {
+      if (!urlOrPath) return '';
+      if (urlOrPath.startsWith('http')) {
+        const marker = '/resumes/';
+        const idx = urlOrPath.indexOf(marker);
+        if (idx !== -1) {
+          return urlOrPath.substring(idx + marker.length).split('?')[0];
+        }
+        // fallback: last pathname segments
+        const u = new URL(urlOrPath);
+        return u.pathname.split('/').slice(-2).join('/');
+      }
+      return urlOrPath;
+    } catch {
+      return urlOrPath;
+    }
+  };
+
   const downloadResume = async () => {
     if (!profile?.resume_url) return;
 
     try {
-      // The resume_url is already just the path (e.g., "user-id/resume.pdf")
-      const filePath = profile.resume_url;
-      
-      const { data, error } = await supabase.storage
-        .from('resumes')
-        .download(filePath);
-
-      if (error) throw error;
-
-      const url = URL.createObjectURL(data);
+      const path = normalizeResumePath(profile.resume_url);
+      let signed = await getSignedResumeUrl(path);
+      if (!signed) {
+        // Attempt to locate the actual file under the user's folder
+        const { data: items } = await supabase.storage.from('resumes').list(user!.id, { limit: 20 });
+        const pdf = (items || []).find(i => i.name.toLowerCase().endsWith('.pdf'));
+        if (pdf) {
+          const fixedPath = `${user!.id}/${pdf.name}`;
+          signed = await getSignedResumeUrl(fixedPath);
+          if (signed) {
+            // Heal DB pointer for future
+            await supabase.from('profiles').update({ resume_url: fixedPath }).eq('user_id', user!.id);
+            setProfile(prev => prev ? { ...prev, resume_url: fixedPath } : prev);
+          }
+        }
+      }
+      if (!signed) throw new Error('Resume file not found in storage');
       const a = document.createElement('a');
-      a.href = url;
+      a.href = signed;
       a.download = `resume_${user?.id}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error downloading resume:', error);
       toast.error('Failed to download resume');
@@ -626,33 +691,21 @@ const ProfilePage: React.FC = () => {
     if (!profile?.resume_url) return;
 
     try {
-      // First, delete the file from storage
-      const filePath = profile.resume_url;
-      const { error: storageError } = await supabase.storage
-        .from('resumes')
-        .remove([filePath]);
-      
+      const path = normalizeResumePath(profile.resume_url);
+      const { error: storageError } = await supabase.storage.from('resumes').remove([path]);
       if (storageError) {
-        console.log('Storage deletion error (may be ignored if file doesn\'t exist):', storageError);
+        console.log('Storage deletion error (may be ignored if file missing):', storageError);
       }
 
-      // Then update the database - use .limit(1) instead of .single()
-      const { data: profiles, error } = await supabase
+      const { error } = await supabase
         .from('profiles')
         .update({ resume_url: null })
-        .eq('user_id', user!.id)
-        .select()
-        .limit(1);
+        .eq('id', profile!.id);
 
       if (error) throw error;
-
-      // Directly update the profile state
-      const updateData = profiles?.[0] || null;
-      if (updateData) {
-        setProfile(updateData);
-      }
+      setProfile(prev => prev ? { ...prev, resume_url: null } : prev);
       setResumeAnalysis(null);
-      toast.success('Resume deleted successfully. You can now upload a PDF resume.');
+      toast.success('Resume deleted. You can upload a new PDF.');
     } catch (error) {
       console.error('Error deleting resume:', error);
       toast.error('Failed to delete resume');
@@ -677,16 +730,16 @@ const ProfilePage: React.FC = () => {
   const profileCompletion = calculateProfileCompletion();
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+      <div className="glass-card">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-[28px] font-semibold text-gray-900 dark:text-white">
+              <h1 className="text-[28px] font-semibold text-gray-900">
                 Profile Settings
               </h1>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
+              <p className="mt-1 text-sm text-gray-500 flex items-center gap-2">
                 <span className="text-lg">🎯</span>
                 Complete your profile to improve job matches
               </p>
@@ -742,27 +795,10 @@ const ProfilePage: React.FC = () => {
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Left Column - Profile Preview */}
           <div className="lg:w-[30%]">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 sticky top-8">
-              {/* Avatar Upload */}
-              <div className="flex flex-col items-center">
-                <div className="relative group">
-                  <div className="w-[120px] h-[120px] rounded-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-white text-3xl font-bold shadow-lg">
-                    {avatarUrl ? (
-                      <img 
-                        src={avatarUrl} 
-                        alt="Profile" 
-                        className="w-full h-full rounded-full object-cover"
-                      />
-                    ) : (
-                      formData.fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-                    )}
-                  </div>
-                  <button className="absolute inset-0 w-full h-full rounded-full bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                    <Camera className="h-8 w-8 text-white" />
-                  </button>
-                </div>
-                
-                <h2 className="mt-4 text-xl font-semibold text-gray-900 dark:text-white">
+            <div className="glass-card p-6 sticky top-8">
+              {/* Summary (no avatar to avoid duplication) */}
+              <div className="flex flex-col items-center text-center">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
                   {formData.fullName || 'Your Name'}
                 </h2>
                 
@@ -789,7 +825,7 @@ const ProfilePage: React.FC = () => {
               </div>
 
               {/* Quick Stats */}
-              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+              <div className="mt-6 pt-6 border-t border-gray-200">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-500 dark:text-gray-400">Applications</span>
@@ -807,11 +843,7 @@ const ProfilePage: React.FC = () => {
               </div>
 
               {/* Actions */}
-              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700 space-y-2">
-                <button className="w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors flex items-center gap-2">
-                  <Download className="h-4 w-4" />
-                  Export Profile Data
-                </button>
+              <div className="mt-6 pt-6 border-t border-gray-200 space-y-2">
                 <button 
                   onClick={() => signOut()}
                   className="w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors flex items-center gap-2"
@@ -825,9 +857,9 @@ const ProfilePage: React.FC = () => {
 
           {/* Right Column - Settings */}
           <div className="lg:w-[70%]">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700">
+            <div className="glass-card">
               {/* Tabs */}
-              <div className="border-b border-gray-200 dark:border-gray-700">
+              <div className="border-b border-gray-200">
                 <nav className="flex space-x-8 px-6" aria-label="Tabs">
                   {tabs.map((tab) => {
                     const Icon = tab.icon;
@@ -1043,13 +1075,10 @@ const ProfilePage: React.FC = () => {
                               onDragLeave={handleDragLeave}
                               onDrop={handleDrop}
                               onClick={() => fileInputRef.current?.click()}
-                              className={`
-                                relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all
-                                ${isDragging 
-                                  ? 'border-teal-500 bg-teal-50 dark:bg-teal-900/20' 
-                                  : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
-                                }
-                              `}
+                              className={
+                                `glass-card relative rounded-xl p-8 text-center cursor-pointer transition-all border-2 border-dashed ` +
+                                (isDragging ? 'border-teal-500 bg-teal-50 dark:bg-teal-900/20' : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500')
+                              }
                             >
                               <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                               <p className="text-base font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -1066,7 +1095,7 @@ const ProfilePage: React.FC = () => {
                               )}
                             </div>
                           ) : (
-                            <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-6">
+                            <div className="glass-card p-6">
                               <div className="flex items-start justify-between mb-4">
                                 <div className="flex items-start gap-4">
                                   <div className="w-12 h-12 bg-teal-100 dark:bg-teal-900 rounded-lg flex items-center justify-center">
@@ -1188,6 +1217,63 @@ const ProfilePage: React.FC = () => {
                               <span className="font-medium text-teal-600">{formData.yearsOfExperience} years</span>
                               <span>30+</span>
                             </div>
+                          </div>
+                        </div>
+
+                        {/* Skills (chips) */}
+                        <div className="mb-6">
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Skills
+                          </label>
+                          <div className="flex flex-wrap gap-2 mb-3">
+                            {formData.skills.map((skill, idx) => (
+                              <span key={`${skill}-${idx}`} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-600">
+                                {skill}
+                                <button
+                                  type="button"
+                                  className="hover:text-red-600"
+                                  onClick={() => removeSkillAt(idx)}
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </span>
+                            ))}
+                            {formData.skills.length === 0 && (
+                              <span className="text-xs text-gray-500 dark:text-gray-400">Add at least one skill</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={newSkill}
+                              onChange={(e) => setNewSkill(e.target.value)}
+                              onBlur={() => {
+                                const val = newSkill.trim().replace(/,$/, '');
+                                if (val) addSkill(val);
+                                setNewSkill('');
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ',') {
+                                  e.preventDefault();
+                                  const val = newSkill.trim().replace(/,$/, '');
+                                  if (val) addSkill(val);
+                                  setNewSkill('');
+                                }
+                              }}
+                              placeholder="Type a skill and press Enter"
+                              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const val = newSkill.trim().replace(/,$/, '');
+                                if (val) addSkill(val);
+                                setNewSkill('');
+                              }}
+                              className="px-3 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition-colors"
+                            >
+                              Add
+                            </button>
                           </div>
                         </div>
                       </div>

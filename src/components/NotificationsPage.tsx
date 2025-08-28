@@ -203,24 +203,24 @@ const NotificationsPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+      <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-[28px] font-semibold text-gray-900 dark:text-white">
+              <h1 className="text-[28px] font-semibold text-gray-900">
                 Notifications
               </h1>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
+              <p className="mt-1 text-sm text-gray-500 flex items-center gap-2">
                 <Bell className="h-4 w-4" />
                 Stay updated with your job search activity
               </p>
             </div>
             
             {unreadCount > 0 && (
-              <div className="bg-teal-50 dark:bg-teal-900/20 px-4 py-2 rounded-lg">
-                <p className="text-sm font-medium text-teal-700 dark:text-teal-300">
+              <div className="bg-teal-50 px-4 py-2 rounded-lg">
+                <p className="text-sm font-medium text-teal-700">
                   {unreadCount} unread
                 </p>
               </div>
@@ -233,13 +233,13 @@ const NotificationsPage: React.FC = () => {
         {/* Filters and Actions */}
         <div className="mb-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+            <div className="flex bg-white rounded-lg shadow-sm border border-gray-200">
               <button
                 onClick={() => setFilter('all')}
                 className={`px-4 py-2 text-sm font-medium rounded-l-lg transition-colors ${
                   filter === 'all'
-                    ? 'bg-teal-50 text-teal-700 dark:bg-teal-900/20 dark:text-teal-300'
-                    : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+                    ? 'bg-teal-50 text-teal-700'
+                    : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
                 All
@@ -248,8 +248,8 @@ const NotificationsPage: React.FC = () => {
                 onClick={() => setFilter('unread')}
                 className={`px-4 py-2 text-sm font-medium rounded-r-lg transition-colors ${
                   filter === 'unread'
-                    ? 'bg-teal-50 text-teal-700 dark:bg-teal-900/20 dark:text-teal-300'
-                    : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+                    ? 'bg-teal-50 text-teal-700'
+                    : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
                 Unread
@@ -259,7 +259,7 @@ const NotificationsPage: React.FC = () => {
             <select
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value)}
-              className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
+              className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:border-gray-300 transition-colors"
             >
               <option value="all">All Types</option>
               <option value="job_match">Job Matches</option>
@@ -273,7 +273,7 @@ const NotificationsPage: React.FC = () => {
             {unreadCount > 0 && (
               <button
                 onClick={markAllAsRead}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
               >
                 Mark all as read
               </button>
@@ -281,7 +281,7 @@ const NotificationsPage: React.FC = () => {
             {notifications.some(n => n.read) && (
               <button
                 onClick={deleteAllRead}
-                className="px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 transition-colors"
               >
                 Clear read
               </button>
@@ -294,20 +294,20 @@ const NotificationsPage: React.FC = () => {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center"
+            className="glass-card p-12 text-center"
           >
             <div className="max-w-sm mx-auto">
-              <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 {filter === 'unread' ? (
                   <Bell className="h-8 w-8 text-gray-400" />
                 ) : (
                   <Inbox className="h-8 w-8 text-gray-400" />
                 )}
               </div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
                 {filter === 'unread' ? 'All caught up!' : 'No notifications yet'}
               </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-sm text-gray-500">
                 {filter === 'unread' 
                   ? "You've read all your notifications. Check back later for new updates."
                   : "We'll notify you when there are new job matches or updates to your applications."
@@ -325,7 +325,7 @@ const NotificationsPage: React.FC = () => {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, x: -100 }}
                   transition={{ delay: index * 0.05 }}
-                  className={`bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-all ${
+                  className={`glass-card p-4 hover:shadow-md transition-all ${
                     !notification.read ? 'border-l-4 border-l-teal-500' : ''
                   }`}
                   onClick={() => !notification.read && markAsRead(notification.id)}
@@ -340,15 +340,15 @@ const NotificationsPage: React.FC = () => {
                         <div>
                           <h4 className={`text-sm font-medium ${
                             !notification.read 
-                              ? 'text-gray-900 dark:text-white' 
-                              : 'text-gray-700 dark:text-gray-300'
+                              ? 'text-gray-900' 
+                              : 'text-gray-700'
                           }`}>
                             {notification.title}
                           </h4>
-                          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                          <p className="mt-1 text-sm text-gray-600">
                             {notification.message}
                           </p>
-                          <p className="mt-2 text-xs text-gray-500 dark:text-gray-500 flex items-center gap-1">
+                          <p className="mt-2 text-xs text-gray-500 flex items-center gap-1">
                             <Clock className="h-3 w-3" />
                             {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
                           </p>
@@ -359,14 +359,14 @@ const NotificationsPage: React.FC = () => {
                             e.stopPropagation();
                             deleteNotification(notification.id);
                           }}
-                          className="text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                          className="text-gray-400 hover:text-red-600 transition-colors"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                       
                       {notification.data?.action_url && (
-                        <button className="mt-3 inline-flex items-center text-sm font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300">
+                        <button className="mt-3 inline-flex items-center text-sm font-medium text-teal-600 hover:text-teal-700">
                           View Details
                           <ChevronRight className="ml-1 h-4 w-4" />
                         </button>
