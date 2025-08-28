@@ -152,18 +152,21 @@ const ProfilePage: React.FC = () => {
     }
   }, [location]);
 
+  // Initial data load on mount only
   useEffect(() => {
     fetchProfile();
     fetchProfileStats();
     fetchSubscription();
     fetchJobPreferences();
-    // Set up autosave
+  }, []);
+
+  // Autosave interval; re-create only when hasUnsavedChanges toggles
+  useEffect(() => {
     const autosaveInterval = setInterval(() => {
       if (hasUnsavedChanges) {
         handleSave(true);
       }
-    }, 30000); // Auto-save every 30 seconds
-
+    }, 30000);
     return () => clearInterval(autosaveInterval);
   }, [hasUnsavedChanges]);
 
