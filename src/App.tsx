@@ -13,7 +13,7 @@ import { ResumePage } from './components/ResumePage';
 import LinkedInAutomationBot from './components/LinkedInAutomationBot';
 import { SuccessPage } from './components/SuccessPage';
 import JobSearchConvex from './components/JobSearchConvex';
-import { BillingPage } from './components/billing/BillingPage';
+import { BillingPageOptimized as BillingPage } from './components/billing/BillingPageOptimized';
 import SettingsPage from './components/SettingsPage';
 import MacOSDashboard from './components/MacOSDashboard';
 import ApplicationsPage from './components/applications/ApplicationsPage';
