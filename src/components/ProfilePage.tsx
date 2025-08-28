@@ -70,7 +70,7 @@ const ProfilePage: React.FC = () => {
   const [uploadingResume, setUploadingResume] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  
   const [resumeAnalysis, setResumeAnalysis] = useState<{
     score: number;
     keySkills: string[];
@@ -118,9 +118,9 @@ const ProfilePage: React.FC = () => {
     profileVisibility: 'public'
   });
 
-  // Profile completion calculation
+  // Profile completion calculation (resume optional)
   const calculateProfileCompletion = () => {
-    const fields = [
+    const required = [
       formData.fullName,
       formData.email,
       formData.phone,
@@ -128,11 +128,10 @@ const ProfilePage: React.FC = () => {
       formData.linkedinUrl,
       formData.currentJobTitle,
       formData.yearsOfExperience > 0,
-      formData.skills.length > 0,
-      profile?.resume_url
+      formData.skills.length > 0
     ];
-    const completed = fields.filter(Boolean).length;
-    return Math.round((completed / fields.length) * 100);
+    const completed = required.filter(Boolean).length;
+    return Math.round((completed / required.length) * 100);
   };
 
   // Handle URL query parameters to set active tab
@@ -743,26 +742,9 @@ const ProfilePage: React.FC = () => {
           {/* Left Column - Profile Preview */}
           <div className="lg:w-[30%]">
             <div className="glass-card p-6 sticky top-8">
-              {/* Avatar Upload */}
-              <div className="flex flex-col items-center">
-                <div className="relative group">
-                  <div className="w-[120px] h-[120px] rounded-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-white text-3xl font-bold shadow-lg">
-                    {avatarUrl ? (
-                      <img 
-                        src={avatarUrl} 
-                        alt="Profile" 
-                        className="w-full h-full rounded-full object-cover"
-                      />
-                    ) : (
-                      formData.fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-                    )}
-                  </div>
-                  <button className="absolute inset-0 w-full h-full rounded-full bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                    <Camera className="h-8 w-8 text-white" />
-                  </button>
-                </div>
-                
-                <h2 className="mt-4 text-xl font-semibold text-gray-900 dark:text-white">
+              {/* Summary (no avatar to avoid duplication) */}
+              <div className="flex flex-col items-center text-center">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
                   {formData.fullName || 'Your Name'}
                 </h2>
                 
@@ -808,10 +790,6 @@ const ProfilePage: React.FC = () => {
 
               {/* Actions */}
               <div className="mt-6 pt-6 border-t border-gray-200 space-y-2">
-                <button className="w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors flex items-center gap-2">
-                  <Download className="h-4 w-4" />
-                  Export Profile Data
-                </button>
                 <button 
                   onClick={() => signOut()}
                   className="w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors flex items-center gap-2"
