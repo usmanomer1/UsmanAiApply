@@ -233,7 +233,7 @@ export const ResumeAnalyzerV2: React.FC<ResumeAnalyzerV2Props> = ({
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center gap-3">
-                <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                <FileText className="h-6 w-6 text-[#23a972] dark:text-[#23a972]" />
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
                   Resume Optimizer
                 </h2>
@@ -273,7 +273,7 @@ export const ResumeAnalyzerV2: React.FC<ResumeAnalyzerV2Props> = ({
                         href={job.job_apply_link || job.link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline mt-2"
+                        className="inline-flex items-center gap-1 text-sm text-[#23a972] hover:underline mt-2"
                       >
                         View Job Posting
                         <ExternalLink className="h-3 w-3" />
@@ -287,13 +287,13 @@ export const ResumeAnalyzerV2: React.FC<ResumeAnalyzerV2Props> = ({
               {step === 'preview' && analysisResult?.data && (
                 <div className="space-y-6">
                   {/* Score */}
-                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-6">
+                  <div className="bg-[#23a972]/10 dark:bg-[#23a972]/10 rounded-lg p-6">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
                       Resume Analysis Score
                     </h3>
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                        <p className="text-3xl font-bold text-[#23a972]">
                           {analysisResult.data.summary.overallScore.toFixed(1)}/10
                         </p>
                         <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
@@ -367,7 +367,7 @@ export const ResumeAnalyzerV2: React.FC<ResumeAnalyzerV2Props> = ({
                             <a
                               href={generationResult.data.downloadUrl}
                               download
-                              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                              className="flex items-center gap-2 px-4 py-2 bg-[#23a972] text-white rounded-lg hover:bg-[#1e9463] transition"
                             >
                               <Download className="h-4 w-4" />
                               Download Resume
@@ -386,7 +386,7 @@ export const ResumeAnalyzerV2: React.FC<ResumeAnalyzerV2Props> = ({
                         {!generationResult.data?.downloadUrl && (
                           <button
                             onClick={handleDownload}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                            className="flex items-center gap-2 px-4 py-2 bg-[#23a972] text-white rounded-lg hover:bg-[#1e9463] transition"
                           >
                             <Download className="h-4 w-4" />
                             Download Resume
@@ -401,7 +401,7 @@ export const ResumeAnalyzerV2: React.FC<ResumeAnalyzerV2Props> = ({
               {/* Loading States */}
               {loading && (
                 <div className="flex flex-col items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400 mb-4" />
+                  <Loader2 className="h-8 w-8 animate-spin text-[#23a972] mb-4" />
                   <p className="text-gray-600 dark:text-gray-400">
                     {step === 'analyze' ? 'Analyzing your resume...' : 'Generating optimized resume...'}
                   </p>
@@ -424,7 +424,7 @@ export const ResumeAnalyzerV2: React.FC<ResumeAnalyzerV2Props> = ({
               {step === 'preview' && analysisResult && !generationResult && !loading && (
                 <button
                   onClick={handleGenerate}
-                  className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                  className="flex items-center gap-2 px-6 py-2 bg-[#23a972] text-white rounded-lg hover:bg-[#1e9463] transition"
                 >
                   Generate Optimized Resume
                   <ArrowRight className="h-4 w-4" />

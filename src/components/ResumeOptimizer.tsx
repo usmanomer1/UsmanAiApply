@@ -217,7 +217,7 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
             className="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden"
           >
             {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-purple-700 text-white p-6">
+            <div className="bg-[#23a972] text-white p-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <div className="p-2 bg-white/20 rounded-xl">
@@ -225,7 +225,7 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
                   </div>
                   <div>
                     <h2 className="text-2xl font-bold">Resume Optimizer</h2>
-                    <p className="text-blue-100">
+                    <p className="text-white/80">
                       Optimize for: {job?.job_title} at {job?.employer_name}
                     </p>
                   </div>
@@ -241,9 +241,9 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
               {/* Progress Indicator */}
               <div className="mt-6 flex items-center justify-between">
                 <div className="flex items-center space-x-4">
-                  <div className={`flex items-center space-x-2 ${localState.step === 'analyze' ? 'text-white' : 'text-blue-200'}`}>
+                  <div className={`flex items-center space-x-2 ${localState.step === 'analyze' ? 'text-white' : 'text-white/70'}`}>
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                      localState.step === 'analyze' ? 'bg-white text-blue-600' : 
+                      localState.step === 'analyze' ? 'bg-white text-[#23a972]' : 
                       analysisResult ? 'bg-green-500 text-white' : 'bg-white/20'
                     }`}>
                       {analysisResult ? <CheckCircle className="h-4 w-4" /> : '1'}
@@ -251,9 +251,9 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
                     <span className="text-sm font-medium">Analyze</span>
                   </div>
                   <div className="w-8 h-0.5 bg-white/30" />
-                  <div className={`flex items-center space-x-2 ${localState.step === 'results' ? 'text-white' : 'text-blue-200'}`}>
+                  <div className={`flex items-center space-x-2 ${localState.step === 'results' ? 'text-white' : 'text-white/70'}`}>
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                      localState.step === 'results' ? 'bg-white text-blue-600' : 
+                      localState.step === 'results' ? 'bg-white text-[#23a972]' : 
                       generationResult ? 'bg-green-500 text-white' : 'bg-white/20'
                     }`}>
                       {generationResult ? <CheckCircle className="h-4 w-4" /> : '2'}
@@ -261,9 +261,9 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
                     <span className="text-sm font-medium">Optimize</span>
                   </div>
                   <div className="w-8 h-0.5 bg-white/30" />
-                  <div className={`flex items-center space-x-2 ${localState.step === 'generation' ? 'text-white' : 'text-blue-200'}`}>
+                  <div className={`flex items-center space-x-2 ${localState.step === 'generation' ? 'text-white' : 'text-white/70'}`}>
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                      localState.step === 'generation' ? 'bg-white text-blue-600' : 'bg-white/20'
+                      localState.step === 'generation' ? 'bg-white text-[#23a972]' : 'bg-white/20'
                     }`}>
                       <Download className="h-4 w-4" />
                     </div>
@@ -278,9 +278,9 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
               {loading && (
                 <div className="flex flex-col items-center justify-center py-12">
                   <div className="relative">
-                    <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600"></div>
+                    <div className="animate-spin rounded-full h-16 w-16 border-4 border-white/40 border-t-white"></div>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <Sparkles className="h-6 w-6 text-blue-600" />
+                      <Sparkles className="h-6 w-6 text-white" />
                     </div>
                   </div>
                   <p className="text-lg font-medium text-gray-800 mt-4">
@@ -313,7 +313,7 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
               {!loading && !error && analysisResult && localState.step === 'results' && (
                 <div className="space-y-6">
                   {/* Score Display */}
-                  <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-6">
+                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6">
                     <div className="grid grid-cols-2 gap-6">
                       <div className="text-center">
                         <div className="text-4xl font-bold text-gray-800 mb-2">
@@ -397,14 +397,14 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
                   {/* Suggestions */}
                   <div className="bg-white border border-gray-200 rounded-xl p-6">
                     <div className="flex items-center mb-4">
-                      <Briefcase className="h-5 w-5 text-blue-600 mr-2" />
+                      <Briefcase className="h-5 w-5 text-[#23a972] mr-2" />
                       <h3 className="font-semibold text-gray-900">Optimization Recommendations</h3>
                     </div>
                     <div className="space-y-3">
                       {suggestions.length > 0 ? (
                         suggestions.map((suggestion, index) => (
                           <div key={index} className="flex items-start">
-                            <CheckCircle className="h-4 w-4 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />
+                            <CheckCircle className="h-4 w-4 text-[#23a972] mr-3 mt-0.5 flex-shrink-0" />
                             <p className="text-gray-700 text-sm">{suggestion}</p>
                           </div>
                         ))
@@ -419,7 +419,7 @@ export const ResumeOptimizer: React.FC<ResumeOptimizerProps> = ({
                     <button
                       onClick={handleGenerate}
                       disabled={loading}
-                      className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-3"
+                      className="px-8 py-3 bg-[#23a972] text-white rounded-xl hover:bg-[#1e9463] transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-3"
                     >
                       <Sparkles className="h-5 w-5" />
                       <span className="font-medium">Generate Optimized Resume</span>
