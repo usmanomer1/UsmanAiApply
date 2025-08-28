@@ -657,7 +657,7 @@ const JobSearchConvex: React.FC = () => {
       {/* Search Section */}
       <div className="sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 backdrop-blur-sm hover:shadow-xl transition-shadow duration-300">
+          <div className="glass-card p-6 hover:shadow-xl transition-shadow duration-300">
           {/* Resume Upload Alert */}
           {!resumeText && (
             <motion.div 
@@ -1292,7 +1292,7 @@ const JobSearchConvex: React.FC = () => {
                         ease: 'easeOut'
                       }}
                       whileHover={isMeasured ? { y: -2, transition: { duration: 0.2 } } : undefined}
-                      className={`bg-white rounded-lg shadow-sm hover:shadow-lg transition-shadow p-4 mx-2 border ${getMatchScoreColor(job.match_score)}`}
+                      className={`glass-card p-4 mx-2 border ${getMatchScoreColor(job.match_score)}`}
                       style={{ 
                         minHeight: Math.max(160, averageHeightRef.current - 20) + 'px',
                         willChange: isNewItem ? 'opacity' : 'auto',
