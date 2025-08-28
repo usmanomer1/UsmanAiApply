@@ -408,6 +408,38 @@ const ProfilePage: React.FC = () => {
     setHasUnsavedChanges(true);
   };
 
+  // Skills helpers with autosave
+  const saveSkills = async (nextSkills: string[]) => {
+    if (!user) return;
+    try {
+      await supabase
+        .from('profiles')
+        .update({ skills: nextSkills })
+        .eq('user_id', user.id);
+    } catch (error) {
+      console.error('Error saving skills:', error);
+      toast.error('Failed to save skills');
+    }
+  };
+
+  const addSkill = (value: string) => {
+    const trimmed = (value || '').trim();
+    if (!trimmed) return;
+    const exists = formData.skills.some(s => s.toLowerCase() === trimmed.toLowerCase());
+    if (exists) return;
+    const next = [...formData.skills, trimmed];
+    setFormData(prev => ({ ...prev, skills: next }));
+    setHasUnsavedChanges(true);
+    void saveSkills(next);
+  };
+
+  const removeSkillAt = (index: number) => {
+    const next = formData.skills.filter((_, i) => i !== index);
+    setFormData(prev => ({ ...prev, skills: next }));
+    setHasUnsavedChanges(true);
+    void saveSkills(next);
+  };
+
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -680,7 +712,7 @@ const ProfilePage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="glass-card">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
@@ -1023,13 +1055,10 @@ const ProfilePage: React.FC = () => {
                               onDragLeave={handleDragLeave}
                               onDrop={handleDrop}
                               onClick={() => fileInputRef.current?.click()}
-                              className={`
-                                relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all
-                                ${isDragging 
-                                  ? 'border-teal-500 bg-teal-50 dark:bg-teal-900/20' 
-                                  : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
-                                }
-                              `}
+                              className={
+                                `glass-card relative rounded-xl p-8 text-center cursor-pointer transition-all border-2 border-dashed ` +
+                                (isDragging ? 'border-teal-500 bg-teal-50 dark:bg-teal-900/20' : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500')
+                              }
                             >
                               <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                               <p className="text-base font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -1046,7 +1075,7 @@ const ProfilePage: React.FC = () => {
                               )}
                             </div>
                           ) : (
-                            <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-6">
+                            <div className="glass-card p-6">
                               <div className="flex items-start justify-between mb-4">
                                 <div className="flex items-start gap-4">
                                   <div className="w-12 h-12 bg-teal-100 dark:bg-teal-900 rounded-lg flex items-center justify-center">
@@ -1183,10 +1212,7 @@ const ProfilePage: React.FC = () => {
                                 <button
                                   type="button"
                                   className="hover:text-red-600"
-                                  onClick={() => {
-                                    const next = formData.skills.filter((_, i) => i !== idx);
-                                    handleInputChange('skills', next);
-                                  }}
+                                  onClick={() => removeSkillAt(idx)}
                                 >
                                   <X className="h-3.5 w-3.5" />
                                 </button>
@@ -1201,12 +1227,16 @@ const ProfilePage: React.FC = () => {
                               type="text"
                               value={newSkill}
                               onChange={(e) => setNewSkill(e.target.value)}
+                              onBlur={() => {
+                                const val = newSkill.trim().replace(/,$/, '');
+                                if (val) addSkill(val);
+                                setNewSkill('');
+                              }}
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  const val = newSkill.trim();
-                                  if (val && !formData.skills.includes(val)) {
-                                    handleInputChange('skills', [...formData.skills, val]);
-                                  }
+                                if (e.key === 'Enter' || e.key === ',') {
+                                  e.preventDefault();
+                                  const val = newSkill.trim().replace(/,$/, '');
+                                  if (val) addSkill(val);
                                   setNewSkill('');
                                 }
                               }}
@@ -1216,10 +1246,8 @@ const ProfilePage: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => {
-                                const val = newSkill.trim();
-                                if (val && !formData.skills.includes(val)) {
-                                  handleInputChange('skills', [...formData.skills, val]);
-                                }
+                                const val = newSkill.trim().replace(/,$/, '');
+                                if (val) addSkill(val);
                                 setNewSkill('');
                               }}
                               className="px-3 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition-colors"
