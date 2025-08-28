@@ -722,7 +722,7 @@ const ProfilePage: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-[#23a972]" />
       </div>
     );
   }
@@ -773,12 +773,12 @@ const ProfilePage: React.FC = () => {
                     fill="none"
                     strokeDasharray={`${2 * Math.PI * 36}`}
                     strokeDashoffset={`${2 * Math.PI * 36 * (1 - profileCompletion / 100)}`}
-                    className="text-teal-600 transition-all duration-500"
+                    className="text-[#23a972] transition-all duration-500"
                   />
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
                   {profileCompletion === 100 ? (
-                    <CheckCircle className="h-8 w-8 text-teal-600" />
+                    <CheckCircle className="h-8 w-8 text-[#23a972]" />
                   ) : (
                     <span className="text-lg font-bold text-gray-900 dark:text-white">
                       {profileCompletion}
@@ -909,7 +909,7 @@ const ProfilePage: React.FC = () => {
                             />
                             <button
                               onClick={() => avatarInputRef.current?.click()}
-                              className="absolute -bottom-2 -right-2 p-2 bg-teal-600 text-white rounded-full hover:bg-teal-700 transition-colors shadow-lg"
+                              className="absolute -bottom-2 -right-2 p-2 bg-[#23a972] text-white rounded-full hover:bg-[#1e9463] transition-colors shadow-lg"
                             >
                               <Camera className="h-4 w-4" />
                             </button>
@@ -974,7 +974,7 @@ const ProfilePage: React.FC = () => {
                               value={formData.fullName}
                               onChange={(e) => handleInputChange('fullName', e.target.value)}
                               placeholder="Enter your full name"
-                              className="w-full pl-10 pr-20 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                              className="w-full pl-10 pr-20 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#23a972] focus:border-transparent dark:bg-gray-700 dark:text-white"
                             />
                             <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-gray-400">
                               {formData.fullName.length}/50
@@ -997,7 +997,7 @@ const ProfilePage: React.FC = () => {
                               value={formData.phone}
                               onChange={(e) => handleInputChange('phone', e.target.value)}
                               placeholder="+1 (555) 123-4567"
-                              className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                              className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#23a972] focus:border-transparent dark:bg-gray-700 dark:text-white"
                             />
                           </div>
                         </div>
@@ -1014,7 +1014,7 @@ const ProfilePage: React.FC = () => {
                               value={formData.location}
                               onChange={(e) => handleInputChange('location', e.target.value)}
                               placeholder="San Francisco, CA"
-                              className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                              className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#23a972] focus:border-transparent dark:bg-gray-700 dark:text-white"
                             />
                           </div>
                         </div>
@@ -1031,14 +1031,14 @@ const ProfilePage: React.FC = () => {
                               value={formData.linkedinUrl}
                               onChange={(e) => handleInputChange('linkedinUrl', e.target.value)}
                               placeholder="https://linkedin.com/in/yourprofile"
-                              className="w-full pl-10 pr-10 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                              className="w-full pl-10 pr-10 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#23a972] focus:border-transparent dark:bg-gray-700 dark:text-white"
                             />
                             {formData.linkedinUrl && (
                               <a
                                 href={formData.linkedinUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-teal-600 transition-colors"
+                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-[#23a972] transition-colors"
                               >
                                 <ExternalLink className="h-5 w-5" />
                               </a>
@@ -1090,7 +1090,7 @@ const ProfilePage: React.FC = () => {
                               
                               {uploadingResume && (
                                 <div className="absolute inset-0 bg-white dark:bg-gray-800 bg-opacity-90 flex items-center justify-center rounded-xl">
-                                  <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
+                                  <Loader2 className="h-8 w-8 animate-spin text-[#23a972]" />
                                 </div>
                               )}
                             </div>
@@ -1098,8 +1098,8 @@ const ProfilePage: React.FC = () => {
                             <div className="glass-card p-6">
                               <div className="flex items-start justify-between mb-4">
                                 <div className="flex items-start gap-4">
-                                  <div className="w-12 h-12 bg-teal-100 dark:bg-teal-900 rounded-lg flex items-center justify-center">
-                                    <FileText className="h-6 w-6 text-teal-600 dark:text-teal-400" />
+                                  <div className="w-12 h-12 bg-[#23a972]/10 rounded-lg flex items-center justify-center">
+                                    <FileText className="h-6 w-6 text-[#23a972]" />
                                   </div>
                                   <div>
                                     <p className="font-medium text-gray-900 dark:text-white">resume.pdf</p>
@@ -1155,7 +1155,7 @@ const ProfilePage: React.FC = () => {
                                 </button>
                                 <button
                                   onClick={() => navigate('/resume')}
-                                  className="inline-flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition-colors"
+                                  className="inline-flex items-center px-4 py-2 bg-[#23a972] text-white rounded-lg text-sm font-medium hover:bg-[#1e9463] transition-colors"
                                 >
                                   <Sparkles className="h-4 w-4 mr-2" />
                                   Optimize with AI
@@ -1193,7 +1193,7 @@ const ProfilePage: React.FC = () => {
                               value={formData.currentJobTitle}
                               onChange={(e) => handleInputChange('currentJobTitle', e.target.value)}
                               placeholder="e.g., Senior Software Engineer"
-                              className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                              className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#23a972] focus:border-transparent dark:bg-gray-700 dark:text-white"
                             />
                           </div>
                         </div>
@@ -1214,7 +1214,7 @@ const ProfilePage: React.FC = () => {
                             />
                             <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
                               <span>0</span>
-                              <span className="font-medium text-teal-600">{formData.yearsOfExperience} years</span>
+                              <span className="font-medium text-[#23a972]">{formData.yearsOfExperience} years</span>
                               <span>30+</span>
                             </div>
                           </div>
@@ -1261,7 +1261,7 @@ const ProfilePage: React.FC = () => {
                                 }
                               }}
                               placeholder="Type a skill and press Enter"
-                              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#23a972] focus:border-transparent dark:bg-gray-700 dark:text-white"
                             />
                             <button
                               type="button"
@@ -1270,7 +1270,7 @@ const ProfilePage: React.FC = () => {
                                 if (val) addSkill(val);
                                 setNewSkill('');
                               }}
-                              className="px-3 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition-colors"
+                              className="px-3 py-2 bg-[#23a972] text-white rounded-lg text-sm font-medium hover:bg-[#1e9463] transition-colors"
                             >
                               Add
                             </button>
@@ -1312,7 +1312,7 @@ const ProfilePage: React.FC = () => {
                                   setJobPreferences(prev => ({ ...prev, employmentTypes: newTypes }));
                                   setHasUnsavedChanges(true);
                                 }}
-                                className="h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500" 
+                                className="h-4 w-4 text-[#23a972] border-gray-300 rounded focus:ring-[#23a972]" 
                               />
                               <span className="ml-3 text-sm text-gray-700 dark:text-gray-300">Full-time</span>
                             </label>
@@ -1327,7 +1327,7 @@ const ProfilePage: React.FC = () => {
                                   setJobPreferences(prev => ({ ...prev, employmentTypes: newTypes }));
                                   setHasUnsavedChanges(true);
                                 }}
-                                className="h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500" 
+                                className="h-4 w-4 text-[#23a972] border-gray-300 rounded focus:ring-[#23a972]" 
                               />
                               <span className="ml-3 text-sm text-gray-700 dark:text-gray-300">Part-time</span>
                             </label>
@@ -1342,7 +1342,7 @@ const ProfilePage: React.FC = () => {
                                   setJobPreferences(prev => ({ ...prev, employmentTypes: newTypes }));
                                   setHasUnsavedChanges(true);
                                 }}
-                                className="h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500" 
+                                className="h-4 w-4 text-[#23a972] border-gray-300 rounded focus:ring-[#23a972]" 
                               />
                               <span className="ml-3 text-sm text-gray-700 dark:text-gray-300">Contract</span>
                             </label>
@@ -1357,7 +1357,7 @@ const ProfilePage: React.FC = () => {
                                   setJobPreferences(prev => ({ ...prev, employmentTypes: newTypes }));
                                   setHasUnsavedChanges(true);
                                 }}
-                                className="h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500" 
+                                className="h-4 w-4 text-[#23a972] border-gray-300 rounded focus:ring-[#23a972]" 
                               />
                               <span className="ml-3 text-sm text-gray-700 dark:text-gray-300">Internship</span>
                             </label>
@@ -1381,7 +1381,7 @@ const ProfilePage: React.FC = () => {
                                   setJobPreferences(prev => ({ ...prev, workArrangements: newArrangements }));
                                   setHasUnsavedChanges(true);
                                 }}
-                                className="h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500" 
+                                className="h-4 w-4 text-[#23a972] border-gray-300 rounded focus:ring-[#23a972]" 
                               />
                               <span className="ml-3 text-sm text-gray-700 dark:text-gray-300">Remote</span>
                             </label>
@@ -1396,7 +1396,7 @@ const ProfilePage: React.FC = () => {
                                   setJobPreferences(prev => ({ ...prev, workArrangements: newArrangements }));
                                   setHasUnsavedChanges(true);
                                 }}
-                                className="h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500" 
+                                className="h-4 w-4 text-[#23a972] border-gray-300 rounded focus:ring-[#23a972]" 
                               />
                               <span className="ml-3 text-sm text-gray-700 dark:text-gray-300">Hybrid</span>
                             </label>
@@ -1625,7 +1625,7 @@ const ProfilePage: React.FC = () => {
                       <button
                         onClick={() => handleSave()}
                         disabled={saving}
-                        className="inline-flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="inline-flex items-center px-4 py-2 bg-[#23a972] text-white rounded-lg text-sm font-medium hover:bg-[#1e9463] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {saving ? (
                           <>
@@ -1689,7 +1689,7 @@ const ProfilePage: React.FC = () => {
                       value={passwordForm.newPassword}
                       onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
                       placeholder="Enter new password"
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#23a972] focus:border-transparent dark:bg-gray-700 dark:text-white"
                     />
                   </div>
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -1708,7 +1708,7 @@ const ProfilePage: React.FC = () => {
                       value={passwordForm.confirmPassword}
                       onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
                       placeholder="Confirm new password"
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#23a972] focus:border-transparent dark:bg-gray-700 dark:text-white"
                     />
                   </div>
                 </div>
@@ -1724,7 +1724,7 @@ const ProfilePage: React.FC = () => {
                 <button
                   onClick={handlePasswordChange}
                   disabled={passwordLoading || !passwordForm.newPassword || !passwordForm.confirmPassword}
-                  className="flex-1 inline-flex items-center justify-center px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 inline-flex items-center justify-center px-4 py-2 bg-[#23a972] text-white rounded-lg text-sm font-medium hover:bg-[#1e9463] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {passwordLoading ? (
                     <>
