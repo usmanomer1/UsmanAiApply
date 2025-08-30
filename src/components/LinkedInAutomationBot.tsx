@@ -381,6 +381,8 @@ const LinkedInAutomationBot: React.FC = () => {
   const heartbeatInterval = useRef<number | null>(null);
   // Ref to track if we've already logged the visibility change
   const visibilityLoggedRef = useRef(false);
+  // Ref to track if restoration has been attempted
+  const hasAttemptedRestoration = useRef(false);
 
   const isSupabaseConfigured = () => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -414,8 +416,15 @@ const LinkedInAutomationBot: React.FC = () => {
 
   // Separate useEffect for state restoration
   useEffect(() => {
-    // Only restore if we don't already have an active task
-    if (user && !currentTask && !isRunning) {
+    // Reset flag when user changes
+    if (!user) {
+      hasAttemptedRestoration.current = false;
+      return;
+    }
+    
+    // Only restore if we haven't attempted it yet and conditions are met
+    if (!hasAttemptedRestoration.current && !currentTask && !isRunning) {
+      hasAttemptedRestoration.current = true;
       restoreAutomationState();
     }
   }, [user]); // Remove currentTask and isRunning from deps to prevent loops
@@ -893,8 +902,10 @@ const LinkedInAutomationBot: React.FC = () => {
       return; // Already have an active task
     }
     
+    // Only log once when actually checking
+    addLog('🔍 Checking for active automation sessions...');
+    
     try {
-      addLog('🔍 Checking for active automation sessions...');
       
       // First check for active session from database/backend
       try {
