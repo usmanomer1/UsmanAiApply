@@ -21,7 +21,8 @@ import {
   Cpu,
   ChevronDown,
   Monitor,
-  Briefcase
+  Briefcase,
+  FileText
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -353,6 +354,7 @@ const LinkedInAutomationBot: React.FC = () => {
 
   const [showPaywall, setShowPaywall] = useState(false);
   const [accessCheckComplete, setAccessCheckComplete] = useState(false);
+  const [userResume, setUserResume] = useState<{ fileName: string; hasResume: boolean } | null>(null);
   
   // Stream cleanup ref for real-time updates
   const streamCleanupRef = useRef<(() => void) | null>(null);
@@ -396,6 +398,7 @@ const LinkedInAutomationBot: React.FC = () => {
     loadConfiguration();
     fetchUserSubscription();
     checkAccess();
+    checkUserResume();
     
     return () => {
       // Cleanup polling interval on unmount
@@ -673,6 +676,33 @@ const LinkedInAutomationBot: React.FC = () => {
     const remainingSteps = Math.max(0, stepLimit - usedSteps);
     // Convert steps back to applications (10 steps per application)
     return Math.floor(remainingSteps / 10);
+  };
+
+  const checkUserResume = async () => {
+    try {
+      if (!user || !user.id) {
+        setUserResume({ fileName: '', hasResume: false });
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('resume_url')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (profile?.resume_url) {
+        const fileName = profile.resume_url.split('/').pop() || 'resume.pdf';
+        setUserResume({ fileName, hasResume: true });
+      } else {
+        setUserResume({ fileName: '', hasResume: false });
+      }
+    } catch (error) {
+      console.error('Error checking resume:', error);
+      setUserResume({ fileName: '', hasResume: false });
+    }
   };
 
   const fetchUserResumeContent = async (): Promise<string | null> => {
@@ -2218,6 +2248,12 @@ This is the #1 issue that needs to be fixed immediately.`;
       return;
     }
 
+    // Check for resume requirement
+    if (!userResume?.hasResume) {
+      toast.error('Please upload a resume in your profile before starting automation');
+      return;
+    }
+
     if (!apiKey || apiKey.trim() === '') {
       toast.error('Browser Use API key is not configured. Please check your environment variables.');
       return;
@@ -3261,6 +3297,39 @@ This is the #1 issue that needs to be fixed immediately.`;
                         </select>
                       </div>
 
+                      {/* Resume Status Section */}
+                      <div className="col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Resume</label>
+                        <div className={`px-4 py-3 rounded-lg border-2 ${
+                          userResume?.hasResume 
+                            ? 'bg-green-50 border-green-300' 
+                            : 'bg-amber-50 border-amber-300'
+                        }`}>
+                          <div className="flex items-center gap-2">
+                            {userResume?.hasResume ? (
+                              <>
+                                <FileText className="w-5 h-5 text-green-600" />
+                                <span className="text-sm font-medium text-green-800">
+                                  Resume ready: {userResume.fileName}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <AlertCircle className="w-5 h-5 text-amber-600" />
+                                <span className="text-sm font-medium text-amber-800">
+                                  No resume uploaded
+                                </span>
+                              </>
+                            )}
+                          </div>
+                          {!userResume?.hasResume && (
+                            <p className="text-xs text-amber-700 mt-1">
+                              Please upload a resume in your profile to use automation
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Date Posted</label>
                         <select
@@ -3548,11 +3617,11 @@ This is the #1 issue that needs to be fixed immediately.`;
                 {!isRunning ? (
                   <button
                     onClick={startAutomation}
-                    disabled={!config.linkedinEmail}
+                    disabled={!config.linkedinEmail || !userResume?.hasResume}
                     className="w-full px-6 py-4 bg-[#23a972] hover:bg-[#1e9463] text-white rounded-xl font-semibold text-lg transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
                   >
                     <Play className="h-6 w-6" />
-                    Start Agent
+                    {!userResume?.hasResume ? 'Resume Required' : 'Start Agent'}
                   </button>
                 ) : isPaused ? (
                   <div className="space-y-3">

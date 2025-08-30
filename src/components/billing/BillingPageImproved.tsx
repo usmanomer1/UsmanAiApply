@@ -1,25 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { 
-  CreditCard, 
-  Crown, 
-  Check, 
   ExternalLink,
   Calendar,
   RefreshCw,
-  Loader2,
-  AlertCircle,
-  CheckCircle,
-  ArrowRight,
-  Bot,
-  Brain,
-  ShoppingCart,
-  Coins,
-  TrendingUp,
-  Package,
-  Star,
-  Search,
-  FileText
+  Loader2
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -27,12 +12,13 @@ import {
   getProductByPriceId, 
   getSubscriptionProducts, 
   getTokenProducts, 
-  getPlanLimits,
   getPlanNameByPriceId,
   validateStripeConfig
 } from '../../stripe-config';
 import toast from 'react-hot-toast';
-import { getUserUsageOptimized, getBillingDataOptimized, clearUsageCache } from '../../lib/usageTrackingOptimized';
+import PricingSection3, { PricingPlan } from '../../components/ui/pricing-section-3';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '../ui';
+import { getBillingDataOptimized, clearUsageCache } from '../../lib/usageTrackingOptimized';
 import { UserUsage } from '../../lib/usageTracking';
 
 interface UserSubscription {
@@ -56,6 +42,7 @@ export const BillingPageImproved: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'subscriptions' | 'tokens'>('subscriptions');
   const [refreshing, setRefreshing] = useState(false);
   const [stripeConfigError, setStripeConfigError] = useState<string | null>(null);
+  const [supportOpen, setSupportOpen] = useState(false);
   
   // Debounce and caching refs
   const lastRefreshTime = useRef<number>(0);
@@ -65,6 +52,9 @@ export const BillingPageImproved: React.FC = () => {
   // Memoized values to reduce recalculations
   const subscriptionProducts = useMemo(() => getSubscriptionProducts(), []);
   const tokenProducts = useMemo(() => getTokenProducts(), []);
+  const jobTokenProducts = useMemo(() =>
+    tokenProducts.filter(p => !p.name.toLowerCase().startsWith('ai tokens'))
+  , [tokenProducts]);
 
   const isSupabaseConfigured = useCallback(() => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -323,13 +313,6 @@ export const BillingPageImproved: React.FC = () => {
     return null;
   }, [subscription]);
 
-  const planLimits = useMemo(() => {
-    if (subscription?.price_id) {
-      return getPlanLimits(subscription.price_id) || { applications: 0, aiTokens: 0, isSubscription: false };
-    }
-    return { applications: 0, aiTokens: 0, isSubscription: false };
-  }, [subscription]);
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -341,25 +324,7 @@ export const BillingPageImproved: React.FC = () => {
   return (
     <div className="min-h-screen py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="glass-card p-8 text-center mb-16"
-        >
-          <h1 className="text-[32px] font-semibold text-gray-900 dark:text-white mb-2">
-            Choose Your Plan
-          </h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-            Select the perfect plan for your job search automation needs
-          </p>
-          {stripeConfigError && (
-            <div className="mt-4 text-sm text-amber-600 dark:text-amber-400">
-              Billing service configuration issue
-            </div>
-          )}
-        </motion.div>
+        
 
         {/* Current Plan Status & Usage Cards */}
         {subscription && subscription.subscription_status === 'active' && (
@@ -369,49 +334,37 @@ export const BillingPageImproved: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.3 }}
-              className="glass-card relative overflow-hidden hover:shadow-xl transition-all duration-300"
+              className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-all duration-300"
             >
               <div className="relative p-6">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Current Plan</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">Current Plan</h3>
                   <button
                     type="button"
                     onClick={handleRefresh}
                     disabled={refreshing}
-                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200 disabled:opacity-50"
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-all duration-200 disabled:opacity-50"
                     title="Refresh billing data"
                   >
                     <RefreshCw className={`w-4 h-4 text-gray-500 transition-transform duration-500 ${refreshing ? 'animate-spin' : ''}`} />
                   </button>
                 </div>
                 
-                <div className="flex items-center space-x-4 mb-6">
-                  <motion.div 
-                    whileHover={{ scale: 1.05 }}
-                    className="relative p-3 bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl shadow-lg"
-                  >
-                    <Crown className="w-6 h-6 text-white" />
-                    <div className="absolute inset-0 bg-white/20 rounded-xl animate-pulse" />
-                  </motion.div>
+                <div className="flex items-center justify-between mb-6">
                   <div>
-                    <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                    <div className="text-2xl font-bold text-gray-900">
                       {currentProduct?.name?.replace('Jobotic ', '') || 
                        (subscription?.price_id ? getPlanNameByPriceId(subscription.price_id) : 'Free')}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                      </span>
-                      <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">
-                        Active Plan
-                      </span>
+                    <div className="mt-1 inline-flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-black/80" />
+                      <span className="text-sm text-gray-700 font-medium">Active</span>
                     </div>
                   </div>
                 </div>
 
                 {subscription.current_period_end && (
-                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-6 bg-gray-50 dark:bg-gray-700/50 rounded-lg px-4 py-2">
+                  <div className="flex items-center gap-2 text-sm text-gray-600 mb-6 bg-gray-50 rounded-lg px-4 py-2">
                     <Calendar className="w-4 h-4 text-gray-500" />
                     <span>Renews {formatDate(subscription.current_period_end)}</span>
                   </div>
@@ -420,10 +373,10 @@ export const BillingPageImproved: React.FC = () => {
                 <button
                   type="button"
                   onClick={openBillingPortal}
-                  className="w-full group relative px-4 py-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-xl transition-all duration-200 text-sm font-medium overflow-hidden"
+                  className="w-full group relative px-4 py-3 rounded-xl text-sm font-semibold bg-gradient-to-t from-neutral-900 to-neutral-600 text-white border border-neutral-700 shadow-lg shadow-neutral-900 hover:from-neutral-800 hover:to-neutral-700 hover:-translate-y-0.5 hover:shadow-xl transition-all"
                 >
                   <span className="relative z-10 flex items-center justify-center gap-2">
-                    <ExternalLink className="w-4 h-4 group-hover:rotate-12 transition-transform duration-200" />
+                    <ExternalLink className="w-4 h-4 transition-transform duration-200" />
                     Manage Subscription
                   </span>
                 </button>
@@ -436,42 +389,30 @@ export const BillingPageImproved: React.FC = () => {
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.2 }}
-                className="glass-card relative overflow-hidden shadow-xl"
+                transition={{ duration: 0.35, delay: 0.2 }}
+                className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm hover:shadow-md"
               >
                 <div className="relative p-6">
                   <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center space-x-4">
-                      <motion.div 
-                        whileHover={{ scale: 1.1, rotate: 5 }}
-                        className="relative p-3 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl shadow-lg"
-                      >
-                        <Bot className="w-6 h-6 text-white" />
-                        <motion.div 
-                          className="absolute inset-0 bg-white/30 rounded-xl"
-                          animate={{ scale: [1, 1.2, 1] }}
-                          transition={{ duration: 2, repeat: Infinity }}
-                        />
-                      </motion.div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Agent Steps</h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          AI agent steps used this month
-                        </p>
-                      </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">Agent Steps</h3>
+                      <p className="text-sm text-gray-600">
+                        AI agent steps used this month
+                      </p>
                     </div>
                   </div>
                   
                   <div className="space-y-4">
                     <div className="flex items-end justify-between">
                       <motion.span 
-                        initial={{ scale: 0.5, opacity: 0 }}
+                        initial={{ scale: 0.95, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
-                        className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent"
+                        transition={{ duration: 0.35, ease: 'easeOut' }}
+                        className="text-5xl font-bold text-black/80"
                       >
                         {(usage?.automation_steps?.used || 0).toLocaleString()}
                       </motion.span>
-                      <span className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                      <span className="text-sm text-gray-600 mb-2">
                         {usage?.automation_steps?.limit && usage.automation_steps.limit > 0 
                           ? `of ${usage.automation_steps.limit.toLocaleString()} included` 
                           : 'No plan limits'}
@@ -480,41 +421,30 @@ export const BillingPageImproved: React.FC = () => {
                   
                     {usage?.automation_steps?.limit && usage.automation_steps.limit > 0 && (
                       <div className="relative">
-                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                        <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                           <motion.div
                             initial={{ width: 0 }}
                             animate={{ width: `${usage.automation_steps.percentage}%` }}
-                            transition={{ duration: 1, delay: 0.5, ease: "easeOut" }}
-                            className="h-full relative overflow-hidden"
-                          >
-                            <div className={`absolute inset-0 bg-gradient-to-r ${getProgressBarColor(usage.automation_steps.percentage)}`} />
-                            <motion.div 
-                              className="absolute inset-0 bg-white/30"
-                              animate={{ x: ['-100%', '100%'] }}
-                              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                            />
-                          </motion.div>
+                            transition={{ duration: 0.9, delay: 0.4, ease: "easeOut" }}
+                            className="h-full relative overflow-hidden bg-black/80"
+                          />
                         </div>
                       </div>
                     )}
                   
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-600 dark:text-gray-400">
+                      <span className="text-xs text-gray-600">
                         {!usage?.automation_steps?.limit || usage.automation_steps.limit === 0 ? 
                           <span className="italic">Subscribe to get automation steps</span> :
                           usage.automation_steps.percentage >= 100 ? 
-                            <span className="text-orange-600 dark:text-orange-400 font-medium">Additional: $0.03 per step</span> :
+                            <span className="font-medium text-gray-800">Additional: $0.03 per step</span> :
                             <span>{usage.automation_steps.remaining.toLocaleString()} remaining</span>
                         }
                       </span>
                       {usage?.automation_steps?.limit && usage.automation_steps.limit > 0 && (
-                        <motion.span 
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          className={`text-sm font-bold ${getUsageStatusColor(usage.automation_steps.percentage)}`}
-                        >
+                        <span className="text-sm font-bold text-black/70">
                           {Math.round(usage.automation_steps.percentage)}% used
-                        </motion.span>
+                        </span>
                       )}
                     </div>
                   </div>
@@ -526,65 +456,46 @@ export const BillingPageImproved: React.FC = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: 0.4 }}
-                className="glass-card relative overflow-hidden shadow-xl"
+                className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm hover:shadow-md"
               >
                 <div className="relative p-6">
                   <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center space-x-4">
-                      <motion.div 
-                        whileHover={{ scale: 1.1, rotate: 10 }}
-                        className="relative p-3 bg-gradient-to-br from-teal-500 to-green-600 rounded-xl shadow-lg"
-                      >
-                        <Search className="w-6 h-6 text-white" />
-                        <motion.div 
-                          className="absolute inset-0 bg-white/30 rounded-xl"
-                          animate={{ scale: [1, 1.2, 1] }}
-                          transition={{ duration: 2, repeat: Infinity, delay: 1 }}
-                        />
-                      </motion.div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Job Searches</h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          AI-powered job matches this month
-                        </p>
-                      </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">Job Searches</h3>
+                      <p className="text-sm text-gray-600">
+                        AI-powered job matches this month
+                      </p>
                     </div>
                   </div>
                   
                   <div className="space-y-4">
                     <div className="flex items-end justify-between">
                       <motion.span 
-                        initial={{ scale: 0.5, opacity: 0 }}
+                        initial={{ scale: 0.95, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
-                        className="text-5xl font-bold bg-gradient-to-r from-teal-600 to-green-600 bg-clip-text text-transparent"
+                        transition={{ duration: 0.35, ease: 'easeOut' }}
+                        className="text-5xl font-bold text-black/80"
                       >
                         {(usage?.job_search_match?.used || 0).toLocaleString()}
                       </motion.span>
-                      <span className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                      <span className="text-sm text-gray-600 mb-2">
                         Unlimited
                       </span>
                     </div>
                   
                     <div className="relative">
-                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                      <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                         <motion.div
                           initial={{ width: 0 }}
                           animate={{ width: '100%' }}
-                          transition={{ duration: 1, delay: 0.9, ease: "easeOut" }}
-                          className="h-full relative overflow-hidden"
-                        >
-                          <div className="absolute inset-0 bg-gradient-to-r from-teal-500 to-green-600" />
-                          <motion.div 
-                            className="absolute inset-0 bg-white/30"
-                            animate={{ x: ['-100%', '100%'] }}
-                            transition={{ duration: 2, repeat: Infinity, ease: "linear", delay: 1 }}
-                          />
-                        </motion.div>
+                          transition={{ duration: 0.9, delay: 0.4, ease: "easeOut" }}
+                          className="h-full relative overflow-hidden bg-black/80"
+                        />
                       </div>
                     </div>
                   
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-600 dark:text-gray-400">
+                      <span className="text-xs text-gray-600">
                         Unlimited searches available
                       </span>
                     </div>
@@ -593,38 +504,32 @@ export const BillingPageImproved: React.FC = () => {
               </motion.div>
             </div>
 
-            {/* Usage Warning */}
+            {/* Usage Notice */}
             {usage?.automation_steps && usage.automation_steps.percentage >= 80 && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-6"
+                className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
               >
-                <div className="flex items-start space-x-4">
-                  <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-xl">
-                    <AlertCircle className="w-6 h-6 text-amber-600 dark:text-amber-400" />
-                  </div>
+                <div className="flex items-start gap-4">
                   <div className="flex-1">
-                    <h3 className="text-xl font-semibold text-amber-800 dark:text-amber-200 mb-3">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-3">
                       Approaching Usage Limits
                     </h3>
-                    <p className="text-amber-700 dark:text-amber-300 mb-6 leading-relaxed">
-                      You're approaching your monthly limits. Consider upgrading to get more applications and AI tokens 
-                      to continue using the service without interruption.
+                    <p className="text-gray-700 mb-6 leading-relaxed">
+                      You're approaching your monthly limits. Upgrade to get more applications and AI tokens.
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4">
                       <button
                         onClick={() => setActiveTab('subscriptions')}
-                        className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-3 rounded-xl font-semibold transition-colors"
+                        className="px-6 py-3 rounded-xl font-semibold bg-gradient-to-t from-neutral-900 to-neutral-600 text-white border border-neutral-700 shadow-lg shadow-neutral-900 hover:from-neutral-800 hover:to-neutral-700 hover:-translate-y-0.5 hover:shadow-xl transition-all"
                       >
-                        <TrendingUp className="w-5 h-5 mr-2 inline" />
                         Upgrade Plan
                       </button>
                       <button 
                         onClick={() => setActiveTab('tokens')}
-                        className="bg-white/10 dark:bg-white/10 border border-amber-200/50 dark:border-amber-400/50 text-amber-800 dark:text-amber-200 hover:bg-white/20 dark:hover:bg-white/20 px-6 py-3 rounded-xl font-semibold transition-colors backdrop-blur-sm"
+                        className="px-6 py-3 rounded-xl font-semibold border border-gray-300 text-gray-900 hover:bg-gray-50 transition-colors"
                       >
-                        <Package className="w-5 h-5 mr-2 inline" />
                         Buy Token Packs
                       </button>
                     </div>
@@ -659,7 +564,6 @@ export const BillingPageImproved: React.FC = () => {
                   activeTab === 'subscriptions' ? 'text-white dark:text-gray-900' : 'text-gray-700 dark:text-gray-300'
                 }`}
               >
-                <Crown className="w-5 h-5" />
                 <span>Subscriptions</span>
               </button>
               <button
@@ -669,267 +573,169 @@ export const BillingPageImproved: React.FC = () => {
                   activeTab === 'tokens' ? 'text-white dark:text-gray-900' : 'text-gray-700 dark:text-gray-300'
                 }`}
               >
-                <Coins className="w-5 h-5" />
                 <span>Token Packs</span>
               </button>
             </div>
           </div>
         </motion.div>
 
-        {/* Subscription Plans */}
+        {/* Subscription Plans - shadcn section */}
         {activeTab === 'subscriptions' && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
-            {subscriptionProducts.map((product, index) => {
-              const isCurrentPlan = subscription?.price_id === product.priceId;
-              const isPopular = product.name.includes('Pro');
-              const isPriceValid = !product.priceId.startsWith('price_missing');
-              const isFeatured = index === 1;
-              const displayName = index === 0 ? 'Starter' : index === 1 ? 'Pro' : 'Max';
-              const badgeLabel = index === 0 ? 'FREE' : index === 1 ? 'PRO' : 'ADVANCE';
-              const badgeColor = index === 0 ? 'bg-gray-100 text-gray-700' : index === 1 ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700';
-              const badgeDot = index === 0 ? 'bg-emerald-400' : index === 1 ? 'bg-orange-500' : 'bg-emerald-500';
-              
-              return (
-                <motion.div
-                  key={product.id}
-                  initial={{ opacity: 0, y: 16 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1], delay: index * 0.05 }}
-                  className="relative"
-                >
-                  {/* Current Plan Indicator */}
-                  {isCurrentPlan && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="absolute -top-3 left-6 z-10"
-                    >
-                      <div className="flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-xs font-medium rounded-full shadow-lg">
-                        <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
-                        </span>
-                        Current Plan
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {/* Popular Badge */}
-                  {isPopular && !isCurrentPlan && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="absolute -top-3 right-6 z-10"
-                    >
-                      <div className="flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white text-xs font-medium rounded-full shadow-lg">
-                        <Star className="w-3 h-3" />
-                        Most Popular
-                      </div>
-                    </motion.div>
-                  )}
-
-                  <div 
-                    className={`
-                      relative overflow-hidden rounded-2xl border 
-                      ${isFeatured ? 'bg-gradient-to-b from-gray-900 to-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-200'}
-                      transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg
-                      ${!isPriceValid ? 'opacity-60' : ''}
-                      h-full min-h-[480px]
-                    `}
+          <div className="max-w-6xl mx-auto">
+            <PricingSection3
+              compact
+              plans={subscriptionProducts.map((p, i) => ({
+                name: i === 0 ? 'Starter' : i === 1 ? 'Pro' : 'Max',
+                description: i === 0
+                  ? 'Up to ~40 applications/mo, basic agent run time'
+                  : i === 1
+                  ? 'Extended limits (most users do 100–200 apps/mo), 10× runtime'
+                  : 'Highest limits (built for power users & small teams)',
+                price: p.price,
+                yearlyPrice: p.price * 10,
+                buttonText: (subscription?.price_id === p.priceId)
+                  ? 'Current Plan'
+                  : (i === 0 ? 'Choose Starter' : i === 1 ? 'Get Pro' : 'Upgrade to Max'),
+                buttonVariant: (subscription?.price_id === p.priceId) ? 'default' : (i === 1 ? 'default' : 'outline'),
+                popular: i === 1,
+              })) as unknown as PricingPlan[]}
+              onSelect={(planName: string) => {
+                const idx = planName === 'Starter' ? 0 : planName === 'Pro' ? 1 : 2;
+                const prod = subscriptionProducts[idx];
+                if (!prod || prod.priceId.startsWith('price_missing')) return;
+                if (subscription?.price_id === prod.priceId) return;
+                handlePurchase(prod.priceId);
+              }}
+            />
+            <div className="text-center mt-10">
+              <button
+                type="button"
+                onClick={() => setSupportOpen(true)}
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold bg-gradient-to-t from-neutral-900 to-neutral-600 text-white border border-neutral-700 shadow-lg shadow-neutral-900 hover:from-neutral-800 hover:to-neutral-700 hover:-translate-y-0.5 hover:shadow-xl transition-all"
+              >
+                Contact support
+              </button>
+            </div>
+            <Dialog open={supportOpen} onOpenChange={setSupportOpen}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Contact Us</DialogTitle>
+                  <DialogDescription>
+                    For all support inquiries, including billing issues, receipts, and general assistance, please email us.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="mt-4 flex items-center justify-between gap-3">
+                  <a
+                    href="mailto:usman@Jobotic.ai"
+                    className="flex-1 inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-[#23a972] text-white hover:bg-[#1e9463] transition-colors"
                   >
-                    {/* Corner dots */}
-                    <span className={`absolute top-3 left-3 h-2 w-2 rounded-full ${isFeatured ? 'bg-white/20' : 'bg-gray-200'}`}></span>
-                    <span className={`absolute top-3 right-3 h-2 w-2 rounded-full ${isFeatured ? 'bg-white/20' : 'bg-gray-200'}`}></span>
-                    <span className={`absolute bottom-3 left-3 h-2 w-2 rounded-full ${isFeatured ? 'bg-white/20' : 'bg-gray-200'}`}></span>
-                    <span className={`absolute bottom-3 right-3 h-2 w-2 rounded-full ${isFeatured ? 'bg-white/20' : 'bg-gray-200'}`}></span>
-                    
-                    {/* Plan badge */}
-                    <div className={`absolute top-4 right-4 inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold ${badgeColor}`}>
-                      <span className={`h-2 w-2 rounded-full ${badgeDot}`}></span>
-                      {badgeLabel}
-                    </div>
-
-                    <div className="relative p-8 flex flex-col h-full">
-                      {/* Plan Header */}
-                      <div className="text-center mb-6">
-                        <h3 className={`text-sm font-semibold mb-1 ${isFeatured ? 'text-white' : 'text-gray-900'}`}>{displayName} Plan</h3>
-                        <div className="flex items-baseline justify-center gap-2">
-                          <span className={`text-4xl font-bold ${isFeatured ? 'text-white' : 'text-gray-900'}`}>${product.price}</span>
-                          <span className={`text-xs font-medium ${isFeatured ? 'text-gray-300' : 'text-gray-500'}`}>/month</span>
-                        </div>
-                      </div>
-
-                      {/* Features */}
-                      <div className="mb-8 flex-grow">
-                        <ul className={`space-y-2 ${isFeatured ? 'text-gray-200' : 'text-gray-700'}`}>
-                          <li className="flex items-center justify-between text-sm">
-                            <span>Applications</span>
-                            <span className={`${isFeatured ? 'text-white' : 'text-gray-900'} font-medium`}>
-                              {(product.applicationCount ?? 0)}/mo
-                            </span>
-                          </li>
-                          <li className="flex items-center justify-between text-sm">
-                            <span>Agent steps</span>
-                            <span className={`${isFeatured ? 'text-white' : 'text-gray-900'} font-medium`}>
-                              {(((product.applicationCount ?? 0) * 10)).toLocaleString()}
-                            </span>
-                          </li>
-                          <li className="flex items-center justify-between text-sm">
-                            <span>AI tokens</span>
-                            <span className={`${isFeatured ? 'text-white' : 'text-gray-900'} font-medium`}>Unlimited</span>
-                          </li>
-                          <li className="text-sm">Resume optimization tools</li>
-                          <li className="text-sm">AI‑powered job matching</li>
-                          <li className="text-sm">{product.name.includes('Plus') ? 'Email support' : product.name.includes('Pro') ? 'Priority support' : 'Priority support + Early access'}</li>
-                        </ul>
-                      </div>
-
-                      {/* CTA Button */}
-                      <button
-                        onClick={() => handlePurchase(product.priceId)}
-                        disabled={isCurrentPlan || purchasing === product.priceId || !isPriceValid}
-                        className={`
-                          w-full py-3 px-6 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-teal-500
-                          flex items-center justify-center gap-2
-                          ${
-                            isCurrentPlan
-                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                              : !isPriceValid
-                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                              : isFeatured
-                              ? 'bg-white text-gray-900 hover:bg-gray-100'
-                              : 'bg-gray-900 text-white hover:bg-black'
-                          }
-                        `}
-                      >
-                        {purchasing === product.priceId ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>Processing...</span>
-                          </>
-                        ) : isCurrentPlan ? (
-                          <>
-                            <CheckCircle className="w-4 h-4" />
-                            <span>Current Plan</span>
-                          </>
-                        ) : !isPriceValid ? (
-                          <span>Coming Soon</span>
-                        ) : (
-                          <>
-                            <span>{isPopular ? 'Get Started' : 'Select Plan'}</span>
-                            <ArrowRight className="w-4 h-4" />
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })}
+                    Email us
+                  </a>
+                  <DialogClose asChild>
+                    <button className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">Close</button>
+                  </DialogClose>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         )}
 
         {/* Token Packs */}
         {activeTab === 'tokens' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-            {tokenProducts.map((product, index) => {
-              const isPriceValid = !product.priceId.startsWith('price_missing');
-              
-              return (
-                <motion.div
-                  key={product.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  whileHover={{ y: -8, transition: { duration: 0.2 } }}
-                  className={`relative glass-card rounded-2xl transition-all duration-300 hover:shadow-2xl ${
-                    !isPriceValid ? 'opacity-60' : ''
-                  }`}
-                >
-                  <div className="p-8">
-                    {/* Token Pack Header */}
-                    <div className="text-center mb-8">
-                      <div className={`w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center ${
-                        product.name.includes('Job') ? 'bg-gradient-to-br from-emerald-500 to-emerald-600' :
-                        'bg-gradient-to-br from-amber-500 to-amber-600'
-                      }`}>
-                        {product.name.includes('Job') ? (
-                          <Bot className="w-8 h-8 text-white" />
-                        ) : (
-                          <Brain className="w-8 h-8 text-white" />
-                        )}
+          <div className="max-w-7xl mx-auto">
+            <div className="hidden lg:grid grid-cols-4 gap-4">
+              {jobTokenProducts.map((product, index) => {
+                const isPriceValid = !product.priceId.startsWith('price_missing');
+                return (
+                  <motion.div
+                    key={product.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1, duration: 0.35 }}
+                    whileHover={{ y: -6, transition: { duration: 0.2 } }}
+                    className={`relative rounded-2xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-all duration-300 ${
+                      !isPriceValid ? 'opacity-60' : ''
+                    }`}
+                  >
+                    <div className="p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-1">{product.name}</h3>
+                      <div className="mb-3">
+                        <span className="text-3xl font-bold text-gray-900">${product.price.toFixed(2)}</span>
+                        <span className="text-gray-500 ml-1">one-time</span>
                       </div>
-                      
-                      <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                        {product.name}
-                      </h3>
-                      
-                      <div className="mb-4">
-                        <span className="text-4xl font-bold text-gray-900 dark:text-white">
-                          ${product.price.toFixed(2)}
-                        </span>
-                        <span className="text-gray-500 dark:text-gray-400 ml-1">
-                          one-time
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Description */}
-                    <div className="mb-8">
-                      <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-                        {product.description}
-                      </p>
-                    </div>
-
-                    {/* Features */}
-                    <div className="mb-8">
-                      <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
-                        Includes
-                      </h4>
+                      <p className="text-sm text-gray-600 mb-5 line-clamp-3">{product.description}</p>
                       {product.features && (
-                        <ul className="space-y-3">
+                        <ul className="space-y-2 mb-6">
                           {product.features.slice(0, 3).map((feature, idx) => (
-                            <li key={idx} className="flex items-center text-sm text-gray-600 dark:text-gray-300">
-                              <Check className="w-4 h-4 text-green-500 mr-3 flex-shrink-0" />
+                            <li key={idx} className="flex items-center text-sm text-gray-700">
+                              <span className="text-black h-6 w-6 bg-white border border-black rounded-full grid place-content-center mt-0.5 mr-3">
+                                <span className="block h-1.5 w-1.5 rounded-full bg-black" />
+                              </span>
                               {feature}
                             </li>
                           ))}
                         </ul>
                       )}
+                      <motion.button
+                        whileHover={isPriceValid ? { scale: 1.01 } : {}}
+                        whileTap={isPriceValid ? { scale: 0.99 } : {}}
+                        onClick={() => handlePurchase(product.priceId)}
+                        disabled={purchasing === product.priceId || !isPriceValid}
+                        className={`relative w-full py-2.5 px-4 rounded-xl font-semibold transition-all duration-200 overflow-hidden ${
+                          !isPriceValid
+                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                            : 'bg-gradient-to-t from-neutral-900 to-neutral-600 text-white border border-neutral-700 shadow-lg shadow-neutral-900 hover:from-neutral-800 hover:to-neutral-700 hover:-translate-y-0.5 hover:shadow-xl'
+                        }`}
+                      >
+                        <span className="relative z-10">
+                          {purchasing === product.priceId ? 'Loading…' : (!isPriceValid ? 'Coming Soon' : 'Buy Now')}
+                        </span>
+                      </motion.button>
                     </div>
-
-                    {/* CTA Button */}
-                    <motion.button
-                      whileHover={isPriceValid ? { scale: 1.02 } : {}}
-                      whileTap={isPriceValid ? { scale: 0.98 } : {}}
-                      onClick={() => handlePurchase(product.priceId)}
-                      disabled={purchasing === product.priceId || !isPriceValid}
-                      className={`relative w-full py-3 px-4 rounded-xl font-semibold transition-all duration-200 overflow-hidden ${
-                        !isPriceValid
-                          ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-                          : 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg hover:shadow-xl'
-                      }`}
+                  </motion.div>
+                );
+              })}
+            </div>
+            <div className="lg:hidden">
+              <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 -mx-4 px-4">
+                {jobTokenProducts.map((product, index) => {
+                  const isPriceValid = !product.priceId.startsWith('price_missing');
+                  return (
+                    <motion.div
+                      key={product.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1, duration: 0.35 }}
+                      className={`min-w-[280px] snap-start rounded-2xl border border-gray-200 bg-white shadow-sm ${!isPriceValid ? 'opacity-60' : ''}`}
                     >
-                      <span className="relative z-10">
-                        {purchasing === product.priceId ? (
-                          <div className="flex items-center justify-center">
-                            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                            Loading...
-                          </div>
-                        ) : !isPriceValid ? (
-                          'Coming Soon'
-                        ) : (
-                          <div className="flex items-center justify-center">
-                            <ShoppingCart className="w-5 h-5 mr-2" />
-                            Buy Now
-                          </div>
-                        )}
-                      </span>
-                    </motion.button>
-                  </div>
-                </motion.div>
-              );
-            })}
+                      <div className="p-6">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-1">{product.name}</h3>
+                        <div className="mb-3">
+                          <span className="text-3xl font-bold text-gray-900">${product.price.toFixed(2)}</span>
+                          <span className="text-gray-500 ml-1">one-time</span>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-5 line-clamp-3">{product.description}</p>
+                        <motion.button
+                          whileHover={isPriceValid ? { scale: 1.01 } : {}}
+                          whileTap={isPriceValid ? { scale: 0.99 } : {}}
+                          onClick={() => handlePurchase(product.priceId)}
+                          disabled={purchasing === product.priceId || !isPriceValid}
+                          className={`relative w-full py-2.5 px-4 rounded-xl font-semibold transition-all duration-200 overflow-hidden ${
+                            !isPriceValid
+                              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                              : 'bg-gradient-to-t from-neutral-900 to-neutral-600 text-white border border-neutral-700 shadow-lg shadow-neutral-900 hover:from-neutral-800 hover:to-neutral-700'
+                          }`}
+                        >
+                          <span className="relative z-10">
+                            {purchasing === product.priceId ? 'Loading…' : (!isPriceValid ? 'Coming Soon' : 'Buy Now')}
+                          </span>
+                        </motion.button>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         )}
       </div>

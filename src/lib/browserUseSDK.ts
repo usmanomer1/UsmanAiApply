@@ -86,13 +86,13 @@ class BrowserUseSDK {
   private buildTaskPrompt(config: BrowserUseConfig): string {
     const { jobTitle, location, targetCount, linkedinEmail, customInstructions, resumeContent, applyToExternalJobs, uploadedFileName } = config;
     
-    let prompt = `You are an intelligent LinkedIn job application assistant. Your task is to help apply for jobs on LinkedIn.
+    let prompt = `You are an AI assistant helping with LinkedIn job applications. Your goal is to apply to ${targetCount} jobs ${applyToExternalJobs ? '(including both Easy Apply and external job postings)' : 'using LinkedIn\'s "Easy Apply" feature'}.
 
 IMPORTANT: You have been provided with credentials to login automatically:
 - Email: ${linkedinEmail}
 - Password is provided securely in the secrets
 
-Instructions:
+CRITICAL - LOGIN HANDLING:
 1. Go to LinkedIn (linkedin.com)
 2. Login using the provided credentials automatically
 3. If you encounter 2FA/two-factor authentication:
@@ -101,20 +101,102 @@ Instructions:
    - The user will enter the code manually in the live browser view
    - After waiting 30 seconds, check if you're logged in and continue
    - If still on 2FA page after 30 seconds, wait another 30 seconds
-4. Once logged in (either directly or after 2FA), search for "${jobTitle}" jobs in "${location}"
-5. Apply to ${targetCount} relevant positions using ${applyToExternalJobs ? 'Easy Apply or external applications' : 'Easy Apply only'}
-6. For each job you apply to, extract the job details in structured format
+4. If you see a login page, login modal, or "Sign in" overlay:
+   - Take a screenshot of the page
+   - Include the exact text: "INTERVENTION:LOGIN_REQUIRED - Manual login needed"
+   - Then simply wait (use wait action for 30 seconds)
+   - DO NOT search for this text on Google
+   - DO NOT use done() - this would end the entire automation
+   - The system will detect the intervention text and pause
+   - After manual login, the automation will resume automatically
 
-${uploadedFileName ? `
-RESUME FILE:
-- A resume file "${uploadedFileName}" has been uploaded and is available for use
-- The file is already uploaded and ready to use - you don't need to upload it again
-- If the site has a "Choose File" or "Upload Resume" button, click it and select the available file
-${resumeContent ? `- Additionally, here's the resume content for reference when filling forms:\n[Resume content provided below in context]` : ''}
-` : resumeContent ? `
-RESUME CONTENT:
-- Use the following resume content to answer questions and fill forms:
-` : ''}
+STEP-BY-STEP PROCESS:
+1. Navigate directly to: https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(jobTitle)}&location=${encodeURIComponent(location)}&sortBy=DD
+2. Wait 3-5 seconds for the page to fully load before proceeding
+3. Check if login is required - if you see any login modal or sign-in overlay, output "INTERVENTION:LOGIN_REQUIRED - Manual login needed"
+4. After login is complete and you're on the jobs page, look for the left sidebar with job listings
+5. Look for jobs with ${applyToExternalJobs ? '"Easy Apply" buttons OR external application links' : '"Easy Apply" buttons'} in the job listings
+6. For each job (continue until you reach ${targetCount} applications):
+   a. BEFORE clicking any apply button, clearly state: "APPLYING TO: [EXACT COMPANY NAME] - [EXACT JOB TITLE]"
+   b. Extract the actual company name from the job posting (not generic terms)
+   c. Extract the exact job title from the posting
+   d. Click the "Easy Apply" button
+   e. Fill out the application form (ALWAYS scroll down to see all fields - some are hidden below)
+   f. Answer any questions that appear (scroll down after each answer to see more questions)
+   g. For multi-step forms: Complete current step, then scroll down to find "Next" or "Continue" button
+   h. ${uploadedFileName ? `RESUME HANDLING: When prompted to upload a resume:
+      * The file "${uploadedFileName}" is already available in the system
+      * Click the "Upload Resume" or "Choose File" button
+      * The file will be automatically uploaded
+      * You don't need to browse for files - just click the upload button
+      * The system has the file ready for automatic upload` : 'Skip resume upload if no file is provided'}
+   i. CRITICAL: ALWAYS SCROLL DOWN to find the "Submit" or "Submit application" button
+      - The submit button is ALWAYS at the bottom of the form
+      - Keep scrolling down until you see the submit button
+      - Look for buttons like "Submit", "Submit application", "Apply", or "Send application"
+   j. Before clicking submit, repeat: "SUBMITTING APPLICATION TO: [COMPANY NAME] - [JOB TITLE]"
+   k. Click the submit button to complete the application
+   l. Close the modal and move to the next job
+
+7. Continue applying to jobs until you've completed ${targetCount} applications
+8. If you run out of Easy Apply jobs on the current page:
+   - Scroll down to load more jobs or click "See more jobs" if available
+   - Try adjusting filters or broadening search criteria
+   - Only stop when you've reached the target or no more suitable jobs are available
+
+🚨 CRITICAL SCROLLING INSTRUCTIONS - MUST FOLLOW:
+- **MANDATORY**: ALWAYS scroll down when you can't find buttons like "Submit", "Next", "Continue", or "Apply"
+- **SUBMIT BUTTON RULE**: The submit button is NEVER visible without scrolling down - this is LinkedIn's design
+- **KEEP SCROLLING**: If you don't see a submit button, keep scrolling down until you find it
+- **LinkedIn FORM BEHAVIOR**: LinkedIn forms often have content below the fold - scroll to reveal hidden elements
+- **FORM COMPLETION**: If you encounter form questions but can't see all of them, scroll down to see more questions
+- **TROUBLESHOOTING**: When stuck on any form, try scrolling both up and down to find missing elements
+- **FINAL REVIEW PAGE**: On the final review page, the submit button is always at the bottom - scroll to find it
+- **NEVER SKIP**: Never assume there's no submit button - always scroll down to look for it
+
+📝 SUBMISSION PROCESS - CRITICAL:
+1. **FIND THE SUBMIT BUTTON**: After filling all fields, scroll to the very bottom of the form
+2. **BUTTON VARIATIONS**: Look for "Submit", "Submit application", "Apply", "Send application", or "Review and submit"
+3. **SCROLL PERSISTENCE**: If you don't see any submit button, keep scrolling down - it exists
+4. **PAGE COMPLETION**: Make sure all required fields are filled before the submit button becomes active
+5. **FINAL ACTION**: Click the submit button only after scrolling down and finding it
+6. **CONFIRMATION**: Wait for LinkedIn to show a success message or redirect before moving to next job
+
+COMPANY NAME EXTRACTION REQUIREMENTS:
+- Extract the ACTUAL company name from the LinkedIn job posting
+- Company names appear in these locations on LinkedIn:
+  * Directly below or next to the job title
+  * In the format "Job Title at Company Name" 
+  * As a clickable company link/button
+  * In the job details section
+- CRITICAL: Always announce the company name you see BEFORE clicking Easy Apply
+- Format: "I can see this is a [JOB TITLE] position at [COMPANY NAME]"
+- DO NOT use generic terms like "Company", "Employer", "Organization", "LinkedIn Company"
+- Examples of REAL company names: "Google", "Microsoft", "Meta", "Apple", "Netflix", "Shopify", "Stripe"
+- If you cannot find the actual company name, announce "Unable to identify company name" and skip this job
+
+JOB TITLE EXTRACTION REQUIREMENTS:
+- Extract the EXACT job title from the posting
+- Use the full title as displayed on LinkedIn
+- Examples: "Senior Software Engineer", "Product Manager", "Data Scientist"
+
+🔧 FORM HANDLING GUIDELINES - LINKEDIN EASY APPLY:
+- **ESSENTIAL**: Always scroll down in Easy Apply forms to ensure you see all content
+- **SUBMIT BUTTON LOCATION**: Submit buttons are ALWAYS at the bottom - never visible without scrolling
+- **MULTI-STEP PROCESS**: LinkedIn Easy Apply often has 2-4 steps with Next/Continue buttons between them
+- **STEP NAVIGATION**: For multi-step forms, look for "Next" or "Continue" buttons (ALWAYS scroll down to find them)
+- **COMPLETE ALL FIELDS**: If forms have multiple questions, scroll to see all questions before proceeding
+- **FORM VALIDATION**: LinkedIn will not show the submit button until all required fields are filled
+- **FINAL REVIEW**: The last step is usually a review page - scroll down to find the final submit button
+${uploadedFileName ? `- 🔧 RESUME UPLOAD: When prompted to upload a resume/CV:
+  * Look for the "Upload Resume" or "Choose File" button
+  * Click it to trigger the upload dialog
+  * The file "${uploadedFileName}" will be automatically uploaded
+  * The system has pre-loaded this file for you
+  * You don't need to browse or select - just click the upload button
+  * If LinkedIn shows existing resumes, you can ignore them - use the upload option` : ''}
+- Skip optional fields if they're complex, but fill required fields
+- If a form seems stuck, try scrolling up and down to find missing elements
 
 ${resumeContent ? `
 USER'S RESUME CONTENT FOR REFERENCE:
@@ -127,30 +209,27 @@ Use this resume information to:
 - Make informed decisions when answering screening questions
 ` : ''}
 
-${customInstructions ? `Additional Instructions: ${customInstructions}` : ''}
+🤖 DYNAMIC FIELD HANDLING:
+- For fields that are dynamic and you don't have specific information to input, make EDUCATED GUESSES
+- Use context clues from the job posting, company, and role to provide reasonable answers
+- Examples of educated guesses:
+  * Years of experience: Base on the job level (entry=1-2, mid=3-5, senior=5+)
+  * Salary expectations: Research typical ranges for the role/location
+  * Availability: Default to "2 weeks notice" or "Available immediately"
+  * Skills questions: Answer positively if it's related to the job title
+  * Certifications: Only claim if commonly associated with the role
+- NEVER leave required fields blank - always provide a reasonable guess
+- For yes/no questions about skills/experience, err on the side of confidence if it's job-relevant
+- For text fields asking "Why are you interested?", provide a brief, professional response based on the company/role
+
+${customInstructions ? `
+Additional Instructions: ${customInstructions}
+` : ''}
 
 PROGRESS TRACKING:
 - Keep count of how many applications you've submitted
 - Announce progress: "APPLICATION #X of ${targetCount} COMPLETED"
 - Continue until you reach exactly ${targetCount} applications
-
-CRITICAL APPLICATION TRACKING - YOU MUST DO THIS FOR EVERY APPLICATION:
-1. BEFORE clicking Easy Apply: 
-   - Extract the job URL from the browser address bar or the job posting
-   - Announce "APPLYING TO: [COMPANY NAME] - [JOB TITLE]"
-   - Also note the job URL for tracking
-
-2. BEFORE clicking Submit: 
-   - Announce "SUBMITTING APPLICATION TO: [COMPANY NAME] - [JOB TITLE]"
-   - Include the job URL if available
-
-IMPORTANT FORMAT RULES:
-- Use EXACT format: "APPLYING TO: Company - Job Title" (no quotes, dash separator)
-- Extract the REAL company name from the job posting (not "LinkedIn Company" or generic terms)
-- Extract the EXACT job title from the posting header
-- Company comes FIRST, then dash, then job title
-- Capture the job URL from the address bar when on the job details page
-- Example: "APPLYING TO: Google - Senior Software Engineer"
 
 IMPORTANT: 
 - ${applyToExternalJobs ? 'Apply through Easy Apply when available, or external sites if needed' : 'Use the Easy Apply feature only, skip jobs that require external applications'}

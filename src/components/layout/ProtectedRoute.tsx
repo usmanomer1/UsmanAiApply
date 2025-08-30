@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Bot, Sparkles } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import Onboarding from '../onboarding/Onboarding';
@@ -67,30 +66,19 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   if (loading || checkingOnboarding) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-gray-950 dark:to-gray-900 flex items-center justify-center">
         <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass-card p-8 md:p-10 text-center w-[90%] max-w-sm"
         >
-          <div className="relative mb-8">
-            <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto shadow-2xl">
-              <Bot className="w-10 h-10 text-white" />
-            </div>
-            <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-white" />
-            </div>
-          </div>
-          
           <motion.div
+            className="w-12 h-12 border-4 border-gray-200 border-t-[#23a972] rounded-full mx-auto mb-5"
             animate={{ rotate: 360 }}
-            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-            className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full mx-auto mb-6"
+            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
           />
-          
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Loading Jobotic</h2>
-          <p className="text-gray-600 dark:text-gray-300">Preparing your premium job search experience...</p>
-          
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Loading</h2>
+          <p className="text-gray-600 dark:text-gray-300 mt-1">Getting your dashboard ready…</p>
           {!isSupabaseConfigured() && (
             <div className="mt-4 text-sm text-amber-600 dark:text-amber-400">
               Database not configured
