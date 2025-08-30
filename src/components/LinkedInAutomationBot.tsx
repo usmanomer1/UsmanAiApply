@@ -299,13 +299,13 @@ const LinkedInAutomationBot: React.FC = () => {
   });
   
   // AI Model selection state
-  const [selectedModel, setSelectedModel] = useState<'gemini-2.5-flash' | 'gpt-4o' | 'claude-sonnet-4-20250514'>('gemini-2.5-flash');
+  const [selectedModel, setSelectedModel] = useState<'gemini-2.0-flash' | 'gpt-4o' | 'claude-sonnet-4-20250514'>('gpt-4o');
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
 
   // Model definitions with properties
   const AI_MODELS = {
-    'gemini-2.5-flash': {
-      name: 'Gemini 2.5 Flash',
+    'gemini-2.0-flash': {
+      name: 'Gemini 2.0 Flash',
       provider: 'Google',
       stepMultiplier: 1,
       requestLabel: '1x steps',
