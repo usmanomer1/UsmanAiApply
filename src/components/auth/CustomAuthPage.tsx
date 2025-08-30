@@ -8,6 +8,7 @@ import { getSubscriptionProducts } from '../../stripe-config';
 import toast from 'react-hot-toast';
 import Turnstile from 'react-turnstile';
 import { EmailVerificationError } from '../ui/EmailVerificationError';
+import { track } from '../../lib/analytics';
 
 type AuthMode = 'login' | 'signup' | 'forgot-password';
 type AuthStep = 'email' | 'password';
@@ -170,6 +171,7 @@ export const CustomAuthPage: React.FC = () => {
       const finalCaptchaToken = isCaptchaDisabled ? 'dev-bypass' : captchaToken;
       
       if (authMode === 'login') {
+        track('AUTH_SUBMIT_CLICKED', { mode: 'login' });
         await signIn(formData.email, formData.password, finalCaptchaToken);
         navigate(planParam ? '/billing' : '/dashboard');
       } else if (authMode === 'signup') {
@@ -177,6 +179,7 @@ export const CustomAuthPage: React.FC = () => {
           setMessage({ type: 'error', text: 'New registrations are temporarily disabled during maintenance.' });
           return;
         }
+        track('AUTH_SUBMIT_CLICKED', { mode: 'signup' });
         await signUp(formData.email, formData.password, formData.fullName, finalCaptchaToken);
         setMessage({ 
           type: 'success', 
@@ -247,6 +250,7 @@ export const CustomAuthPage: React.FC = () => {
     setMessage(null);
     
     try {
+      track('AUTH_GOOGLE_SIGN_IN_CLICKED');
       // Determine redirect URL based on plan parameter
       const redirectUrl = planParam 
         ? `${window.location.origin}/auth?plan=${planParam}`

@@ -176,6 +176,12 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
       setIsParsing(false);
       
       // Auto-advance after success
+      // Cache resume text locally so jobs page can use it immediately
+      try {
+        localStorage.setItem('resume_text_cache', text);
+      } catch (e) {
+        console.warn('Could not cache resume text after onboarding upload:', e);
+      }
       setTimeout(() => {
         setCurrentStep(3); // Go to personal details step
       }, 1500);

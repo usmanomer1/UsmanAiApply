@@ -29,6 +29,7 @@ import {
 } from '../../stripe-config';
 import toast from 'react-hot-toast';
 import { getUserUsage } from '../../lib/usageTracking';
+import { track } from '../../lib/analytics';
 
 interface UserSubscription {
   customer_id: string;
@@ -161,6 +162,13 @@ export const BillingPageOptimized: React.FC = () => {
         throw new Error('Product not found');
       }
 
+      track('CHECKOUT_INITIATED', {
+        price_id: priceId,
+        product_name: product.name,
+        mode: product.mode,
+        category: product.category,
+      });
+
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-checkout`, {
         method: 'POST',
         headers: {
@@ -200,6 +208,7 @@ export const BillingPageOptimized: React.FC = () => {
     }
 
     try {
+      track('BILLING_PORTAL_OPEN_CLICKED');
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {

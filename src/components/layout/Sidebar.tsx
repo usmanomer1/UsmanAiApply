@@ -24,7 +24,7 @@ const Sidebar: React.FC = () => {
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
   const [notifications, setNotifications] = useState(0);
-  const [userProfile, setUserProfile] = useState<{ full_name: string; email: string; resume_url?: string } | null>(null);
+  const [userProfile, setUserProfile] = useState<{ full_name: string; email: string; resume_url?: string; avatar_url?: string } | null>(null);
   const [hasResume, setHasResume] = useState(false);
 
   const handleLogout = async () => {
@@ -44,7 +44,7 @@ const Sidebar: React.FC = () => {
       
       const { data, error } = await supabase
         .from('profiles')
-        .select('full_name, email, resume_url')
+        .select('full_name, email, resume_url, avatar_url')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -243,10 +243,14 @@ const Sidebar: React.FC = () => {
         {/* User Profile */}
         <div className="p-3.5 border-t subtle-divider">
           <div className="flex items-center gap-3 px-2.5 py-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-teal-400 to-teal-600 rounded-full flex items-center justify-center shadow-sm">
-              <span className="text-white text-sm font-semibold">
-                {userProfile?.full_name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'U'}
-              </span>
+            <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center shadow-sm">
+              {userProfile?.avatar_url ? (
+                <img src={userProfile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-white text-sm font-semibold">
+                  {userProfile?.full_name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'U'}
+                </span>
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-900 truncate">

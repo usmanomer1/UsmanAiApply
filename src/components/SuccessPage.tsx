@@ -6,6 +6,7 @@ import { getProductByPriceId, formatPrice } from '../stripe-config';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
+import { track } from '../lib/analytics';
 
 export const SuccessPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -44,6 +45,12 @@ export const SuccessPage: React.FC = () => {
       });
     }
   }, [sessionId, priceId, type]);
+
+  useEffect(() => {
+    if (sessionId && priceId) {
+      track('CHECKOUT_SUCCESS', { session_id: sessionId, price_id: priceId });
+    }
+  }, [sessionId, priceId]);
 
   const getSuccessIcon = (type: string) => {
     switch (type) {
