@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { isSupabaseConfigured } from './supabase';
+import { track } from './analytics';
 
 export type UsageType = 
   | 'automation_steps'
@@ -91,6 +92,15 @@ export async function incrementUsage(
       return false;
     }
 
+    // Emit analytics based on usage type
+    if (usageType === 'job_search_match') {
+      track('JOB_SEARCH_RUN', metadata);
+    } else if (usageType === 'resume_optimization') {
+      track('RESUME_OPTIMIZATION_RUN', metadata);
+    } else if (usageType === 'cover_letter_generation') {
+      track('COVER_LETTER_RUN', metadata);
+    }
+
     return true;
   } catch (error) {
     console.error('Failed to increment usage:', error);
@@ -159,6 +169,15 @@ export async function trackAutomationSteps(
     if (error) {
       console.error('Error tracking automation steps:', error);
       return false;
+    }
+
+    // Emit analytics event for agent run status
+    if (status === 'running') {
+      track('AGENT_RUN_UPDATED', { task_id: taskId, step_count: stepCount });
+    } else if (status === 'completed') {
+      track('AGENT_RUN_COMPLETED', { task_id: taskId, step_count: stepCount });
+    } else if (status === 'failed') {
+      track('AGENT_RUN_FAILED', { task_id: taskId, step_count: stepCount });
     }
 
     // console.log('Successfully tracked automation steps:', data);

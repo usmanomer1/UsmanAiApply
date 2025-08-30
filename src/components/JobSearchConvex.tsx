@@ -65,6 +65,7 @@ const JobSearchConvex: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [location, setLocation] = useState('');
   const [resumeText, setResumeText] = useState('');
+  const [resumeLoading, setResumeLoading] = useState(true);
   const [sessionId, setSessionId] = useState<Id<"jobSearchSessions"> | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]); // Local state for streamed jobs
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
@@ -255,32 +256,39 @@ const JobSearchConvex: React.FC = () => {
   
   // Load resume on mount
   useEffect(() => {
+    let cancelled = false;
     const loadResume = async () => {
-      if (!user?.id) return;
-      
+      if (!user?.id) {
+        setResumeLoading(false);
+        return;
+      }
+      setResumeLoading(true);
       try {
-        // Try IndexedDB first for better performance
+        // Use cached resume first (populated by onboarding or profile upload)
         const cachedResume = localStorage.getItem('resume_text_cache');
         if (cachedResume) {
-          setResumeText(cachedResume);
+          if (!cancelled) setResumeText(cachedResume);
           return;
         }
-        
-        // Load from Supabase
-        const { data: profile } = await supabase
+        // Load latest profile row robustly
+        const { data: profiles, error } = await supabase
           .from('profiles')
           .select('resume_url')
           .eq('user_id', user.id)
-          .single();
-        
+          .order('created_at', { ascending: false })
+          .limit(1);
+        if (error) {
+          throw error;
+        }
+        const profile = profiles?.[0];
         if (profile?.resume_url) {
-          const { data: fileData } = await supabase.storage
+          const { data: fileData, error: dlErr } = await supabase.storage
             .from('resumes')
             .download(profile.resume_url);
-          
+          if (dlErr) throw dlErr;
           if (fileData) {
-            const text = await extractTextFromPDF(fileData);
-            setResumeText(text);
+            const text = await extractTextFromPDF(fileData as File);
+            if (!cancelled) setResumeText(text);
             // Cache for performance
             try {
               localStorage.setItem('resume_text_cache', text);
@@ -291,11 +299,13 @@ const JobSearchConvex: React.FC = () => {
         }
       } catch (error) {
         console.error('Error loading resume:', error);
-        toast.error('Please upload your resume to use job search');
+        // Don't toast immediately on first load after onboarding; the banner will guide
+      } finally {
+        if (!cancelled) setResumeLoading(false);
       }
     };
-    
     loadResume();
+    return () => { cancelled = true; };
   }, [user]);
   
   // Update liked/applied sets when interactions change
@@ -659,7 +669,7 @@ const JobSearchConvex: React.FC = () => {
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="glass-card p-6 hover:shadow-xl transition-shadow duration-300">
           {/* Resume Upload Alert */}
-          {!resumeText && (
+          {!resumeLoading && !resumeText && (
             <motion.div 
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}

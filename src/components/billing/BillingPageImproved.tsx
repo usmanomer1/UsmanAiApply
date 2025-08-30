@@ -20,6 +20,7 @@ import PricingSection3, { PricingPlan } from '../../components/ui/pricing-sectio
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '../ui';
 import { getBillingDataOptimized, clearUsageCache } from '../../lib/usageTrackingOptimized';
 import { UserUsage } from '../../lib/usageTracking';
+import { track } from '../../lib/analytics';
 
 interface UserSubscription {
   customer_id: string;
@@ -174,6 +175,24 @@ export const BillingPageImproved: React.FC = () => {
     };
   }, [fetchBillingData]);
 
+  // Track Stripe portal return and checkout cancel
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('canceled') === 'true') {
+        track('CHECKOUT_CANCELED');
+        // Clean URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+      const openedAt = sessionStorage.getItem('portal_open_at');
+      if (openedAt) {
+        const durationMs = Date.now() - parseInt(openedAt, 10);
+        track('BILLING_PORTAL_RETURNED', { durationMs });
+        sessionStorage.removeItem('portal_open_at');
+      }
+    } catch {}
+  }, []);
+
   const handleRefresh = async () => {
     await fetchBillingData(true);
   };
@@ -193,6 +212,13 @@ export const BillingPageImproved: React.FC = () => {
       if (!product) {
         throw new Error('Product not found');
       }
+
+      track('CHECKOUT_INITIATED', {
+        price_id: priceId,
+        product_name: product.name,
+        mode: product.mode,
+        category: product.category,
+      });
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-checkout`, {
         method: 'POST',
@@ -233,6 +259,7 @@ export const BillingPageImproved: React.FC = () => {
     }
 
     try {
+      track('BILLING_PORTAL_OPEN_CLICKED');
       // Get the user's session for authentication
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -270,6 +297,8 @@ export const BillingPageImproved: React.FC = () => {
       }
 
       if (data.url) {
+        // Mark the time before redirecting to portal
+        sessionStorage.setItem('portal_open_at', Date.now().toString());
         // Successfully got portal URL - redirect
         toast.success('Redirecting to billing portal...', { duration: 2000 });
         window.location.href = data.url;

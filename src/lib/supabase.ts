@@ -321,8 +321,23 @@ export const generateAvatarUrl = (userId: string): string => {
 export const uploadAvatar = async (userId: string, file: File): Promise<string | null> => {
   try {
     const fileExt = file.name.split('.').pop();
-    const fileName = `${userId}-${Date.now()}.${fileExt}`;
-    const filePath = `avatars/${fileName}`;
+    const fileName = `avatar-${Date.now()}.${fileExt}`;
+    // Use userId as folder to match storage policies
+    const filePath = `${userId}/${fileName}`;
+
+    // First, try to delete any existing avatars for this user
+    const { data: existingFiles } = await supabase.storage
+      .from('avatars')
+      .list(userId, {
+        limit: 10
+      });
+
+    if (existingFiles && existingFiles.length > 0) {
+      const filesToDelete = existingFiles.map(file => `${userId}/${file.name}`);
+      await supabase.storage
+        .from('avatars')
+        .remove(filesToDelete);
+    }
 
     const { error: uploadError } = await supabase.storage
       .from('avatars')
@@ -333,7 +348,25 @@ export const uploadAvatar = async (userId: string, file: File): Promise<string |
 
     if (uploadError) {
       console.error('Error uploading avatar:', uploadError);
-      return null;
+      // Try without folder structure as fallback
+      const simplePath = `${userId}-${Date.now()}.${fileExt}`;
+      const { error: fallbackError } = await supabase.storage
+        .from('avatars')
+        .upload(simplePath, file, {
+          upsert: true,
+          cacheControl: '3600'
+        });
+      
+      if (fallbackError) {
+        console.error('Fallback upload also failed:', fallbackError);
+        return null;
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(simplePath);
+      
+      return publicUrl;
     }
 
     const { data: { publicUrl } } = supabase.storage
@@ -394,14 +427,14 @@ export const uploadResume = async (file: File, userId: string): Promise<string |
     // console.log('Attempting to upload file:', fileName, 'size:', file.size);
     
     // Upload the new file with proper authentication
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('resumes')
       .upload(fileName, file, {
         upsert: true,
         cacheControl: '3600',
       });
 
-    // console.log('Upload response:', { uploadData, uploadError });
+    // console.log('Upload response:', { uploadError });
 
     if (uploadError) {
       console.error('Supabase upload error:', uploadError);

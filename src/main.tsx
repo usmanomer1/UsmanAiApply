@@ -4,6 +4,7 @@ import * as Sentry from '@sentry/react'
 import { browserTracingIntegration } from '@sentry/react'
 import { replayIntegration } from '@sentry/replay'
 import { ConvexProvider, ConvexReactClient } from 'convex/react'
+import { PostHogProvider } from 'posthog-js/react'
 import App from './App.tsx'
 import './index.css'
 import { supabase } from './lib/supabase.ts'
@@ -16,10 +17,10 @@ Sentry.init({
   dsn: "https://a999c9b7652cf69f708de66b5f3acd54@o4509578673258496.ingest.us.sentry.io/4509580186157056",
   integrations: [
     browserTracingIntegration(),
-    replayIntegration({
-      maskAllText: false,
-      blockAllMedia: false,
-    }),
+    // Turn Replay on by default; allow disabling via env
+    ...(import.meta.env.VITE_ENABLE_SENTRY_REPLAY === 'false'
+      ? []
+      : [replayIntegration({ maskAllText: false, blockAllMedia: false })])
   ],
   tracesSampleRate: 0.2,
   // Setting this option to true will send default PII data to Sentry.
@@ -170,6 +171,16 @@ if (typeof window !== "undefined") {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    {AppWithProviders}
+    <PostHogProvider
+      apiKey={import.meta.env.VITE_PUBLIC_POSTHOG_KEY}
+      options={{
+        api_host: import.meta.env.VITE_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com',
+        defaults: '2025-05-24',
+        capture_exceptions: true,
+        debug: import.meta.env.DEV,
+      }}
+    >
+      {AppWithProviders}
+    </PostHogProvider>
   </React.StrictMode>,
 )
