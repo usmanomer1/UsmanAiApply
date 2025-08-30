@@ -26,6 +26,7 @@ const Sidebar: React.FC = () => {
   const [notifications, setNotifications] = useState(0);
   const [userProfile, setUserProfile] = useState<{ full_name: string; email: string; resume_url?: string; avatar_url?: string } | null>(null);
   const [hasResume, setHasResume] = useState(false);
+  const [avatarTimestamp, setAvatarTimestamp] = useState(Date.now());
 
   const handleLogout = async () => {
     try {
@@ -79,13 +80,17 @@ const Sidebar: React.FC = () => {
           table: 'profiles',
           filter: `user_id=eq.${user?.id}`
         },
-        (payload) => {
+        async (payload) => {
           console.log('Profile updated, refreshing sidebar avatar:', payload);
           // Refresh the profile when it's updated (including avatar changes)
-          fetchProfile();
+          await fetchProfile();
+          // Force avatar re-render by updating timestamp
+          setAvatarTimestamp(Date.now());
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Sidebar profile subscription status:', status);
+      });
     
     return () => {
       profileSubscription.unsubscribe();
@@ -269,10 +274,10 @@ const Sidebar: React.FC = () => {
             <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center shadow-sm">
               {userProfile?.avatar_url ? (
                 <img 
-                  src={userProfile.avatar_url.includes('supabase') ? `${userProfile.avatar_url}?t=${Date.now()}` : userProfile.avatar_url} 
+                  src={userProfile.avatar_url.includes('supabase') ? `${userProfile.avatar_url}?t=${avatarTimestamp}` : userProfile.avatar_url} 
                   alt="Avatar" 
                   className="w-full h-full object-cover"
-                  key={userProfile.avatar_url} 
+                  key={`${userProfile.avatar_url}-${avatarTimestamp}`} 
                 />
               ) : (
                 <span className="text-white text-sm font-semibold">
