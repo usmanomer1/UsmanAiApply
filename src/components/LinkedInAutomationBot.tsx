@@ -299,20 +299,20 @@ const LinkedInAutomationBot: React.FC = () => {
   });
   
   // AI Model selection state
-  const [selectedModel, setSelectedModel] = useState<'gemini-2.5-pro' | 'gpt-4o' | 'claude-sonnet-4-20250514'>('gpt-4o');
+  const [selectedModel, setSelectedModel] = useState<'gpt-4.1-mini' | 'gpt-4o' | 'claude-sonnet-4-20250514'>('gpt-4o');
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
 
   // Model definitions with properties
   const AI_MODELS = {
-    'gemini-2.5-pro': {
-      name: 'Gemini 2.5 Pro',
-      provider: 'Google',
-      stepMultiplier: 3,
-      requestLabel: '3x steps',
-      speed: 'Fast',
-      description: 'Powerful model with advanced capabilities',
-      icon: '🚀',
-      color: 'from-blue-500 to-indigo-600'
+    'gpt-4.1-mini': {
+      name: 'GPT-4.1 Mini',
+      provider: 'OpenAI',
+      stepMultiplier: 1,
+      requestLabel: '1x steps',
+      speed: 'Fastest',
+      description: 'Lightweight and efficient model',
+      icon: '⚡',
+      color: 'from-blue-500 to-cyan-600'
     },
     'gpt-4o': {
       name: 'GPT-4o',
