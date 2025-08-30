@@ -67,6 +67,29 @@ const Sidebar: React.FC = () => {
     };
     
     fetchProfile();
+    
+    // Set up real-time subscription for profile updates (including avatar changes)
+    const profileSubscription = supabase
+      .channel('profile-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `user_id=eq.${user?.id}`
+        },
+        (payload) => {
+          console.log('Profile updated, refreshing sidebar avatar:', payload);
+          // Refresh the profile when it's updated (including avatar changes)
+          fetchProfile();
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      profileSubscription.unsubscribe();
+    };
   }, [user]);
 
   // Fetch unread notifications count
@@ -245,7 +268,12 @@ const Sidebar: React.FC = () => {
           <div className="flex items-center gap-3 px-2.5 py-2">
             <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center shadow-sm">
               {userProfile?.avatar_url ? (
-                <img src={userProfile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                <img 
+                  src={`${userProfile.avatar_url}?t=${Date.now()}`} 
+                  alt="Avatar" 
+                  className="w-full h-full object-cover"
+                  key={userProfile.avatar_url} 
+                />
               ) : (
                 <span className="text-white text-sm font-semibold">
                   {userProfile?.full_name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'U'}
