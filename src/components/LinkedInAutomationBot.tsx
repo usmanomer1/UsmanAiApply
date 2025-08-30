@@ -299,13 +299,13 @@ const LinkedInAutomationBot: React.FC = () => {
   });
   
   // AI Model selection state
-  const [selectedModel, setSelectedModel] = useState<'gemini-2.0-flash' | 'gpt-4.1' | 'claude-3-7-sonnet-20250219'>('gemini-2.0-flash');
+  const [selectedModel, setSelectedModel] = useState<'gemini-2.5-flash' | 'gpt-4o' | 'claude-4-sonnet'>('gemini-2.5-flash');
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
 
   // Model definitions with properties
   const AI_MODELS = {
-    'gemini-2.0-flash': {
-      name: 'Gemini 2.0 Flash',
+    'gemini-2.5-flash': {
+      name: 'Gemini 2.5 Flash',
       provider: 'Google',
       stepMultiplier: 1,
       requestLabel: '1x steps',
@@ -314,8 +314,8 @@ const LinkedInAutomationBot: React.FC = () => {
       icon: '🚀',
       color: 'from-blue-500 to-indigo-600'
     },
-    'gpt-4.1': {
-      name: 'GPT-4.1',
+    'gpt-4o': {
+      name: 'GPT-4o',
       provider: 'OpenAI',
       stepMultiplier: 3,
       requestLabel: '3x steps',
@@ -324,8 +324,8 @@ const LinkedInAutomationBot: React.FC = () => {
       icon: '🎯',
       color: 'from-emerald-500 to-teal-600'
     },
-    'claude-3-7-sonnet-20250219': {
-      name: 'Claude 3.7 Sonnet',
+    'claude-4-sonnet': {
+      name: 'Claude 4.0 Sonnet',
       provider: 'Anthropic',
       stepMultiplier: 3,
       requestLabel: '3x steps',
@@ -1936,10 +1936,11 @@ This is the #1 issue that needs to be fixed immediately.`;
       extractJobs: true,
       resumeContent: resumeContent || undefined,
       applyToExternalJobs: effectiveConfig.applyToExternalJobs,
-      uploadedFileName: uploadedFileNames.length > 0 ? uploadedFileNames[0] : undefined
+      uploadedFileName: uploadedFileNames.length > 0 ? uploadedFileNames[0] : undefined,
+      modelName: selectedModel // Pass the selected AI model
     };
 
-    addLog(`🚀 Starting LinkedIn automation with Browser-Use SDK`, 'success');
+    addLog(`🚀 Starting LinkedIn automation with Jobotic Agent`, 'success');
 
     console.log('Creating task with config:', {
       jobTitle: sdkConfig.jobTitle,

@@ -11,6 +11,79 @@ export interface BrowserUseConfig {
   resumeContent?: string;
   applyToExternalJobs?: boolean;
   uploadedFileName?: string;
+  // Additional config for URL building
+  locationId?: string;
+  remotePreference?: string;
+  experienceLevel?: string;
+  experience?: string;
+  jobType?: string;
+  datePosted?: string;
+  companySize?: string;
+  workType?: string;
+  modelName?: string; // AI model to use
+}
+
+// LinkedIn location ID mapping
+const LINKEDIN_LOCATIONS = {
+  'San Francisco Bay Area': '90000084',
+  'New York City': '90000070', 
+  'Los Angeles': '90000049',
+  'Chicago': '90000045',
+  'Boston': '90000024',
+  'Washington DC': '90000096',
+  'Seattle': '90000102',
+  'Austin': '90000023',
+  'Denver': '90000052',
+  'Atlanta': '90000001',
+  'Dallas': '90000051',
+  'Houston': '90000055',
+  'Philadelphia': '90000080',
+  'Phoenix': '90000081',
+  'San Diego': '90000086',
+  'Portland': '90000083',
+  'Miami': '90000068',
+  'Detroit': '90000053',
+  'Minneapolis': '90000069',
+  'Toronto': '100025096',
+  'Vancouver': '100083280',
+  'Montreal': '100073278',
+  'London': '100853491',
+  'Berlin': '102975707',
+  'Amsterdam': '102011674',
+  'Paris': '100985050',
+  'Munich': '100968856',
+  'Zurich': '100036621',
+  'Dublin': '100842717',
+  'Stockholm': '100086362',
+  'Singapore': '102454443',
+  'Hong Kong': '102817007',
+  'Tokyo': '101355337',
+  'Sydney': '105490917',
+  'Melbourne': '101452733',
+  'Dubai': '103588996',
+  'Tel Aviv': '101620260',
+  'Mumbai': '105214831',
+  'Bangalore': '109524677',
+  'Delhi': '102713980',
+  'Hyderabad': '104869687',
+  'Remote': '0'
+};
+
+// Work type mapping
+const WORK_TYPE_MAP = {
+  'Remote': '2',
+  'On-site': '1', 
+  'Hybrid': '3'
+};
+
+// Experience level mapping
+const EXPERIENCE_LEVEL_MAP = {
+  'Internship': '1',
+  'Entry level': '2',
+  'Associate': '3',
+  'Mid-Senior level': '4',
+  'Director': '5',
+  'Executive': '6'
 }
 
 export interface BrowserUseSession {
@@ -34,6 +107,120 @@ class BrowserUseSDK {
   constructor() {
     // Use Supabase Edge Functions URL
     this.baseUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
+  }
+
+  private buildLinkedInJobsURL(config: BrowserUseConfig): string {
+    const baseUrl = 'https://www.linkedin.com/jobs/search/';
+    const params = new URLSearchParams();
+    
+    // Essential LinkedIn parameters
+    if (!config.applyToExternalJobs) {
+      params.append('f_AL', 'true'); // Easy Apply filter only when not applying to external jobs
+    }
+    params.append('distance', '25'); // Search radius
+    params.append('origin', 'JOB_SEARCH_PAGE_KEYWORD_HISTORY'); // LinkedIn tracking
+    params.append('refresh', 'true'); // Fresh results
+    
+    // Job title/keywords
+    if (config.jobTitle) {
+      params.append('keywords', config.jobTitle);
+    } else {
+      params.append('keywords', 'Software Engineer'); // Default fallback
+    }
+    
+    // Location handling
+    const locationInput = config.location?.trim();
+    
+    if (locationInput && locationInput !== 'San Francisco Bay Area') {
+      const locationKey = Object.keys(LINKEDIN_LOCATIONS).find(key => 
+        key.toLowerCase() === locationInput.toLowerCase()
+      );
+      
+      if (locationKey) {
+        const locationId = LINKEDIN_LOCATIONS[locationKey as keyof typeof LINKEDIN_LOCATIONS];
+        if (locationId === 'remote' || locationId === '0') {
+          params.append('f_WT', '2');
+        } else {
+          params.append('geoId', locationId);
+        }
+      } else if (config.locationId && config.locationId.trim() !== '' && config.locationId !== '90000084') {
+        params.append('geoId', config.locationId.trim());
+      } else {
+        params.append('location', locationInput);
+      }
+    } else if (locationInput === 'San Francisco Bay Area' || !locationInput) {
+      params.append('geoId', '90000084');
+    }
+    
+    // Work type (Remote/On-site/Hybrid)
+    if (config.workType && config.workType !== 'any' && !params.has('f_WT')) {
+      const workType = WORK_TYPE_MAP[config.workType as keyof typeof WORK_TYPE_MAP];
+      if (workType) {
+        params.append('f_WT', workType);
+      }
+    } else if (config.remotePreference && config.remotePreference !== 'All' && !params.has('f_WT')) {
+      const workType = WORK_TYPE_MAP[config.remotePreference as keyof typeof WORK_TYPE_MAP];
+      if (workType) {
+        params.append('f_WT', workType);
+      }
+    }
+    
+    // Experience level
+    if (config.experienceLevel && config.experienceLevel !== 'any') {
+      const experienceLevel = EXPERIENCE_LEVEL_MAP[config.experienceLevel as keyof typeof EXPERIENCE_LEVEL_MAP];
+      if (experienceLevel) {
+        params.append('f_E', experienceLevel);
+      }
+    } else if (config.experience && config.experience !== 'All') {
+      const experienceLevel = EXPERIENCE_LEVEL_MAP[config.experience as keyof typeof EXPERIENCE_LEVEL_MAP];
+      if (experienceLevel) {
+        params.append('f_E', experienceLevel);
+      }
+    }
+    
+    // Job type (Full-time, Part-time, etc.)
+    if (config.jobType) {
+      const jobTypeMap: { [key: string]: string } = {
+        'Full-time': 'F',
+        'Part-time': 'P',
+        'Contract': 'C',
+        'Temporary': 'T',
+        'Volunteer': 'V',
+        'Internship': 'I'
+      };
+      const jobType = jobTypeMap[config.jobType];
+      if (jobType) {
+        params.append('f_JT', jobType);
+      }
+    }
+    
+    // Date posted
+    if (config.datePosted) {
+      if (config.datePosted.startsWith('r')) {
+        params.append('f_TPR', config.datePosted);
+      } else {
+        const dateMap: { [key: string]: string } = {
+          'Past 24 hours': 'r86400',
+          'Past week': 'r604800',
+          'Past month': 'r2592000'
+        };
+        if (dateMap[config.datePosted]) {
+          params.append('f_TPR', dateMap[config.datePosted]);
+        }
+      }
+    }
+    
+    // Company size
+    if (config.companySize) {
+      params.append('f_C', config.companySize);
+    }
+    
+    // Sort by most recent
+    params.append('sortBy', 'DD');
+    
+    const finalUrl = `${baseUrl}?${params.toString()}`;
+    
+    return finalUrl;
   }
 
   private async getAuthHeaders() {
@@ -60,6 +247,7 @@ class BrowserUseSDK {
       ...config,
       task,
       extractJobs: true,
+      modelName: config.modelName, // Pass the selected AI model
     };
     
     if (config.uploadedFileName) {
@@ -111,7 +299,7 @@ CRITICAL - LOGIN HANDLING:
    - After manual login, the automation will resume automatically
 
 STEP-BY-STEP PROCESS:
-1. Navigate directly to: https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(jobTitle)}&location=${encodeURIComponent(location)}&sortBy=DD
+1. Navigate directly to the job search URL: ${this.buildLinkedInJobsURL(config)}
 2. Wait 3-5 seconds for the page to fully load before proceeding
 3. Check if login is required - if you see any login modal or sign-in overlay, output "INTERVENTION:LOGIN_REQUIRED - Manual login needed"
 4. After login is complete and you're on the jobs page, look for the left sidebar with job listings
