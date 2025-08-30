@@ -269,7 +269,7 @@ const Sidebar: React.FC = () => {
             <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center shadow-sm">
               {userProfile?.avatar_url ? (
                 <img 
-                  src={`${userProfile.avatar_url}?t=${Date.now()}`} 
+                  src={userProfile.avatar_url.includes('supabase') ? `${userProfile.avatar_url}?t=${Date.now()}` : userProfile.avatar_url} 
                   alt="Avatar" 
                   className="w-full h-full object-cover"
                   key={userProfile.avatar_url} 
