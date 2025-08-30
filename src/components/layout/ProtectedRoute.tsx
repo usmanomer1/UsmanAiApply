@@ -99,14 +99,14 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return <Navigate to="/auth" replace />;
   }
 
+  // Check if user is on mobile immediately after authentication
+  if (isMobile) {
+    return <MobileRedirect />;
+  }
+
   // If user hasn't completed onboarding, show onboarding flow
   if (onboardingCompleted === false) {
     return <Onboarding onComplete={() => setOnboardingCompleted(true)} />;
-  }
-
-  // Check if user is on mobile after authentication and onboarding
-  if (isMobile) {
-    return <MobileRedirect />;
   }
 
   return <>{children}</>;
