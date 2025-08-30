@@ -299,7 +299,7 @@ const LinkedInAutomationBot: React.FC = () => {
   });
   
   // AI Model selection state
-  const [selectedModel, setSelectedModel] = useState<'gemini-2.5-flash' | 'gpt-4o' | 'claude-4-sonnet'>('gemini-2.5-flash');
+  const [selectedModel, setSelectedModel] = useState<'gemini-2.5-flash' | 'gpt-4o' | 'claude-sonnet-4-20250514'>('gemini-2.5-flash');
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
 
   // Model definitions with properties
@@ -324,8 +324,8 @@ const LinkedInAutomationBot: React.FC = () => {
       icon: '🎯',
       color: 'from-emerald-500 to-teal-600'
     },
-    'claude-4-sonnet': {
-      name: 'Claude 4.0 Sonnet',
+    'claude-sonnet-4-20250514': {
+      name: 'Claude 4 Sonnet',
       provider: 'Anthropic',
       stepMultiplier: 3,
       requestLabel: '3x steps',
