@@ -320,62 +320,71 @@ export const generateAvatarUrl = (userId: string): string => {
 // Helper to upload avatar to Supabase Storage
 export const uploadAvatar = async (userId: string, file: File): Promise<string | null> => {
   try {
-    const fileExt = file.name.split('.').pop();
+    console.log('Starting avatar upload for user:', userId);
+    console.log('File details:', { name: file.name, size: file.size, type: file.type });
+    
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
     const fileName = `avatar-${Date.now()}.${fileExt}`;
-    // Use userId as folder to match storage policies
-    const filePath = `${userId}/${fileName}`;
-
-    // First, try to delete any existing avatars for this user
-    const { data: existingFiles } = await supabase.storage
-      .from('avatars')
-      .list(userId, {
-        limit: 10
-      });
-
-    if (existingFiles && existingFiles.length > 0) {
-      const filesToDelete = existingFiles.map(file => `${userId}/${file.name}`);
-      await supabase.storage
-        .from('avatars')
-        .remove(filesToDelete);
-    }
+    
+    // Try simpler path first (more likely to work with policies)
+    const simplePath = `${userId}-${Date.now()}.${fileExt}`;
+    
+    console.log('Attempting upload with path:', simplePath);
 
     const { error: uploadError } = await supabase.storage
       .from('avatars')
-      .upload(filePath, file, {
+      .upload(simplePath, file, {
         upsert: true,
         cacheControl: '3600'
       });
 
     if (uploadError) {
-      console.error('Error uploading avatar:', uploadError);
-      // Try without folder structure as fallback
-      const simplePath = `${userId}-${Date.now()}.${fileExt}`;
+      console.error('Primary upload failed:', uploadError);
+      console.error('Error details:', {
+        message: uploadError.message,
+        name: uploadError.name,
+        cause: uploadError.cause
+      });
+      
+      // Try with folder structure as fallback
+      const folderPath = `${userId}/${fileName}`;
+      console.log('Trying fallback with folder path:', folderPath);
+      
       const { error: fallbackError } = await supabase.storage
         .from('avatars')
-        .upload(simplePath, file, {
+        .upload(folderPath, file, {
           upsert: true,
           cacheControl: '3600'
         });
       
       if (fallbackError) {
         console.error('Fallback upload also failed:', fallbackError);
+        console.error('Fallback error details:', {
+          message: fallbackError.message,
+          name: fallbackError.name,
+          cause: fallbackError.cause
+        });
         return null;
       }
 
+      console.log('Fallback upload successful');
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
-        .getPublicUrl(simplePath);
+        .getPublicUrl(folderPath);
       
+      console.log('Generated public URL:', publicUrl);
       return publicUrl;
     }
 
+    console.log('Primary upload successful');
     const { data: { publicUrl } } = supabase.storage
       .from('avatars')
-      .getPublicUrl(filePath);
+      .getPublicUrl(simplePath);
 
+    console.log('Generated public URL:', publicUrl);
     return publicUrl;
   } catch (error) {
-    console.error('Error in uploadAvatar:', error);
+    console.error('Unexpected error in uploadAvatar:', error);
     return null;
   }
 };
