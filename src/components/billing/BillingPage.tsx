@@ -1059,6 +1059,11 @@ This will create the default configuration needed for the billing portal to work
               </motion.div>
             )}
           </div>
+          <div className="text-center mt-4">
+            <a href="#" className="text-xs text-gray-500 hover:text-gray-700 underline focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#23a972] rounded">
+              See full limits
+            </a>
+          </div>
         )}
 
         {/* Plan Toggle */}
@@ -1111,9 +1116,29 @@ This will create the default configuration needed for the billing portal to work
               const isPriceValid = !product.priceId.startsWith('price_missing');
               const isFeatured = index === 1;
               const displayName = index === 0 ? 'Starter' : index === 1 ? 'Pro' : 'Max';
-              const badgeLabel = index === 0 ? 'FREE' : index === 1 ? 'PRO' : 'ADVANCE';
-              const badgeColor = index === 0 ? 'bg-gray-100 text-gray-700' : index === 1 ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700';
-              const badgeDot = index === 0 ? 'bg-emerald-400' : index === 1 ? 'bg-orange-500' : 'bg-emerald-500';
+              const price = Number(product.price || 0);
+              const priceInteger = Math.floor(price).toString();
+              const priceDecimals = (price % 1).toFixed(2).slice(1);
+              const usageBullets = displayName === 'Starter'
+                ? [
+                    { label: 'Up to ~40 applications / mo', tooltip: 'How many job applications your automations can submit monthly.' },
+                    { label: 'Basic agent run time', tooltip: 'How long the automation can run per session before stopping.' },
+                  ]
+                : displayName === 'Pro'
+                ? [
+                    { label: 'Extended limits (most users do 100–200 apps/mo)', tooltip: 'Typical monthly applications our Pro users complete.' },
+                    { label: '10× agent runtime vs Starter', tooltip: 'Significantly longer automation sessions before stopping.' },
+                  ]
+                : [
+                    { label: 'Highest limits (built for power users & small teams)', tooltip: 'Designed for heavy usage and small team workflows.' },
+                    { label: 'Unlimited background runs*', tooltip: 'Run automations in the background without timeboxing*.' },
+                  ];
+              const featureBullets = [
+                'Resume optimization',
+                'AI matching',
+                displayName === 'Starter' ? 'Email support' : displayName === 'Pro' ? 'Priority support' : 'Priority + Early access',
+              ];
+              const ctaLabel = displayName === 'Starter' ? 'Choose Starter' : displayName === 'Pro' ? 'Get Pro' : 'Upgrade to Max';
               
               return (
                 <motion.div
@@ -1130,7 +1155,7 @@ This will create the default configuration needed for the billing portal to work
                       animate={{ opacity: 1, scale: 1 }}
                       className="absolute -top-3 left-6 z-10"
                     >
-                      <div className="flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-xs font-medium rounded-full shadow-lg">
+                      <div className="flex items-center gap-1.5 px-3 py-1 bg-[#23a972] text-white text-xs font-medium rounded-full shadow-lg">
                         <span className="relative flex h-2 w-2">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
                           <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
@@ -1157,7 +1182,7 @@ This will create the default configuration needed for the billing portal to work
                   <div 
                     className={`
                       relative overflow-hidden rounded-2xl border 
-                      ${isFeatured ? 'bg-gradient-to-b from-gray-900 to-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-200'}
+                      ${isFeatured ? 'bg-gradient-to-b from-gray-900 to-gray-800 text-white border-gray-700 ring-1 ring-[#23a972]/30 shadow-[0_0_30px_rgba(35,169,114,0.12)] md:scale-[1.02]' : 'bg-white text-gray-900 border-gray-200'}
                       transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg
                       ${!isPriceValid ? 'opacity-60' : ''}
                       h-full min-h-[480px]
@@ -1180,35 +1205,38 @@ This will create the default configuration needed for the billing portal to work
                       {/* Plan Header */}
                       <div className="text-center mb-6">
                         <h3 className={`text-sm font-semibold mb-1 ${isFeatured ? 'text-white' : 'text-gray-900'}`}>{displayName} Plan</h3>
-                        <div className="flex items-baseline justify-center gap-2">
-                          <span className={`text-4xl font-bold ${isFeatured ? 'text-white' : 'text-gray-900'}`}>${product.price}</span>
-                          <span className={`text-xs font-medium ${isFeatured ? 'text-gray-300' : 'text-gray-500'}`}>/month</span>
+                        <div className="flex items-baseline justify-center gap-1">
+                          <span className={`text-4xl font-bold ${isFeatured ? 'text-white' : 'text-gray-900'}`}>${priceInteger}</span>
+                          <span className={`text-xl font-semibold ${isFeatured ? 'text-gray-300' : 'text-gray-500'}`}>{priceDecimals}</span>
+                          <span className={`text-xs font-medium ${isFeatured ? 'text-gray-300' : 'text-gray-500'}`}>
+                            /mo
+                          </span>
                         </div>
                       </div>
 
-                      {/* Minimal Features */}
+                      {/* Usage & Features groups with tooltips */}
                       <div className="mb-8 flex-grow">
-                        <ul className={`space-y-2 ${isFeatured ? 'text-gray-200' : 'text-gray-700'}`}>
-                          <li className="flex items-center justify-between text-sm">
-                            <span>Applications</span>
-                            <span className={`${isFeatured ? 'text-white' : 'text-gray-900'} font-medium`}>
-                              {(product.applicationCount ?? 0)}/mo
-                            </span>
-                          </li>
-                          <li className="flex items-center justify-between text-sm">
-                            <span>Agent steps</span>
-                            <span className={`${isFeatured ? 'text-white' : 'text-gray-900'} font-medium`}>
-                              {(((product.applicationCount ?? 0) * 10)).toLocaleString()}
-                            </span>
-                          </li>
-                          <li className="flex items-center justify-between text-sm">
-                            <span>AI tokens</span>
-                            <span className={`${isFeatured ? 'text-white' : 'text-gray-900'} font-medium`}>Unlimited</span>
-                          </li>
-                          <li className="text-sm">Resume optimization tools</li>
-                          <li className="text-sm">AI‑powered job matching</li>
-                          <li className="text-sm">{product.name.includes('Plus') ? 'Email support' : product.name.includes('Pro') ? 'Priority support' : 'Priority support + Early access'}</li>
-                        </ul>
+                        <div className="space-y-3">
+                          <div>
+                            <div className={`text-[11px] uppercase tracking-wide mb-2 ${isFeatured ? 'text-gray-400' : 'text-gray-500'}`}>Usage</div>
+                            <ul className={`space-y-2 ${isFeatured ? 'text-gray-200' : 'text-gray-700'}`}>
+                              {usageBullets.map((item, i) => (
+                                <li key={i} className="flex items-start text-sm">
+                                  <span>{item.label}</span>
+                                  <HelpCircle className={`ml-2 h-3.5 w-3.5 ${isFeatured ? 'text-gray-400' : 'text-gray-400'} hover:text-gray-600`} title={item.tooltip} aria-label={item.tooltip} />
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                          <div className="mt-4">
+                            <div className={`text-[11px] uppercase tracking-wide mb-2 ${isFeatured ? 'text-gray-400' : 'text-gray-500'}`}>Features</div>
+                            <ul className={`space-y-2 ${isFeatured ? 'text-gray-200' : 'text-gray-700'}`}>
+                              {featureBullets.map((text, i) => (
+                                <li key={i} className="text-sm">{text}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
                       </div>
 
                       {/* CTA Button */}
@@ -1216,7 +1244,7 @@ This will create the default configuration needed for the billing portal to work
                         onClick={() => handlePurchase(product.priceId)}
                         disabled={isCurrentPlan || purchasing === product.priceId || !isPriceValid}
                         className={`
-                          w-full py-3 px-6 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-teal-500
+                          w-full py-3 px-6 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#23a972]
                           flex items-center justify-center gap-2
                           ${
                             isCurrentPlan
@@ -1224,8 +1252,8 @@ This will create the default configuration needed for the billing portal to work
                               : !isPriceValid
                               ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                               : isFeatured
-                              ? 'bg-white text-gray-900 hover:bg-gray-100'
-                              : 'bg-gray-900 text-white hover:bg-black'
+                              ? 'bg-[#23a972] text-white hover:bg-[#1e9463]'
+                              : 'bg-white text-gray-900 hover:bg-gray-50 border border-gray-300'
                           }
                         `}
                       >
@@ -1243,11 +1271,14 @@ This will create the default configuration needed for the billing portal to work
                           <span>Coming Soon</span>
                         ) : (
                           <>
-                            <span>{isPopular ? 'Get Started' : 'Select Plan'}</span>
+                            <span>{ctaLabel}</span>
                             <ArrowRight className="w-4 h-4" />
                           </>
                         )}
                       </button>
+                      <div className={`mt-2 text-[11px] ${isFeatured ? 'text-gray-300' : 'text-gray-500'} text-center`}>
+                        Cancel anytime • No lock-in
+                      </div>
                     </div>
                   </div>
                 </motion.div>
