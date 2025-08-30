@@ -71,12 +71,12 @@ export const MobileRedirect: React.FC = () => {
             transition={{ delay: 0.4 }}
             className="text-center space-y-6"
           >
-            <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-              Desktop Experience Required
+            <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-red-400 via-orange-400 to-yellow-400 bg-clip-text text-transparent">
+              Not Optimized for Mobile
             </h1>
             
             <p className="text-gray-300 text-lg leading-relaxed">
-              Our AI job automation agent works best on desktop browsers for optimal performance and functionality.
+              This application requires a desktop browser. Mobile devices are not supported due to the complex automation features.
             </p>
 
             {/* Features grid */}
