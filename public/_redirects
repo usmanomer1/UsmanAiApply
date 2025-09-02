@@ -1,5 +1,8 @@
 # SPA Redirect Rules for Netlify
 # Handle client-side routing - serve index.html for all routes
+# Serve robots.txt directly (must come before catch-all)
+/robots.txt  /robots.txt  200
+
 /*    /index.html   200
  
 # API routes and assets should not be redirected

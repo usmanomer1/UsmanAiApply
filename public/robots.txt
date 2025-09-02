@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+
+# Disallow common non-content routes (uncomment if needed)
+# Disallow: /api/
+# Disallow: /_netlify/
+
+# Note: Ensure Netlify redirects do not rewrite this file to index.html
+
