@@ -356,3 +356,10 @@ h1, h2, h3, h4, h5, h6 {
   background-size: 200% 200%;
   animation: gradient 15s ease infinite;
 }
+
+/* Ensure chart tooltips are not clipped by parent overflow */
+.chart-container,
+.recharts-wrapper,
+.recharts-tooltip-wrapper {
+  overflow: visible !important;
+}
