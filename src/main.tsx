@@ -14,22 +14,35 @@ const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL || 'https:/
 
 // Initialize Sentry in both development and production
 Sentry.init({
-  dsn: "https://a999c9b7652cf69f708de66b5f3acd54@o4509578673258496.ingest.us.sentry.io/4509580186157056",
+  dsn: import.meta.env.VITE_SENTRY_DSN || "https://a999c9b7652cf69f708de66b5f3acd54@o4509578673258496.ingest.us.sentry.io/4509580186157056",
   integrations: [
     browserTracingIntegration(),
-    // Turn Replay on by default; allow disabling via env
+    // Session Replay
     ...(import.meta.env.VITE_ENABLE_SENTRY_REPLAY === 'false'
       ? []
-      : [replayIntegration({ maskAllText: false, blockAllMedia: false })])
+      : [
+          replayIntegration({
+            // Defaults: keep visible for debugging; adjust per privacy policy
+            maskAllText:
+              (import.meta.env.VITE_SENTRY_REPLAY_MASK_ALL_TEXT || 'false') === 'true',
+            blockAllMedia:
+              (import.meta.env.VITE_SENTRY_REPLAY_BLOCK_ALL_MEDIA || 'false') === 'true',
+          }),
+        ]),
   ],
-  tracesSampleRate: 0.2,
+  tracesSampleRate: Number(import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE || 0.2),
+  // Session Replay sampling
+  replaysSessionSampleRate: Number(
+    import.meta.env.VITE_SENTRY_REPLAYS_SESSION_SAMPLE_RATE || (import.meta.env.DEV ? 1.0 : 0.1)
+  ),
+  replaysOnErrorSampleRate: Number(
+    import.meta.env.VITE_SENTRY_REPLAYS_ON_ERROR_SAMPLE_RATE || 1.0
+  ),
   // Setting this option to true will send default PII data to Sentry.
-  sendDefaultPii: true,
-  // Enable debug mode in development
+  sendDefaultPii: (import.meta.env.VITE_SENTRY_SEND_DEFAULT_PII || 'true') === 'true',
   debug: import.meta.env.DEV,
-  // Set environment
-  environment: import.meta.env.DEV ? 'development' : 'production',
-  release: '2.0',
+  environment: import.meta.env.VITE_SENTRY_ENV || (import.meta.env.DEV ? 'development' : 'production'),
+  release: import.meta.env.VITE_APP_RELEASE || '2.0',
 });
 
 // Set user context from Supabase authentication
