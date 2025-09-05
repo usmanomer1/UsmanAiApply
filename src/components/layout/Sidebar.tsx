@@ -18,6 +18,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
+import { createSafeRealtimeSubscription } from '../../lib/realtimeUtils';
 
 const Sidebar: React.FC = () => {
   const location = useLocation();
@@ -69,28 +70,26 @@ const Sidebar: React.FC = () => {
     
     fetchProfile();
     
-    // Set up real-time subscription for profile updates (including avatar changes)
-    const profileSubscription = supabase
-      .channel('profile-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'profiles',
-          filter: `user_id=eq.${user?.id}`
-        },
-        async (payload) => {
-          console.log('Profile updated, refreshing sidebar avatar:', payload);
-          // Refresh the profile when it's updated (including avatar changes)
-          await fetchProfile();
-          // Force avatar re-render by updating timestamp
-          setAvatarTimestamp(Date.now());
-        }
-      )
-      .subscribe((status) => {
-        console.log('Sidebar profile subscription status:', status);
-      });
+    // Set up safe real-time subscription for profile updates (including avatar changes)
+    const profileSubscription = createSafeRealtimeSubscription({
+      channel: 'profile-changes',
+      table: 'profiles',
+      event: 'UPDATE',
+      filter: `user_id=eq.${user?.id}`,
+      onData: async (payload) => {
+        console.log('Profile updated, refreshing sidebar avatar:', payload);
+        // Refresh the profile when it's updated (including avatar changes)
+        await fetchProfile();
+        // Force avatar re-render by updating timestamp
+        setAvatarTimestamp(Date.now());
+      },
+      onError: (error) => {
+        console.warn('Profile subscription error:', error);
+      },
+      onStatusChange: (status) => {
+        console.log('Profile subscription status:', status);
+      }
+    });
     
     return () => {
       profileSubscription.unsubscribe();
@@ -119,26 +118,26 @@ const Sidebar: React.FC = () => {
     
     fetchNotifications();
     
-    // Commented out real-time subscription to avoid WebSocket errors
-    // const subscription = supabase
-    //   .channel('notifications')
-    //   .on(
-    //     'postgres_changes',
-    //     {
-    //       event: '*',
-    //       schema: 'public',
-    //       table: 'notifications',
-    //       filter: `user_id=eq.${user?.id}`
-    //     },
-    //     () => {
-    //       fetchNotifications();
-    //     }
-    //   )
-    //   .subscribe();
+    // Set up safe real-time subscription for notifications
+    const notificationSubscription = createSafeRealtimeSubscription({
+      channel: 'notifications',
+      table: 'notifications',
+      event: '*',
+      filter: `user_id=eq.${user?.id}`,
+      onData: () => {
+        fetchNotifications();
+      },
+      onError: (error) => {
+        console.warn('Notification subscription error:', error);
+      },
+      onStatusChange: (status) => {
+        console.log('Notification subscription status:', status);
+      }
+    });
     
-    // return () => {
-    //   subscription.unsubscribe();
-    // };
+    return () => {
+      notificationSubscription.unsubscribe();
+    };
   }, [user]);
 
   const navItems = [

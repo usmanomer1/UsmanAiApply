@@ -69,7 +69,7 @@ const originalConsoleWarn = console.warn;
 console.error = (...args) => {
   const message = args.join(' ');
   
-  // Suppress common extension-related errors
+  // Suppress common extension-related errors and browser compatibility issues
   if (
     message.includes('FrameDoesNotExistError') ||
     message.includes('ERR_FILE_NOT_FOUND') ||
@@ -78,10 +78,13 @@ console.error = (...args) => {
     message.includes('utils.js') ||
     message.includes('THREE.WebGLRenderer: Context Lost') ||
     message.includes('Script error for: chrome-extension://') ||
-    message.includes('Non-Error promise rejection captured') && message.includes('Frame')
+    message.includes('Non-Error promise rejection captured') && message.includes('Frame') ||
+    // Suppress Safari 15.6.1 WebSocket security errors
+    (message.includes('The operation is insecure') && message.includes('SecurityError')) ||
+    message.includes('SDK client is not available') // Supabase realtime client warning
   ) {
     // Log to debug console but don't show in main console
-    console.debug('Suppressed extension error:', ...args);
+    console.debug('Suppressed browser compatibility/extension error:', ...args);
     return;
   }
   
@@ -92,15 +95,20 @@ console.error = (...args) => {
 console.warn = (...args) => {
   const message = args.join(' ');
   
-  // Suppress common extension-related warnings
+  // Suppress common extension-related warnings and browser compatibility issues
   if (
     message.includes('FrameDoesNotExistError') ||
     message.includes('Failed to load resource: net::ERR_FILE_NOT_FOUND') ||
     message.includes('extensionState.js') ||
     message.includes('heuristicsRedefinitions.js') ||
-    message.includes('utils.js')
+    message.includes('utils.js') ||
+    // Suppress Safari 15.6.1 WebSocket compatibility warnings
+    message.includes('Safari 15.6.1 detected') ||
+    message.includes('Realtime features disabled') ||
+    message.includes('WebSocket creation failed') ||
+    message.includes('SDK client is not available')
   ) {
-    console.debug('Suppressed extension warning:', ...args);
+    console.debug('Suppressed browser compatibility/extension warning:', ...args);
     return;
   }
   
@@ -108,29 +116,38 @@ console.warn = (...args) => {
   originalConsoleWarn.apply(console, args);
 };
 
-// Handle uncaught errors that might be from extensions
+// Handle uncaught errors that might be from extensions or browser compatibility issues
 window.addEventListener('error', (event) => {
   if (
     event.error?.message?.includes('FrameDoesNotExistError') ||
     event.filename?.includes('chrome-extension://') ||
     event.filename?.includes('extensionState.js') ||
     event.filename?.includes('heuristicsRedefinitions.js') ||
-    event.filename?.includes('utils.js')
+    event.filename?.includes('utils.js') ||
+    // Handle Safari 15.6.1 WebSocket security errors
+    (event.error?.message?.includes('The operation is insecure') && 
+     event.error?.name === 'SecurityError')
   ) {
-    console.debug('Suppressed uncaught extension error:', event.error);
+    console.debug('Suppressed uncaught browser compatibility/extension error:', event.error);
     event.preventDefault();
     return false;
   }
 });
 
-// Handle unhandled promise rejections from extensions
+// Handle unhandled promise rejections from extensions and browser compatibility issues
 window.addEventListener('unhandledrejection', (event) => {
   if (
     event.reason?.message?.includes('FrameDoesNotExistError') ||
     event.reason?.toString?.().includes('Frame') &&
-    event.reason?.toString?.().includes('does not exist')
+    event.reason?.toString?.().includes('does not exist') ||
+    // Handle Safari 15.6.1 WebSocket security errors
+    (event.reason?.message?.includes('The operation is insecure') && 
+     event.reason?.name === 'SecurityError') ||
+    // Handle Supabase Realtime connection errors
+    event.reason?.message?.includes('WebSocket') ||
+    event.reason?.message?.includes('realtime')
   ) {
-    console.debug('Suppressed unhandled extension promise rejection:', event.reason);
+    console.debug('Suppressed unhandled browser compatibility/extension promise rejection:', event.reason);
     event.preventDefault();
     return false;
   }
