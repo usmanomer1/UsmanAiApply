@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "verify-deployment": "node scripts/verify-deployment.js",
+    "build:verify": "npm run build && npm run verify-deployment"
   },
   "dependencies": {
     "@convex-dev/auth": "^0.0.88",
