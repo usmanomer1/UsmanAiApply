@@ -10,16 +10,20 @@ import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import Sidebar from './components/layout/Sidebar';
 import { SuccessPage } from './components/SuccessPage';
 import BillingPageImproved from './components/billing/BillingPageImproved';
+import { LazyLoadErrorBoundary } from './components/ErrorBoundary';
+import { lazyWithRetry, retryOptions, createFallbackComponent } from './utils/lazyWithRetry';
+import LoadingFallback from './components/LoadingFallback';
+import DevTools from './components/DevTools';
 
-// Lazy-loaded heavy pages
-const ProfilePage = React.lazy(() => import('./components/ProfilePage'));
-const ResumePage = React.lazy(() => import('./components/ResumePage').then(m => ({ default: m.ResumePage })));
-const LinkedInAutomationBot = React.lazy(() => import('./components/LinkedInAutomationBot'));
-const JobSearchConvex = React.lazy(() => import('./components/JobSearchConvex'));
-const SettingsPage = React.lazy(() => import('./components/SettingsPage'));
-const MacOSDashboard = React.lazy(() => import('./components/MacOSDashboard'));
-const ApplicationsPage = React.lazy(() => import('./components/applications/ApplicationsPage'));
-const NotificationsPage = React.lazy(() => import('./components/NotificationsPage'));
+// Enhanced lazy-loaded pages with retry mechanism and fallbacks
+const ProfilePage = lazyWithRetry(() => import('./components/ProfilePage'), retryOptions.page);
+const ResumePage = lazyWithRetry(() => import('./components/ResumePage').then(m => ({ default: m.ResumePage })), retryOptions.page);
+const LinkedInAutomationBot = lazyWithRetry(() => import('./components/LinkedInAutomationBot'), retryOptions.page);
+const JobSearchConvex = lazyWithRetry(() => import('./components/JobSearchConvex'), retryOptions.page);
+const SettingsPage = lazyWithRetry(() => import('./components/SettingsPage'), retryOptions.page);
+const MacOSDashboard = lazyWithRetry(() => import('./components/MacOSDashboard'), retryOptions.dashboard);
+const ApplicationsPage = lazyWithRetry(() => import('./components/applications/ApplicationsPage'), retryOptions.page);
+const NotificationsPage = lazyWithRetry(() => import('./components/NotificationsPage'), retryOptions.page);
 
 function App() {
   return (
@@ -49,20 +53,22 @@ function App() {
                             }}
                           />
                           <div className="p-8 relative z-0">
-                            <Suspense fallback={<div />}> 
-                              <Routes>
-                                <Route path="/dashboard" element={<MacOSDashboard />} />
-                                <Route path="/jobs" element={<JobSearchConvex />} />
-                                <Route path="/applications" element={<ApplicationsPage />} />
-                                <Route path="/profile" element={<ProfilePage />} />
-                                <Route path="/auto-apply" element={<LinkedInAutomationBot />} />
-                                <Route path="/resume" element={<ResumePage />} />
-                                <Route path="/billing" element={<BillingPageImproved />} />
-                                <Route path="/notifications" element={<NotificationsPage />} />
-                                <Route path="/settings" element={<SettingsPage />} />
-                                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                              </Routes>
-                            </Suspense>
+                            <LazyLoadErrorBoundary retryable={true}>
+                              <Suspense fallback={<LoadingFallback />}> 
+                                <Routes>
+                                  <Route path="/dashboard" element={<MacOSDashboard />} />
+                                  <Route path="/jobs" element={<JobSearchConvex />} />
+                                  <Route path="/applications" element={<ApplicationsPage />} />
+                                  <Route path="/profile" element={<ProfilePage />} />
+                                  <Route path="/auto-apply" element={<LinkedInAutomationBot />} />
+                                  <Route path="/resume" element={<ResumePage />} />
+                                  <Route path="/billing" element={<BillingPageImproved />} />
+                                  <Route path="/notifications" element={<NotificationsPage />} />
+                                  <Route path="/settings" element={<SettingsPage />} />
+                                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                                </Routes>
+                              </Suspense>
+                            </LazyLoadErrorBoundary>
                           </div>
                         </main>
                       </div>
@@ -82,6 +88,7 @@ function App() {
                   },
                 }}
               />
+              <DevTools />
             </div>
           </Router>
         </ConvexAuthProvider>

@@ -35,5 +35,24 @@ export default defineConfig({
   build: {
     // Generate source maps for Sentry
     sourcemap: true,
+    // Improve chunk loading reliability
+    rollupOptions: {
+      output: {
+        // Ensure stable chunk names for better caching
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
+        // Split vendor libraries into separate chunks
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          ui: ['lucide-react', 'framer-motion', '@radix-ui/react-dialog'],
+          charts: ['recharts'],
+          supabase: ['@supabase/supabase-js'],
+          convex: ['convex']
+        }
+      }
+    },
+    // Increase chunk size warning limit to avoid unnecessary warnings
+    chunkSizeWarningLimit: 1000,
   },
 });
