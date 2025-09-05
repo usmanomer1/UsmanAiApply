@@ -62,6 +62,24 @@ const initializeUserContext = async () => {
 
 initializeUserContext()
 
+// Register service worker for better chunk loading reliability
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then((registration) => {
+        console.log('SW registered: ', registration);
+        
+        // Check for updates periodically
+        setInterval(() => {
+          registration.update();
+        }, 60000); // Check every minute
+      })
+      .catch((registrationError) => {
+        console.log('SW registration failed: ', registrationError);
+      });
+  });
+}
+
 // Suppress common browser extension errors to reduce console noise
 const originalConsoleError = console.error;
 const originalConsoleWarn = console.warn;
