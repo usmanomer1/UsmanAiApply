@@ -14,8 +14,57 @@ export const isSupabaseConfigured = (): boolean => {
   );
 };
 
+// Browser compatibility detection for WebSocket/Realtime features
+export const isRealtimeSupported = (): boolean => {
+  try {
+    // Check if WebSocket is available
+    if (typeof WebSocket === 'undefined') {
+      return false;
+    }
+
+    // Safari 15.6.1 specific detection and security check
+    const userAgent = navigator.userAgent;
+    if (userAgent.includes('Safari/') && userAgent.includes('Version/15.6.1')) {
+      console.warn('Safari 15.6.1 detected - Realtime features may be limited due to WebSocket security policies');
+      return false;
+    }
+
+    // Additional WebSocket security check
+    try {
+      // Attempt to create a test WebSocket connection (but don't actually connect)
+      const testWs = new WebSocket('wss://echo.websocket.org');
+      testWs.close();
+      return true;
+    } catch (error) {
+      console.warn('WebSocket creation failed:', error);
+      return false;
+    }
+  } catch (error) {
+    console.warn('WebSocket compatibility check failed:', error);
+    return false;
+  }
+};
+
+// Create Supabase client with fallback configuration for browser compatibility
+const createSupabaseClient = () => {
+  const options: any = {};
+  
+  // Disable realtime for incompatible browsers
+  if (!isRealtimeSupported()) {
+    console.warn('Realtime features disabled due to browser compatibility issues');
+    options.realtime = {
+      params: {
+        // Disable all realtime features
+        eventsPerSecond: 0,
+      }
+    };
+  }
+
+  return createClient(supabaseUrl, supabaseAnonKey, options);
+};
+
 // Create Supabase client - only if configured
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createSupabaseClient();
 
 // Environment validation helper for debugging
 export const getSupabaseConfig = () => {
