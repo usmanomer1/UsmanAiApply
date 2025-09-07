@@ -885,7 +885,7 @@ const ProfilePage: React.FC = () => {
 
               {/* Tab Content */}
               <div className="p-6">
-                <AnimatePresence mode="wait">
+                <AnimatePresence mode="wait" key="tab-content">
                   {activeTab === 'general' && (
                     <motion.div
                       key="general"
@@ -1591,12 +1591,13 @@ const ProfilePage: React.FC = () => {
             </div>
 
             {/* Sticky Save Bar */}
-            <AnimatePresence>
+            <AnimatePresence key="save-bar">
               {hasUnsavedChanges && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 20 }}
+                  transition={{ delay: 0.1 }}
                   className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-4 py-4 shadow-lg"
                 >
                   <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -1641,7 +1642,7 @@ const ProfilePage: React.FC = () => {
       </div>
 
       {/* Password Change Modal */}
-      <AnimatePresence>
+      <AnimatePresence key="password-modal">
         {showPasswordModal && (
           <motion.div
             initial={{ opacity: 0 }}
