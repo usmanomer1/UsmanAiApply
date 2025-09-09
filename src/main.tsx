@@ -62,6 +62,46 @@ const initializeUserContext = async () => {
 
 initializeUserContext()
 
+// ServiceWorker cleanup - Remove any previously registered service workers
+const cleanupServiceWorkers = async () => {
+  if ('serviceWorker' in navigator) {
+    try {
+      const registrations = await navigator.serviceWorker.getRegistrations()
+      
+      if (registrations.length > 0) {
+        console.log('Found existing ServiceWorker registrations, cleaning up...', registrations.length)
+        
+        for (const registration of registrations) {
+          try {
+            const success = await registration.unregister()
+            if (success) {
+              console.log('Successfully unregistered ServiceWorker:', registration.scope)
+            } else {
+              console.warn('Failed to unregister ServiceWorker:', registration.scope)
+            }
+          } catch (error) {
+            console.error('Error unregistering ServiceWorker:', registration.scope, error)
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error during ServiceWorker cleanup:', error)
+    }
+  }
+}
+
+// Listen for messages from the cleanup service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event.data?.type === 'UNREGISTER_SW') {
+      console.log('Received cleanup message from ServiceWorker:', event.data.message)
+    }
+  })
+}
+
+// Run cleanup
+cleanupServiceWorkers()
+
 // Suppress common browser extension errors to reduce console noise
 const originalConsoleError = console.error;
 const originalConsoleWarn = console.warn;
