@@ -62,26 +62,6 @@ const initializeUserContext = async () => {
 
 initializeUserContext()
 
-<<<<<<< HEAD
-// Register service worker for better chunk loading reliability
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then((registration) => {
-        console.log('SW registered: ', registration);
-        
-        // Check for updates periodically
-        setInterval(() => {
-          registration.update();
-        }, 60000); // Check every minute
-      })
-      .catch((registrationError) => {
-        console.log('SW registration failed: ', registrationError);
-      });
-  });
-}
-
-=======
 // ServiceWorker cleanup - Remove any previously registered service workers
 const cleanupServiceWorkers = async () => {
   if ('serviceWorker' in navigator) {
@@ -122,7 +102,6 @@ if ('serviceWorker' in navigator) {
 // Run cleanup
 cleanupServiceWorkers()
 
->>>>>>> pr-11
 // Suppress common browser extension errors to reduce console noise
 const originalConsoleError = console.error;
 const originalConsoleWarn = console.warn;
