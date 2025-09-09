@@ -4,6 +4,8 @@ import { Mail, AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from './button';
 import { Input } from './input';
 import { useAuth } from '../../contexts/AuthContext';
+import Turnstile from 'react-turnstile';
+import toast from 'react-hot-toast';
 
 interface EmailVerificationErrorProps {
   initialEmail?: string;
@@ -17,15 +19,23 @@ export const EmailVerificationError: React.FC<EmailVerificationErrorProps> = ({
   const [email, setEmail] = useState(initialEmail);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
   const { resendEmailVerification } = useAuth();
 
   const handleResend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
     
+    // Check captcha unless disabled in development
+    const isCaptchaDisabled = import.meta.env.VITE_DISABLE_CAPTCHA === 'true';
+    if (!isCaptchaDisabled && !captchaToken) {
+      toast.error('Please complete the CAPTCHA verification.');
+      return;
+    }
+    
     setLoading(true);
     try {
-      await resendEmailVerification(email);
+      await resendEmailVerification(email, captchaToken);
       setSuccess(true);
     } catch (error) {
       console.error('Failed to resend verification email:', error);
@@ -87,10 +97,21 @@ export const EmailVerificationError: React.FC<EmailVerificationErrorProps> = ({
               />
             </div>
             
+            {/* Captcha verification */}
+            {import.meta.env.VITE_DISABLE_CAPTCHA !== 'true' && (
+              <div className="flex justify-center py-2">
+                <Turnstile
+                  sitekey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+                  onSuccess={setCaptchaToken}
+                  onExpire={() => setCaptchaToken('')}
+                />
+              </div>
+            )}
+            
             <div className="flex gap-2">
               <Button
                 type="submit"
-                disabled={loading || !email.trim()}
+                disabled={loading || !email.trim() || (import.meta.env.VITE_DISABLE_CAPTCHA !== 'true' && !captchaToken)}
                 size="sm"
                 className="bg-amber-600 hover:bg-amber-700 text-white flex-1"
               >

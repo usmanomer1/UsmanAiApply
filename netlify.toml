@@ -30,13 +30,4 @@
     Cache-Control = "no-cache"
     Service-Worker-Allowed = "/"
 
-# Enable gzip compression for better performance
-[[headers]]
-  for = "*.js"
-  [headers.values]
-    Content-Encoding = "gzip"
-
-[[headers]]
-  for = "*.css"
-  [headers.values]
-    Content-Encoding = "gzip"
+# Netlify handles gzip compression automatically - no need to set Content-Encoding headers manually

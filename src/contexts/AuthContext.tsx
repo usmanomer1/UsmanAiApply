@@ -11,7 +11,7 @@ interface AuthContextType {
 	signIn: (email: string, password: string, captchaToken?: string) => Promise<void>;
 	signUp: (email: string, password: string, fullName: string, captchaToken?: string) => Promise<void>;
 	signOut: () => Promise<void>;
-	resendEmailVerification: (email: string) => Promise<void>;
+	resendEmailVerification: (email: string, captchaToken?: string) => Promise<void>;
 	changePassword: (newPassword: string) => Promise<void>;
 }
 
@@ -233,16 +233,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 		}
 	};
 
-	const resendEmailVerification = async (email: string) => {
+	const resendEmailVerification = async (email: string, captchaToken?: string) => {
 		try {
 			if (!isSupabaseConfigured()) {
 				toast.error('Authentication service not configured. Please check your environment variables.');
 				throw new Error('Supabase not configured');
 			}
 
+			// Skip CAPTCHA in development mode
+			const isCaptchaDisabled = import.meta.env.VITE_DISABLE_CAPTCHA === 'true';
+
 			const { error } = await supabase.auth.resend({
 				type: 'signup',
 				email: email,
+				options: (!isCaptchaDisabled && captchaToken) ? { captchaToken } : undefined,
 			});
 
 			if (error) {
