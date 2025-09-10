@@ -1,6 +1,36 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+// Normalize Supabase URL to ensure secure protocol when appropriate
+const normalizeSupabaseUrl = (rawUrl: string): string => {
+  if (!rawUrl) return '';
+  let url = rawUrl.trim();
+
+  // Remove any trailing slash to keep consistency
+  url = url.replace(/\/$/, '');
+
+  // If already https, return as-is
+  if (url.startsWith('https://')) return url;
+
+  // If explicitly http but we're on a secure origin or using Supabase-hosted domain, upgrade to https
+  const onSecureOrigin = typeof window !== 'undefined' && window.location?.protocol === 'https:';
+  const isSupabaseHosted = /\.supabase\.(co|in)/.test(url) || /supabase\.co/.test(url);
+
+  if (url.startsWith('http://') && (onSecureOrigin || isSupabaseHosted)) {
+    try {
+      const u = new URL(url);
+      u.protocol = 'https:';
+      return u.toString().replace(/\/$/, '');
+    } catch {
+      // Fallback: simple string replace
+      return ('https://' + url.slice('http://'.length)).replace(/\/$/, '');
+    }
+  }
+
+  return url;
+};
+
+const rawSupabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseUrl = normalizeSupabaseUrl(rawSupabaseUrl);
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 // Centralized Supabase configuration detection
@@ -9,7 +39,7 @@ export const isSupabaseConfigured = (): boolean => {
     supabaseUrl && 
     supabaseAnonKey && 
     supabaseUrl.startsWith('https://') &&
-    supabaseUrl.includes('.supabase.co') &&
+    (supabaseUrl.includes('.supabase.co') || supabaseUrl.includes('.supabase.in')) &&
     supabaseAnonKey.length > 50 // Supabase keys are typically longer
   );
 };
@@ -24,7 +54,9 @@ export const getSupabaseConfig = () => {
     hasKey: !!supabaseAnonKey,
     urlFormat: supabaseUrl.startsWith('https://') && supabaseUrl.includes('.supabase.co'),
     keyLength: supabaseAnonKey.length,
-    isConfigured: isSupabaseConfigured()
+    isConfigured: isSupabaseConfigured(),
+    normalizedUrl: supabaseUrl,
+    rawUrl: rawSupabaseUrl
   };
 };
 

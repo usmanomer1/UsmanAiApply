@@ -8,6 +8,7 @@ import CustomAuthPage from './components/auth/CustomAuthPage';
 import PasswordResetPage from './components/auth/PasswordResetPage';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import Sidebar from './components/layout/Sidebar';
+import WebSocketErrorBoundary from './components/common/WebSocketErrorBoundary';
 import { SuccessPage } from './components/SuccessPage';
 import BillingPageImproved from './components/billing/BillingPageImproved';
 import { LazyLoadErrorBoundary } from './components/ErrorBoundary';
@@ -41,7 +42,9 @@ function App() {
                   element={
                     <ProtectedRoute>
                       <div className="flex">
-                        <Sidebar />
+                        <WebSocketErrorBoundary>
+                          <Sidebar />
+                        </WebSocketErrorBoundary>
                         <main className="flex-1 ml-[240px]">
                           {/* Subtle global background accents */}
                           <div
