@@ -13,11 +13,14 @@ import {
   Mail,
   CreditCard,
   FolderOpen,
-  Code
+  Code,
+  AlertTriangle,
+  X
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
+import { isSafari, retryWithExponentialBackoff, debounce } from '../../lib/utils';
 
 const Sidebar: React.FC = () => {
   const location = useLocation();
@@ -27,6 +30,8 @@ const Sidebar: React.FC = () => {
   const [userProfile, setUserProfile] = useState<{ full_name: string; email: string; resume_url?: string; avatar_url?: string } | null>(null);
   const [hasResume, setHasResume] = useState(false);
   const [avatarTimestamp, setAvatarTimestamp] = useState(Date.now());
+  const [realtimeError, setRealtimeError] = useState<string | null>(null);
+  const [subscriptionRetries, setSubscriptionRetries] = useState(0);
 
   const handleLogout = async () => {
     try {
@@ -69,33 +74,109 @@ const Sidebar: React.FC = () => {
     
     fetchProfile();
     
-    // Set up real-time subscription for profile updates (including avatar changes)
-    const profileSubscription = supabase
-      .channel('profile-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'profiles',
-          filter: `user_id=eq.${user?.id}`
-        },
-        async (payload) => {
-          console.log('Profile updated, refreshing sidebar avatar:', payload);
-          // Refresh the profile when it's updated (including avatar changes)
-          await fetchProfile();
-          // Force avatar re-render by updating timestamp
-          setAvatarTimestamp(Date.now());
+    // Set up real-time subscription for profile updates with Safari safety and retry logic
+    const setupProfileSubscription = async () => {
+      try {
+        // Check if we're on Safari and have had multiple failures
+        if (isSafari() && subscriptionRetries >= 3) {
+          console.warn('Skipping realtime subscription on Safari due to repeated failures');
+          setRealtimeError('Realtime updates disabled on Safari for stability');
+          return null;
         }
-      )
-      .subscribe((status) => {
-        console.log('Sidebar profile subscription status:', status);
-      });
+
+        // Use retry logic for non-Safari browsers or initial Safari attempts
+        const subscribeWithRetry = () => {
+          return new Promise((resolve, reject) => {
+            try {
+              const profileSubscription = supabase
+                .channel('profile-changes')
+                .on(
+                  'postgres_changes',
+                  {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'profiles',
+                    filter: `user_id=eq.${user?.id}`
+                  },
+                  async (payload) => {
+                    console.log('Profile updated, refreshing sidebar avatar:', payload);
+                    // Refresh the profile when it's updated (including avatar changes)
+                    await fetchProfile();
+                    // Force avatar re-render by updating timestamp
+                    setAvatarTimestamp(Date.now());
+                  }
+                )
+                .subscribe((status) => {
+                  console.log('Sidebar profile subscription status:', status);
+                  
+                  if (status === 'SUBSCRIBED') {
+                    setRealtimeError(null);
+                    setSubscriptionRetries(0);
+                    resolve(profileSubscription);
+                  } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                    console.warn('Realtime subscription failed:', status);
+                    reject(new Error(`Subscription failed with status: ${status}`));
+                  }
+                });
+                
+              // Set a timeout for subscription
+              setTimeout(() => {
+                reject(new Error('Subscription timeout'));
+              }, 10000);
+              
+            } catch (error) {
+              reject(error);
+            }
+          });
+        };
+
+        // For Safari, don't use retry logic to avoid repeated failures
+        if (isSafari()) {
+          try {
+            return await subscribeWithRetry();
+          } catch (error) {
+            console.warn('Safari realtime subscription failed:', error);
+            setSubscriptionRetries(prev => prev + 1);
+            setRealtimeError('Realtime updates unavailable on Safari');
+            return null;
+          }
+        } else {
+          // For other browsers, use retry with exponential backoff
+          return await retryWithExponentialBackoff(
+            subscribeWithRetry,
+            3, // max retries
+            1000, // base delay
+            5000 // max delay
+          );
+        }
+          
+      } catch (error) {
+        console.warn('Failed to set up realtime subscription:', error);
+        setSubscriptionRetries(prev => prev + 1);
+        
+        if (isSafari()) {
+          setRealtimeError('Realtime updates unavailable on Safari');
+        } else {
+          setRealtimeError('Failed to connect to realtime updates');
+        }
+        
+        return null;
+      }
+    };
+
+    let profileSubscription: any = null;
+    
+    // Debounce the subscription setup to avoid rapid retries
+    const debouncedSetup = debounce(async () => {
+      profileSubscription = await setupProfileSubscription();
+    }, 1000);
+    
+    debouncedSetup();
     
     return () => {
-      profileSubscription.unsubscribe();
+      profileSubscription?.unsubscribe();
     };
-  }, [user]);
+  }, [user, subscriptionRetries]);
 
   // Fetch unread notifications count
   useEffect(() => {
@@ -236,6 +317,26 @@ const Sidebar: React.FC = () => {
           })}
         </ul>
       </nav>
+
+      {/* Realtime Error Notification */}
+      {realtimeError && (
+        <div className="mx-3.5 mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-amber-800">Connection Issue</p>
+              <p className="text-xs text-amber-700 mt-0.5">{realtimeError}</p>
+            </div>
+            <button
+              onClick={() => setRealtimeError(null)}
+              className="text-amber-600 hover:text-amber-800 p-0.5"
+              title="Dismiss"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Bottom Section */}
       <div className="border-t border-gray-100">
