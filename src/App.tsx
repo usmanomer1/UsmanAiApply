@@ -10,9 +10,9 @@ import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import Sidebar from './components/layout/Sidebar';
 import { SuccessPage } from './components/SuccessPage';
 import BillingPageImproved from './components/billing/BillingPageImproved';
+import ProfilePage from './components/ProfilePage';
 
 // Lazy-loaded heavy pages
-const ProfilePage = React.lazy(() => import('./components/ProfilePage'));
 const ResumePage = React.lazy(() => import('./components/ResumePage').then(m => ({ default: m.ResumePage })));
 const LinkedInAutomationBot = React.lazy(() => import('./components/LinkedInAutomationBot'));
 const JobSearchConvex = React.lazy(() => import('./components/JobSearchConvex'));
