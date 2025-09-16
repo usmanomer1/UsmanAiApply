@@ -5,6 +5,7 @@ import { browserTracingIntegration } from '@sentry/react'
 import { replayIntegration } from '@sentry/replay'
 import { ConvexProvider, ConvexReactClient } from 'convex/react'
 import { PostHogProvider } from 'posthog-js/react'
+import { BrowserRouter } from 'react-router-dom'
 import App from './App.tsx'
 import './index.css'
 import { supabase } from './lib/supabase.ts'
@@ -163,11 +164,13 @@ const SentryFallback = ({ error, resetError }: { error: unknown; componentStack:
 
 // Wrap App component with Sentry Error Boundary and Convex Provider
 const AppWithProviders = (
-  <ConvexProvider client={convex}>
-    <Sentry.ErrorBoundary fallback={SentryFallback} showDialog>
-      <App />
-    </Sentry.ErrorBoundary>
-  </ConvexProvider>
+  <BrowserRouter>
+    <ConvexProvider client={convex}>
+      <Sentry.ErrorBoundary fallback={SentryFallback} showDialog>
+        <App />
+      </Sentry.ErrorBoundary>
+    </ConvexProvider>
+  </BrowserRouter>
 );
 
 // Add Sentry to window type for TypeScript
